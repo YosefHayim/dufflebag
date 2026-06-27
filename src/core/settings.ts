@@ -13,7 +13,7 @@
 import { existsSync, readFileSync, writeFileSync, copyFileSync } from "node:fs";
 
 import { ENV_PREFIX } from "./env-config.js";
-import { PATH_MARKER, backupPath } from "./paths.js";
+import { backupPath, isBagCommand } from "./paths.js";
 import type { HookEvent } from "./types.js";
 
 /** A `{ type: "command", command }` leaf inside a matcher group. */
@@ -48,8 +48,6 @@ export interface RenderedHook {
 }
 
 const clone = <T>(value: T): T => structuredClone(value);
-
-const isBagCommand = (command: string): boolean => command.includes(PATH_MARKER);
 
 /**
  * Strip every bag-owned hook from a settings object: drop marker commands, then

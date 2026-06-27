@@ -18,21 +18,13 @@ import { readFileSync, writeSync } from "node:fs";
 import path from "node:path";
 
 import { readConfig } from "./lib/config.js";
+import { allow, emit } from "./lib/io.js";
 import { exists, guardFlag, GUARD_STATE_DIR, isArmed, KILL_SWITCH, loopFile, remove, writeText } from "./lib/state.js";
 import { readOccupancy, resolveTranscript, windowFor, type HookInput } from "./lib/transcript.js";
 
 const WRITE_TOOLS = new Set(["Write", "Edit", "MultiEdit", "NotebookEdit"]);
 
-/** Exit silently, permitting the tool call. Also the fail-open path. */
-const allow = (): never => process.exit(0);
-
 const pctText = (pct: number): string => `${Math.round(pct * 100)}%`;
-
-/** Write JSON to stdout synchronously — a hook must flush before exit (a pipe drops buffered async writes). */
-const emit = (payload: unknown): never => {
-  writeSync(1, JSON.stringify(payload));
-  process.exit(0);
-};
 
 /** True if an edit targets the /handoff resume doc (handoff*.md) — always allowed through. */
 function isHandoffTarget(toolInput: Record<string, unknown> | undefined): boolean {

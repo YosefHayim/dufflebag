@@ -23,6 +23,12 @@ export const INSTALL_DIR_NAME = "skills-bag";
 /** Substring fingerprint used to recognize bag-owned hook commands during uninstall. */
 export const PATH_MARKER = `/${INSTALL_DIR_NAME}/`;
 
+/** True when a settings/hook command string is bag-owned (contains the path marker). */
+export const isBagCommand = (command: string): boolean => command.includes(PATH_MARKER);
+
+/** Filesystem-safe ISO timestamp (`:`/`.` → `-`), used for backup filenames. */
+export const stamp = (): string => new Date().toISOString().replace(/[:.]/g, "-");
+
 /** Resolved absolute paths for a given scope. */
 export interface Layout {
   scope: Scope;

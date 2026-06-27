@@ -9,7 +9,7 @@
  * is what guarantees the written keys and the read keys can never drift.
  */
 
-import type { BagConfig } from "../../core/types.js";
+import type { BagConfig, DedupMode } from "../../core/types.js";
 
 /** Prefix marking every key this tool owns in settings.json `env`. */
 export const ENV_PREFIX = "SKILLS_BAG_";
@@ -24,7 +24,23 @@ export const ENV_KEYS = {
   idleSeconds: "SKILLS_BAG_IDLE_SECONDS",
   ttsVoice: "SKILLS_BAG_TTS_VOICE",
   ttsRate: "SKILLS_BAG_TTS_RATE",
+  dedupMode: "SKILLS_BAG_DEDUP_MODE",
+  dedupSkip: "SKILLS_BAG_DEDUP_SKIP",
 } as const satisfies Record<keyof BagConfig, string>;
+
+/** Valid dedup-guard enforcement levels; anything else coerces to the `deny` default. */
+export const DEDUP_MODES: readonly DedupMode[] = ["deny", "warn", "off"];
+
+/** Type guard: is `value` a valid {@link DedupMode}? (cast-free narrowing via `.some`). */
+export function isDedupMode(value: string): value is DedupMode {
+  return DEDUP_MODES.some((mode) => mode === value);
+}
+
+/** Narrow an arbitrary env string to a {@link DedupMode}, defaulting to `deny`. */
+export function parseDedupMode(raw: string | undefined): DedupMode {
+  const value = (raw ?? "").trim().toLowerCase();
+  return isDedupMode(value) ? value : "deny";
+}
 
 /**
  * Built-in defaults, carried over verbatim from the original Python hooks so
@@ -40,6 +56,8 @@ export const DEFAULTS: BagConfig = {
   idleSeconds: 8,
   ttsVoice: "Samantha",
   ttsRate: 230,
+  dedupMode: "deny",
+  dedupSkip: "",
 };
 
 /** Coerce a string env value to a finite number, or null if unparseable/empty. */
@@ -61,5 +79,7 @@ export function readConfig(env: Record<string, string | undefined> = process.env
     idleSeconds: num(ENV_KEYS.idleSeconds, DEFAULTS.idleSeconds),
     ttsVoice: env[ENV_KEYS.ttsVoice] ?? DEFAULTS.ttsVoice,
     ttsRate: num(ENV_KEYS.ttsRate, DEFAULTS.ttsRate),
+    dedupMode: parseDedupMode(env[ENV_KEYS.dedupMode]),
+    dedupSkip: env[ENV_KEYS.dedupSkip] ?? DEFAULTS.dedupSkip,
   };
 }

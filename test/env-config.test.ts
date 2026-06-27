@@ -51,3 +51,36 @@ describe("env round-trip", () => {
     expect(fromEnvMap({ SKILLS_BAG_HARD_CAP: "abc" }).hardCap).toBe(DEFAULTS.hardCap);
   });
 });
+
+describe("dedup config", () => {
+  it("accepts the three valid modes and rejects anything else", () => {
+    expect(validateConfig({ dedupMode: "warn" })).toEqual({ dedupMode: "warn" });
+    expect(validateConfig({ dedupMode: "OFF" })).toEqual({ dedupMode: "off" }); // case-insensitive
+    expect(() => validateConfig({ dedupMode: "loud" })).toThrow(/Invalid dedup mode/);
+  });
+
+  it("keeps the skip list as a free string", () => {
+    expect(validateConfig({ dedupSkip: "templates, fixtures" })).toEqual({ dedupSkip: "templates, fixtures" });
+  });
+
+  it("round-trips mode + skip through the env map", () => {
+    expect(toEnvMap({ dedupMode: "deny", dedupSkip: "templates" })).toEqual({
+      SKILLS_BAG_DEDUP_MODE: "deny",
+      SKILLS_BAG_DEDUP_SKIP: "templates",
+    });
+  });
+
+  it("omits an empty skip list rather than writing a noise key", () => {
+    expect(toEnvMap({ dedupSkip: "" })).toEqual({});
+  });
+
+  it("defaults dedup mode to deny and skip to empty when unset", () => {
+    const cfg = fromEnvMap({});
+    expect(cfg.dedupMode).toBe("deny");
+    expect(cfg.dedupSkip).toBe("");
+  });
+
+  it("coerces an unknown env mode back to the safe deny default", () => {
+    expect(fromEnvMap({ SKILLS_BAG_DEDUP_MODE: "bogus" }).dedupMode).toBe("deny");
+  });
+});

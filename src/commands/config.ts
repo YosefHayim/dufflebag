@@ -9,12 +9,10 @@
  */
 
 import { fromEnvMap, toEnvMap, validateConfig, ENV_KEYS } from "../core/env-config.js";
-import { resolveLayout } from "../core/paths.js";
+import { resolveLayout, stamp } from "../core/paths.js";
 import { backupSettings, mergeEnv, readSettings, writeSettings } from "../core/settings.js";
 import { c, intro, note, outro, step, success, warn } from "../core/ui.js";
 import type { BagConfig, Scope } from "../core/types.js";
-
-const stamp = (): string => new Date().toISOString().replace(/[:.]/g, "-");
 
 const LABELS: Record<keyof BagConfig, string> = {
   warnPct: "warn %      (nudge /handoff)",
@@ -25,6 +23,8 @@ const LABELS: Record<keyof BagConfig, string> = {
   idleSeconds: "idle (s)    (daemon)",
   ttsVoice: "tts voice",
   ttsRate: "tts rate    (wpm)",
+  dedupMode: "dedup mode  (deny|warn|off)",
+  dedupSkip: "dedup skip  (extra dirs)",
 };
 
 export function config(opts: { scope: Scope; patch: Partial<BagConfig>; projectRoot?: string }): void {

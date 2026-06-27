@@ -8,10 +8,10 @@
  * rendering a config patch back to the `SKILLS_BAG_*` string map.
  */
 
-import { DEFAULTS, ENV_KEYS, ENV_PREFIX, parseNumber, readConfig } from "../hooks/lib/config.js";
+import { DEDUP_MODES, DEFAULTS, ENV_KEYS, ENV_PREFIX, isDedupMode, parseNumber, readConfig } from "../hooks/lib/config.js";
 import type { BagConfig } from "./types.js";
 
-export { DEFAULTS, ENV_KEYS, ENV_PREFIX, parseNumber };
+export { DEDUP_MODES, DEFAULTS, ENV_KEYS, ENV_PREFIX, isDedupMode, parseNumber };
 
 /** Read the effective config out of a settings.json `env` map, falling back to defaults. */
 export const fromEnvMap = (env: Record<string, string> | undefined): BagConfig => readConfig(env ?? {});
@@ -42,6 +42,18 @@ export function validateConfig(patch: Partial<BagConfig>): Partial<BagConfig> {
       out.ttsVoice = String(value);
       continue;
     }
+    if (key === "dedupMode") {
+      const mode = String(value).trim().toLowerCase();
+      if (!isDedupMode(mode)) {
+        throw new Error(`Invalid dedup mode: ${String(value)} (expected one of ${DEDUP_MODES.join(", ")})`);
+      }
+      out.dedupMode = mode;
+      continue;
+    }
+    if (key === "dedupSkip") {
+      out.dedupSkip = String(value);
+      continue;
+    }
     const num = typeof value === "number" ? value : Number(value);
     if (!Number.isFinite(num)) throw new Error(`Invalid value for ${key}: ${String(value)} (expected a number)`);
     const bound = BOUNDS[key as keyof typeof BOUNDS];
@@ -58,7 +70,8 @@ export function toEnvMap(patch: Partial<BagConfig>): Record<string, string> {
   const env: Record<string, string> = {};
   for (const [key, name] of Object.entries(ENV_KEYS) as [keyof BagConfig, string][]) {
     const value = patch[key];
-    if (value != null) env[name] = String(value);
+    // Skip empty strings (e.g. the default empty dedupSkip) so we don't write noise keys.
+    if (value != null && value !== "") env[name] = String(value);
   }
   return env;
 }
