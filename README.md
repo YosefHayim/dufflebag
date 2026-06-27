@@ -1,6 +1,6 @@
 # skills-bag
 
-> A one-command installer for a personal bag of [Claude Code](https://claude.com/claude-code) skills and hooks — a context guardrail, a hands-free autonomous-compact loop, and macOS text-to-speech. Pure TypeScript, Node-only, **no Python**.
+> A one-command installer for a personal bag of [Claude Code](https://claude.com/claude-code) skills and hooks — a context guardrail, a DRY dedup-guard, a hands-free autonomous-compact loop, macOS text-to-speech, and a PNG → pixel-perfect-code skill. Pure TypeScript, Node-only, **no Python**.
 
 ```bash
 npx skills-bag install
@@ -18,6 +18,7 @@ npx skills-bag install
 | **dedup-guard** | Blocks a Write/Edit that pastes a function body or `interface`/`type` shape already defined elsewhere in the repo — DRY enforced at the moment of the write, using an AST fingerprint over the repo's own TypeScript. Deny by default; tunable `warn`/`off`. Also wires Cursor (warn) + an AGENTS.md rule for Codex, and ships a `dedup check` CI gate. | 🟢 any OS · needs the repo's TypeScript |
 | **autonomous-loop** (`/autorun` `/autostop` `/autoexit`) | A background daemon that, once armed, auto-`/compact`s and resumes your work hands-free each time context nears the guardrail and a fresh handoff exists — until a cycle budget, a done-marker, or `/autostop`. | 🔴 macOS + [Ghostty](https://ghostty.org) only |
 | **speak-response** | A `Stop` hook that speaks Claude's prose (code stripped) via the macOS `say` command. | 🟡 macOS |
+| **png-to-code** | A skill that turns a PNG design (illustration, logo, UI mockup) into SVG/HTML/CSS matching the original **1:1** — a decompose → reuse-or-build → render → screenshot-diff → refine loop where a measured pixel diff (not the eye) is the source of truth, plus a rig-first doctrine for animation. Pure skill, no hooks; the diff harness needs Node + Playwright. | 🟢 any OS · Node + Playwright for the diff loop |
 
 `context-guard` is the safe default. The autonomous loop is **experimental and macOS+Ghostty-only** because it works by typing `/compact` into your terminal window via AppleScript — every keystroke is gated behind a wall of safety checks (see [How it works](#how-it-works)).
 
@@ -32,7 +33,7 @@ npx skills-bag install
 npx skills-bag install
 
 # Non-interactive (CI / scripted)
-npx skills-bag install --yes --features context-guard,dedup-guard,autonomous-loop,speak-response
+npx skills-bag install --yes --features context-guard,dedup-guard,autonomous-loop,speak-response,png-to-code
 
 # Project scope — writes ./.claude and commits the payload so teammates get it on clone
 npx skills-bag install --project
@@ -60,6 +61,7 @@ Run `npx skills-bag install` with no flags and it walks you through a short, ani
 │  ◻ dedup-guard      (any OS · needs the repo's TypeScript)
 │  ◻ autonomous-loop  (macos+ghostty)
 │  ◻ speak-response   (macos)
+│  ◻ png-to-code      (any OS · Node + Playwright)
 └
 ```
 
@@ -160,6 +162,27 @@ Tune it with `SKILLS_BAG_DEDUP_MODE` (`deny` · `warn` · `off`) and exclude gen
 
 ---
 
+## PNG → pixel-perfect code
+
+`png-to-code` is a **skill** (no hooks): instructions + a small verification harness Claude follows to reproduce a PNG design as code that matches the original **1:1**. The discipline is that a *measured pixel diff* — not the eye — is the source of truth, so the agent converges slowly and provably instead of declaring "looks close."
+
+```bash
+# add just this skill (any OS)
+npx skills-bag install --features png-to-code
+```
+
+The loop: **decompose** the image into ordered regions → **reuse or build** vectors (search existing SVG libraries first, trace/hand-build only the gap) → **render + screenshot-diff** against the target → **refine the biggest hotspot** and re-measure, one change per iteration, until the mismatch ratio is below 0.1%. Animated figures follow a **rig-first doctrine** (slice at joints, pivot at the joint, parent, overlap) so motion is trivial keyframes on already-correct pivots.
+
+It ships its own harness under the skill's `scripts/` — a one-time setup installs it:
+
+```bash
+cd ~/.claude/skills/png-to-code/scripts && npm i && npx playwright install chromium
+```
+
+`pixel-diff.mjs` (Playwright render + `pixelmatch`) reports the ratio and a hotspot grid; `inspect-png.mjs` samples dimensions/colors; `frames.mjs` contact-sheets animation poses. Without Node/Playwright the skill falls back to a manual overlay and says plainly that the match is eyeballed, not measured.
+
+---
+
 ## How it works
 
 ```
@@ -189,6 +212,7 @@ The daemon never types unless **all** of these hold: the session is armed; conte
 │  └─ package.json          # { "type": "module" } so the ESM hooks run as bare files
 └─ skills/
    ├─ autorun/ autostop/ autoexit/   # only with the autonomous loop
+   └─ png-to-code/                    # only with the png-to-code feature
 ```
 
 The CLI uses [`commander`](https://github.com/tj/commander.js), [`@clack/prompts`](https://github.com/bombshell-dev/clack), and [`picocolors`](https://github.com/alexeyraspopov/picocolors) for the interactive UX; the **hook payload depends on nothing** so it runs the instant a hook fires.

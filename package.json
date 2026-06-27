@@ -1,7 +1,7 @@
 {
   "name": "skills-bag",
-  "version": "0.3.0",
-  "description": "One-command installer for a personal bag of Claude Code skills and hooks: a context guardrail that forces a graceful /handoff before the window fills, a hands-free autonomous-compact loop (autorun/autostop/autoexit), and a macOS text-to-speech hook. Pure TypeScript, Node-only, no Python.",
+  "version": "0.4.0",
+  "description": "One-command installer for a personal bag of Claude Code skills and hooks: a context guardrail that forces a graceful /handoff before the window fills, a DRY dedup-guard, a hands-free autonomous-compact loop (autorun/autostop/autoexit), a macOS text-to-speech hook, and a png-to-code skill that converts PNG designs into pixel-perfect animated SVG via a measured screenshot-diff loop. Pure TypeScript, Node-only, no Python.",
   "type": "module",
   "bin": {
     "skills-bag": "dist/cli.js"
@@ -31,7 +31,9 @@
     "agent",
     "ai",
     "developer-tools",
-    "macos"
+    "macos",
+    "svg",
+    "png-to-code"
   ],
   "author": "Yosef Hayim Sabag",
   "license": "MIT",

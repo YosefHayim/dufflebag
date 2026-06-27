@@ -25,11 +25,19 @@ describe("resolveFeatures", () => {
     // @ts-expect-error — exercising the runtime guard with an invalid id
     expect(() => resolveFeatures(["nope"])).toThrow(/Unknown feature/);
   });
+
+  it("resolves png-to-code as a standalone feature with no dependencies", () => {
+    expect(resolveFeatures(["png-to-code"])).toEqual(["png-to-code"]);
+  });
 });
 
 describe("skillsFor", () => {
   it("collects the autonomous-loop skills and nothing for guard-only", () => {
     expect(skillsFor(["context-guard"])).toEqual([]);
     expect(skillsFor(["autonomous-loop"]).sort()).toEqual(["autoexit", "autorun", "autostop"]);
+  });
+
+  it("maps png-to-code to its own skill directory", () => {
+    expect(skillsFor(["png-to-code"])).toEqual(["png-to-code"]);
   });
 });

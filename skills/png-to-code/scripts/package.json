@@ -1,0 +1,17 @@
+{
+  "name": "png-to-code-scripts",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Verification + inspection scripts for the png-to-code skill (render+diff, color sampling, SVG optimize).",
+  "scripts": {
+    "diff": "node pixel-diff.mjs",
+    "inspect": "node inspect-png.mjs"
+  },
+  "dependencies": {
+    "pixelmatch": "^6.0.0",
+    "playwright": "^1.49.0",
+    "pngjs": "^7.0.0",
+    "svgo": "^3.3.2"
+  }
+}

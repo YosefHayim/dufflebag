@@ -67,10 +67,20 @@ export const FEATURES: Record<FeatureId, Feature> = {
     skills: [],
     hooks: [{ event: "Stop", file: HOOK.speak }],
   },
+  "png-to-code": {
+    id: "png-to-code",
+    title: "PNG → pixel-perfect code",
+    summary:
+      "A skill that turns a PNG design (illustration, logo, UI mockup) into SVG/HTML/CSS that measurably converges to a 1:1 match — a decompose → reuse-or-build → render → screenshot-diff → refine loop, plus a rig-first doctrine for animation. Pure skill (no hooks); its diff harness needs Node + Playwright.",
+    requires: [],
+    platform: "any",
+    skills: ["png-to-code"],
+    hooks: [],
+  },
 };
 
 /** Every feature id, in display/install order. */
-export const ALL_FEATURES: FeatureId[] = ["context-guard", "dedup-guard", "autonomous-loop", "speak-response"];
+export const ALL_FEATURES: FeatureId[] = ["context-guard", "dedup-guard", "autonomous-loop", "speak-response", "png-to-code"];
 
 /** The safe-by-default selection: works on any OS, no GUI automation. */
 export const DEFAULT_FEATURES: FeatureId[] = ["context-guard"];

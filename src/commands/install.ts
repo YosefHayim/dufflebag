@@ -249,6 +249,12 @@ function nextSteps(features: FeatureId[], scope: Scope): string {
     lines.push(`${c.dim("•")} Dedup-guard blocks copy-pasted functions/types on Claude (Cursor warns; Codex via AGENTS.md).`);
     lines.push(`${c.dim("•")} Scan or gate CI: ${c.cyan("skills-bag dedup check --since main")} ${c.dim("· soften with --dedup-mode warn")}`);
   }
+  if (features.includes("png-to-code")) {
+    const base = scope === "project" ? "./.claude" : "~/.claude";
+    lines.push(
+      `${c.dim("•")} png-to-code: one-time harness setup — ${c.cyan(`cd ${base}/skills/png-to-code/scripts && npm i && npx playwright install chromium`)}`,
+    );
+  }
   lines.push(`${c.dim("•")} Tune values: ${c.cyan("skills-bag config --warn 0.15")}`);
   if (scope === "project") lines.push(`${c.dim("•")} Commit ${c.cyan(".claude/")} so teammates share the setup.`);
   lines.push(`${c.dim("•")} Health check: ${c.cyan("skills-bag doctor")}`);

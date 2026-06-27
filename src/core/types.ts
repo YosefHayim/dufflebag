@@ -54,7 +54,7 @@ export interface Feature {
   platform: "any" | "macos" | "macos+ghostty";
 }
 
-export type FeatureId = "context-guard" | "autonomous-loop" | "speak-response" | "dedup-guard";
+export type FeatureId = "context-guard" | "autonomous-loop" | "speak-response" | "dedup-guard" | "png-to-code";
 
 /**
  * dedup-guard enforcement level (`SKILLS_BAG_DEDUP_MODE`):
