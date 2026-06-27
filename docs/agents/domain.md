@@ -5,7 +5,7 @@ How the engineering skills should consume this repo's domain documentation when 
 ## Before exploring, read these
 
 - **`skills/png-to-code/CONTEXT.md`** — domain vocabulary and workflow contract for the png-to-code skill
-- **`skills/png-to-code/LANGUAGE.md`** — technical term glossary (tools and concepts)
+- **`skills/png-to-code/TECH-GLOSSARY.md`** — technical term glossary (tools and concepts)
 - **`skills/png-to-code/docs/adr/`** — read ADRs that touch the area you're about to work in
 
 If any of these files don't exist, **proceed silently**. Don't flag their absence; don't suggest creating them upfront.
@@ -17,7 +17,7 @@ Single-context layout for png-to-code:
 ```
 skills/png-to-code/
 ├── CONTEXT.md
-├── LANGUAGE.md
+├── TECH-GLOSSARY.md
 ├── docs/adr/
 │   └── (architectural decisions)
 └── scripts/

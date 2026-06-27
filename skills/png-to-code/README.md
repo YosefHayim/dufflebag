@@ -74,5 +74,5 @@ Match the target repo's framework when one exists. Otherwise default to vanilla 
 
 - [`SKILL.md`](SKILL.md) — agent workflow
 - [`CONTEXT.md`](CONTEXT.md) — domain vocabulary and decisions
-- [`LANGUAGE.md`](LANGUAGE.md) — technical term glossary
+- [`TECH-GLOSSARY.md`](TECH-GLOSSARY.md) — technical term glossary
 - [`reference/`](reference/) — decompose, rigging, animation, verification

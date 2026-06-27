@@ -1,6 +1,6 @@
 # CONTEXT.md — png-to-code domain
 
-Project-specific vocabulary and workflow contract for the png-to-code skill. Technical tool definitions live in [`LANGUAGE.md`](LANGUAGE.md).
+Project-specific vocabulary and workflow contract for the png-to-code skill. Technical tool definitions live in [`TECH-GLOSSARY.md`](TECH-GLOSSARY.md).
 
 ## What this is
 

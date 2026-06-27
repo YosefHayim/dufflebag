@@ -73,4 +73,4 @@ If Node/Playwright is unavailable, use the manual overlay method in `reference/v
 - `scripts/svgo.config.mjs` — safe SVGO config (keeps viewBox + IDs)
 - `scripts/robot.svgo.config.mjs` — conservative SVGO for animated SVGs
 - `README.md` — full script catalog
-- `CONTEXT.md` / `LANGUAGE.md` — domain vocabulary and technical glossary
+- `CONTEXT.md` / `TECH-GLOSSARY.md` — domain vocabulary and technical glossary

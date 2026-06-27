@@ -1,4 +1,4 @@
-# LANGUAGE.md — Technical glossary
+# TECH-GLOSSARY.md — Technical glossary
 
 > Pure term definitions for tools and concepts used by the png-to-code scripts and references.
 > Project-specific vocabulary agents must reuse consistently lives in [`CONTEXT.md`](CONTEXT.md).
