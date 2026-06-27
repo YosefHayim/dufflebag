@@ -13,10 +13,12 @@ npx playwright install chromium
 
 ## Inspect the target
 
+All commands below run from the skill's `scripts/` directory:
+
 ```
-node scripts/inspect-png.mjs --input design.png             # dimensions
-node scripts/inspect-png.mjs --input design.png --at 40,120  # exact hex at a pixel
-node scripts/inspect-png.mjs --input design.png --palette 12 # dominant colors
+npx tsx src/core/inspect-png.ts --input design.png             # dimensions
+npx tsx src/core/inspect-png.ts --input design.png --at 40,120  # exact hex at a pixel
+npx tsx src/core/inspect-png.ts --input design.png --palette 12 # dominant colors
 ```
 
 `--at` may be repeated to sample several points in one call.
@@ -24,7 +26,7 @@ node scripts/inspect-png.mjs --input design.png --palette 12 # dominant colors
 ## Run a diff
 
 ```
-node scripts/pixel-diff.mjs --target design.png --input build/index.html
+npx tsx src/core/pixel-diff.ts --target design.png --input build/index.html
 ```
 
 Options:
@@ -63,15 +65,15 @@ Guard against it every build:
 
 - **Run a second, low-threshold sweep** to surface pale differences the strict pass hides:
   ```
-  node scripts/pixel-diff.mjs --target design.png --input build.html --threshold 0.02
+  npx tsx src/core/pixel-diff.ts --target design.png --input build.html --threshold 0.02
   ```
   A big jump between the `0.1` and `0.02` ratios (here 1% → 13%) means a faint, large-area mismatch — open that diff image; the red will outline the missing/!wrong pale shape.
 - **Eyeball the full render against the target at matched scale**, not just the diff. The diff paints what *differs*; it cannot flag a soft element that is below threshold everywhere. A human glance catches "the background cloud is gone" instantly.
-- **Sample flat regions with `inspect-png.mjs --at`** where you expect a tint. White-vs-tint at the same coordinate confirms presence/absence directly, independent of the diff.
+- **Sample flat regions with `inspect-png.ts --at`** where you expect a tint. White-vs-tint at the same coordinate confirms presence/absence directly, independent of the diff.
 
 Missing a pale element is the most likely way to ship something that "measures 1:1" yet looks wrong. Treat any large gap between strict and loose thresholds as an unmet region, not noise.
 
-A clean _rest_ diff is also blind to **motion-only acquisition artifacts** — defects that exist in the geometry but only surface once a part moves. The classic one: a moving part traced through a slightly loose mask carries a pale background **margin** that blends in at rest (pale-on-pale, scores ~0) but swings into view as a hard-edged patch the instant the part rotates. The static score will look converged while the animation looks broken. So a passing rest diff is never sufficient for a rigged part: **seek every moving part to its rotation extremes and eyeball the part _and_ its junction there** (`scripts/frames.mjs` at the keyframe times), not just the rest pose. See `rigging.md` "Acquiring each part" (mask margin → swinging ghost) for the fix.
+A clean _rest_ diff is also blind to **motion-only acquisition artifacts** — defects that exist in the geometry but only surface once a part moves. The classic one: a moving part traced through a slightly loose mask carries a pale background **margin** that blends in at rest (pale-on-pale, scores ~0) but swings into view as a hard-edged patch the instant the part rotates. The static score will look converged while the animation looks broken. So a passing rest diff is never sufficient for a rigged part: **seek every moving part to its rotation extremes and eyeball the part _and_ its junction there** (`src/core/frames.ts` at the keyframe times), not just the rest pose. See `rigging.md` "Acquiring each part" (mask margin → swinging ghost) for the fix.
 
 ## Avoiding false diffs
 
@@ -86,7 +88,7 @@ A clean _rest_ diff is also blind to **motion-only acquisition artifacts** — d
 When you add motion the original never had — a living background, ambient drift, a hover reaction — there is **no static target to diff it against**. Verify in two independent halves:
 
 1. **The rest frame still measures 1:1.** Author the enhancement to contribute nothing at its `0%`/`100%` keyframe (opacity 0, no transform — see `animation.md` "Living background"), then run the normal frozen diff. It must hold at your converged ratio. If it rose, the enhancement leaked into the rest state and is no longer "on top of" the 1:1 still — pull it back to a true zero rest.
-2. **The motion itself is eyeballed, deliberately.** A pixel diff cannot judge "does the aurora flow nicely". Sample the live cycle with `scripts/frames.mjs <page.html> sheet.png <cell> <t0,t1,…>` across the loop's period and review the contact sheet, plus open it in a browser. Say plainly that the motion is judged by eye — that is correct here, not a shortcut.
+2. **The motion itself is eyeballed, deliberately.** A pixel diff cannot judge "does the aurora flow nicely". Sample the live cycle with `npx tsx src/core/frames.ts <page.html> sheet.png <cell> <t0,t1,…>` across the loop's period and review the contact sheet, plus open it in a browser. Say plainly that the motion is judged by eye — that is correct here, not a shortcut.
 
 Pick timestamps that actually land in the motion: for a long out-of-phase loop, sample seconds apart (e.g. `0,8000,14000`) so you catch the bloom, not just the rest frame.
 

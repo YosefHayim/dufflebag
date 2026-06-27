@@ -45,7 +45,7 @@ When potrace/VTracer aren't available but you need a single **flat or soft color
 5. **Douglas–Peucker simplify** — but the ring is **closed** (start == end), so a single DP pass collapses it to 2 points on a zero-length baseline. Split the ring at its farthest vertex and DP each open half. (This bug silently drops every contour — watch for "kept 0".)
 6. Emit `<path d="M…L…Z">` per component; add a slight `feGaussianBlur` to match a feathered edge.
 
-Place a background region **behind** the figure: the figure's opaque paths cover the part inside its footprint, so only the true background shows. The demo's `extract-blob.mjs` is a worked example.
+Place a background region **behind** the figure: the figure's opaque paths cover the part inside its footprint, so only the true background shows. The demo's `extract-blob.ts` is a worked example.
 
 ## 3. Hand-build (geometric / simple shapes)
 

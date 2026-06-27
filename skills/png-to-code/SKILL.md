@@ -9,14 +9,14 @@ Reproduce a PNG (illustration, logo, UI screen, or full mockup) as code that mat
 
 ## Ground rule
 
-**The diff score is the source of truth.** Never call something "done" or "1:1" from looking at it. Render it, screenshot it, diff it against the target PNG with `scripts/pixel-diff.mjs`, and drive the mismatch ratio toward zero. If you cannot measure it, say so plainly.
+**The diff score is the source of truth.** Never call something "done" or "1:1" from looking at it. Render it, screenshot it, diff it against the target PNG with `scripts/src/core/pixel-diff.ts`, and drive the mismatch ratio toward zero. If you cannot measure it, say so plainly.
 
 ## The loop
 
 Step 0 runs once at the start; repeat steps 4–6 until converged.
 
 0. **Intake — align on intent before measuring.** A PNG is one frozen frame; what the user wants in *motion* and *fidelity* is not in the pixels, so ask (a short `AskUserQuestion` is ideal). Cover: static reproduction or animated? if animated, which parts move and how big a gesture (subtle idle vs hero wave)? strict 1:1, or "inspired-by / make it prettier"? reduced-motion fallback? And **proactively suggest the life a static PNG cannot depict** — most often a living/animated background (drifting aurora, floating blobs) — and confirm the vibe before building. Never infer animation scope from a still. → `reference/decompose.md` (§0)
-1. **Frame** — read target dimensions with `scripts/inspect-png.mjs`. The render viewport is the target's pixel size.
+1. **Frame** — read target dimensions with `scripts/src/core/inspect-png.ts`. The render viewport is the target's pixel size.
 2. **Decompose** — split the image into ordered regions; mark each *raster* (export/slice) vs *reproducible in code* (CSS/SVG). Extract exact specs (color, type, spacing). **If anything will animate, plan the rig now** — decompose into the skeleton of named, joint-pivoted, parented parts before acquiring geometry. → `reference/decompose.md`, `reference/rigging.md`
 3. **Reuse or build** — search existing SVG libraries first and customize; trace or hand-build only the gap. For animated parts, build to rig (**reuse > hand-build > per-part masked trace > never one flat trace**). → `reference/svg-illustration.md`, `reference/rigging.md`
 4. **Build one region** — structural/largest first. Match the target repo's stack; if none, vanilla HTML/CSS/SVG. Order within a region: layout → typography → color → effects.
@@ -41,11 +41,13 @@ npm install
 npx playwright install chromium
 ```
 
-Then, per iteration:
+Then, per iteration (from `scripts/`):
 
 ```
-node scripts/pixel-diff.mjs --target design.png --input build/index.html
+npx tsx src/core/pixel-diff.ts --target design.png --input build/index.html
 ```
+
+Or: `npm run diff -- --target design.png --input build/index.html`
 
 If Node/Playwright is unavailable, use the manual overlay method in `reference/verification.md` and state the match is eyeballed, not measured.
 
@@ -65,7 +67,10 @@ If Node/Playwright is unavailable, use the manual overlay method in `reference/v
 - `reference/rigging.md` — structure a figure to animate: slice at joints, pivot at joint, parent, overlap (do this at build time)
 - `reference/animation.md` — motion that reads as alive: easing, act-then-hold, timing cheat-sheet, reduced motion, line-draw recipe
 - `reference/verification.md` — the diff loop, thresholds, scale, manual fallback
-- `scripts/pixel-diff.mjs` — render (Playwright) + pixel diff (pixelmatch) → ratio + hotspots
-- `scripts/inspect-png.mjs` — target dimensions + color sampling / palette
-- `scripts/frames.mjs` — contact sheet of animation frames by timeline-seeking (verify motion poses)
+- `scripts/src/core/pixel-diff.ts` — render (Playwright) + pixel diff (pixelmatch) → ratio + hotspots
+- `scripts/src/core/inspect-png.ts` — target dimensions + color sampling / palette
+- `scripts/src/core/frames.ts` — contact sheet of animation frames by timeline-seeking (verify motion poses)
 - `scripts/svgo.config.mjs` — safe SVGO config (keeps viewBox + IDs)
+- `scripts/robot.svgo.config.mjs` — conservative SVGO for animated SVGs
+- `README.md` — full script catalog
+- `CONTEXT.md` / `LANGUAGE.md` — domain vocabulary and technical glossary

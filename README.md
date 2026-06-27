@@ -179,7 +179,7 @@ It ships its own harness under the skill's `scripts/` — a one-time setup insta
 cd ~/.claude/skills/png-to-code/scripts && npm i && npx playwright install chromium
 ```
 
-`pixel-diff.mjs` (Playwright render + `pixelmatch`) reports the ratio and a hotspot grid; `inspect-png.mjs` samples dimensions/colors; `frames.mjs` contact-sheets animation poses. Without Node/Playwright the skill falls back to a manual overlay and says plainly that the match is eyeballed, not measured.
+`src/core/pixel-diff.ts` (Playwright render + `pixelmatch`) reports the ratio and a hotspot grid; `inspect-png.ts` samples dimensions/colors; `frames.ts` contact-sheets animation poses. All TypeScript, run via `tsx` from `scripts/`. Without Node/Playwright the skill falls back to a manual overlay and says plainly that the match is eyeballed, not measured.
 
 ---
 

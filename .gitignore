@@ -4,3 +4,16 @@ dist/
 .DS_Store
 coverage/
 *.tsbuildinfo
+
+# png-to-code local/demo artifacts (never commit binaries)
+skills/png-to-code/demo/*
+!skills/png-to-code/demo/README.md
+skills/png-to-code/**/out/
+skills/png-to-code/**/*.png
+skills/png-to-code/**/*.svg
+skills/png-to-code/**/*.html
+skills/png-to-code/**/diff*.png
+skills/png-to-code/scripts/node_modules/
+
+# Playwright browser cache (when installed from scripts/)
+skills/png-to-code/scripts/.playwright/

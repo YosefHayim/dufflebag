@@ -15,7 +15,7 @@ Record the answers as the build contract. Enhancements that go *beyond* the PNG 
 
 ## A. Establish the frame
 
-- Run `node scripts/inspect-png.mjs --input design.png` → get `width × height`. Build at these exact pixel dimensions; the diff loop renders at this viewport.
+- Run `npx tsx src/core/inspect-png.ts --input design.png` (from `scripts/`) → get `width × height`. Build at these exact pixel dimensions; the diff loop renders at this viewport.
 - Sample the base background (a corner): `--at 2,2`.
 - If the PNG is a 2x/retina export, you can still build at its pixel dimensions — just keep every measured number in those same pixels. Stay consistent end to end.
 
@@ -36,7 +36,7 @@ The pre-AI consensus: **slice only true raster; rebuild everything else.** Over-
 
 You have only a PNG (no Figma/Zeplin handoff), so measure from pixels:
 
-- **Color** — sample with `inspect-png.mjs --at x,y` (exact hex) or `--palette 12` (dominant colors). Do not eyeball hex.
+- **Color** — sample with `inspect-png.ts --at x,y` (exact hex) or `--palette 12` (dominant colors). Do not eyeball hex.
 - **Type** — measure cap-height and line-height in pixels; identify the family by shape (serif / grotesque / geometric / humanist) and match to the closest web or system stack; then refine `font-size` until the diff over the text region drops. Record family, size, weight, letter-spacing, line-height, and color per text block.
 - **Spacing & size** — measure gaps, padding, and element box sizes in pixels directly off the image.
 - **Effects** — shadows: read offset, blur, spread, and sample the shadow color. Gradients: sample 2–3 stops and estimate the angle. Radii: measure the corner arc.
