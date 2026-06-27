@@ -1,0 +1,35 @@
+/**
+ * Tests for the feature catalog's dependency resolution — the rule that asking
+ * for the autonomous loop always also pulls the context guard it depends on, in
+ * a stable catalog order, with no duplicates.
+ */
+
+import { describe, expect, it } from "vitest";
+
+import { resolveFeatures, skillsFor } from "../src/core/features.js";
+
+describe("resolveFeatures", () => {
+  it("pulls context-guard when autonomous-loop is requested", () => {
+    expect(resolveFeatures(["autonomous-loop"])).toEqual(["context-guard", "autonomous-loop"]);
+  });
+
+  it("dedupes and returns catalog order regardless of request order", () => {
+    expect(resolveFeatures(["speak-response", "autonomous-loop", "context-guard"])).toEqual([
+      "context-guard",
+      "autonomous-loop",
+      "speak-response",
+    ]);
+  });
+
+  it("throws on an unknown feature id", () => {
+    // @ts-expect-error — exercising the runtime guard with an invalid id
+    expect(() => resolveFeatures(["nope"])).toThrow(/Unknown feature/);
+  });
+});
+
+describe("skillsFor", () => {
+  it("collects the autonomous-loop skills and nothing for guard-only", () => {
+    expect(skillsFor(["context-guard"])).toEqual([]);
+    expect(skillsFor(["autonomous-loop"]).sort()).toEqual(["autoexit", "autorun", "autostop"]);
+  });
+});

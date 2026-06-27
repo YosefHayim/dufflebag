@@ -1,0 +1,73 @@
+/**
+ * `skills-bag uninstall` — the exact inverse of install.
+ *
+ * Removes only what the bag owns: hook entries (matched by the `/skills-bag/`
+ * path marker), `SKILLS_BAG_*` env keys, the installed skill folders (from the
+ * manifest), and the namespaced payload dir. The user's own hooks, env, and
+ * settings are left untouched, and settings.json is backed up first. Any
+ * running autonomous-loop daemon is asked to exit so it stops typing.
+ */
+
+import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { homedir } from "node:os";
+import path from "node:path";
+
+import { readManifest } from "../core/manifest.js";
+import { resolveLayout } from "../core/paths.js";
+import { backupSettings, readSettings, removeManagedEnv, removeManagedHooks, writeSettings } from "../core/settings.js";
+import { removePath } from "../core/fs-utils.js";
+import { c, intro, outro, spinner, step } from "../core/ui.js";
+import type { Scope } from "../core/types.js";
+
+const stamp = (): string => new Date().toISOString().replace(/[:.]/g, "-");
+
+/** Best-effort: signal every recorded autonomous-loop daemon to stop. */
+function stopDaemons(): void {
+  const stateDir = path.join(homedir(), ".claude", ".ctx-loop-state");
+  if (!existsSync(stateDir)) return;
+  for (const file of readdirSync(stateDir)) {
+    if (!file.endsWith(".pid")) continue;
+    const pid = Number(readFileSync(path.join(stateDir, file), "utf8").trim());
+    if (!Number.isInteger(pid) || pid <= 0) continue;
+    try {
+      process.kill(pid, "SIGTERM");
+    } catch {
+      /* already gone */
+    }
+  }
+}
+
+export function uninstall(opts: { scope: Scope; projectRoot?: string }): void {
+  const layout = resolveLayout(opts.scope, opts.projectRoot);
+  const manifest = readManifest(layout.installDir);
+
+  intro(`skills-bag · uninstall · ${opts.scope}`);
+  step(c.dim(`target: ${layout.claudeDir}`));
+
+  if (!manifest && !existsSync(layout.installDir)) {
+    outro(c.yellow("Nothing installed at this scope — nothing to remove."));
+    return;
+  }
+
+  stopDaemons();
+
+  const s = spinner();
+  s.start("Removing");
+
+  // settings.json: strip our hooks + env, after a backup.
+  let backup: string | null = null;
+  if (existsSync(layout.settingsFile)) {
+    backup = backupSettings(layout.settingsFile, stamp());
+    const cleaned = removeManagedEnv(removeManagedHooks(readSettings(layout.settingsFile)));
+    writeSettings(layout.settingsFile, cleaned);
+  }
+
+  // Skills recorded in the manifest, then the payload dir (hooks, manifest, payload package.json).
+  for (const name of manifest?.skills ?? []) removePath(path.join(layout.skillsDir, name));
+  removePath(layout.installDir);
+
+  s.stop("Removed bag hooks, config, skills, and payload");
+
+  if (backup) step(c.dim(`backup: ${path.basename(backup)} (roll back any time)`));
+  outro(c.green("Uninstalled. Restart Claude Code so the hooks unload."));
+}

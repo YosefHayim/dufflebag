@@ -1,0 +1,84 @@
+/**
+ * The feature catalog: the authoritative description of every installable unit
+ * and how it maps onto hooks, skills, and platform constraints.
+ *
+ * Commands never hard-code "which hook file for which event" — they read it from
+ * here, so adding a feature (or moving a hook to a new event) is a one-place
+ * change. Dependencies are resolved by {@link resolveFeatures} so that, e.g.,
+ * asking for `autonomous-loop` always also pulls `context-guard` (they share
+ * WARN_PCT and the daemon relies on the guard's wind-down contract).
+ */
+
+import type { Feature, FeatureId } from "./types.js";
+
+/** Hook files compiled from src/hooks/*.ts and copied into <installDir>/hooks. */
+const HOOK = {
+  guard: "context-guard.js",
+  ctxWatchSpawn: "ctx-watch-spawn.js",
+  speak: "speak-response.js",
+} as const;
+
+/** Tools the context guard throttles — kept identical to the original matcher. */
+const WRITE_MATCHER = "Write|Edit|MultiEdit|NotebookEdit";
+
+export const FEATURES: Record<FeatureId, Feature> = {
+  "context-guard": {
+    id: "context-guard",
+    title: "Context guard",
+    summary: "Nudge a /handoff at ~18% of the model window and hard-deny new code edits at ~20%, so long sessions wind down gracefully instead of ballooning past usable context.",
+    requires: [],
+    platform: "any",
+    skills: [],
+    hooks: [
+      { event: "PreToolUse", matcher: WRITE_MATCHER, file: HOOK.guard },
+      { event: "PostToolUse", matcher: WRITE_MATCHER, file: HOOK.guard },
+      { event: "UserPromptSubmit", file: HOOK.guard },
+    ],
+  },
+  "autonomous-loop": {
+    id: "autonomous-loop",
+    title: "Autonomous loop (autorun/autostop/autoexit)",
+    summary: "A SessionStart daemon that auto-/compacts and resumes work hands-free once context nears the guardrail and a fresh handoff exists. macOS + Ghostty only (it types into your terminal window).",
+    requires: ["context-guard"],
+    platform: "macos+ghostty",
+    skills: ["autorun", "autostop", "autoexit"],
+    hooks: [{ event: "SessionStart", file: HOOK.ctxWatchSpawn }],
+  },
+  "speak-response": {
+    id: "speak-response",
+    title: "Speak responses (TTS)",
+    summary: "A Stop hook that speaks Claude's prose (code blocks stripped) via the macOS `say` command. macOS only.",
+    requires: [],
+    platform: "macos",
+    skills: [],
+    hooks: [{ event: "Stop", file: HOOK.speak }],
+  },
+};
+
+/** Every feature id, in display/install order. */
+export const ALL_FEATURES: FeatureId[] = ["context-guard", "autonomous-loop", "speak-response"];
+
+/** The safe-by-default selection: works on any OS, no GUI automation. */
+export const DEFAULT_FEATURES: FeatureId[] = ["context-guard"];
+
+/**
+ * Expand a requested selection to include all transitive dependencies, returned
+ * in catalog order with duplicates removed. Throws on an unknown id.
+ */
+export function resolveFeatures(requested: FeatureId[]): FeatureId[] {
+  const selected = new Set<FeatureId>();
+  const visit = (id: FeatureId): void => {
+    if (selected.has(id)) return;
+    const feature = FEATURES[id];
+    if (!feature) throw new Error(`Unknown feature: ${id}`);
+    selected.add(id);
+    feature.requires.forEach(visit);
+  };
+  requested.forEach(visit);
+  return ALL_FEATURES.filter((id) => selected.has(id));
+}
+
+/** Collect the unique skill directory names across a set of features. */
+export function skillsFor(ids: FeatureId[]): string[] {
+  return [...new Set(ids.flatMap((id) => FEATURES[id].skills))];
+}
