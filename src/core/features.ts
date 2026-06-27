@@ -16,10 +16,14 @@ const HOOK = {
   guard: "context-guard.js",
   ctxWatchSpawn: "ctx-watch-spawn.js",
   speak: "speak-response.js",
+  dedup: "dedup-guard.js",
 } as const;
 
 /** Tools the context guard throttles — kept identical to the original matcher. */
 const WRITE_MATCHER = "Write|Edit|MultiEdit|NotebookEdit";
+
+/** Tools the dedup guard inspects (notebooks excluded — it checks .ts/.tsx source). */
+const DEDUP_MATCHER = "Write|Edit|MultiEdit";
 
 export const FEATURES: Record<FeatureId, Feature> = {
   "context-guard": {
@@ -34,6 +38,16 @@ export const FEATURES: Record<FeatureId, Feature> = {
       { event: "PostToolUse", matcher: WRITE_MATCHER, file: HOOK.guard },
       { event: "UserPromptSubmit", file: HOOK.guard },
     ],
+  },
+  "dedup-guard": {
+    id: "dedup-guard",
+    title: "Dedup guard",
+    summary:
+      "Block a Write/Edit that pastes a function body or interface/type shape already defined elsewhere in the repo — DRY enforced at the moment of the write. Uses the repo's own TypeScript; deny by default (tune with SKILLS_BAG_DEDUP_MODE). Also wires Cursor (warn) + an AGENTS.md rule for Codex.",
+    requires: [],
+    platform: "any",
+    skills: [],
+    hooks: [{ event: "PreToolUse", matcher: DEDUP_MATCHER, file: HOOK.dedup }],
   },
   "autonomous-loop": {
     id: "autonomous-loop",
@@ -56,7 +70,7 @@ export const FEATURES: Record<FeatureId, Feature> = {
 };
 
 /** Every feature id, in display/install order. */
-export const ALL_FEATURES: FeatureId[] = ["context-guard", "autonomous-loop", "speak-response"];
+export const ALL_FEATURES: FeatureId[] = ["context-guard", "dedup-guard", "autonomous-loop", "speak-response"];
 
 /** The safe-by-default selection: works on any OS, no GUI automation. */
 export const DEFAULT_FEATURES: FeatureId[] = ["context-guard"];

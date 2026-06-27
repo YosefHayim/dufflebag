@@ -12,14 +12,13 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import path from "node:path";
 
+import { removeAgentsBlock, unwriteCursorHook } from "../core/agent-wiring.js";
 import { readManifest } from "../core/manifest.js";
-import { resolveLayout } from "../core/paths.js";
+import { resolveLayout, stamp } from "../core/paths.js";
 import { backupSettings, readSettings, removeManagedEnv, removeManagedHooks, writeSettings } from "../core/settings.js";
 import { removePath } from "../core/fs-utils.js";
 import { c, intro, outro, spinner, step } from "../core/ui.js";
 import type { Scope } from "../core/types.js";
-
-const stamp = (): string => new Date().toISOString().replace(/[:.]/g, "-");
 
 /** Best-effort: signal every recorded autonomous-loop daemon to stop. */
 function stopDaemons(): void {
@@ -62,11 +61,15 @@ export function uninstall(opts: { scope: Scope; projectRoot?: string }): void {
     writeSettings(layout.settingsFile, cleaned);
   }
 
+  // dedup-guard's multi-agent surfaces (Cursor hooks.json + AGENTS.md block) — surgical, no-op when absent.
+  unwriteCursorHook(layout.claudeDir);
+  removeAgentsBlock(layout.claudeDir);
+
   // Skills recorded in the manifest, then the payload dir (hooks, manifest, payload package.json).
   for (const name of manifest?.skills ?? []) removePath(path.join(layout.skillsDir, name));
   removePath(layout.installDir);
 
-  s.stop("Removed bag hooks, config, skills, and payload");
+  s.stop("Removed bag hooks, config, skills, payload, and agent wiring");
 
   if (backup) step(c.dim(`backup: ${path.basename(backup)} (roll back any time)`));
   outro(c.green("Uninstalled. Restart Claude Code so the hooks unload."));

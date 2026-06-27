@@ -15,6 +15,7 @@ npx skills-bag install
 | Feature | What it does | Runs on |
 | --- | --- | --- |
 | **context-guard** | Nudges you to run `/handoff` at ~18% of the model's context window, then hard-denies new code edits at ~20% (handoff-doc writes stay allowed) — so long sessions wind down gracefully instead of ballooning past usable context. | 🟢 any OS, any terminal |
+| **dedup-guard** | Blocks a Write/Edit that pastes a function body or `interface`/`type` shape already defined elsewhere in the repo — DRY enforced at the moment of the write, using an AST fingerprint over the repo's own TypeScript. Deny by default; tunable `warn`/`off`. Also wires Cursor (warn) + an AGENTS.md rule for Codex, and ships a `dedup check` CI gate. | 🟢 any OS · needs the repo's TypeScript |
 | **autonomous-loop** (`/autorun` `/autostop` `/autoexit`) | A background daemon that, once armed, auto-`/compact`s and resumes your work hands-free each time context nears the guardrail and a fresh handoff exists — until a cycle budget, a done-marker, or `/autostop`. | 🔴 macOS + [Ghostty](https://ghostty.org) only |
 | **speak-response** | A `Stop` hook that speaks Claude's prose (code stripped) via the macOS `say` command. | 🟡 macOS |
 
@@ -31,7 +32,7 @@ npx skills-bag install
 npx skills-bag install
 
 # Non-interactive (CI / scripted)
-npx skills-bag install --yes --features context-guard,autonomous-loop,speak-response
+npx skills-bag install --yes --features context-guard,dedup-guard,autonomous-loop,speak-response
 
 # Project scope — writes ./.claude and commits the payload so teammates get it on clone
 npx skills-bag install --project
@@ -56,6 +57,7 @@ Run `npx skills-bag install` with no flags and it walks you through a short, ani
 │
 ◆  Which features do you want to install?
 │  ◼ context-guard    (any OS)
+│  ◻ dedup-guard      (any OS · needs the repo's TypeScript)
 │  ◻ autonomous-loop  (macos+ghostty)
 │  ◻ speak-response   (macos)
 └
@@ -95,6 +97,8 @@ skills-bag config --block 0.22 --budget 5
 | `--idle` | `SKILLS_BAG_IDLE_SECONDS` | `8` | Quiescence required before the daemon counts a turn as idle |
 | `--tts-voice` | `SKILLS_BAG_TTS_VOICE` | `Samantha` | macOS `say` voice |
 | `--tts-rate` | `SKILLS_BAG_TTS_RATE` | `230` | TTS words per minute |
+| `--dedup-mode` | `SKILLS_BAG_DEDUP_MODE` | `deny` | dedup-guard enforcement: `deny` · `warn` · `off` |
+| `--dedup-skip` | `SKILLS_BAG_DEDUP_SKIP` | _(none)_ | extra dir names dedup-guard ignores (comma list) |
 
 Project `settings.json` overrides global, so different repos can run different thresholds. The guard sees changes immediately; an already-running autorun daemon picks them up on the next session.
 
@@ -106,6 +110,7 @@ Project `settings.json` overrides global, so different repos can run different t
 | `skills-bag update` | Refresh hook code, keep your features **and** your tuned config |
 | `skills-bag uninstall` | Surgically remove everything the bag added |
 | `skills-bag config` | Show or change tunables |
+| `skills-bag dedup check` | Scan for duplicate functions/types; exits non-zero on findings (pre-commit / CI gate) |
 | `skills-bag doctor` | Read-only health check across global + project scopes |
 
 All commands take `--global` (default) or `--project`.
@@ -124,6 +129,37 @@ While armed, **you** make each compaction safe: run `/handoff` to save a resume 
 
 ---
 
+## Dedup guard
+
+`dedup-guard` stops the most common form of AI slop — the same function or type re-pasted under a new name — at the moment it's written. It parses the added code with the repo's **own** TypeScript (nothing is bundled), fingerprints each named function body (alpha-canonical, so a renamed copy still matches) and each object-type shape (field-order independent), and compares against a cached index of the whole repo.
+
+```bash
+# add it to any TypeScript repo (--project commits the wiring for teammates)
+npx skills-bag install --project --features dedup-guard
+```
+
+**Enforcement is per-agent — bounded by what each platform actually allows:**
+
+| Agent | What you get | How |
+| --- | --- | --- |
+| **Claude Code** | hard **deny** before the write lands | `PreToolUse` hook |
+| **Cursor** | **warn** after the edit (no native before-edit deny exists) | `afterFileEdit` in `.cursor/hooks.json` |
+| **Codex** | an **AGENTS.md** rule + the `dedup check` command | Codex's `PreToolUse` only intercepts Bash, so edits can't be hooked |
+
+So a duplicate is blocked on Claude, flagged on Cursor, and — on any agent that can't hook a file edit — caught by the command, which doubles as a **pre-commit / CI gate**:
+
+```bash
+skills-bag dedup check                 # scan the repo; exits non-zero on duplicates
+skills-bag dedup check --staged        # only files staged for commit (pre-commit)
+skills-bag dedup check --since main    # only files changed vs a ref (PR / CI)
+```
+
+Tune it with `SKILLS_BAG_DEDUP_MODE` (`deny` · `warn` · `off`) and exclude generated/scaffold dirs with `SKILLS_BAG_DEDUP_SKIP` (e.g. a monorepo's `templates`). A genuinely intentional duplicate? Append `// dup-ignore` to the declaration's first line — honored by both the live hooks and `dedup check`.
+
+> **No TypeScript in the repo → no guard.** dedup-guard resolves the project's own `typescript`; a repo without it is reported by `doctor`, the hook fails open (allows the edit), and `dedup check` reports it as un-checkable and exits 0 rather than failing CI.
+
+---
+
 ## How it works
 
 ```
@@ -132,6 +168,7 @@ While armed, **you** make each compaction safe: run `/handoff` to save a resume 
             └─ env    → SKILLS_BAG_*                                  (prefix-identified)
 
   PreToolUse / PostToolUse / UserPromptSubmit ─▶ context-guard.js   reads context %, nudges/denies
+  PreToolUse (Write|Edit|MultiEdit)           ─▶ dedup-guard.js     denies a duplicate fn/type (DRY)
   SessionStart                                ─▶ ctx-watch-spawn.js  launches the daemon (disarmed)
   Stop                                        ─▶ speak-response.js   speaks the turn (macOS)
 

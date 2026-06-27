@@ -13,10 +13,11 @@ import path from "node:path";
 import { Command } from "commander";
 
 import { config } from "./commands/config.js";
+import { dedupCheck } from "./commands/dedup.js";
 import { doctor } from "./commands/doctor.js";
 import { install } from "./commands/install.js";
 import { uninstall } from "./commands/uninstall.js";
-import { parseNumber } from "./core/env-config.js";
+import { DEDUP_MODES, isDedupMode, parseNumber } from "./core/env-config.js";
 import { packageRoot, readJson } from "./core/fs-utils.js";
 import { fail } from "./core/ui.js";
 import type { BagConfig, FeatureId, Scope } from "./core/types.js";
@@ -52,6 +53,12 @@ function configPatch(opts: Record<string, unknown>): Partial<BagConfig> {
   num("idle", "idleSeconds");
   num("ttsRate", "ttsRate");
   if (typeof opts.ttsVoice === "string") patch.ttsVoice = opts.ttsVoice;
+  if (typeof opts.dedupMode === "string") {
+    const mode = opts.dedupMode.trim().toLowerCase();
+    if (!isDedupMode(mode)) throw new Error(`Invalid --dedup-mode: ${opts.dedupMode} (expected ${DEDUP_MODES.join("|")})`);
+    patch.dedupMode = mode;
+  }
+  if (typeof opts.dedupSkip === "string") patch.dedupSkip = opts.dedupSkip;
   return patch;
 }
 
@@ -95,7 +102,19 @@ withScope(program.command("config"))
   .option("--idle <s>", "daemon idle gate")
   .option("--tts-voice <name>", "macOS `say` voice")
   .option("--tts-rate <n>", "TTS words per minute")
+  .option("--dedup-mode <deny|warn|off>", "dedup-guard enforcement level")
+  .option("--dedup-skip <dirs>", "extra dirs dedup-guard ignores (comma list)")
   .action((opts) => config({ scope: scopeOf(opts), patch: configPatch(opts) }));
+
+const dedup = program.command("dedup").description("Duplicate-code utilities (the dedup-guard feature)");
+dedup
+  .command("check [path]")
+  .description("Scan for duplicate functions/types; exits non-zero on findings (pre-commit / CI gate)")
+  .option("--staged", "only report dups touching git-staged files")
+  .option("--since <ref>", "only report dups touching files changed since <ref> (e.g. main)")
+  .action((pathArg: string | undefined, opts: { staged?: boolean; since?: string }) =>
+    dedupCheck({ path: pathArg, staged: Boolean(opts.staged), since: opts.since }),
+  );
 
 program
   .command("doctor")

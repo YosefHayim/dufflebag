@@ -13,6 +13,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
 import { detectAgents } from "../core/agents.js";
+import { rootDirOf, writeAgentsBlock, writeCursorHook } from "../core/agent-wiring.js";
 import { DEFAULTS, toEnvMap } from "../core/env-config.js";
 import { ALL_FEATURES, DEFAULT_FEATURES, FEATURES, resolveFeatures, skillsFor } from "../core/features.js";
 import {
@@ -25,7 +26,7 @@ import {
   writeJson,
 } from "../core/fs-utils.js";
 import { writeManifest, type Manifest } from "../core/manifest.js";
-import { hookCommand, resolveLayout, type Layout } from "../core/paths.js";
+import { hookCommand, resolveLayout, stamp, type Layout } from "../core/paths.js";
 import {
   ghosttyAvailable,
   homebrewAvailable,
@@ -57,8 +58,6 @@ export interface InstallOptions {
   isUpdate?: boolean;
   projectRoot?: string;
 }
-
-const stamp = (): string => new Date().toISOString().replace(/[:.]/g, "-");
 
 const version = (): string => readJson<{ version: string }>(path.join(packageRoot(), "package.json"))?.version ?? "0.0.0";
 
@@ -118,6 +117,26 @@ async function ensureGhostty(features: FeatureId[], opts: InstallOptions): Promi
       : "Ghostty not detected — install it from https://ghostty.org to use /autorun. context-guard works regardless.",
   );
   return true;
+}
+
+/**
+ * Wire the dedup-guard feature's non-Claude surfaces. Claude is handled by the
+ * shared settings.json path; this adds Cursor + AGENTS.md. In project scope we
+ * write both unconditionally so the committed repo protects every teammate's
+ * agent on clone; in global scope we only write `~/.cursor` when Cursor is
+ * actually installed, and skip AGENTS.md (it's a per-repo file). Returns the
+ * touched paths for the install summary.
+ */
+function wireDedupAgents(layout: Layout, scope: Scope): string[] {
+  const touched: string[] = [];
+  const cursorPresent = detectAgents().some((a) => a.id === "cursor" && a.installed);
+  if (scope === "project" || cursorPresent) {
+    touched.push(writeCursorHook(layout.claudeDir, hookCommand(layout, "dedup-cursor.js")));
+  }
+  if (scope === "project") {
+    touched.push(writeAgentsBlock(layout.claudeDir));
+  }
+  return touched;
 }
 
 /**
@@ -202,6 +221,9 @@ export async function install(opts: InstallOptions): Promise<void> {
   next = mergeEnv(next, toEnvMap(DEFAULTS)); // preserve=default: fills only missing keys
   writeSettings(layout.settingsFile, next);
 
+  // Multi-agent surfaces for dedup-guard (Cursor hooks.json + AGENTS.md block).
+  const dedupWiring = features.includes("dedup-guard") ? wireDedupAgents(layout, opts.scope) : [];
+
   // Manifest.
   const manifest: Manifest = { version: version(), scope: opts.scope, features, skills, installedAt: new Date().toISOString() };
   writeManifest(layout.installDir, manifest);
@@ -210,6 +232,10 @@ export async function install(opts: InstallOptions): Promise<void> {
 
   if (backup) step(c.dim(`backup: ${path.basename(backup)}`));
   if (migrate) step("Migrated off the previous manual install.");
+  if (dedupWiring.length > 0) {
+    const root = rootDirOf(layout.claudeDir);
+    step(c.dim(`dedup-guard also wired: ${dedupWiring.map((f) => path.relative(root, f)).join(", ")}`));
+  }
 
   note(nextSteps(features, opts.scope), "Next steps");
   outro(c.green("Done. Restart Claude Code so the hooks load."));
@@ -219,6 +245,10 @@ function nextSteps(features: FeatureId[], scope: Scope): string {
   const lines = [`${c.dim("•")} Restart Claude Code (or open a new session) to load the hooks.`];
   if (features.includes("autonomous-loop"))
     lines.push(`${c.dim("•")} Arm the loop with ${c.cyan("/autorun")} ${c.dim("(macOS + Ghostty).")}`);
+  if (features.includes("dedup-guard")) {
+    lines.push(`${c.dim("•")} Dedup-guard blocks copy-pasted functions/types on Claude (Cursor warns; Codex via AGENTS.md).`);
+    lines.push(`${c.dim("•")} Scan or gate CI: ${c.cyan("skills-bag dedup check --since main")} ${c.dim("· soften with --dedup-mode warn")}`);
+  }
   lines.push(`${c.dim("•")} Tune values: ${c.cyan("skills-bag config --warn 0.15")}`);
   if (scope === "project") lines.push(`${c.dim("•")} Commit ${c.cyan(".claude/")} so teammates share the setup.`);
   lines.push(`${c.dim("•")} Health check: ${c.cyan("skills-bag doctor")}`);

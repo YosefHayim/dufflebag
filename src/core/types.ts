@@ -54,7 +54,15 @@ export interface Feature {
   platform: "any" | "macos" | "macos+ghostty";
 }
 
-export type FeatureId = "context-guard" | "autonomous-loop" | "speak-response";
+export type FeatureId = "context-guard" | "autonomous-loop" | "speak-response" | "dedup-guard";
+
+/**
+ * dedup-guard enforcement level (`SKILLS_BAG_DEDUP_MODE`):
+ * - `deny` — block the write (Claude/Cursor-compat) — the default.
+ * - `warn` — allow the write but surface the collision to the agent.
+ * - `off`  — inert (the hook allows everything through).
+ */
+export type DedupMode = "deny" | "warn" | "off";
 
 /**
  * Tunable runtime config, surfaced to the hooks as `SKILLS_BAG_*` env vars in
@@ -71,4 +79,8 @@ export interface BagConfig {
   idleSeconds: number;
   ttsVoice: string;
   ttsRate: number;
+  /** dedup-guard enforcement level; see {@link DedupMode}. */
+  dedupMode: DedupMode;
+  /** Extra directory names dedup-guard excludes from its index (comma/space list, e.g. `templates`). */
+  dedupSkip: string;
 }
