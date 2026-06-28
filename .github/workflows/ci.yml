@@ -1,20 +1,35 @@
 name: CI
 
+# Cross-environment verification + main-branch guard for skills-bag.
+#
+# - `test` runs the full gate (typecheck -> test -> build) on every PR and push
+#   to main/dev, across OS (ubuntu, macos) x Node (20, 22, 24) so the supported
+#   range (package.json `engines: node >=20`) is actually exercised.
+# - `CI Gate` is a single aggregated status check: require it in branch
+#   protection so a red matrix blocks PR merges ("doesn't merge it").
+# - `report-failure` opens (or comments on) a GitHub issue labelled `ci-failure`
+#   when main goes red — e.g. after a direct push — so a broken main is never
+#   silent. It never runs for PRs (those failures are visible on the PR itself).
+
 on:
   push:
     branches: [main, dev]
   pull_request:
     branches: [main, dev]
 
+permissions:
+  contents: read
+
 jobs:
   test:
     if: github.actor != 'dependabot[bot]'
-    name: Test on ${{ matrix.os }}
+    name: ${{ matrix.os }} / node ${{ matrix.node }}
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
-
+        node: [20, 22, 24]
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -25,7 +40,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: 24
+          node-version: ${{ matrix.node }}
           cache: pnpm
 
       - name: Install dependencies
@@ -39,3 +54,77 @@ jobs:
 
       - name: Build
         run: pnpm run build
+
+  gate:
+    name: CI Gate
+    needs: test
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every matrix leg to pass
+        run: |
+          echo "matrix result: ${{ needs.test.result }}"
+          test "${{ needs.test.result }}" = "success"
+
+  report-failure:
+    name: Open issue on main failure
+    needs: test
+    if: failure() && github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+      actions: read
+    steps:
+      - name: File or update a ci-failure issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const runUrl = `${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`;
+            const shortSha = context.sha.slice(0, 7);
+            const label = 'ci-failure';
+
+            // Enumerate the failed legs for a useful issue body.
+            const jobs = await github.paginate(github.rest.actions.listJobsForWorkflowRun, {
+              owner, repo, run_id: context.runId, per_page: 100,
+            });
+            const failedLegs = jobs
+              .filter((j) => j.conclusion && !['success', 'skipped'].includes(j.conclusion))
+              .map((j) => `- \`${j.name}\` → **${j.conclusion}**`);
+
+            // Ensure the label exists (idempotent across runs).
+            try {
+              await github.rest.issues.getLabel({ owner, repo, name: label });
+            } catch {
+              await github.rest.issues.createLabel({
+                owner, repo, name: label, color: 'b60205',
+                description: 'Automated CI failure on main',
+              });
+            }
+
+            const title = `CI failed on main @ ${shortSha}`;
+            const body = [
+              '**Main CI failed** after a push to `main`.',
+              '',
+              `- Commit: \`${context.sha}\``,
+              `- Run (full logs + exit codes): ${runUrl}`,
+              '',
+              '### Failed legs',
+              failedLegs.length ? failedLegs.join('\n') : '_Could not enumerate jobs — open the run above._',
+              '',
+              'Close this issue once `main` is green again.',
+            ].join('\n');
+
+            // Dedupe: comment on an existing open issue for the same commit instead of spamming.
+            const open = await github.paginate(github.rest.issues.listForRepo, {
+              owner, repo, state: 'open', labels: label, per_page: 100,
+            });
+            const existing = open.find((i) => i.title === title);
+            if (existing) {
+              await github.rest.issues.createComment({
+                owner, repo, issue_number: existing.number, body: `Still failing — re-run: ${runUrl}`,
+              });
+            } else {
+              await github.rest.issues.create({ owner, repo, title, body, labels: [label] });
+            }
