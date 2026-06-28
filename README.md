@@ -1,5 +1,9 @@
 # skills-bag
 
+<p align="center">
+  <img src=".github/skills-bag.png" alt="skills-bag logo" width="220" />
+</p>
+
 > A one-command installer for a personal bag of [Claude Code](https://claude.com/claude-code) skills and hooks — a context guardrail, a DRY dedup-guard, a hands-free autonomous-compact loop, macOS text-to-speech, and a PNG → pixel-perfect-code skill. Pure TypeScript, Node-only, **no Python**.
 
 ```bash
