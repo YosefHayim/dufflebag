@@ -134,7 +134,7 @@ export function resolveRepoRoot(cwd: string = process.cwd()): string {
   return process.env.CLAUDE_PROJECT_DIR || cwd;
 }
 
-/** Parse the `SKILLS_BAG_DEDUP_SKIP` value (comma/space list) into extra skip-dir names. */
+/** Parse the `skillsBagDedupSkipDirectories` value (comma/space list) into extra skip-dir names. */
 export function parseSkipList(raw: string | undefined): string[] {
   if (!raw) return [];
   return raw

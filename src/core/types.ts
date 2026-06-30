@@ -4,7 +4,7 @@
  * These describe the three moving parts the CLI reconciles: the **feature
  * catalog** (what a user can install), the **Claude Code settings.json** shape
  * we surgically merge into, and the **tunable config** we expose as
- * `SKILLS_BAG_*` environment variables. Keeping them in one place means the
+ * `skillsBag*` environment variables. Keeping them in one place means the
  * install/uninstall/config/doctor commands all agree on the same vocabulary.
  */
 
@@ -35,7 +35,7 @@ export interface ManagedHook {
 
 /**
  * One installable unit. Features compose: `autonomous-loop` depends on
- * `context-guard` (they must share WARN_PCT), so installing the former pulls
+ * `context-guard` (they must share context thresholds), so installing the former pulls
  * the latter. `platform` gates features the daemon can't satisfy elsewhere.
  */
 export interface Feature {
@@ -57,7 +57,7 @@ export interface Feature {
 export type FeatureId = "context-guard" | "autonomous-loop" | "speak-response" | "dedup-guard" | "png-to-code";
 
 /**
- * dedup-guard enforcement level (`SKILLS_BAG_DEDUP_MODE`):
+ * dedup-guard enforcement level (`skillsBagDedupEnforcement`):
  * - `deny` — block the write (Claude/Cursor-compat) — the default.
  * - `warn` — allow the write but surface the collision to the agent.
  * - `off`  — inert (the hook allows everything through).
@@ -65,22 +65,32 @@ export type FeatureId = "context-guard" | "autonomous-loop" | "speak-response" |
 export type DedupMode = "deny" | "warn" | "off";
 
 /**
- * Tunable runtime config, surfaced to the hooks as `SKILLS_BAG_*` env vars in
+ * Tunable runtime config, surfaced to the hooks as `skillsBag*` env vars in
  * settings.json. Values are strings on disk (settings.json env is string→string);
  * the hooks parse + clamp them. `undefined` here means "use the hook's built-in
  * default" — the installer only writes keys it is asked to.
  */
 export interface BagConfig {
-  warnPct: number;
-  blockPct: number;
-  defaultBudget: number;
-  hardCap: number;
-  pollSeconds: number;
-  idleSeconds: number;
-  ttsVoice: string;
-  ttsRate: number;
+  /** Context fill ratio at which to nudge `/handoff`. */
+  contextWarnFraction: number;
+  /** Context fill ratio at which to hard-deny code edits. */
+  contextBlockFraction: number;
+  /** Default `/autorun` cycle count. */
+  autorunDefaultCycleCount: number;
+  /** Absolute anti-runaway autorun cycle cap. */
+  autorunMaxCycleCount: number;
+  /** Daemon poll interval in seconds. */
+  autorunPollIntervalSeconds: number;
+  /** Idle seconds before the daemon counts a turn as done. */
+  autorunIdleThresholdSeconds: number;
+  /** macOS `say` voice name. */
+  speechVoice: string;
+  /** TTS rate in words per minute. */
+  speechWordsPerMinute: number;
   /** dedup-guard enforcement level; see {@link DedupMode}. */
-  dedupMode: DedupMode;
-  /** Extra directory names dedup-guard excludes from its index (comma/space list, e.g. `templates`). */
-  dedupSkip: string;
+  dedupEnforcement: DedupMode;
+  /** Extra directory names dedup-guard excludes from its index (comma/space list). */
+  dedupSkipDirectories: string;
+  /** Verbose hook stderr logging. */
+  debugEnabled: boolean;
 }

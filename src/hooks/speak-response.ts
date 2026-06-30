@@ -3,7 +3,7 @@
  * speak-response — minimal TTS for Claude Code (macOS). A `Stop` hook: when a
  * turn finishes, it reads the transcript and speaks only the assistant's prose
  * (code blocks and tool calls stripped) via the built-in `say` command. TS port
- * of the original bash hook; voice and rate come from `SKILLS_BAG_*` env.
+ * of the original bash hook; voice and rate come from `skillsBag*` env.
  *
  * Fail-open and non-blocking: any error exits 0, and speech is detached so the
  * hook returns instantly. macOS-only — no-ops on other platforms.
@@ -89,10 +89,10 @@ function main(): void {
   const clean = stripMarkdown(proseSinceLastPrompt(entries));
   if (!clean) return;
 
-  const { ttsVoice, ttsRate } = readConfig();
+  const { speechVoice, speechWordsPerMinute } = readConfig();
   // Kill any in-progress speech so turns don't pile up, then detach.
   spawn("pkill", ["-x", "say"], { stdio: "ignore" }).on("error", () => {});
-  const args = ["-v", ttsVoice, ...(ttsRate ? ["-r", String(ttsRate)] : []), clean];
+  const args = ["-v", speechVoice, ...(speechWordsPerMinute ? ["-r", String(speechWordsPerMinute)] : []), clean];
   spawn("/usr/bin/say", args, { detached: true, stdio: "ignore" }).unref();
 }
 

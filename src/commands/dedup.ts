@@ -72,7 +72,7 @@ export function dedupCheck(opts: DedupCheckOptions): void {
   }
 
   const cfg = fromEnvMap(readSettings(resolveLayout("project", repoRoot).settingsFile).env);
-  const skipDirs = [...new Set([...parseSkipList(cfg.dedupSkip), ...parseSkipList(process.env.SKILLS_BAG_DEDUP_SKIP)])];
+  const skipDirs = [...new Set([...parseSkipList(cfg.dedupSkipDirectories)])];
 
   let restrict: Set<string> | undefined;
   if (opts.staged || opts.since) {

@@ -17,6 +17,7 @@ import { FEATURES } from "../core/features.js";
 import { readManifest } from "../core/manifest.js";
 import { resolveLayout } from "../core/paths.js";
 import { ghosttyAvailable, isMacOS, nodeMajor, platformBlocker } from "../core/platform.js";
+import { hasLegacyEnvKeys } from "../core/env-migrate.js";
 import { detectLegacyHooks, listManagedHooks, readSettings } from "../core/settings.js";
 import { c, intro, note, outro } from "../core/ui.js";
 import type { DedupMode, Scope } from "../core/types.js";
@@ -80,8 +81,13 @@ function scopeBlock(scope: Scope): string | null {
     const blocker = platformBlocker(FEATURES[id].platform);
     if (blocker) lines.push(bad(`${id} ${blocker} (inert here)`));
   }
-  if (manifest.features.includes("dedup-guard")) lines.push(...dedupLines(layout.claudeDir, scope, cfg.dedupMode));
-  lines.push(c.dim(`config: warn ${cfg.warnPct} · block ${cfg.blockPct} · budget ${cfg.defaultBudget} · cap ${cfg.hardCap}`));
+  if (manifest.features.includes("dedup-guard")) lines.push(...dedupLines(layout.claudeDir, scope, cfg.dedupEnforcement));
+  if (hasLegacyEnvKeys(settings.env)) lines.push(bad("legacy SKILLS_BAG_* env keys present — run skills-bag update to migrate"));
+  lines.push(
+    c.dim(
+      `config: warn ${cfg.contextWarnFraction} · block ${cfg.contextBlockFraction} · budget ${cfg.autorunDefaultCycleCount} · cap ${cfg.autorunMaxCycleCount}`,
+    ),
+  );
   return lines.join("\n");
 }
 

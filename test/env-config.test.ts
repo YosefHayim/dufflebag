@@ -1,6 +1,6 @@
 /**
  * Tests for the config layer: validation/clamping of user input, the round-trip
- * between a BagConfig and the `SKILLS_BAG_*` string map, and reading effective
+ * between a BagConfig and the `skillsBag*` string map, and reading effective
  * values back (with defaults filling gaps). The clamping rule matters because a
  * typo must never be able to disable the guardrail.
  */
@@ -11,76 +11,81 @@ import { DEFAULTS, fromEnvMap, toEnvMap, validateConfig } from "../src/core/env-
 
 describe("validateConfig", () => {
   it("passes through valid values", () => {
-    expect(validateConfig({ warnPct: 0.15, defaultBudget: 5 })).toEqual({ warnPct: 0.15, defaultBudget: 5 });
+    expect(validateConfig({ contextWarnFraction: 0.15, autorunDefaultCycleCount: 5 })).toEqual({
+      contextWarnFraction: 0.15,
+      autorunDefaultCycleCount: 5,
+    });
   });
 
   it("clamps out-of-range numbers into the safe band", () => {
-    expect(validateConfig({ warnPct: 5 }).warnPct).toBe(0.95); // upper bound
-    expect(validateConfig({ defaultBudget: 0 }).defaultBudget).toBe(1); // lower bound
+    expect(validateConfig({ contextWarnFraction: 5 }).contextWarnFraction).toBe(0.95);
+    expect(validateConfig({ autorunDefaultCycleCount: 0 }).autorunDefaultCycleCount).toBe(1);
   });
 
   it("throws when warn >= block (the guard would never warn before blocking)", () => {
-    expect(() => validateConfig({ warnPct: 0.3, blockPct: 0.2 })).toThrow(/below blockPct/);
+    expect(() => validateConfig({ contextWarnFraction: 0.3, contextBlockFraction: 0.2 })).toThrow(/below contextBlockFraction/);
   });
 
   it("throws on a non-numeric numeric field", () => {
-    expect(() => validateConfig({ hardCap: Number("nope") })).toThrow(/expected a number/);
+    expect(() => validateConfig({ autorunMaxCycleCount: Number("nope") })).toThrow(/expected a number/);
   });
 
-  it("keeps the tts voice as a free string", () => {
-    expect(validateConfig({ ttsVoice: "Ava" })).toEqual({ ttsVoice: "Ava" });
+  it("keeps the speech voice as a free string", () => {
+    expect(validateConfig({ speechVoice: "Ava" })).toEqual({ speechVoice: "Ava" });
   });
 });
 
 describe("env round-trip", () => {
   it("toEnvMap emits only provided keys, stringified", () => {
-    expect(toEnvMap({ warnPct: 0.15, ttsVoice: "Ava" })).toEqual({
-      SKILLS_BAG_WARN_PCT: "0.15",
-      SKILLS_BAG_TTS_VOICE: "Ava",
+    expect(toEnvMap({ contextWarnFraction: 0.15, speechVoice: "Ava" })).toEqual({
+      skillsBagContextWarnFraction: "0.15",
+      skillsBagSpeechVoice: "Ava",
     });
   });
 
   it("fromEnvMap parses values and falls back to defaults for missing keys", () => {
-    const cfg = fromEnvMap({ SKILLS_BAG_WARN_PCT: "0.12" });
-    expect(cfg.warnPct).toBe(0.12);
-    expect(cfg.blockPct).toBe(DEFAULTS.blockPct); // missing → default
-    expect(cfg.ttsVoice).toBe(DEFAULTS.ttsVoice);
+    const cfg = fromEnvMap({ skillsBagContextWarnFraction: "0.12" });
+    expect(cfg.contextWarnFraction).toBe(0.12);
+    expect(cfg.contextBlockFraction).toBe(DEFAULTS.contextBlockFraction);
+    expect(cfg.speechVoice).toBe(DEFAULTS.speechVoice);
   });
 
   it("fromEnvMap ignores garbage and uses the default", () => {
-    expect(fromEnvMap({ SKILLS_BAG_HARD_CAP: "abc" }).hardCap).toBe(DEFAULTS.hardCap);
+    expect(fromEnvMap({ skillsBagAutorunMaxCycleCount: "abc" }).autorunMaxCycleCount).toBe(DEFAULTS.autorunMaxCycleCount);
   });
 });
 
 describe("dedup config", () => {
   it("accepts the three valid modes and rejects anything else", () => {
-    expect(validateConfig({ dedupMode: "warn" })).toEqual({ dedupMode: "warn" });
-    expect(validateConfig({ dedupMode: "OFF" })).toEqual({ dedupMode: "off" }); // case-insensitive
-    expect(() => validateConfig({ dedupMode: "loud" })).toThrow(/Invalid dedup mode/);
+    expect(validateConfig({ dedupEnforcement: "warn" })).toEqual({ dedupEnforcement: "warn" });
+    expect(validateConfig({ dedupEnforcement: "OFF" })).toEqual({ dedupEnforcement: "off" });
+    expect(() => validateConfig({ dedupEnforcement: "loud" })).toThrow(/Invalid dedup mode/);
   });
 
   it("keeps the skip list as a free string", () => {
-    expect(validateConfig({ dedupSkip: "templates, fixtures" })).toEqual({ dedupSkip: "templates, fixtures" });
+    expect(validateConfig({ dedupSkipDirectories: "templates, fixtures" })).toEqual({
+      dedupSkipDirectories: "templates, fixtures",
+    });
   });
 
   it("round-trips mode + skip through the env map", () => {
-    expect(toEnvMap({ dedupMode: "deny", dedupSkip: "templates" })).toEqual({
-      SKILLS_BAG_DEDUP_MODE: "deny",
-      SKILLS_BAG_DEDUP_SKIP: "templates",
+    expect(toEnvMap({ dedupEnforcement: "deny", dedupSkipDirectories: "templates" })).toEqual({
+      skillsBagDedupEnforcement: "deny",
+      skillsBagDedupSkipDirectories: "templates",
     });
   });
 
   it("omits an empty skip list rather than writing a noise key", () => {
-    expect(toEnvMap({ dedupSkip: "" })).toEqual({});
+    expect(toEnvMap({ dedupSkipDirectories: "" })).toEqual({});
   });
 
   it("defaults dedup mode to deny and skip to empty when unset", () => {
     const cfg = fromEnvMap({});
-    expect(cfg.dedupMode).toBe("deny");
-    expect(cfg.dedupSkip).toBe("");
+    expect(cfg.dedupEnforcement).toBe("deny");
+    expect(cfg.dedupSkipDirectories).toBe("");
   });
 
   it("coerces an unknown env mode back to the safe deny default", () => {
-    expect(fromEnvMap({ SKILLS_BAG_DEDUP_MODE: "bogus" }).dedupMode).toBe("deny");
+    expect(fromEnvMap({ skillsBagDedupEnforcement: "bogus" }).dedupEnforcement).toBe("deny");
   });
 });

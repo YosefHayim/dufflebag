@@ -19,7 +19,7 @@
 
 import { readFileSync, writeSync } from "node:fs";
 
-import { parseDedupMode, readConfig } from "./lib/config.js";
+import { readConfig } from "./lib/config.js";
 import {
   buildIndex,
   findDuplicatesInAddedText,
@@ -77,7 +77,8 @@ function reason(filePath: string, hits: DupHit[], blocked: boolean): string {
 }
 
 function main(): void {
-  const mode = parseDedupMode(readConfig().dedupMode);
+  const cfg = readConfig();
+  const mode = cfg.dedupEnforcement;
   if (mode === "off") allow();
 
   let data: HookInput;
@@ -99,7 +100,7 @@ function main(): void {
   const ts = loadTypeScript(repoRoot);
   if (!ts) allow(); // no TypeScript in the repo → can't check; fail open.
 
-  const skipDirs = parseSkipList(process.env.SKILLS_BAG_DEDUP_SKIP);
+  const skipDirs = parseSkipList(cfg.dedupSkipDirectories);
   const index = buildIndex({ repoRoot, skipDirs, ts: ts! });
   const hits = findDuplicatesInAddedText(ts!, index, repoRoot, filePath, added);
   if (hits.length === 0) allow();
@@ -115,6 +116,6 @@ function main(): void {
 try {
   main();
 } catch (e) {
-  if (process.env.SKILLS_BAG_DEBUG) writeSync(2, `dedup-guard error: ${e instanceof Error ? e.stack : String(e)}\n`);
+  if (readConfig().debugEnabled) writeSync(2, `dedup-guard error: ${e instanceof Error ? e.stack : String(e)}\n`);
   process.exit(0); // fail-open: never block a tool because the guard itself errored.
 }

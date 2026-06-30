@@ -1,5 +1,5 @@
 /**
- * Shared config contract between the CLI (which writes `SKILLS_BAG_*` into
+ * Shared config contract between the CLI (which writes `skillsBag*` keys into
  * settings.json) and the hooks (which read them from the environment).
  *
  * This module is the single source of truth for the key names and defaults, and
@@ -12,21 +12,40 @@
 import type { BagConfig, DedupMode } from "../../core/types.js";
 
 /** Prefix marking every key this tool owns in settings.json `env`. */
-export const ENV_PREFIX = "SKILLS_BAG_";
+export const ENV_PREFIX = "skillsBag";
+
+/** Legacy SCREAMING_SNAKE prefix from skills-bag < 0.5.0 (migrated on install/update). */
+export const LEGACY_ENV_PREFIX = "SKILLS_BAG_";
 
 /** Canonical env var name for each config field. */
 export const ENV_KEYS = {
-  warnPct: "SKILLS_BAG_WARN_PCT",
-  blockPct: "SKILLS_BAG_BLOCK_PCT",
-  defaultBudget: "SKILLS_BAG_DEFAULT_BUDGET",
-  hardCap: "SKILLS_BAG_HARD_CAP",
-  pollSeconds: "SKILLS_BAG_POLL_SECONDS",
-  idleSeconds: "SKILLS_BAG_IDLE_SECONDS",
-  ttsVoice: "SKILLS_BAG_TTS_VOICE",
-  ttsRate: "SKILLS_BAG_TTS_RATE",
-  dedupMode: "SKILLS_BAG_DEDUP_MODE",
-  dedupSkip: "SKILLS_BAG_DEDUP_SKIP",
+  contextWarnFraction: "skillsBagContextWarnFraction",
+  contextBlockFraction: "skillsBagContextBlockFraction",
+  autorunDefaultCycleCount: "skillsBagAutorunDefaultCycleCount",
+  autorunMaxCycleCount: "skillsBagAutorunMaxCycleCount",
+  autorunPollIntervalSeconds: "skillsBagAutorunPollIntervalSeconds",
+  autorunIdleThresholdSeconds: "skillsBagAutorunIdleThresholdSeconds",
+  speechVoice: "skillsBagSpeechVoice",
+  speechWordsPerMinute: "skillsBagSpeechWordsPerMinute",
+  dedupEnforcement: "skillsBagDedupEnforcement",
+  dedupSkipDirectories: "skillsBagDedupSkipDirectories",
+  debugEnabled: "skillsBagDebugEnabled",
 } as const satisfies Record<keyof BagConfig, string>;
+
+/** Legacy env key → BagConfig field (for one-time migration). */
+export const LEGACY_ENV_KEYS: Record<string, keyof BagConfig> = {
+  SKILLS_BAG_WARN_PCT: "contextWarnFraction",
+  SKILLS_BAG_BLOCK_PCT: "contextBlockFraction",
+  SKILLS_BAG_DEFAULT_BUDGET: "autorunDefaultCycleCount",
+  SKILLS_BAG_HARD_CAP: "autorunMaxCycleCount",
+  SKILLS_BAG_POLL_SECONDS: "autorunPollIntervalSeconds",
+  SKILLS_BAG_IDLE_SECONDS: "autorunIdleThresholdSeconds",
+  SKILLS_BAG_TTS_VOICE: "speechVoice",
+  SKILLS_BAG_TTS_RATE: "speechWordsPerMinute",
+  SKILLS_BAG_DEDUP_MODE: "dedupEnforcement",
+  SKILLS_BAG_DEDUP_SKIP: "dedupSkipDirectories",
+  SKILLS_BAG_DEBUG: "debugEnabled",
+};
 
 /** Valid dedup-guard enforcement levels; anything else coerces to the `deny` default. */
 export const DEDUP_MODES: readonly DedupMode[] = ["deny", "warn", "off"];
@@ -48,16 +67,17 @@ export function parseDedupMode(raw: string | undefined): DedupMode {
  * block at 20%, 10-cycle autorun budget, 50-cycle anti-runaway cap).
  */
 export const DEFAULTS: BagConfig = {
-  warnPct: 0.18,
-  blockPct: 0.2,
-  defaultBudget: 10,
-  hardCap: 50,
-  pollSeconds: 5,
-  idleSeconds: 8,
-  ttsVoice: "Samantha",
-  ttsRate: 230,
-  dedupMode: "deny",
-  dedupSkip: "",
+  contextWarnFraction: 0.18,
+  contextBlockFraction: 0.2,
+  autorunDefaultCycleCount: 10,
+  autorunMaxCycleCount: 50,
+  autorunPollIntervalSeconds: 5,
+  autorunIdleThresholdSeconds: 8,
+  speechVoice: "Samantha",
+  speechWordsPerMinute: 230,
+  dedupEnforcement: "deny",
+  dedupSkipDirectories: "",
+  debugEnabled: false,
 };
 
 /** Coerce a string env value to a finite number, or null if unparseable/empty. */
@@ -67,19 +87,28 @@ export function parseNumber(raw: string | undefined): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+function parseBoolean(raw: string | undefined, fallback: boolean): boolean {
+  if (raw == null || raw.trim() === "") return fallback;
+  const value = raw.trim().toLowerCase();
+  if (value === "1" || value === "true" || value === "yes") return true;
+  if (value === "0" || value === "false" || value === "no") return false;
+  return fallback;
+}
+
 /** Read the effective config from an environment map, falling back to defaults per key. */
 export function readConfig(env: Record<string, string | undefined> = process.env): BagConfig {
   const num = (name: string, fallback: number): number => parseNumber(env[name]) ?? fallback;
   return {
-    warnPct: num(ENV_KEYS.warnPct, DEFAULTS.warnPct),
-    blockPct: num(ENV_KEYS.blockPct, DEFAULTS.blockPct),
-    defaultBudget: num(ENV_KEYS.defaultBudget, DEFAULTS.defaultBudget),
-    hardCap: num(ENV_KEYS.hardCap, DEFAULTS.hardCap),
-    pollSeconds: num(ENV_KEYS.pollSeconds, DEFAULTS.pollSeconds),
-    idleSeconds: num(ENV_KEYS.idleSeconds, DEFAULTS.idleSeconds),
-    ttsVoice: env[ENV_KEYS.ttsVoice] ?? DEFAULTS.ttsVoice,
-    ttsRate: num(ENV_KEYS.ttsRate, DEFAULTS.ttsRate),
-    dedupMode: parseDedupMode(env[ENV_KEYS.dedupMode]),
-    dedupSkip: env[ENV_KEYS.dedupSkip] ?? DEFAULTS.dedupSkip,
+    contextWarnFraction: num(ENV_KEYS.contextWarnFraction, DEFAULTS.contextWarnFraction),
+    contextBlockFraction: num(ENV_KEYS.contextBlockFraction, DEFAULTS.contextBlockFraction),
+    autorunDefaultCycleCount: num(ENV_KEYS.autorunDefaultCycleCount, DEFAULTS.autorunDefaultCycleCount),
+    autorunMaxCycleCount: num(ENV_KEYS.autorunMaxCycleCount, DEFAULTS.autorunMaxCycleCount),
+    autorunPollIntervalSeconds: num(ENV_KEYS.autorunPollIntervalSeconds, DEFAULTS.autorunPollIntervalSeconds),
+    autorunIdleThresholdSeconds: num(ENV_KEYS.autorunIdleThresholdSeconds, DEFAULTS.autorunIdleThresholdSeconds),
+    speechVoice: env[ENV_KEYS.speechVoice] ?? DEFAULTS.speechVoice,
+    speechWordsPerMinute: num(ENV_KEYS.speechWordsPerMinute, DEFAULTS.speechWordsPerMinute),
+    dedupEnforcement: parseDedupMode(env[ENV_KEYS.dedupEnforcement]),
+    dedupSkipDirectories: env[ENV_KEYS.dedupSkipDirectories] ?? DEFAULTS.dedupSkipDirectories,
+    debugEnabled: parseBoolean(env[ENV_KEYS.debugEnabled], DEFAULTS.debugEnabled),
   };
 }
