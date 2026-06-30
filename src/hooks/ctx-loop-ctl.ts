@@ -24,7 +24,7 @@ import { readConfig } from "./lib/config.js";
 import { loopFile, readInt, remove, writeText } from "./lib/state.js";
 import { resolveSessionId, sumTokens } from "./lib/transcript.js";
 
-const DEFAULT_BUDGET = readConfig().defaultBudget;
+const DEFAULT_BUDGET = readConfig().autorunDefaultCycleCount;
 const RATE_LIMITS_FILE = path.join(homedir(), ".claude", ".last-rate-limits.json");
 
 const daemonPath = (): string => path.join(path.dirname(fileURLToPath(import.meta.url)), "ctx-watch.js");

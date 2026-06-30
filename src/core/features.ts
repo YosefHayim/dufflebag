@@ -43,7 +43,7 @@ export const FEATURES: Record<FeatureId, Feature> = {
     id: "dedup-guard",
     title: "Dedup guard",
     summary:
-      "Block a Write/Edit that pastes a function body or interface/type shape already defined elsewhere in the repo — DRY enforced at the moment of the write. Uses the repo's own TypeScript; deny by default (tune with SKILLS_BAG_DEDUP_MODE). Also wires Cursor (warn) + an AGENTS.md rule for Codex.",
+      "Block a Write/Edit that pastes a function body or interface/type shape already defined elsewhere in the repo — DRY enforced at the moment of the write. Uses the repo's own TypeScript; deny by default (tune with skillsBagDedupEnforcement). Also wires Cursor (warn) + an AGENTS.md rule for Codex.",
     requires: [],
     platform: "any",
     skills: [],

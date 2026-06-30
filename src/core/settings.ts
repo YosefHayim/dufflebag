@@ -4,7 +4,7 @@
  * We edit a file the user hand-maintains, so every mutation here is built to be
  * **surgical and idempotent**: bag-owned hooks are identified by the
  * `/skills-bag/` path marker in their command, and bag-owned config by the
- * `SKILLS_BAG_` env prefix. That means uninstall removes exactly what we added
+ * `skillsBag` env prefix. That means uninstall removes exactly what we added
  * and re-installs never duplicate. All functions are pure (clone in, clone out)
  * so the merge logic can be exhaustively unit-tested without touching disk; the
  * thin IO wrappers at the bottom add read/parse/backup/write.
@@ -12,7 +12,8 @@
 
 import { existsSync, readFileSync, writeFileSync, copyFileSync } from "node:fs";
 
-import { ENV_PREFIX } from "./env-config.js";
+import { ENV_PREFIX, LEGACY_ENV_PREFIX } from "./env-config.js";
+import { migrateEnv } from "./env-migrate.js";
 import { backupPath, isBagCommand } from "./paths.js";
 import type { HookEvent } from "./types.js";
 
@@ -90,7 +91,7 @@ export function mergeManagedHooks(input: ClaudeSettings, hooks: RenderedHook[]):
 }
 
 /**
- * Merge `SKILLS_BAG_*` config into `env`. By default existing keys are
+ * Merge `skillsBag*` config into `env`. By default existing keys are
  * preserved (the upgrade rule: fill new gaps, never clobber a user's tuning);
  * pass `overwrite: true` for the `config` command, which intentionally sets the
  * keys the user just specified.
@@ -108,14 +109,22 @@ export function mergeEnv(
   return settings;
 }
 
-/** Remove every `SKILLS_BAG_*` key from `env`, dropping `env` if it ends up empty. */
+/** Remove every `skillsBag*` (and legacy `SKILLS_BAG_*`) key from `env`, dropping `env` if it ends up empty. */
 export function removeManagedEnv(input: ClaudeSettings): ClaudeSettings {
   const settings = clone(input);
   if (!settings.env) return settings;
   for (const key of Object.keys(settings.env)) {
-    if (key.startsWith(ENV_PREFIX)) delete settings.env[key];
+    if (key.startsWith(ENV_PREFIX) || key.startsWith(LEGACY_ENV_PREFIX)) delete settings.env[key];
   }
   if (Object.keys(settings.env).length === 0) delete settings.env;
+  return settings;
+}
+
+/** Migrate legacy env keys and return settings ready for install/update merge. */
+export function applyEnvMigration(input: ClaudeSettings): ClaudeSettings {
+  if (!input.env || !Object.keys(input.env).some((k) => k.startsWith(LEGACY_ENV_PREFIX))) return input;
+  const settings = clone(input);
+  settings.env = migrateEnv(settings.env!);
   return settings;
 }
 

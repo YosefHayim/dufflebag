@@ -45,20 +45,20 @@ function configPatch(opts: Record<string, unknown>): Partial<BagConfig> {
     const parsed = parseNumber(opts[flag] as string | undefined);
     if (parsed != null) (patch[key] as number) = parsed;
   };
-  num("warn", "warnPct");
-  num("block", "blockPct");
-  num("budget", "defaultBudget");
-  num("hardCap", "hardCap");
-  num("poll", "pollSeconds");
-  num("idle", "idleSeconds");
-  num("ttsRate", "ttsRate");
-  if (typeof opts.ttsVoice === "string") patch.ttsVoice = opts.ttsVoice;
+  num("warn", "contextWarnFraction");
+  num("block", "contextBlockFraction");
+  num("budget", "autorunDefaultCycleCount");
+  num("hardCap", "autorunMaxCycleCount");
+  num("poll", "autorunPollIntervalSeconds");
+  num("idle", "autorunIdleThresholdSeconds");
+  num("ttsRate", "speechWordsPerMinute");
+  if (typeof opts.ttsVoice === "string") patch.speechVoice = opts.ttsVoice;
   if (typeof opts.dedupMode === "string") {
     const mode = opts.dedupMode.trim().toLowerCase();
     if (!isDedupMode(mode)) throw new Error(`Invalid --dedup-mode: ${opts.dedupMode} (expected ${DEDUP_MODES.join("|")})`);
-    patch.dedupMode = mode;
+    patch.dedupEnforcement = mode;
   }
-  if (typeof opts.dedupSkip === "string") patch.dedupSkip = opts.dedupSkip;
+  if (typeof opts.dedupSkip === "string") patch.dedupSkipDirectories = opts.dedupSkip;
   return patch;
 }
 

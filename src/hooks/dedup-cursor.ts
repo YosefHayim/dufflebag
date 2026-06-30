@@ -16,7 +16,7 @@
 
 import { readFileSync, writeSync } from "node:fs";
 
-import { parseDedupMode } from "./lib/config.js";
+import { readConfig } from "./lib/config.js";
 import { buildIndex, findDuplicatesInAddedText, isSourcePath, loadTypeScript, parseSkipList, resolveRepoRoot } from "./lib/dupIndex.js";
 import { allow } from "./lib/io.js";
 
@@ -39,8 +39,8 @@ function pick(payload: CursorPayload, keys: string[]): string {
 }
 
 function main(): void {
-  const mode = parseDedupMode(process.env.SKILLS_BAG_DEDUP_MODE);
-  if (mode === "off") allow();
+  const cfg = readConfig();
+  if (cfg.dedupEnforcement === "off") allow();
 
   let payload: CursorPayload;
   try {
@@ -57,7 +57,7 @@ function main(): void {
   const ts = loadTypeScript(repoRoot);
   if (!ts) allow();
 
-  const skipDirs = parseSkipList(process.env.SKILLS_BAG_DEDUP_SKIP);
+  const skipDirs = parseSkipList(cfg.dedupSkipDirectories);
   const index = buildIndex({ repoRoot, skipDirs, ts: ts! });
   const hits = findDuplicatesInAddedText(ts!, index, repoRoot, filePath, content);
   if (hits.length === 0) allow();
@@ -78,6 +78,6 @@ function main(): void {
 try {
   main();
 } catch (e) {
-  if (process.env.SKILLS_BAG_DEBUG) writeSync(2, `dedup-cursor error: ${e instanceof Error ? e.stack : String(e)}\n`);
+  if (readConfig().debugEnabled) writeSync(2, `dedup-cursor error: ${e instanceof Error ? e.stack : String(e)}\n`);
   process.exit(0);
 }

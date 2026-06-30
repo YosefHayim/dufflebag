@@ -27,11 +27,11 @@ import { KILL_SWITCH, LOOP_STATE_DIR, loopFile, readInt, remove, writeText } fro
 import { readOccupancy, resolveTranscriptForSid, tailLines, windowFor } from "./lib/transcript.js";
 
 const cfg = readConfig();
-const WARN_PCT = cfg.warnPct;
-const POLL_MS = cfg.pollSeconds * 1000;
-const IDLE_MS = cfg.idleSeconds * 1000;
-const HARD_CAP = cfg.hardCap;
-const DEFAULT_BUDGET = cfg.defaultBudget;
+const WARN_PCT = cfg.contextWarnFraction;
+const POLL_MS = cfg.autorunPollIntervalSeconds * 1000;
+const IDLE_MS = cfg.autorunIdleThresholdSeconds * 1000;
+const HARD_CAP = cfg.autorunMaxCycleCount;
+const DEFAULT_BUDGET = cfg.autorunDefaultCycleCount;
 
 const STALE_REAP_MS = 600_000; // no transcript growth this long → session gone
 const KEYLOCK_STALE_MS = 30_000; // reclaim a keystroke lock held by a dead daemon

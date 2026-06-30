@@ -3,11 +3,11 @@
  * context-guard — throttles code-writing as the context window fills, forcing a
  * graceful /handoff + /compact wind-down instead of a session ballooning past
  * usable context. TS port of the original Python hook; behavior is identical,
- * but the WARN/BLOCK thresholds now come from `SKILLS_BAG_*` env (one source of
+ * but the warn/block thresholds now come from `skillsBag*` env (one source of
  * truth shared with the daemon) instead of hand-synced constants.
  *
- *   Warn band  (>= warnPct, < blockPct): allow edits, nudge once to /handoff.
- *   Block band (>= blockPct):            deny code-mutation tools, EXCEPT writes
+ *   Warn band  (>= contextWarnFraction, < contextBlockFraction): allow edits, nudge once to /handoff.
+ *   Block band (>= contextBlockFraction):            deny code-mutation tools, EXCEPT writes
  *                                         to the handoff doc itself.
  *
  * Registered on PreToolUse (deny) + PostToolUse/UserPromptSubmit (nudge),
@@ -91,18 +91,19 @@ function main(): void {
   if (!transcript) allow();
   const { occupancy, model } = readOccupancy(transcript!);
   if (!occupancy) allow();
-  const { warnPct, blockPct } = readConfig();
+  const { contextWarnFraction, contextBlockFraction } = readConfig();
   const window = windowFor(model);
   const pct = occupancy! / window;
   const event = data!.hook_event_name;
-  if (event === "PreToolUse") handlePreToolUse(data!, pct, model, window, blockPct);
-  if (event === "PostToolUse" || event === "UserPromptSubmit") emitNudgeOnce(data!, pct, window, event, warnPct, blockPct);
+  if (event === "PreToolUse") handlePreToolUse(data!, pct, model, window, contextBlockFraction);
+  if (event === "PostToolUse" || event === "UserPromptSubmit")
+    emitNudgeOnce(data!, pct, window, event, contextWarnFraction, contextBlockFraction);
   allow();
 }
 
 try {
   main();
 } catch (e) {
-  if (process.env.SKILLS_BAG_DEBUG) writeSync(2, `guard error: ${e instanceof Error ? e.stack : String(e)}\n`);
+  if (readConfig().debugEnabled) writeSync(2, `guard error: ${e instanceof Error ? e.stack : String(e)}\n`);
   process.exit(0); // fail-open: never block a tool because the guard itself errored.
 }

@@ -85,7 +85,7 @@ Run `npx skills-bag install` with no flags and it walks you through a short, ani
 
 ## Configure
 
-All tunables live as `SKILLS_BAG_*` environment variables in your `settings.json` — one source of truth shared by the guard and the daemon, so thresholds can't drift.
+All tunables live as `skillsBag*` camelCase environment variables in your `settings.json` — one source of truth shared by the guard and the daemon, so thresholds can't drift. Upgrading from skills-bag before 0.5.0? Run `skills-bag update` to migrate legacy `SKILLS_BAG_*` keys automatically.
 
 ```bash
 skills-bag config                       # show effective values
@@ -95,16 +95,16 @@ skills-bag config --block 0.22 --budget 5
 
 | Flag | Env var | Default | Meaning |
 | --- | --- | --- | --- |
-| `--warn` | `SKILLS_BAG_WARN_PCT` | `0.18` | Fraction of the window at which to nudge `/handoff` |
-| `--block` | `SKILLS_BAG_BLOCK_PCT` | `0.20` | Fraction at which to hard-deny code edits |
-| `--budget` | `SKILLS_BAG_DEFAULT_BUDGET` | `10` | Cycles for a bare `/autorun` |
-| `--hard-cap` | `SKILLS_BAG_HARD_CAP` | `50` | Absolute anti-runaway ceiling |
-| `--poll` | `SKILLS_BAG_POLL_SECONDS` | `5` | Daemon poll interval |
-| `--idle` | `SKILLS_BAG_IDLE_SECONDS` | `8` | Quiescence required before the daemon counts a turn as idle |
-| `--tts-voice` | `SKILLS_BAG_TTS_VOICE` | `Samantha` | macOS `say` voice |
-| `--tts-rate` | `SKILLS_BAG_TTS_RATE` | `230` | TTS words per minute |
-| `--dedup-mode` | `SKILLS_BAG_DEDUP_MODE` | `deny` | dedup-guard enforcement: `deny` · `warn` · `off` |
-| `--dedup-skip` | `SKILLS_BAG_DEDUP_SKIP` | _(none)_ | extra dir names dedup-guard ignores (comma list) |
+| `--warn` | `skillsBagContextWarnFraction` | `0.18` | Fraction of the window at which to nudge `/handoff` |
+| `--block` | `skillsBagContextBlockFraction` | `0.20` | Fraction at which to hard-deny code edits |
+| `--budget` | `skillsBagAutorunDefaultCycleCount` | `10` | Cycles for a bare `/autorun` |
+| `--hard-cap` | `skillsBagAutorunMaxCycleCount` | `50` | Absolute anti-runaway ceiling |
+| `--poll` | `skillsBagAutorunPollIntervalSeconds` | `5` | Daemon poll interval |
+| `--idle` | `skillsBagAutorunIdleThresholdSeconds` | `8` | Quiescence required before the daemon counts a turn as idle |
+| `--tts-voice` | `skillsBagSpeechVoice` | `Samantha` | macOS `say` voice |
+| `--tts-rate` | `skillsBagSpeechWordsPerMinute` | `230` | TTS words per minute |
+| `--dedup-mode` | `skillsBagDedupEnforcement` | `deny` | dedup-guard enforcement: `deny` · `warn` · `off` |
+| `--dedup-skip` | `skillsBagDedupSkipDirectories` | _(none)_ | extra dir names dedup-guard ignores (comma list) |
 
 Project `settings.json` overrides global, so different repos can run different thresholds. The guard sees changes immediately; an already-running autorun daemon picks them up on the next session.
 
@@ -160,7 +160,7 @@ skills-bag dedup check --staged        # only files staged for commit (pre-commi
 skills-bag dedup check --since main    # only files changed vs a ref (PR / CI)
 ```
 
-Tune it with `SKILLS_BAG_DEDUP_MODE` (`deny` · `warn` · `off`) and exclude generated/scaffold dirs with `SKILLS_BAG_DEDUP_SKIP` (e.g. a monorepo's `templates`). A genuinely intentional duplicate? Append `// dup-ignore` to the declaration's first line — honored by both the live hooks and `dedup check`.
+Tune it with `skillsBagDedupEnforcement` (`deny` · `warn` · `off`) and exclude generated/scaffold dirs with `skillsBagDedupSkipDirectories` (e.g. a monorepo's `templates`). A genuinely intentional duplicate? Append `// dup-ignore` to the declaration's first line — honored by both the live hooks and `dedup check`.
 
 > **No TypeScript in the repo → no guard.** dedup-guard resolves the project's own `typescript`; a repo without it is reported by `doctor`, the hook fails open (allows the edit), and `dedup check` reports it as un-checkable and exits 0 rather than failing CI.
 
@@ -192,7 +192,7 @@ cd ~/.claude/skills/png-to-code/scripts && npm i && npx playwright install chrom
 ```
             settings.json (yours, edited surgically)
             ├─ hooks  → node "~/.claude/skills-bag/hooks/<hook>.js"   (path-identified)
-            └─ env    → SKILLS_BAG_*                                  (prefix-identified)
+            └─ env    → skillsBag*                                   (prefix-identified)
 
   PreToolUse / PostToolUse / UserPromptSubmit ─▶ context-guard.js   reads context %, nudges/denies
   PreToolUse (Write|Edit|MultiEdit)           ─▶ dedup-guard.js     denies a duplicate fn/type (DRY)
@@ -209,7 +209,7 @@ The daemon never types unless **all** of these hold: the session is armed; conte
 
 ```
 ~/.claude/
-├─ settings.json            # your file; bag hooks + SKILLS_BAG_* env merged in, backed up first
+├─ settings.json            # your file; bag hooks + skillsBag* env merged in, backed up first
 ├─ skills-bag/
 │  ├─ hooks/                # the self-contained compiled hook payload (bare Node, zero deps)
 │  ├─ manifest.json         # what this scope installed (features, skills, version)
@@ -228,7 +228,7 @@ skills-bag uninstall            # global
 skills-bag uninstall --project  # project
 ```
 
-Removes the bag's hooks (by path marker), `SKILLS_BAG_*` env keys (by prefix), the installed skills, and the payload dir — backing up `settings.json` first. Your own hooks, env, and settings are untouched, and timestamped backups remain next to `settings.json` for rollback.
+Removes the bag's hooks (by path marker), `skillsBag*` env keys (by prefix), the installed skills, and the payload dir — backing up `settings.json` first. Your own hooks, env, and settings are untouched, and timestamped backups remain next to `settings.json` for rollback.
 
 ## Development
 

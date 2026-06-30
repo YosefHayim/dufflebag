@@ -9,6 +9,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  applyEnvMigration,
   detectLegacyHooks,
   listManagedHooks,
   mergeEnv,
@@ -38,8 +39,8 @@ const userSettings = (): ClaudeSettings => ({
 describe("mergeManagedHooks", () => {
   it("adds bag hooks alongside the user's existing hooks", () => {
     const next = mergeManagedHooks(userSettings(), [bagHook("PreToolUse", "context-guard.js", "Write|Edit")]);
-    expect(next.hooks?.PreToolUse).toHaveLength(2); // user's + bag's
-    expect(next.statusLine).toEqual({ type: "command", command: "my-statusline" }); // untouched
+    expect(next.hooks?.PreToolUse).toHaveLength(2);
+    expect(next.statusLine).toEqual({ type: "command", command: "my-statusline" });
   });
 
   it("is idempotent — re-merging does not duplicate bag hooks", () => {
@@ -55,8 +56,8 @@ describe("removeManagedHooks", () => {
   it("removes only bag hooks, leaving user hooks and dropping emptied events", () => {
     const merged = mergeManagedHooks(userSettings(), [bagHook("Stop", "speak-response.js")]);
     const cleaned = removeManagedHooks(merged);
-    expect(cleaned.hooks?.Stop).toBeUndefined(); // bag-only event dropped entirely
-    expect(cleaned.hooks?.PreToolUse).toHaveLength(1); // user's hook survives
+    expect(cleaned.hooks?.Stop).toBeUndefined();
+    expect(cleaned.hooks?.PreToolUse).toHaveLength(1);
     expect(cleaned.hooks?.PreToolUse?.[0]?.hooks[0]?.command).toContain("my-own-hook.py");
   });
 
@@ -70,25 +71,36 @@ describe("removeManagedHooks", () => {
 
 describe("env merge", () => {
   it("preserves existing values by default (the update rule)", () => {
-    const start = mergeEnv(userSettings(), { SKILLS_BAG_WARN_PCT: "0.18" });
-    const next = mergeEnv(start, { SKILLS_BAG_WARN_PCT: "0.18", SKILLS_BAG_HARD_CAP: "50" });
-    // simulate a user-tuned value, then a re-install that must not clobber it
-    const tuned = mergeEnv(next, { SKILLS_BAG_WARN_PCT: "0.99" });
-    expect(tuned.env?.SKILLS_BAG_WARN_PCT).toBe("0.18");
-    expect(tuned.env?.SKILLS_BAG_HARD_CAP).toBe("50");
+    const start = mergeEnv(userSettings(), { skillsBagContextWarnFraction: "0.18" });
+    const next = mergeEnv(start, { skillsBagContextWarnFraction: "0.18", skillsBagAutorunMaxCycleCount: "50" });
+    const tuned = mergeEnv(next, { skillsBagContextWarnFraction: "0.99" });
+    expect(tuned.env?.skillsBagContextWarnFraction).toBe("0.18");
+    expect(tuned.env?.skillsBagAutorunMaxCycleCount).toBe("50");
     expect(tuned.env?.MY_VAR).toBe("keep");
   });
 
   it("overwrites when explicitly told to (the config command)", () => {
-    const start = mergeEnv(userSettings(), { SKILLS_BAG_WARN_PCT: "0.18" });
-    const next = mergeEnv(start, { SKILLS_BAG_WARN_PCT: "0.15" }, { overwrite: true });
-    expect(next.env?.SKILLS_BAG_WARN_PCT).toBe("0.15");
+    const start = mergeEnv(userSettings(), { skillsBagContextWarnFraction: "0.18" });
+    const next = mergeEnv(start, { skillsBagContextWarnFraction: "0.15" }, { overwrite: true });
+    expect(next.env?.skillsBagContextWarnFraction).toBe("0.15");
   });
 
-  it("removeManagedEnv strips only SKILLS_BAG_* keys", () => {
-    const withBag = mergeEnv(userSettings(), { SKILLS_BAG_WARN_PCT: "0.18" });
+  it("removeManagedEnv strips only skillsBag* and legacy SKILLS_BAG_* keys", () => {
+    const withBag = mergeEnv(userSettings(), {
+      skillsBagContextWarnFraction: "0.18",
+      SKILLS_BAG_BLOCK_PCT: "0.2",
+    });
     const cleaned = removeManagedEnv(withBag);
     expect(cleaned.env).toEqual({ MY_VAR: "keep" });
+  });
+
+  it("applyEnvMigration rewrites legacy keys in place", () => {
+    const migrated = applyEnvMigration({
+      env: { SKILLS_BAG_WARN_PCT: "0.18", MY_VAR: "keep" },
+    });
+    expect(migrated.env?.skillsBagContextWarnFraction).toBe("0.18");
+    expect(migrated.env?.SKILLS_BAG_WARN_PCT).toBeUndefined();
+    expect(migrated.env?.MY_VAR).toBe("keep");
   });
 });
 
@@ -109,6 +121,6 @@ describe("legacy detection", () => {
     const cleaned = removeLegacyHooks(settings);
     const remaining = cleaned.hooks?.PreToolUse ?? [];
     expect(remaining).toHaveLength(1);
-    expect(remaining[0]?.hooks[0]?.command).toContain("skills-bag"); // the bag hook stays
+    expect(remaining[0]?.hooks[0]?.command).toContain("skills-bag");
   });
 });

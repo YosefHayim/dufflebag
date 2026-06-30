@@ -1,5 +1,5 @@
 /**
- * `skills-bag config` — read or update the `SKILLS_BAG_*` tunables.
+ * `skills-bag config` — read or update the `skillsBag*` tunables.
  *
  * With no flags it prints the effective config for the scope (the values the
  * hooks actually see). With flags it validates, backs up, and writes only the
@@ -15,16 +15,17 @@ import { c, intro, note, outro, step, success, warn } from "../core/ui.js";
 import type { BagConfig, Scope } from "../core/types.js";
 
 const LABELS: Record<keyof BagConfig, string> = {
-  warnPct: "warn %      (nudge /handoff)",
-  blockPct: "block %     (deny edits)",
-  defaultBudget: "budget      (autorun cycles)",
-  hardCap: "hard cap    (max cycles)",
-  pollSeconds: "poll (s)    (daemon)",
-  idleSeconds: "idle (s)    (daemon)",
-  ttsVoice: "tts voice",
-  ttsRate: "tts rate    (wpm)",
-  dedupMode: "dedup mode  (deny|warn|off)",
-  dedupSkip: "dedup skip  (extra dirs)",
+  contextWarnFraction: "context warn (nudge /handoff)",
+  contextBlockFraction: "context block (deny edits)",
+  autorunDefaultCycleCount: "autorun default cycles",
+  autorunMaxCycleCount: "autorun max cycles",
+  autorunPollIntervalSeconds: "autorun poll interval (s)",
+  autorunIdleThresholdSeconds: "autorun idle threshold (s)",
+  speechVoice: "speech voice",
+  speechWordsPerMinute: "speech rate (wpm)",
+  dedupEnforcement: "dedup enforcement (deny|warn|off)",
+  dedupSkipDirectories: "dedup skip directories",
+  debugEnabled: "debug logging",
 };
 
 export function config(opts: { scope: Scope; patch: Partial<BagConfig>; projectRoot?: string }): void {
@@ -37,7 +38,7 @@ export function config(opts: { scope: Scope; patch: Partial<BagConfig>; projectR
   if (Object.keys(opts.patch).length === 0) {
     const rows = (Object.keys(LABELS) as (keyof BagConfig)[]).map((key) => {
       const isSet = settings.env?.[ENV_KEYS[key]] != null;
-      return `${LABELS[key].padEnd(28)} ${c.bold(String(current[key]))}${isSet ? "" : c.dim("  (default)")}`;
+      return `${LABELS[key].padEnd(34)} ${c.bold(String(current[key]))}${isSet ? "" : c.dim("  (default)")}`;
     });
     note(rows.join("\n"), "effective config");
     outro(c.dim("Change with e.g. `skills-bag config --warn 0.15 --budget 5`"));

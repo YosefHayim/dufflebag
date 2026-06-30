@@ -37,6 +37,7 @@ import {
 } from "../core/platform.js";
 import {
   backupSettings,
+  applyEnvMigration,
   detectLegacyHooks,
   mergeEnv,
   mergeManagedHooks,
@@ -215,8 +216,9 @@ export async function install(opts: InstallOptions): Promise<void> {
     }
   }
 
-  // Settings surgery: optional legacy removal → managed hooks → env defaults (preserve user values).
+  // Settings surgery: optional legacy removal → env migration → managed hooks → env defaults (preserve user values).
   let next = migrate ? removeLegacyHooks(settings) : settings;
+  next = applyEnvMigration(next);
   next = mergeManagedHooks(next, renderHooks(layout, features));
   next = mergeEnv(next, toEnvMap(DEFAULTS)); // preserve=default: fills only missing keys
   writeSettings(layout.settingsFile, next);
