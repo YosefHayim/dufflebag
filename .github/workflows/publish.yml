@@ -1,22 +1,29 @@
 name: Publish Package
 
-# Publishes skills-bag to npm via OIDC trusted publishing (no NPM_TOKEN).
+# Publishes dufflebag to npm via OIDC trusted publishing (no NPM_TOKEN). A per-repo
+# COPY of templates/workflows/publish.yml (kept in sync by `dufflebag scaffold-ci`),
+# NOT a referenced reusable workflow: OIDC binds provenance to THIS repo AND this
+# exact filename (publish.yml), so it cannot be centralized (ADR 0009).
 #
 # ONE-TIME SETUP (then every release is automatic):
 #   1. Publish v0.1.0 once manually (npm publish --access public) to create the package.
-#   2. On npmjs.com → the `skills-bag` package → Settings → Trusted Publisher,
-#      add this GitHub repo (YosefHayim/skills-bag) and workflow file `publish.yml`.
-#   The workflow filename `publish.yml` must stay aligned with that config —
-#   renaming it invalidates the OIDC match.
+#   2. On npmjs.com → the dufflebag package → Settings → Trusted Publisher, add this
+#      repo (YosefHayim/dufflebag) and workflow file `publish.yml`. Renaming this
+#      file invalidates the OIDC match.
 #
 # Triggers:
 #   - push of a v*.*.* tag (e.g. `git tag v0.2.0 && git push --tags`)
+#   - a completed `Release` workflow run (gated to success below; inert until a
+#     Release workflow exists in this repo)
 #   - workflow_dispatch (manual recovery, e.g. re-publish an existing tag)
 
 on:
   push:
     tags:
       - 'v*.*.*'
+  workflow_run:
+    workflows: [Release]
+    types: [completed]
   workflow_dispatch:
     inputs:
       tag:
@@ -30,6 +37,8 @@ permissions:
 
 jobs:
   publish:
+    # Skip a workflow_run trigger that did not succeed — a failed Release must not publish.
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     permissions:
       id-token: write

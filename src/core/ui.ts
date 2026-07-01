@@ -8,15 +8,17 @@
  */
 
 import {
+  cancel,
   confirm as clackConfirm,
   intro as clackIntro,
-  isCancel,
-  cancel,
   log as clackLog,
   multiselect as clackMultiselect,
   note as clackNote,
   outro as clackOutro,
+  select as clackSelect,
   spinner as clackSpinner,
+  text as clackText,
+  isCancel,
 } from "@clack/prompts";
 import pc from "picocolors";
 
@@ -94,4 +96,38 @@ export async function multiselect<T extends string>(message: string, choices: Ch
     process.exit(0);
   }
   return picked as T[];
+}
+
+/**
+ * Animated single-select. Returns `fallback` unchanged in non-interactive runs
+ * so a piped/CI invocation can't hang waiting on a menu. Ctrl-C exits cleanly.
+ */
+export async function select<T extends string>(message: string, choices: Choice<T>[], initial: T, fallback: T): Promise<T> {
+  if (!process.stdin.isTTY) return fallback;
+  // Same conditional-type dodge as multiselect: call clack with a concrete
+  // `string` so its `Option<Value>` type resolves; values round-trip unchanged.
+  const picked = await clackSelect<string>({
+    message,
+    options: choices.map((ch) => ({ value: ch.value, label: ch.label, hint: ch.hint })),
+    initialValue: initial,
+  });
+  if (isCancel(picked)) {
+    cancel("Cancelled — nothing was changed.");
+    process.exit(0);
+  }
+  return picked as T;
+}
+
+/**
+ * Free-text prompt. Returns `initial` (or "") without prompting in
+ * non-interactive runs so scripted callers stay deterministic. Ctrl-C exits.
+ */
+export async function text(message: string, opts: { placeholder?: string; initial?: string } = {}): Promise<string> {
+  if (!process.stdin.isTTY) return opts.initial ?? "";
+  const answer = await clackText({ message, placeholder: opts.placeholder, initialValue: opts.initial });
+  if (isCancel(answer)) {
+    cancel("Cancelled — nothing was changed.");
+    process.exit(0);
+  }
+  return answer;
 }

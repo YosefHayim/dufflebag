@@ -1,8 +1,8 @@
 /**
- * `skills-bag uninstall` — the exact inverse of install.
+ * `dufflebag uninstall` — the exact inverse of install.
  *
- * Removes only what the bag owns: hook entries (matched by the `/skills-bag/`
- * path marker), `SKILLS_BAG_*` env keys, the installed skill folders (from the
+ * Removes only what the bag owns: hook entries (matched by the `/dufflebag/`
+ * path marker), `dufflebag*` env keys, the installed skill folders (from the
  * manifest), and the namespaced payload dir. The user's own hooks, env, and
  * settings are left untouched, and settings.json is backed up first. Any
  * running autonomous-loop daemon is asked to exit so it stops typing.
@@ -11,14 +11,25 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import path from "node:path";
-
-import { removeAgentsBlock, unwriteCursorHook } from "../core/agent-wiring.js";
-import { readManifest } from "../core/manifest.js";
-import { resolveLayout, stamp } from "../core/paths.js";
-import { backupSettings, readSettings, removeManagedEnv, removeManagedHooks, writeSettings } from "../core/settings.js";
-import { removePath } from "../core/fs-utils.js";
-import { c, intro, outro, spinner, step } from "../core/ui.js";
-import type { Scope } from "../core/types.js";
+import type { Scope } from "../core/index.js";
+import {
+  backupSettings,
+  c,
+  intro,
+  outro,
+  readManifest,
+  readSettings,
+  removeAgentsBlock,
+  removeManagedEnv,
+  removeManagedHooks,
+  removePath,
+  resolveLayout,
+  spinner,
+  stamp,
+  step,
+  unwriteCursorHook,
+  writeSettings,
+} from "../core/index.js";
 
 /** Best-effort: signal every recorded autonomous-loop daemon to stop. */
 function stopDaemons(): void {
@@ -40,7 +51,7 @@ export function uninstall(opts: { scope: Scope; projectRoot?: string }): void {
   const layout = resolveLayout(opts.scope, opts.projectRoot);
   const manifest = readManifest(layout.installDir);
 
-  intro(`skills-bag · uninstall · ${opts.scope}`);
+  intro(`dufflebag · uninstall · ${opts.scope}`);
   step(c.dim(`target: ${layout.claudeDir}`));
 
   if (!manifest && !existsSync(layout.installDir)) {

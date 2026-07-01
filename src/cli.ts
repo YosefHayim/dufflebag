@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * skills-bag CLI entry point.
+ * dufflebag CLI entry point.
  *
  * Command structure + help/version are handled by commander; the interactive
  * UX (spinners, prompts, multiselect) lives in the command modules via the
@@ -12,15 +12,9 @@ import path from "node:path";
 
 import { Command } from "commander";
 
-import { config } from "./commands/config.js";
-import { dedupCheck } from "./commands/dedup.js";
-import { doctor } from "./commands/doctor.js";
-import { install } from "./commands/install.js";
-import { uninstall } from "./commands/uninstall.js";
-import { DEDUP_MODES, isDedupMode, parseNumber } from "./core/env-config.js";
-import { packageRoot, readJson } from "./core/fs-utils.js";
-import { fail } from "./core/ui.js";
-import type { BagConfig, FeatureId, Scope } from "./core/types.js";
+import { config, dedupCheck, doctor, install, menu, scaffoldCi, uninstall } from "./commands/index.js";
+import type { BagConfig, FeatureId, Scope } from "./core/index.js";
+import { DEDUP_MODES, fail, isDedupMode, packageRoot, parseNumber, readJson } from "./core/index.js";
 
 const VERSION = readJson<{ version: string }>(path.join(packageRoot(), "package.json"))?.version ?? "0.0.0";
 
@@ -65,9 +59,14 @@ function configPatch(opts: Record<string, unknown>): Partial<BagConfig> {
 const program = new Command();
 
 program
-  .name("skills-bag")
+  .name("dufflebag")
   .description("Install a personal bag of Claude Code skills & hooks (context guard, autonomous loop, TTS).")
   .version(VERSION, "-v, --version");
+
+program
+  .command("menu")
+  .description("Interactive menu — the default when you run `dufflebag` in a terminal with no command")
+  .action(() => menu());
 
 const withScope = (cmd: Command): Command =>
   cmd.option("--global", "target ~/.claude (default)").option("--project", "target ./.claude (committable, per-repo)");
@@ -89,7 +88,7 @@ withScope(program.command("update"))
   });
 
 withScope(program.command("uninstall"))
-  .description("Surgically remove everything skills-bag added")
+  .description("Surgically remove everything dufflebag added")
   .action((opts) => uninstall({ scope: scopeOf(opts) }));
 
 withScope(program.command("config"))
@@ -121,7 +120,16 @@ program
   .description("Read-only health check across global + project scopes")
   .action(() => doctor());
 
-program.parseAsync(process.argv).catch((err: unknown) => {
+program
+  .command("scaffold-ci [path]")
+  .description("Copy the CI + publish workflow set into a repo (each repo owns its CI)")
+  .option("-f, --force", "overwrite existing workflow files (resync from dufflebag)")
+  .action((pathArg: string | undefined, opts: { force?: boolean }) => scaffoldCi({ path: pathArg, force: Boolean(opts.force) }));
+
+// Bare invocation in a terminal opens the interactive menu; with any argument
+// (a command, -h, -v) or when piped/CI (no TTY), defer to commander as usual.
+const bare = process.argv.length <= 2 && process.stdin.isTTY;
+(bare ? menu() : program.parseAsync(process.argv)).catch((err: unknown) => {
   fail(err instanceof Error ? err.message : String(err));
   process.exitCode = 1;
 });

@@ -1,0 +1,63 @@
+name: CI
+
+# Local gate composing the single-purpose workflows (biome / typecheck / test /
+# build / report-failure) via `./` refs — each is `on: workflow_call`. Copied into
+# this repo by `dufflebag scaffold-ci`; it's yours to edit. Re-run
+# `dufflebag scaffold-ci --force` to resync the set from dufflebag (ADR 0009).
+#
+# - `CI Gate` is the single aggregated status check: require it in branch
+#   protection so a red leg blocks merges.
+# - `report-failure` opens/updates a ci-failure issue when main goes red (never
+#   for PRs — ADR 0005).
+# - E2E is opt-in: if this repo has a `test:e2e` script, uncomment the `e2e:` job
+#   below and add `e2e` to the gate's `needs` + success check (e2e.yml ships
+#   alongside).
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main, dev]
+
+permissions:
+  contents: read
+
+jobs:
+  biome:
+    uses: ./.github/workflows/biome.yml
+
+  typecheck:
+    uses: ./.github/workflows/typecheck.yml
+
+  test:
+    uses: ./.github/workflows/test.yml
+
+  build:
+    uses: ./.github/workflows/build.yml
+
+  # e2e:
+  #   uses: ./.github/workflows/e2e.yml
+
+  gate:
+    name: CI Gate
+    needs: [biome, typecheck, test, build]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every gate to pass
+        run: |
+          echo "biome=${{ needs.biome.result }} typecheck=${{ needs.typecheck.result }} test=${{ needs.test.result }} build=${{ needs.build.result }}"
+          test "${{ needs.biome.result }}" = "success" \
+            && test "${{ needs.typecheck.result }}" = "success" \
+            && test "${{ needs.test.result }}" = "success" \
+            && test "${{ needs.build.result }}" = "success"
+
+  report-failure:
+    name: Open issue on main failure
+    needs: [biome, typecheck, test, build]
+    if: failure() && github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      issues: write
+      actions: read
+    uses: ./.github/workflows/report-failure.yml
