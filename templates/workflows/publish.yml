@@ -1,0 +1,95 @@
+name: Publish Package
+
+# CANONICAL COPY-TEMPLATE — scaffolded per repo by `dufflebag scaffold-ci`, which
+# fills in this repo's owner/name and package below. Publish is a per-repo COPY
+# (not a referenced reusable workflow): npm OIDC trusted publishing binds provenance to
+# THIS repo AND this exact filename (publish.yml), so it cannot be centralized
+# behind workflow_call (ADR 0009). Keep the file named publish.yml.
+#
+# ONE-TIME SETUP (then every release is automatic):
+#   1. Publish v0.1.0 once manually (npm publish --access public) to create the package.
+#   2. On npmjs.com → the {{PACKAGE}} package → Settings → Trusted Publisher, add
+#      this repo ({{OWNER}}/{{REPO}}) and workflow file `publish.yml`. Renaming this
+#      file invalidates the OIDC match.
+#
+# Triggers:
+#   - push of a v*.*.* tag (e.g. `git tag v0.2.0 && git push --tags`)
+#   - a completed `Release` workflow run (for repos that cut releases via a Release
+#     workflow, e.g. release-please) — gated to success below
+#   - workflow_dispatch (manual recovery, e.g. re-publish an existing tag)
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_run:
+    workflows: [Release]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing tag to publish (e.g. v0.2.0). Defaults to main HEAD.'
+        required: false
+        default: ''
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  publish:
+    # Skip a workflow_run trigger that did not succeed — a failed Release must not publish.
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    env:
+      INPUT_TAG: ${{ inputs.tag }}
+    steps:
+      - name: Resolve checkout ref
+        id: ref
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            if [ -n "$INPUT_TAG" ]; then echo "ref=$INPUT_TAG" >> "$GITHUB_OUTPUT"; else echo "ref=main" >> "$GITHUB_OUTPUT"; fi
+          else
+            echo "ref=$GITHUB_REF" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ steps.ref.outputs.ref }}
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+          cache: pnpm
+
+      - name: Verify npm supports OIDC Trusted Publishing
+        run: |
+          test "$(printf '%s\n' "11.5.1" "$(npm -v)" | sort -V | head -1)" = "11.5.1" || {
+            echo "::error::npm $(npm -v) is below 11.5.1; trusted publishing is not supported"
+            exit 1
+          }
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Type check
+        run: pnpm run typecheck
+
+      - name: Run tests
+        run: pnpm test
+
+      - name: Build
+        run: pnpm run build
+
+      - name: Publish to npm (trusted publishing)
+        run: pnpm publish --no-git-checks --access public --provenance

@@ -1,5 +1,5 @@
 /**
- * `skills-bag config` — read or update the `skillsBag*` tunables.
+ * `dufflebag config` — read or update the `dufflebag*` tunables.
  *
  * With no flags it prints the effective config for the scope (the values the
  * hooks actually see). With flags it validates, backs up, and writes only the
@@ -8,11 +8,26 @@
  * the next session, since its env is frozen at spawn.
  */
 
-import { fromEnvMap, toEnvMap, validateConfig, ENV_KEYS } from "../core/env-config.js";
-import { resolveLayout, stamp } from "../core/paths.js";
-import { backupSettings, mergeEnv, readSettings, writeSettings } from "../core/settings.js";
-import { c, intro, note, outro, step, success, warn } from "../core/ui.js";
-import type { BagConfig, Scope } from "../core/types.js";
+import type { BagConfig, Scope } from "../core/index.js";
+import {
+  backupSettings,
+  c,
+  ENV_KEYS,
+  fromEnvMap,
+  intro,
+  mergeEnv,
+  note,
+  outro,
+  readSettings,
+  resolveLayout,
+  stamp,
+  step,
+  success,
+  toEnvMap,
+  validateConfig,
+  warn,
+  writeSettings,
+} from "../core/index.js";
 
 const LABELS: Record<keyof BagConfig, string> = {
   contextWarnFraction: "context warn (nudge /handoff)",
@@ -33,7 +48,7 @@ export function config(opts: { scope: Scope; patch: Partial<BagConfig>; projectR
   const settings = readSettings(layout.settingsFile);
   const current = fromEnvMap(settings.env);
 
-  intro(`skills-bag · config · ${opts.scope}`);
+  intro(`dufflebag · config · ${opts.scope}`);
 
   if (Object.keys(opts.patch).length === 0) {
     const rows = (Object.keys(LABELS) as (keyof BagConfig)[]).map((key) => {
@@ -41,7 +56,7 @@ export function config(opts: { scope: Scope; patch: Partial<BagConfig>; projectR
       return `${LABELS[key].padEnd(34)} ${c.bold(String(current[key]))}${isSet ? "" : c.dim("  (default)")}`;
     });
     note(rows.join("\n"), "effective config");
-    outro(c.dim("Change with e.g. `skills-bag config --warn 0.15 --budget 5`"));
+    outro(c.dim("Change with e.g. `dufflebag config --warn 0.15 --budget 5`"));
     return;
   }
 

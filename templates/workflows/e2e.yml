@@ -1,0 +1,41 @@
+name: E2E
+
+# Single-purpose, reusable (workflow_call): the end-to-end suite. OPT-IN — it
+# ships as a template but is NOT wired into dufflebag's own ci.yml (dufflebag has
+# no e2e tests, so it would run red). In a repo that defines a `test:e2e` script,
+# uncomment the `e2e:` job in ci.yml (`uses: ./.github/workflows/e2e.yml`) and,
+# for Playwright, uncomment the browser-install step below.
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  e2e:
+    name: E2E tests
+    if: github.actor != 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Playwright repos: install browsers before the suite.
+      # - name: Install Playwright browsers
+      #   run: pnpm exec playwright install --with-deps chromium
+
+      - name: Run E2E tests
+        run: pnpm run test:e2e
