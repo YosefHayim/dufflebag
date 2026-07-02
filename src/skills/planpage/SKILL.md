@@ -1,9 +1,9 @@
 ---
-name: skill-ui
+name: planpage
 description: Render a skill's plan, review gate, or report as a beautiful, self-contained, INTERACTIVE HTML page — via the open-source planpage package (Preact components → static HTML + a local post-back server so the user can approve / adjust / flip decisions in the browser and the choice comes straight back to the agent). Use whenever a skill needs an approval gate, a decision review, or a shareable before/after report — author with the kit's components instead of hand-rolling HTML each time.
 ---
 
-# skill-ui — interactive HTML plans for skills (via the `planpage` package)
+# planpage — interactive HTML plans for skills
 
 Like `mcp-ui`, but for terminal skills. This skill is a **thin consumer of the open-source [`planpage`](https://github.com/YosefHayim/planpage) package** (on npm — `npm i planpage`, or zero-install with `npx planpage`). The components, the render engine, the auto-captured gallery, and the post-back server all live there as the single source of truth. Don't hand-roll HTML here; author with the package.
 

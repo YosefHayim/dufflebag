@@ -1,4 +1,4 @@
-# skill-ui — components (moved to the `planpage` package)
+# planpage skill — components live in the `planpage` package
 
 The copy-paste HTML kit that used to live here has been **retired**. The components, theme, and post-back script are now the open-source [`planpage`](https://github.com/YosefHayim/planpage) package — one source of truth: typed, tested, and shown in a live gallery.
 
