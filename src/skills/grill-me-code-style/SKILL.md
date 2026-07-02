@@ -11,7 +11,7 @@ Ask the questions one at a time, waiting for feedback on each before continuing.
 
 This is the **greenfield** variant: there is little or no code to read. Your source of truth is my **taste** (grill me) plus the project's **purpose** and its **language/framework** conventions. Never write generic advice ("use clear names", "keep functions small") — every rule must be a real, load-bearing decision for THIS project. If the project already has meaningful code, stop and use `grill-me-code-style-with-docs` instead.
 
-**Nothing is written to disk until I approve.** You grill (Steps 1–5), render an **HTML plan** as the review gate (Step 6), and only then write the files (Step 7).
+**Nothing is written to disk until I approve.** You grill (Steps 1–5) — the code-style grill is a **pick-the-code gallery**: I pick from illustrative code variants shown in the TUI, dimension by dimension (Step 2). You render an **interactive HTML plan** as the review gate (Step 6, built with the `skill-ui` kit — I approve, adjust, or flip any decision in the browser), and only then write the files (Step 7).
 
 </what-to-do>
 
@@ -27,21 +27,15 @@ A project can't have a code style before it has a spine. Before grilling code, *
 
 Record each doc's state — `create` · `validate ✓` · `drift` (with the gap) — for the Step 6 plan.
 
-## Step 2 — Grill the code-style decision tree
+## Step 2 — Grill the code style as a pick-the-code gallery
 
-Cover only load-bearing, project-specific dimensions. For each, recommend an answer derived from the purpose + language/framework:
+The code-style grill runs as **pick-the-code**, not prose. For each dimension I show you code **variants in the TUI** (`AskUserQuestion` — the code goes in each option's `preview`) and you **pick**. With no repo to read, variants are **illustrative**: variant **A** is the default idiom for this language + framework (what the agent would reach for), variant **B** the alternative — both concrete to THIS project's domain, never `foo`/`bar`. Recommend one from the purpose + framework, but the pick is mine.
 
-- **Structure** — folder/module layout for this project type (feature- vs layer-based; where new code goes).
-- **Module boundaries** — what a unit is, what's shared, allowed dependency direction.
-- **Data vs side effects** — how they're separated (pure core vs I/O edges).
-- **Error handling** — throw vs return, error types, boundary validation.
-- **Naming** — conventions that encode behavior / return shape.
-- **Types & contracts** — where shared contracts live; validation at boundaries.
-- **Code idioms (the micro-style)** — **grill this explicitly; it's the layer the old skill skipped.** The judgment calls a formatter can't make: function form (arrow vs declaration), body length, single- vs multi-return, early-return vs nesting, named vs default exports, class vs function/facade, casts & immutability policy, comment density, file-size cap, and (for UI) component/hook order. Each becomes a `CODE-STYLE.md` rule.
-- **Formatting** — quotes, semicolons, line width, trailing commas, import order. Grill my preference, but **the answer becomes a formatter config, not prose**: pick and scaffold `biome.json` / `.prettierrc` / an eslint config, and record the choice as an ADR. `CODE-STYLE.md` references the formatter; it never restates its rules.
-- **Tests** — what's tested, where they live, style.
-- **How to add a feature** — the canonical end-to-end recipe.
-- **Anti-patterns** — the explicit "never do this here" list.
+- **Walk the whole catalog.** Run **[STYLE-CATALOG.md](STYLE-CATALOG.md)** — ~25 dimensions (structure, boundaries, data vs side-effects, errors, naming, types & contracts, control flow, async, the API/IO and UI surfaces, tests, the "add a feature" recipe) in **6 grouped rounds**, with a **checkpoint between rounds** (keep going · go deeper · skip the rest) and whole rounds skipped when they don't apply. Covering every dimension is how the generated code won't surprise me.
+- **Each pick → a rule.** Chosen variant = the `✓` example; rejected variant = a plausible `✗ not this`. Every rule carries an **enforced-vs-taste tag** (`[lint: <rule>]` / `[taste]`).
+- **Formatting** — quotes, semicolons, line width, trailing commas, import order. Grill my preference, but **the answer becomes a formatter config, not prose**: pick and scaffold `biome.json` / `.prettierrc` / an eslint config, and record the choice as an ADR. `CODE-STYLE.md` references the formatter; it never restates its rules. The **machine-catchable slop tells** land here too as **linter rules** (`no-nested-ternary`, complexity/length caps, `no-restricted-syntax` for banned identifiers/shapes) — prevented, not just documented.
+- **Anti-patterns / AI-slop fingerprint** — the explicit "never do this here" list. Grill the recognizable AI tells up front so generated code avoids them from day one: giveaway micro-helpers (`isRecord`, `isObject`, `isNonEmptyString`, `isDefined`, `ensureArray`, `noop`), defensive over-guards (redundant null/type checks the types already prove), nested or duplicated ternaries, one-use wrapper functions, copy-pasted boilerplate, and generic names (`handleData`, `processItem`, `result`, `temp`). Each becomes a concrete `Never` entry (an illustrative snippet, since there's no code yet) with an enforced-vs-taste tag.
+- **Compose the canonical example.** After the rounds, assemble every pick into one **canonical example** — a representative feature for this project written in the agreed style — so I see the whole pattern together. It becomes the Step 6 litmus and the `## Canonical example` block of `CODE-STYLE.md`; with no code yet, it's the single clearest picture of what "good" looks like here.
 
 ## Step 3 — Grill the CLI
 
@@ -63,22 +57,31 @@ Detect the stack from my answers / package manifest. For each framework/library,
 
 ## Step 6 — Render the plan as an HTML report (the review gate)
 
-When decisions are settled, **before writing anything**, render a single self-contained HTML file to the OS temp dir so nothing lands in the repo. Resolve the temp dir from `$TMPDIR` (fall back to `/tmp`, or `%TEMP%` on Windows) and write `<tmpdir>/code-style-plan-<timestamp>.html`; open it (`open` on macOS, `xdg-open` on Linux, `start` on Windows) and tell me the absolute path.
+When decisions are settled, the **canonical example** composed in Step 2 (a representative feature in the target style) is the litmus — show it to me. With no code to read, seeing the whole style *as code* is the surest way to catch surprises before approval. Fold my reactions back into the rules.
+
+Then, **before writing anything**, render the plan through the **`skill-ui` kit** as a single self-contained, **interactive** HTML file. Build it from `skill-ui`'s components, write it to `<tmpdir>/code-style-plan-<timestamp>.html` (resolve `$TMPDIR`; fall back to `/tmp` or `%TEMP%`; nothing lands in the repo), then **serve it for a live decision** on a **safe ephemeral port** (`serve-plan.mjs` binds an OS-assigned high port — never 3000 / 5173 / 8000 / 8080 / 8787 / 19006):
+
+```bash
+node <skill-ui>/scripts/serve-plan.mjs <tmpdir>/code-style-plan-<ts>.html <tmpdir>/code-style-decision-<ts>.json
+```
+
+It opens the browser and blocks until I click **Approve** or **Adjust**; read the decision JSON — `{ approved, flips, revisit, notes }` — and act on it (`flips` re-open those picks, `revisit` re-grills them). (No Node / headless / port blocked? `open` the file directly; the page's **Copy decision** button hands me the same JSON to paste back — never a hang.)
 
 Self-contained, CDN-only — no repo assets, no app code:
 
-- Load **Tailwind** (`https://cdn.tailwindcss.com`) and **Mermaid** (`https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs`, `mermaid.initialize({ startOnLoad: true, theme: "neutral" })`) from CDN. No other scripts.
-- Three sections: **① Doc scaffold** — PROJECT / CONTEXT / LANGUAGE as cards tagged `create` · `validate ✓` · `drift`. **② Code style** — the rules (each a one-line rule + a short snippet), plus the chosen **formatter config** rendered as a code block. **③ CLI** — the command surface + dual-mode routing as a Mermaid `flowchart`.
-- End with the **write-list**: every file to be created/edited.
+- **The `skill-ui` `plan-shell` is the page** — it loads Tailwind + Mermaid from CDN, carries the theme, and wires the submit-bar + post-back. Plug content into its components; don't re-derive the HTML.
+- Sections: **① Doc scaffold** — PROJECT / CONTEXT / LANGUAGE as `section-card`s tagged `create` · `validate ✓` · `drift`. **② Code style** — each rule as a **`pick-block`** (✓ chosen / ✗ rejected, flippable, `data-id`) with its enforced-vs-taste tag; the chosen **formatter + linter config** as a `code-block`; the **`Never` fingerprint** (the banned tells); and the composed **`## Canonical example`** as a headlined `code-block`. **③ CLI** — the command surface + dual-mode routing as a Mermaid `flow`.
+- Then the **write-list**: every file to be created/edited.
+- **Review the exact writes** — below the write-list, inline the proposed content for **CODE-STYLE.md** and **AGENTS.md** (full content when new, a diff if the file already exists) as `diff-block`s, so nothing lands sight-unseen.
 
-(For richer diagram patterns and styling, the `improve-codebase-architecture` skill's HTML report is a good exemplar — reuse its conventions, don't reinvent them.)
+(The `skill-ui` kit owns the shell, components, theme, and post-back — reference it and plug in content; don't reinvent the HTML.)
 
-Then ask: **approve, or adjust?** Write nothing until I approve.
+The interactive plan **is** the ask — I approve or adjust in the browser and it posts back. Write nothing until the decision reads `approved: true`; on adjust, fold in `flips` / `revisit` / `notes` and re-render.
 
 ## Step 7 — On approval, write the files
 
-1. `CODE-STYLE.md` — the **SSOT for style** (greenfield shape, no before/after): Stack & framework references · Rules (rule + snippet + one-line _Why_) · Recipes (add a feature/module/**CLI command**) · a "Never" list.
-2. The **formatter config** (`biome.json` / `.prettierrc` / eslint) chosen in Step 2.
+1. `CODE-STYLE.md` — the **SSOT for style** (greenfield shape): Stack & framework references · Rules (rule + **✓ chosen / ✗ rejected** illustrative snippets + one-line _Why_ + enforced-vs-taste tag) · the **`## Canonical example`** (the composed feature from Step 2) · Recipes (add a feature/module/**CLI command**) · the **`Never` fingerprint** (the banned tells, illustrative snippets).
+2. The **formatter + linter config** (`biome.json` / `.prettierrc` / eslint) chosen in Step 2 — including the lint rules for the machine-catchable tells.
 3. The **structure docs** flagged `create` in Step 1 — PROJECT.md (via `grill-with-docs`' flow), CONTEXT.md (orientation), LANGUAGE.md (names-only glossary).
 4. Any **ADRs** from Steps 3–4 into `docs/adr/current/`.
 5. Refresh the `## Conventions` section in `AGENTS.md` — a short digest of only the load-bearing rules, marked `<!-- rules digest — full guide in CODE-STYLE.md; edit there -->`. `CODE-STYLE.md` stays the source.
