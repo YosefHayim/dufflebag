@@ -418,6 +418,66 @@ _Barrels use NodeNext `.js` re-exports and must not introduce an import cycle._
 
 ---
 
+## Scripts — the shared `package.json` contract
+
+Every repo in this workspace (this one included) exposes the **same script _names_**
+so muscle memory and CI carry across projects. **Names are the contract; bodies bend
+to the stack only where they must** (`dev`/`build`/`start`). The toolchain is fixed:
+**biome** (lint + format), **vitest** (test), **`tsc --noEmit`** (typecheck), **tsx**
+(run TS), **husky** (`prepare`). Distilled from the 15-repo reality (`typecheck` in 14 ·
+`test`/`dev`/`build` in 13 · `lint`/`format` in 12 · `prepare` in 11 · `lint:fix` in 9).
+
+### The canonical surface
+
+| Script | Canonical body | Notes |
+|---|---|---|
+| `dev` | stack — `tsx --watch` · `next dev` · `astro dev` · `turbo run dev` · `vite` · (CLI product → `<pm> cli`) | the dev loop |
+| `build` | stack — `tsc` · `tsup` · `next build` · `astro build` · `vite build` · `turbo run build` | shippable output |
+| `start` | stack — `node dist/…` · `next start` | run the built artifact (when runnable) |
+| `cli` | `tsx <entry>` | interactive front door — bare = menu, `-- <sub>` = direct |
+| `test` | `vitest run` | jest only where that's already the runner (Oly-App) |
+| `test:watch` | `vitest` | watch mode |
+| `test:coverage` | `vitest run --coverage` | when coverage is tracked |
+| `typecheck` | `tsc --noEmit` | multiple tsconfigs → chain with `&&` |
+| `lint` | `biome check .` | read-only: lint + format-check + imports |
+| `lint:fix` | `biome check --write .` | autofix |
+| `format` | `biome format --write .` | format-only convenience |
+| `check:ci` | `biome ci .` | machine gate — no writes, CI-optimized |
+| `prepare` | `husky` | installs git hooks |
+| `verify` | `biome ci . && tsc --noEmit && vitest run && <build>` | the ONE aggregate gate; `verify:push` husky alias where a pre-push runs it |
+
+### Conventions
+
+- **`ns:action` colon sub-namespacing** — variants nest under `:` (never a dash, never
+  run-together): `test:watch`, `test:coverage`, `test:e2e`, `lint:fix`, `check:ci`,
+  `dev:web`, `verify:push`.
+- **Chain the atomics into one `verify` gate** — `verify` runs `check:ci → typecheck →
+  test → build` (+ any repo-specific validator). It replaces the four old names for the
+  same gate: `qa` · `quality` · `validate` · `qa:all`. A human never memorizes the sequence.
+- **`cli` is the universal front door** — bare `cli` opens the interactive menu;
+  `cli -- <sub> [flags]` runs a subcommand directly; both routes call the **same**
+  functions and a non-TTY invocation falls back safely (never hangs) — the ADR 0011
+  pattern. A CLI-first product aliases `dev` → `cli`; a product-name shortcut (`alg`,
+  `launch`) may alias it too.
+- **Names are the contract; bodies bend to the stack.** Only `dev`/`build`/`start`
+  change shape per framework — the rest stay byte-identical everywhere the tool is present.
+- **Add only where the tool is already present** — never add `test` without vitest/jest,
+  `typecheck` without tsc, or `cli` without an entrypoint. Each name is a promise the
+  toolchain must keep.
+
+### Recipe: how to script a repo
+
+1. Add the canonical names that fit the stack (minimum: `dev`, `build`, `test`,
+   `test:watch`, `typecheck`, `lint`, `lint:fix`, `format`, `verify`).
+2. Keep the `test`/`typecheck`/`lint`/`lint:fix`/`format`/`check:ci` bodies **verbatim**;
+   only `dev`/`build`/`start` bend to the framework.
+3. Wire `verify` = `check:ci && typecheck && test && build`; point the pre-push hook
+   (`verify:push`) at it.
+4. Nest every variant under `:` (`test:watch`, not `test-watch` or `testWatch`).
+5. `dufflebag scaffold-ci` so the CI legs run the same names.
+
+---
+
 ## Recipes
 
 ### How to add a feature
@@ -504,11 +564,14 @@ Write new code like these files:
 - **Never** ship build-only `.ts` into a user's install — the catalog `ships` allowlist is the boundary ([ADR 0008](../../docs/adr/current/0008-vertical-per-feature-layout.md)).
 - **Never** make `publish.yml` a referenced `workflow_call` — OIDC binds per repo + filename; it is copied + templated, never referenced ([ADR 0009](../../docs/adr/current/0009-reusable-workflows-and-cli-scaffolding.md)).
 - **Never** edit a shared workflow leg in only one of `.github/workflows/` or `templates/workflows/` — they must stay byte-identical (the drift test enforces it).
+- **Never** name a script variant with a dash or run-together — sub-namespace under `:` (`test:watch`, never `test-watch`/`testwatch`); and **never** split the aggregate gate back into `qa`/`quality`/`validate`/`qa:all` — there is one `verify`.
+- **Never** rename `dev`/`build`/`start`/`test`/`typecheck`/`lint`/`lint:fix`/`format`/`cli`/`verify` to a repo-local synonym — the names are the cross-repo contract (only their bodies bend, and only `dev`/`build`/`start` bend).
 
 ---
 
 ## Refresh log
 
+- **2026-07-02**: added the **Scripts — the shared `package.json` contract** section — one canonical name→body table (biome `lint`/`lint:fix`/`format` · vitest `test`/`test:watch` · `tsc --noEmit` `typecheck` · `tsx` `cli` · `husky` `prepare`), `ns:action` colon nesting, a single `verify` gate (`check:ci && typecheck && test && build`, replacing `qa`/`quality`/`validate`/`qa:all`), and `cli` as the universal interactive front door. Every owned repo in the workspace was normalized to this surface in the same pass (zaatar-tech-main-repo excluded — not ours). This SSOT ships to other repos via `templates/mdFiles/`; each repo's own `CODE-STYLE.md` cross-references it.
 - **2026-07-02** ([ADR 0014](../../docs/adr/current/0014-consolidate-under-src-and-templates.md)): source consolidation into two top-level buckets — `skills/` → `src/skills/`, `scripts/` → `src/scripts/` (all source under `src/`), and `mdFiles/` → `templates/mdFiles/` (all copyable templates under `templates/`, joining `templates/workflows/`). `rootDir: "."` keeps the `dist/src/**` layout; skill→kernel imports drop the now-redundant segment (`../../../src/payload/` → `../../../payload/`). Personal-skill symlinks re-pointed; the catalog ship-path + `bundledSkillsDir()` follow to `src/skills`.
 - **2026-07-02** ([ADR 0012](../../docs/adr/current/0012-tsdoc-on-the-exported-surface.md), [ADR 0013](../../docs/adr/current/0013-style-refresh-colocated-tests-single-command-autorun-templates.md)): TSDoc mandatory on the exported surface (reverses the old minimal-comments rule); biome linter on (`recommended`); tests co-located, `test/` removed; the autonomous loop collapsed to one `autorun` command with `stop`/`exit` verbs; `workflow-templates/` → `templates/workflows/`; this guide moved to `mdFiles/CODE-STYLE.md`.
 - **2026-07-01** ([ADR 0007](../../docs/adr/current/0007-rename-to-dufflebag-broadened-remit.md)–[0010](../../docs/adr/current/0010-core-grouped-by-domain.md)): the dufflebag pivot — rename across four contracts (clean break, no back-compat), vertical per-feature layout, catalog ship-allowlist, reusable workflows, core grouped by domain.

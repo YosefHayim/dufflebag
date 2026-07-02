@@ -15,14 +15,18 @@
     "!src/skills/**/*.test.ts"
   ],
   "scripts": {
+    "dev": "pnpm cli",
+    "cli": "tsx src/cli.ts",
     "prebuild": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
     "build": "tsc && node src/scripts/assembleHooks.mjs",
-    "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
     "format": "biome format --write .",
-    "check": "biome check --write .",
     "check:ci": "biome ci .",
-    "dev": "node --import tsx src/cli.ts",
+    "verify": "biome ci . && tsc --noEmit && vitest run && pnpm build",
     "prepublishOnly": "npm run build"
   },
   "keywords": [
