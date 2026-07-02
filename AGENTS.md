@@ -32,7 +32,7 @@ Feature docs live under `src/skills/<feature>/`. The png-to-code harness is Type
 **Two kinds of skill live under `src/skills/`:**
 
 - **Shipped features** — `png-to-code` and the autonomous-loop skill (`autorun`, with `stop`/`exit` verbs) are registered in the CLI (`src/core/catalog/features.ts`) and **copied** into `~/.claude/skills/` by `npx dufflebag install`.
-- **Personal skills** — `grill-me`, `grill-with-docs`, `grill-me-code-style`, `grill-me-code-style-with-docs`, and `deslop` are the owner's own skills: git-tracked here as their SSOT but installed by **symlink** from `~/.claude/skills/`. They are **not** registered CLI features and are not shipped by `install`. Edit them here — the symlink makes changes live immediately.
+- **Personal skills** — `grill-me`, `grill-with-docs`, `grill-me-code-style`, `grill-me-code-style-with-docs`, `deslop`, and `planpage` (the `planpage`-package consumer skill) are the owner's own skills: git-tracked here as their SSOT but installed by **symlink** from `~/.claude/skills/`. They are **not** registered CLI features and are not shipped by `install`. Edit them here — the symlink makes changes live immediately.
 
 ## Conventions
 

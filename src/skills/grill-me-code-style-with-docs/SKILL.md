@@ -11,7 +11,7 @@ Ask the questions one at a time, waiting for feedback on each before continuing.
 
 My **taste is the source of truth**; the existing code is **evidence, not gospel** — much of it may be the slop I want gone. When code and my stated taste conflict, my taste wins and `CODE-STYLE.md` records the DESIRED end-state, not the current one.
 
-**Nothing is written to disk until I approve.** You scan and grill (Steps 1–5) — the code-style grill is a **pick-the-code gallery**: you show me real code variants and I pick what I like, dimension by dimension (Step 3). You render an **interactive HTML plan** as the review gate (Step 6, built with the `skill-ui` kit — I approve, adjust, or flip any decision right in the browser and it posts back), write the files on approval (Step 7), then run one **structure-review capstone** (Step 8) that can reorganize the tree and open a PR.
+**Nothing is written to disk until I approve.** You scan and grill (Steps 1–5) — the code-style grill is a **pick-the-code gallery**: you show me real code variants and I pick what I like, dimension by dimension (Step 3). You render an **interactive HTML plan** as the review gate (Step 6, built with the **planpage** kit — I approve, adjust, or flip any decision right in the browser and it posts back), write the files on approval (Step 7), then run one **structure-review capstone** (Step 8) that can reorganize the tree and open a PR.
 
 </what-to-do>
 
@@ -62,17 +62,17 @@ Detect the stack and point each framework/library to the official skill that own
 
 **Litmus first:** the **canonical example** composed in Step 3 (a real feature from this repo rewritten in the target style) is the litmus — show it to me. Seeing the whole style produce actual code catches surprises now, not at PR review; fold my reactions back into the rules before rendering.
 
-Then, **before writing anything**, render the plan through the **`skill-ui` kit** as a single self-contained, **interactive** HTML file. Build it from `skill-ui`'s components, write it to `<tmpdir>/code-style-plan-<timestamp>.html` (resolve `$TMPDIR`; fall back to `/tmp` or `%TEMP%`; nothing lands in the repo), then **serve it for a live decision** on a **safe ephemeral port** (`serve-plan.mjs` binds an OS-assigned high port — never 3000 / 5173 / 8000 / 8080 / 8787 / 19006 or other dev-server ports):
+Then, **before writing anything**, render the plan through the **planpage** kit as a single self-contained, **interactive** HTML file. Build it from planpage's components, write it to `<tmpdir>/code-style-plan-<timestamp>.html` (resolve `$TMPDIR`; fall back to `/tmp` or `%TEMP%`; nothing lands in the repo), then **serve it for a live decision** on a **safe ephemeral port** (`planpage serve` binds an OS-assigned high port — never 3000 / 5173 / 8000 / 8080 / 8787 / 19006 or other dev-server ports):
 
 ```bash
-node <skill-ui>/scripts/serve-plan.mjs <tmpdir>/code-style-plan-<ts>.html <tmpdir>/code-style-decision-<ts>.json
+npx planpage serve <tmpdir>/code-style-plan-<ts>.html <tmpdir>/code-style-decision-<ts>.json
 ```
 
 It opens the browser and blocks until I click **Approve** or **Adjust**. Read the decision JSON — `{ approved, flips, revisit, notes }` — and act on it: `flips` re-open those picks, `revisit` re-grills them, `notes` is free feedback. (No Node / headless / port blocked? `open` the file directly; the page's **Copy decision** button hands me the same JSON to paste back — never a hang.)
 
 Self-contained, CDN-only — no repo assets, no app code:
 
-- **The `skill-ui` `plan-shell` is the page** — it loads Tailwind + Mermaid from CDN, carries the theme, and wires the submit-bar + post-back. Plug content into its components; don't re-derive the HTML.
+- **The planpage shell is the page** — it loads Tailwind + Mermaid from CDN, carries the theme, and wires the submit-bar + post-back. Plug content into its components; don't re-derive the HTML.
 - **① Doc scaffold** — PROJECT / CONTEXT / LANGUAGE as `section-card`s tagged `create` · `validate ✓` · `drift`.
 - **② Code style** — each rule as a **`pick-block`** (✓ chosen / ✗ rejected, flippable, `data-id`) with its enforced-vs-taste tag and `file:symbol`; the chosen **formatter + linter config** as a `code-block`; the **`Never` fingerprint** (banned tells + real offenders); the **Exemplars** (the golden files); and the composed **`## Canonical example`** as a headlined `code-block`.
 - **③ CLI** — the command surface + dual-mode routing as a Mermaid `flowchart`.
@@ -80,7 +80,7 @@ Self-contained, CDN-only — no repo assets, no app code:
 - Then the **write-list**: every file to be created/edited.
 - **Review the exact writes** — below the write-list, inline what will actually land for **CODE-STYLE.md** and **AGENTS.md** (both the `## Conventions` digest and `## Repo layout`), rendered as a **diff when the file exists** (green/red `<pre>` lines) or **full proposed content when new**. Other writes (ADRs, created structure docs) stay summarized in ①/②. Nothing lands sight-unseen.
 
-(The `skill-ui` kit owns the shell, components, theme, and post-back — reference it and plug in content; don't reinvent the HTML. For richer diagram patterns, the `improve-codebase-architecture` report remains a good styling reference.)
+(The planpage kit owns the shell, components, theme, and post-back — reference it and plug in content; don't reinvent the HTML. For richer diagram patterns, the `improve-codebase-architecture` report remains a good styling reference.)
 
 The interactive plan **is** the ask — I approve or adjust in the browser and it posts back. Write nothing until the decision reads `approved: true`; on adjust, fold in `flips` / `revisit` / `notes` and re-render.
 
@@ -96,7 +96,7 @@ The interactive plan **is** the ask — I approve or adjust in the browser and i
 
 After the docs land, run one capstone pass: judge whether the codebase is **organized by purpose/job/role** and holds a **pure core / imperative shell**, using the just-written `CODE-STYLE.md` + `CONTEXT.md` as the rubric. It runs **inline and portable** — no dependency on any other skill — but it **borrows the lenses** of `improve-codebase-architecture` (cite it): the **deletion test** (would deleting this module concentrate complexity, or just move it?), **deep-vs-shallow** modules, and its caution that **pure functions extracted only for testability can lose locality** — so don't over-purify.
 
-Present the proposal as its **own interactive `skill-ui` page** — the §④ renderer (before/after `tree-panel` + a neighborhood-scoped module graph via `ascii-architecture-flow-mapper`) with its **own approve/adjust gate** (a second `serve-plan.mjs` run on its own safe port, a separate decision file). If the structure already holds up, render **"✓ clean"** and stop — "make sure" is a valid outcome.
+Present the proposal as its **own interactive planpage page** — the §④ renderer (before/after `tree-panel` + a neighborhood-scoped module graph via `ascii-architecture-flow-mapper`) with its **own approve/adjust gate** (a second `npx planpage serve` run on its own safe port, a separate decision file). If the structure already holds up, render **"✓ clean"** and stop — "make sure" is a valid outcome.
 
 **On approval, execute and ship** — the one place this skill moves files:
 

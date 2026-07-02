@@ -11,7 +11,7 @@ Ask the questions one at a time, waiting for feedback on each before continuing.
 
 This is the **greenfield** variant: there is little or no code to read. Your source of truth is my **taste** (grill me) plus the project's **purpose** and its **language/framework** conventions. Never write generic advice ("use clear names", "keep functions small") — every rule must be a real, load-bearing decision for THIS project. If the project already has meaningful code, stop and use `grill-me-code-style-with-docs` instead.
 
-**Nothing is written to disk until I approve.** You grill (Steps 1–5) — the code-style grill is a **pick-the-code gallery**: I pick from illustrative code variants shown in the TUI, dimension by dimension (Step 2). You render an **interactive HTML plan** as the review gate (Step 6, built with the `skill-ui` kit — I approve, adjust, or flip any decision in the browser), and only then write the files (Step 7).
+**Nothing is written to disk until I approve.** You grill (Steps 1–5) — the code-style grill is a **pick-the-code gallery**: I pick from illustrative code variants shown in the TUI, dimension by dimension (Step 2). You render an **interactive HTML plan** as the review gate (Step 6, built with the **planpage** kit — I approve, adjust, or flip any decision in the browser), and only then write the files (Step 7).
 
 </what-to-do>
 
@@ -59,22 +59,22 @@ Detect the stack from my answers / package manifest. For each framework/library,
 
 When decisions are settled, the **canonical example** composed in Step 2 (a representative feature in the target style) is the litmus — show it to me. With no code to read, seeing the whole style *as code* is the surest way to catch surprises before approval. Fold my reactions back into the rules.
 
-Then, **before writing anything**, render the plan through the **`skill-ui` kit** as a single self-contained, **interactive** HTML file. Build it from `skill-ui`'s components, write it to `<tmpdir>/code-style-plan-<timestamp>.html` (resolve `$TMPDIR`; fall back to `/tmp` or `%TEMP%`; nothing lands in the repo), then **serve it for a live decision** on a **safe ephemeral port** (`serve-plan.mjs` binds an OS-assigned high port — never 3000 / 5173 / 8000 / 8080 / 8787 / 19006):
+Then, **before writing anything**, render the plan through the **planpage** kit as a single self-contained, **interactive** HTML file. Build it from planpage's components, write it to `<tmpdir>/code-style-plan-<timestamp>.html` (resolve `$TMPDIR`; fall back to `/tmp` or `%TEMP%`; nothing lands in the repo), then **serve it for a live decision** on a **safe ephemeral port** (`planpage serve` binds an OS-assigned high port — never 3000 / 5173 / 8000 / 8080 / 8787 / 19006):
 
 ```bash
-node <skill-ui>/scripts/serve-plan.mjs <tmpdir>/code-style-plan-<ts>.html <tmpdir>/code-style-decision-<ts>.json
+npx planpage serve <tmpdir>/code-style-plan-<ts>.html <tmpdir>/code-style-decision-<ts>.json
 ```
 
 It opens the browser and blocks until I click **Approve** or **Adjust**; read the decision JSON — `{ approved, flips, revisit, notes }` — and act on it (`flips` re-open those picks, `revisit` re-grills them). (No Node / headless / port blocked? `open` the file directly; the page's **Copy decision** button hands me the same JSON to paste back — never a hang.)
 
 Self-contained, CDN-only — no repo assets, no app code:
 
-- **The `skill-ui` `plan-shell` is the page** — it loads Tailwind + Mermaid from CDN, carries the theme, and wires the submit-bar + post-back. Plug content into its components; don't re-derive the HTML.
+- **The planpage shell is the page** — it loads Tailwind + Mermaid from CDN, carries the theme, and wires the submit-bar + post-back. Plug content into its components; don't re-derive the HTML.
 - Sections: **① Doc scaffold** — PROJECT / CONTEXT / LANGUAGE as `section-card`s tagged `create` · `validate ✓` · `drift`. **② Code style** — each rule as a **`pick-block`** (✓ chosen / ✗ rejected, flippable, `data-id`) with its enforced-vs-taste tag; the chosen **formatter + linter config** as a `code-block`; the **`Never` fingerprint** (the banned tells); and the composed **`## Canonical example`** as a headlined `code-block`. **③ CLI** — the command surface + dual-mode routing as a Mermaid `flow`.
 - Then the **write-list**: every file to be created/edited.
 - **Review the exact writes** — below the write-list, inline the proposed content for **CODE-STYLE.md** and **AGENTS.md** (full content when new, a diff if the file already exists) as `diff-block`s, so nothing lands sight-unseen.
 
-(The `skill-ui` kit owns the shell, components, theme, and post-back — reference it and plug in content; don't reinvent the HTML.)
+(The planpage kit owns the shell, components, theme, and post-back — reference it and plug in content; don't reinvent the HTML.)
 
 The interactive plan **is** the ask — I approve or adjust in the browser and it posts back. Write nothing until the decision reads `approved: true`; on adjust, fold in `flips` / `revisit` / `notes` and re-render.
 
