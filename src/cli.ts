@@ -60,7 +60,9 @@ const program = new Command();
 
 program
   .name("dufflebag")
-  .description("Install a personal bag of Claude Code skills & hooks (context guard, autonomous loop, TTS).")
+  .description(
+    "Install a personal bag of AI coding agent skills & hooks for Claude Code, Kimi, and Kiro (context guard, autonomous loop, TTS).",
+  )
   .version(VERSION, "-v, --version");
 
 program

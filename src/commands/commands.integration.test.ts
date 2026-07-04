@@ -67,13 +67,17 @@ describe("install / uninstall round-trip", () => {
       expect(Object.keys(mid.env ?? {}).some((k) => k.startsWith("dufflebag"))).toBe(true);
       expect(mid.env?.MY_OWN_KEY).toBe("keep-me"); // user env preserved
       expect(existsSync(layout.installDir)).toBe(true); // payload written
-      expect(existsSync(path.join(layout.skillsDir, "autorun"))).toBe(true); // skill copied
+      expect(existsSync(path.join(layout.skillsDir, "autorun"))).toBe(true); // Claude skill copied
+      expect(existsSync(path.join(layout.kimiSkillsDir, "autorun"))).toBe(true); // Kimi skill copied
+      expect(existsSync(path.join(layout.kiroSkillsDir, "autorun"))).toBe(true); // Kiro skill copied
 
       uninstall({ scope: "project", projectRoot: dir });
 
       expect(readFileSync(layout.settingsFile, "utf8")).toBe(before); // exact inverse
       expect(existsSync(layout.installDir)).toBe(false);
       expect(existsSync(path.join(layout.skillsDir, "autorun"))).toBe(false);
+      expect(existsSync(path.join(layout.kimiSkillsDir, "autorun"))).toBe(false);
+      expect(existsSync(path.join(layout.kiroSkillsDir, "autorun"))).toBe(false);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

@@ -42,6 +42,16 @@ export interface Layout {
   hooksDir: string;
   /** Skills are copied here: <claudeDir>/skills */
   skillsDir: string;
+  /** ~/.kimi-code or <root>/.kimi-code */
+  kimiDir: string;
+  /** Skills are copied here: <kimiDir>/skills */
+  kimiSkillsDir: string;
+  /** ~/.kiro or <root>/.kiro */
+  kiroDir: string;
+  /** Skills are copied here: <kiroDir>/skills */
+  kiroSkillsDir: string;
+  /** Cross-tool Agent Skills dir: ~/.agents/skills or <root>/.agents/skills */
+  agentsSkillsDir: string;
 }
 
 /**
@@ -50,6 +60,9 @@ export interface Layout {
  */
 export function resolveLayout(scope: Scope, projectRoot: string = process.cwd()): Layout {
   const claudeDir = scope === "global" ? path.join(homedir(), ".claude") : path.join(projectRoot, ".claude");
+  const kimiDir = scope === "global" ? path.join(homedir(), ".kimi-code") : path.join(projectRoot, ".kimi-code");
+  const kiroDir = scope === "global" ? path.join(homedir(), ".kiro") : path.join(projectRoot, ".kiro");
+  const agentsDir = scope === "global" ? path.join(homedir(), ".agents") : path.join(projectRoot, ".agents");
   const installDir = path.join(claudeDir, INSTALL_DIR_NAME);
   return {
     scope,
@@ -58,6 +71,11 @@ export function resolveLayout(scope: Scope, projectRoot: string = process.cwd())
     installDir,
     hooksDir: path.join(installDir, "hooks"),
     skillsDir: path.join(claudeDir, "skills"),
+    kimiDir,
+    kimiSkillsDir: path.join(kimiDir, "skills"),
+    kiroDir,
+    kiroSkillsDir: path.join(kiroDir, "skills"),
+    agentsSkillsDir: path.join(agentsDir, "skills"),
   };
 }
 

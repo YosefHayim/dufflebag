@@ -7,7 +7,8 @@
  * Never mutates anything.
  */
 
-import { existsSync } from "node:fs";
+import { existsSync, readdirSync } from "node:fs";
+import path from "node:path";
 import type { DedupMode, Scope } from "../core/index.js";
 import {
   c,
@@ -32,6 +33,14 @@ import { loadTypeScript } from "../skills/dedup-guard/lib/dupIndex.js";
 
 const ok = (t: string): string => `${c.green("✓")} ${t}`;
 const bad = (t: string): string => `${c.yellow("⚠")} ${t}`;
+
+/** List the skill folder names present in an agent's skills directory, if any. */
+function installedSkills(dir: string): string[] {
+  if (!existsSync(dir)) return [];
+  return readdirSync(dir, { withFileTypes: true })
+    .filter((d) => d.isDirectory() && existsSync(path.join(dir, d.name, "SKILL.md")))
+    .map((d) => d.name);
+}
 
 function hostBlock(): string {
   const installed = detectAgents().filter((a) => a.installed);
@@ -73,16 +82,35 @@ function scopeBlock(scope: Scope): string | null {
 
   const settings = readSettings(layout.settingsFile);
   const managed = listManagedHooks(settings);
-  const expected = manifest.features.flatMap((id) => FEATURES[id].hooks).length;
+  const expectedHooks = manifest.features.flatMap((id) => FEATURES[id].hooks).length;
   const cfg = fromEnvMap(settings.env);
 
   const lines = [
     `version  ${c.bold(manifest.version)}   ${c.dim(manifest.installedAt)}`,
     `features ${manifest.features.map((id) => c.bold(id)).join(", ")}`,
-    managed.length >= expected
+    managed.length >= expectedHooks
       ? ok(`${managed.length} bag hook(s) wired`)
-      : bad(`${managed.length}/${expected} bag hook(s) wired — re-run install`),
+      : bad(`${managed.length}/${expectedHooks} bag hook(s) wired — re-run install`),
   ];
+
+  // Report skills: both feature-declared AND any mirrored from .agents/skills/.
+  const agentsSkills = installedSkills(layout.agentsSkillsDir);
+  const kimiSkills = installedSkills(layout.kimiSkillsDir);
+  const kiroSkills = installedSkills(layout.kiroSkillsDir);
+
+  if (agentsSkills.length > 0 || kimiSkills.length > 0 || kiroSkills.length > 0) {
+    lines.push(ok(`Agents skills (source): ${agentsSkills.length} — ${agentsSkills.join(", ") || "none"}`));
+    lines.push(
+      kimiSkills.length >= agentsSkills.length
+        ? ok(`Kimi skills (synced): ${kimiSkills.length} — ${kimiSkills.join(", ")}`)
+        : bad(`Kimi skills: ${kimiSkills.length}/${agentsSkills.length} synced — re-run install`),
+    );
+    lines.push(
+      kiroSkills.length >= agentsSkills.length
+        ? ok(`Kiro skills (synced): ${kiroSkills.length} — ${kiroSkills.join(", ")}`)
+        : bad(`Kiro skills: ${kiroSkills.length}/${agentsSkills.length} synced — re-run install`),
+    );
+  }
   for (const id of manifest.features) {
     const blocker = platformBlocker(FEATURES[id].platform);
     if (blocker) lines.push(bad(`${id} ${blocker} (inert here)`));

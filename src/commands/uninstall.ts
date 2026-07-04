@@ -52,7 +52,7 @@ export function uninstall(opts: { scope: Scope; projectRoot?: string }): void {
   const manifest = readManifest(layout.installDir);
 
   intro(`dufflebag · uninstall · ${opts.scope}`);
-  step(c.dim(`target: ${layout.claudeDir}`));
+  step(c.dim(`targets: ${layout.claudeDir}, ${layout.kimiDir}, ${layout.kiroDir}`));
 
   if (!manifest && !existsSync(layout.installDir)) {
     outro(c.yellow("Nothing installed at this scope — nothing to remove."));
@@ -77,11 +77,26 @@ export function uninstall(opts: { scope: Scope; projectRoot?: string }): void {
   removeAgentsBlock(layout.claudeDir);
 
   // Skills recorded in the manifest, then the payload dir (hooks, manifest, payload package.json).
-  for (const name of manifest?.skills ?? []) removePath(path.join(layout.skillsDir, name));
+  for (const name of manifest?.skills ?? []) {
+    removePath(path.join(layout.skillsDir, name));
+    removePath(path.join(layout.kimiSkillsDir, name));
+    removePath(path.join(layout.kiroSkillsDir, name));
+    removePath(path.join(layout.agentsSkillsDir, name));
+  }
+
+  // Also remove any mirrored skills in Kiro/Kimi dirs that were synced from
+  // .agents/skills/ (the full skill set, not just feature-declared ones).
+  for (const dir of [layout.kiroSkillsDir, layout.kimiSkillsDir]) {
+    if (!existsSync(dir)) continue;
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      if (entry.isDirectory()) removePath(path.join(dir, entry.name));
+    }
+  }
+
   removePath(layout.installDir);
 
   s.stop("Removed bag hooks, config, skills, payload, and agent wiring");
 
   if (backup) step(c.dim(`backup: ${path.basename(backup)} (roll back any time)`));
-  outro(c.green("Uninstalled. Restart Claude Code so the hooks unload."));
+  outro(c.green("Uninstalled. Restart Claude Code / Kimi / Kiro so the hooks/skills unload."));
 }
