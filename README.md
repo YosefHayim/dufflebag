@@ -16,17 +16,40 @@ npx dufflebag install
 
 ## What's in the bag
 
+<!-- AUTO:FEATURES:START -->
 | Feature | What it does | Runs on |
 | --- | --- | --- |
-| **context-guard** | Nudges you to run `/handoff` at ~18% of the model's context window, then hard-denies new code edits at ~20% (handoff-doc writes stay allowed) — so long sessions wind down gracefully instead of ballooning past usable context. | 🟢 any OS, any terminal |
-| **dedup-guard** | Blocks a Write/Edit that pastes a function body or `interface`/`type` shape already defined elsewhere in the repo — DRY enforced at the moment of the write, using an AST fingerprint over the repo's own TypeScript. Deny by default; tunable `warn`/`off`. Also wires Cursor (warn) + an AGENTS.md rule for Codex, and ships a `dedup check` CI gate. | 🟢 any OS · needs the repo's TypeScript |
-| **autonomous-loop** (`/autorun`, `/autorun stop`, `/autorun exit`) | A background daemon that, once armed, auto-`/compact`s and resumes your work hands-free each time context nears the guardrail and a fresh handoff exists — until a cycle budget, a done-marker, or `/autorun stop`. | 🔴 macOS + [Ghostty](https://ghostty.org) only |
-| **speak-response** | A `Stop` hook that speaks Claude's prose (code stripped) via the macOS `say` command. | 🟡 macOS |
-| **png-to-code** | A skill that turns a PNG design (illustration, logo, UI mockup) into SVG/HTML/CSS matching the original **1:1** — a decompose → reuse-or-build → render → screenshot-diff → refine loop where a measured pixel diff (not the eye) is the source of truth, plus a rig-first doctrine for animation. Pure skill, no hooks; the diff harness needs Node + Playwright. | 🟢 any OS · Node + Playwright for the diff loop |
+| **context-guard** | Nudge a /handoff at ~18% of the model window and hard-deny new code edits at ~20%, so long sessions wind down gracefully instead of ballooning past usable context. | 🟢 any OS |
+| **dedup-guard** | Block a Write/Edit that pastes a function body or interface/type shape already defined elsewhere in the repo — DRY enforced at the moment of the write. Uses the repo's own TypeScript; deny by default (tune with dufflebagDedupEnforcement). Also wires Cursor (warn) + an AGENTS.md rule for Codex. | 🟢 any OS |
+| **autonomous-loop** | A SessionStart daemon that auto-/compacts and resumes work hands-free once context nears the guardrail and a fresh handoff exists. macOS + Ghostty only (it types into your terminal window). | 🔴 macOS + Ghostty |
+| **speak-response** | A Stop hook that speaks Claude's prose (code blocks stripped) via the macOS `say` command. macOS only. | 🟡 macOS |
+| **png-to-code** | A skill that turns a PNG design (illustration, logo, UI mockup) into SVG/HTML/CSS that measurably converges to a 1:1 match — a decompose → reuse-or-build → render → screenshot-diff → refine loop, plus a rig-first doctrine for animation. Pure skill (no hooks); its diff harness needs Node + Playwright. | 🟢 any OS |
+<!-- AUTO:FEATURES:END -->
 
 `context-guard` is the safe default. The autonomous loop is **experimental and macOS+Ghostty-only** because it works by typing `/compact` into your terminal window via AppleScript — every keystroke is gated behind a wall of safety checks (see [How it works](#how-it-works)).
 
 > **Heads up:** the autonomous loop types into your terminal. Install it only if you understand and want that. The kill switch is always one command away: `touch ~/.claude/.ctx-guard-off`.
+
+---
+
+## Agent skills
+
+<!-- AUTO:SKILLS:START -->
+Beyond the installable hooks, dufflebag ships **agent skills** — instruction sets that coding agents (Claude Code, Kiro, Cursor) follow when triggered by natural language:
+
+| Skill | Description |
+| --- | --- |
+| **autorun** | Drive the autonomous context loop for this session — arm it to auto-/compact and resume work hands-free, or pause/shut it down. Use when the user types /autorun (optionally with a number or `stop`/`exit`), says "autorun", "autopilot", "take it from here", "keep going hands-off", or asks to pause / stop / shut down / exit the auto-compact loop. |
+| **deslop** | Reviews code readability first, then applies approved cleanup that makes the full pipeline understandable in seconds. Use when the user says "deslop", "make this readable", "make this less AI", "second pass", "clean this up", "rename for clarity", "show before and after", or asks to improve code comprehension across React, TypeScript, backend, folders, imports, hooks, or functions. |
+| **grill-me** | Interview the user relentlessly about a plan or design until reaching shared understanding, resolving each branch of the decision tree. Use when user wants to stress-test a plan, get grilled on their design, or mentions "grill me". |
+| **grill-me-code-style** | Grill the user on how a NEW/greenfield project is built — code style, structure docs, and CLI — then render an HTML plan and, on approval, write CODE-STYLE.md + a formatter config and refresh the AGENTS.md digest. Ensures PROJECT.md/CONTEXT.md/LANGUAGE.md exist (create if missing, validate if present) and grills real code idioms + formatting, not just architecture. Use when setting up or reorganizing a new project, when there is little/no code, or when defining coding style, structure, or CLI conventions from scratch. For an existing codebase, use grill-me-code-style-with-docs instead. |
+| **grill-me-code-style-with-docs** | Grill the user on how an EXISTING codebase is built — code style, structure docs, and CLI — using the real code as evidence, then render an HTML plan and, on approval, write/update CODE-STYLE.md + a formatter config and refresh the AGENTS.md digest. Ensures PROJECT.md/CONTEXT.md/LANGUAGE.md exist (create if missing, validate if present), fans out sub-agents for the most-repeated patterns, grills real code idioms + formatting with before/after, audits deps, and references official framework skills. Use when defining/updating style, structure, or CLI conventions for a repo with meaningful code. For a brand-new or empty project, use grill-me-code-style instead. |
+| **grill-with-docs** | Grilling session that challenges your plan against the existing domain model, sharpens terminology, and updates documentation (CONTEXT.md, ADRs) inline as decisions crystallise. Use when user wants to stress-test a plan against their project's language and documented decisions. |
+| **planpage** | Render a skill's plan, review gate, or report as a beautiful, self-contained, INTERACTIVE HTML page — via the open-source planpage package (Preact components → static HTML + a local post-back server so the user can approve / adjust / flip decisions in the browser and the choice comes straight back to the agent). Use whenever a skill needs an approval gate, a decision review, or a shareable before/after report — author with the kit's components instead of hand-rolling HTML each time. |
+| **png-to-code** | Convert a PNG design into pixel-perfect code — SVG illustrations/logos, HTML/CSS UI, and animations — using a decompose → reuse-or-build → render → screenshot-diff → refine loop that measurably converges to a 1:1 match instead of eyeballing. Use when the user provides a PNG, screenshot, mockup, or inspiration image and wants it turned into SVG, HTML/CSS, a web component, or an animated illustration, or asks to match a design "pixel-perfect" / "1:1". |
+
+Skills are installed alongside hooks into your agent's skills directory. They require no configuration — just ask your agent to do the thing (e.g. "deslop this", "grill me", "convert this PNG to code").
+<!-- AUTO:SKILLS:END -->
 
 ---
 

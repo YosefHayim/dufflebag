@@ -27,7 +27,8 @@
     "format": "biome format --write .",
     "check:ci": "biome ci .",
     "verify": "biome ci . && tsc --noEmit && vitest run && pnpm build",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build",
+    "generate-readme": "node src/scripts/generateReadme.mjs"
   },
   "keywords": [
     "claude-code",
