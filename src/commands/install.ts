@@ -1,18 +1,21 @@
 /**
  * `dufflebag install` — the orchestrator.
  *
- * Reconciles a requested feature set into ~/.claude (or ./.claude for project
- * scope): copies the self-contained hook payload and skills, then performs the
- * settings.json surgery (backup → managed hooks →
- * env defaults). Every disk write is preceded by a timestamped backup, and the
- * env merge preserves any value the user already set, so re-running this is also
- * the safe `update` path.
+ * Reconciles a requested feature set into every detected agent's native skill
+ * format: copies the self-contained hook payload and skills for Claude Code,
+ * writes rule files for Cursor, appends managed blocks for Windsurf/Cline/etc.,
+ * then performs the settings.json surgery (backup → managed hooks → env defaults).
+ * Every disk write is preceded by a timestamped backup, and the env merge
+ * preserves any value the user already set, so re-running this is also the safe
+ * `update` path.
  */
 
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
 import path from "node:path";
 import type { FeatureId, Layout, Manifest, RenderedHook, Scope } from "../core/index.js";
 import {
+  AGENT_CONFIGS,
   ALL_FEATURES,
   backupSettings,
   bundledHooksDir,
@@ -56,7 +59,9 @@ import {
   writeJson,
   writeManifest,
   writeSettings,
+  writeSkillsForAgent,
 } from "../core/index.js";
+import type { AgentId } from "../core/wiring/agents.js";
 
 export interface InstallOptions {
   scope: Scope;
@@ -81,17 +86,18 @@ function renderHooks(layout: Layout, features: FeatureId[]): RenderedHook[] {
 }
 
 /**
- * Render a note of the AI coding agents detected on this host. Claude Code is
- * the install target; a detected Cursor/Codex is shown but flagged as not yet
- * wired (issue #5) so the user knows dufflebag saw it and why it's untouched.
+ * Render a note of the AI coding agents detected on this host.
  */
 function agentsNote(): string {
-  const shown = detectAgents().filter((a) => a.installed || a.supported);
+  const agents = detectAgents();
+  const shown = agents.filter((a) => a.installed);
+  if (shown.length === 0) return c.dim("No agents detected on this host.");
   return shown
     .map((a) => {
-      const mark = a.supported ? c.green("✓") : c.dim("•");
-      const tag = a.supported ? c.green("install target") : c.dim("detected · adapter tracked in #5");
-      return `${mark} ${c.bold(a.name)} ${c.dim("—")} ${tag}`;
+      const mark = c.green("✓");
+      const mode = AGENT_CONFIGS[a.id].mode;
+      const tag = c.dim(`(${mode})`);
+      return `${mark} ${c.bold(a.name)} ${tag}`;
     })
     .join("\n");
 }
@@ -220,16 +226,47 @@ async function chooseFeatures(opts: InstallOptions, prior: FeatureId[] | undefin
   return resolveFeatures(picked.length > 0 ? picked : preset);
 }
 
+/**
+ * Interactive agent picker. Detects which agents are present, presents a
+ * multiselect pre-selecting all detected ones. Returns the agent IDs to
+ * install into. Non-interactive runs install into all detected agents.
+ */
+async function chooseAgents(opts: InstallOptions): Promise<AgentId[]> {
+  const agents = detectAgents();
+  const detected = agents.filter((a) => a.installed).map((a) => a.id);
+  // Always include Claude Code (it's the hooks target and always supported).
+  const preselect = detected.length > 0 ? detected : ["claude-code" as AgentId];
+
+  if (opts.assumeYes || !process.stdin.isTTY) return preselect;
+
+  const picked = await multiselect<AgentId>(
+    "Which agents should receive skills?",
+    agents
+      .filter((a) => a.installed || a.id === "claude-code")
+      .map((a) => ({
+        value: a.id,
+        label: `${a.name} (${AGENT_CONFIGS[a.id].mode})`,
+        hint: a.installed ? "detected" : "",
+      })),
+    preselect,
+    preselect,
+  );
+  // Always include Claude Code (hooks wiring depends on it).
+  if (!picked.includes("claude-code")) picked.unshift("claude-code");
+  return picked.length > 0 ? picked : preselect;
+}
+
 export async function install(opts: InstallOptions): Promise<void> {
   const layout = resolveLayout(opts.scope, opts.projectRoot);
   const prior = readJson<Manifest>(path.join(layout.installDir, "manifest.json"));
 
   intro(`dufflebag ${version()} · ${opts.isUpdate ? "update" : "install"} · ${opts.scope}`);
-  step(c.dim(`targets: ${layout.claudeDir}, ${layout.kimiDir}, ${layout.kiroDir}`));
+  step(c.dim(`targets: ${layout.claudeDir}`));
   note(agentsNote(), "Agents detected");
 
   const features = await chooseFeatures(opts, prior?.features);
   const skills = skillsFor(features);
+  const selectedAgents = await chooseAgents(opts);
 
   // Bootstrap Ghostty for the autonomous loop before preflight, so a successful
   // install means the generic platform warning below has nothing left to flag.
@@ -256,14 +293,29 @@ export async function install(opts: InstallOptions): Promise<void> {
   copyDir(bundledHooksDir(), layout.hooksDir);
   writeJson(path.join(layout.installDir, "package.json"), { name: "dufflebag-payload", private: true, type: "module" });
 
-  // Copy skills into every supported agent's skills directory. Kimi and Kiro
-  // do not get hooks/payload — only the shipped skill markdown/scripts.
-  // We also mirror into the cross-tool .agents/skills/ location because Kimi
-  // Code CLI 0.22.x auto-discovers user skills from there for slash commands.
   const ctl = path.join(layout.hooksDir, "ctxLoopCtl.js");
-  installSkillsInto(features, layout.skillsDir, ctl);
-  installSkillsInto(features, layout.kimiSkillsDir, ctl);
-  installSkillsInto(features, layout.kiroSkillsDir, ctl);
+  const scopeRoot = opts.scope === "global" ? homedir() : (opts.projectRoot ?? process.cwd());
+
+  // Install skills into each selected agent using its native format.
+  const featureCatalog = FEATURES as unknown as Record<string, { skills: string[]; ships: string[] }>;
+  const agentsSummary: string[] = [];
+
+  for (const agentId of selectedAgents) {
+    const config = AGENT_CONFIGS[agentId];
+    if (config.mode === "skills-dir") {
+      // Skills-dir agents use the existing installSkillsInto logic.
+      if (config.skillsDir) {
+        const targetDir = path.join(scopeRoot, config.skillsDir);
+        installSkillsInto(features, targetDir, ctl);
+      }
+    } else {
+      // rules-file, single-file, config-ref agents use the new writer.
+      writeSkillsForAgent(agentId, scopeRoot, features, featureCatalog, ctl);
+    }
+    agentsSummary.push(config.name);
+  }
+
+  // Also install into the cross-tool .agents/skills/ location.
   installSkillsInto(features, layout.agentsSkillsDir, ctl);
 
   // Mirror ALL skills from the cross-tool source (.agents/skills/) into Kiro
@@ -282,7 +334,7 @@ export async function install(opts: InstallOptions): Promise<void> {
   const manifest: Manifest = { version: version(), scope: opts.scope, features, skills, installedAt: new Date().toISOString() };
   writeManifest(layout.installDir, manifest);
 
-  s.stop(`Installed ${c.bold(features.join(", "))}`);
+  s.stop(`Installed ${c.bold(features.join(", "))} → ${agentsSummary.join(", ")}`);
 
   if (backup) step(c.dim(`backup: ${path.basename(backup)}`));
   if (synced.length > 0) step(c.dim(`synced ${synced.length} skill(s) from .agents/skills/ → Kiro + Kimi`));
@@ -291,15 +343,14 @@ export async function install(opts: InstallOptions): Promise<void> {
     step(c.dim(`dedup-guard also wired: ${dedupWiring.map((f) => path.relative(root, f)).join(", ")}`));
   }
 
-  note(nextSteps(features, opts.scope), "Next steps");
-  outro(c.green("Done. Restart Claude Code / Kimi / Kiro (or start a new session) so the hooks/skills load."));
+  note(nextSteps(features, opts.scope, selectedAgents), "Next steps");
+  outro(c.green("Done. Restart your agents (or start a new session) so the skills load."));
 }
 
-function nextSteps(features: FeatureId[], scope: Scope): string {
-  const lines = [
-    `${c.dim("•")} Restart Claude Code to load the hooks.`,
-    `${c.dim("•")} Restart Kimi Code CLI / Kiro (or run /reload) so the copied skills are discovered.`,
-  ];
+function nextSteps(features: FeatureId[], scope: Scope, agents: AgentId[]): string {
+  const lines = [`${c.dim("•")} Restart your coding agents to load the new skills.`];
+  const agentNames = agents.map((id) => AGENT_CONFIGS[id].name).join(", ");
+  lines.push(`${c.dim("•")} Skills installed for: ${c.cyan(agentNames)}`);
   if (features.includes("autonomous-loop"))
     lines.push(`${c.dim("•")} Arm the loop with ${c.cyan("/autorun")} ${c.dim("(macOS + Ghostty).")}`);
   if (features.includes("dedup-guard")) {
@@ -316,9 +367,7 @@ function nextSteps(features: FeatureId[], scope: Scope): string {
   }
   lines.push(`${c.dim("•")} Tune values: ${c.cyan("dufflebag config --warn 0.15")}`);
   if (scope === "project") {
-    lines.push(
-      `${c.dim("•")} Commit ${c.cyan(".claude/")}, ${c.cyan(".kimi-code/")}, and ${c.cyan(".kiro/")} so teammates share the setup.`,
-    );
+    lines.push(`${c.dim("•")} Commit agent config dirs so teammates share the setup.`);
   }
   lines.push(`${c.dim("•")} Health check: ${c.cyan("dufflebag doctor")}`);
   return lines.join("\n");

@@ -12,6 +12,7 @@ import { homedir } from "node:os";
 import path from "node:path";
 
 import type { Scope } from "../catalog/types.js";
+import { AGENT_CONFIGS, type AgentId, type SkillInstallMode } from "../wiring/agents.js";
 
 /**
  * The namespaced directory name the bag owns. It appears in every hook command
@@ -88,4 +89,36 @@ export function hookCommand(layout: Layout, file: string): string {
 /** Timestamped backup path for a settings.json (caller supplies the stamp for determinism/testability). */
 export function backupPath(settingsFile: string, stamp: string): string {
   return `${settingsFile}.bak.${stamp}`;
+}
+
+/** Resolved target for writing skills into a specific agent. */
+export interface AgentTarget {
+  /** The directory or file path where skills are written. */
+  dir: string;
+  /** How the agent consumes skill content. */
+  mode: SkillInstallMode;
+  /** For single-file / config-ref modes: the absolute file path of the target. */
+  file?: string;
+}
+
+/**
+ * Resolve the absolute write target for a given agent and scope. This is the
+ * generic resolver that abstracts over the per-agent Layout fields — use it
+ * when you need a uniform "where does this agent get its skills?" answer
+ * without hard-coding per-agent paths.
+ */
+export function resolveAgentTarget(agentId: AgentId, scope: Scope, projectRoot: string = process.cwd()): AgentTarget {
+  const config = AGENT_CONFIGS[agentId];
+  const root = scope === "global" ? homedir() : projectRoot;
+
+  switch (config.mode) {
+    case "skills-dir":
+      return { dir: path.join(root, config.skillsDir!), mode: config.mode };
+    case "rules-file":
+      return { dir: path.join(root, config.rulesDir!), mode: config.mode };
+    case "single-file":
+      return { dir: path.dirname(path.join(root, config.targetFile!)), mode: config.mode, file: path.join(root, config.targetFile!) };
+    case "config-ref":
+      return { dir: path.dirname(path.join(root, config.targetFile!)), mode: config.mode, file: path.join(root, config.targetFile!) };
+  }
 }

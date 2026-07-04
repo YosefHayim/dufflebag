@@ -9,3 +9,4 @@ export * from "./settings/settings.js";
 export * from "./ui.js";
 export * from "./wiring/agents.js";
 export * from "./wiring/agentWiring.js";
+export * from "./wiring/skillWriter.js";
