@@ -23,3 +23,11 @@ skills/png-to-code/scripts/.playwright/
 
 # Kimi Code CLI local config + skills
 .kimi-code/
+
+# .claude local files (backups, local settings, installed payload)
+.claude/settings.json.bak.*
+.claude/settings.local.json
+.claude/dufflebag/
+
+# .agents installed node_modules
+.agents/skills/**/node_modules/
