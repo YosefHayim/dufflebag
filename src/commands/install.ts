@@ -9,7 +9,7 @@
  * the safe `update` path.
  */
 
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import type { FeatureId, Layout, Manifest, RenderedHook, Scope } from "../core/index.js";
 import {
@@ -152,6 +152,50 @@ function wireDedupAgents(layout: Layout, scope: Scope): string[] {
 }
 
 /**
+ * Copy the feature-declared skill folders into a single agent's skills directory.
+ * Re-uses the catalog's `ships` allowlist and templates the daemon control path
+ * into SKILL.md when present.
+ */
+function installSkillsInto(features: FeatureId[], targetDir: string, ctl: string): void {
+  const skills = skillsFor(features);
+  if (skills.length === 0) return;
+  ensureDir(targetDir);
+  for (const id of features) {
+    const feature = FEATURES[id];
+    for (const name of feature.skills) {
+      const src = path.join(bundledSkillsDir(), name);
+      const dest = path.join(targetDir, name);
+      for (const rel of feature.ships) copyDir(path.join(src, rel), path.join(dest, rel));
+      const skillMd = path.join(dest, "SKILL.md");
+      if (existsSync(skillMd)) writeFileSync(skillMd, readFileSync(skillMd, "utf8").replaceAll("@@CTL@@", ctl), "utf8");
+    }
+  }
+}
+
+/**
+ * Mirror every skill directory from the cross-tool source of truth
+ * (`~/.agents/skills/` for global, `./.agents/skills/` for project) into the
+ * Kiro and Kimi skills directories. This ensures that skills installed by any
+ * tool (Claude Code, manual, third-party) are available in all three editors.
+ * Returns the list of skill names that were synced.
+ */
+function mirrorAllSkills(layout: Layout): string[] {
+  const src = layout.agentsSkillsDir;
+  if (!existsSync(src)) return [];
+  const entries = readdirSync(src, { withFileTypes: true }).filter(
+    (d) => d.isDirectory() && existsSync(path.join(src, d.name, "SKILL.md")),
+  );
+  if (entries.length === 0) return [];
+  ensureDir(layout.kiroSkillsDir);
+  ensureDir(layout.kimiSkillsDir);
+  for (const entry of entries) {
+    copyDir(path.join(src, entry.name), path.join(layout.kiroSkillsDir, entry.name));
+    copyDir(path.join(src, entry.name), path.join(layout.kimiSkillsDir, entry.name));
+  }
+  return entries.map((d) => d.name);
+}
+
+/**
  * Decide the feature set: an explicit `--features`, else the prior manifest (on
  * update / re-run), else an interactive multiselect, else the safe default.
  */
@@ -181,7 +225,7 @@ export async function install(opts: InstallOptions): Promise<void> {
   const prior = readJson<Manifest>(path.join(layout.installDir, "manifest.json"));
 
   intro(`dufflebag ${version()} · ${opts.isUpdate ? "update" : "install"} · ${opts.scope}`);
-  step(c.dim(`target: ${layout.claudeDir}`));
+  step(c.dim(`targets: ${layout.claudeDir}, ${layout.kimiDir}, ${layout.kiroDir}`));
   note(agentsNote(), "Agents detected");
 
   const features = await chooseFeatures(opts, prior?.features);
@@ -212,22 +256,19 @@ export async function install(opts: InstallOptions): Promise<void> {
   copyDir(bundledHooksDir(), layout.hooksDir);
   writeJson(path.join(layout.installDir, "package.json"), { name: "dufflebag-payload", private: true, type: "module" });
 
-  // Copy skills — only each feature's catalog-declared `ships` paths, so build-only
-  // sources never leak into an install (fail-safe) — then template the daemon path.
-  if (skills.length > 0) {
-    ensureDir(layout.skillsDir);
-    const ctl = path.join(layout.hooksDir, "ctxLoopCtl.js");
-    for (const id of features) {
-      const feature = FEATURES[id];
-      for (const name of feature.skills) {
-        const src = path.join(bundledSkillsDir(), name);
-        const dest = path.join(layout.skillsDir, name);
-        for (const rel of feature.ships) copyDir(path.join(src, rel), path.join(dest, rel));
-        const skillMd = path.join(dest, "SKILL.md");
-        if (existsSync(skillMd)) writeFileSync(skillMd, readFileSync(skillMd, "utf8").replaceAll("@@CTL@@", ctl), "utf8");
-      }
-    }
-  }
+  // Copy skills into every supported agent's skills directory. Kimi and Kiro
+  // do not get hooks/payload — only the shipped skill markdown/scripts.
+  // We also mirror into the cross-tool .agents/skills/ location because Kimi
+  // Code CLI 0.22.x auto-discovers user skills from there for slash commands.
+  const ctl = path.join(layout.hooksDir, "ctxLoopCtl.js");
+  installSkillsInto(features, layout.skillsDir, ctl);
+  installSkillsInto(features, layout.kimiSkillsDir, ctl);
+  installSkillsInto(features, layout.kiroSkillsDir, ctl);
+  installSkillsInto(features, layout.agentsSkillsDir, ctl);
+
+  // Mirror ALL skills from the cross-tool source (.agents/skills/) into Kiro
+  // and Kimi so every skill available to Claude Code is also reachable by them.
+  const synced = mirrorAllSkills(layout);
 
   // Settings surgery: managed hooks → env defaults (preserve user values).
   let next = mergeManagedHooks(settings, renderHooks(layout, features));
@@ -244,17 +285,21 @@ export async function install(opts: InstallOptions): Promise<void> {
   s.stop(`Installed ${c.bold(features.join(", "))}`);
 
   if (backup) step(c.dim(`backup: ${path.basename(backup)}`));
+  if (synced.length > 0) step(c.dim(`synced ${synced.length} skill(s) from .agents/skills/ → Kiro + Kimi`));
   if (dedupWiring.length > 0) {
     const root = rootDirOf(layout.claudeDir);
     step(c.dim(`dedup-guard also wired: ${dedupWiring.map((f) => path.relative(root, f)).join(", ")}`));
   }
 
   note(nextSteps(features, opts.scope), "Next steps");
-  outro(c.green("Done. Restart Claude Code so the hooks load."));
+  outro(c.green("Done. Restart Claude Code / Kimi / Kiro (or start a new session) so the hooks/skills load."));
 }
 
 function nextSteps(features: FeatureId[], scope: Scope): string {
-  const lines = [`${c.dim("•")} Restart Claude Code (or open a new session) to load the hooks.`];
+  const lines = [
+    `${c.dim("•")} Restart Claude Code to load the hooks.`,
+    `${c.dim("•")} Restart Kimi Code CLI / Kiro (or run /reload) so the copied skills are discovered.`,
+  ];
   if (features.includes("autonomous-loop"))
     lines.push(`${c.dim("•")} Arm the loop with ${c.cyan("/autorun")} ${c.dim("(macOS + Ghostty).")}`);
   if (features.includes("dedup-guard")) {
@@ -270,7 +315,11 @@ function nextSteps(features: FeatureId[], scope: Scope): string {
     );
   }
   lines.push(`${c.dim("•")} Tune values: ${c.cyan("dufflebag config --warn 0.15")}`);
-  if (scope === "project") lines.push(`${c.dim("•")} Commit ${c.cyan(".claude/")} so teammates share the setup.`);
+  if (scope === "project") {
+    lines.push(
+      `${c.dim("•")} Commit ${c.cyan(".claude/")}, ${c.cyan(".kimi-code/")}, and ${c.cyan(".kiro/")} so teammates share the setup.`,
+    );
+  }
   lines.push(`${c.dim("•")} Health check: ${c.cyan("dufflebag doctor")}`);
   return lines.join("\n");
 }

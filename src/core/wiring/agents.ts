@@ -15,7 +15,7 @@ import { homedir } from "node:os";
 import path from "node:path";
 
 /** Stable id for each agent dufflebag knows how to detect. */
-export type AgentId = "claude-code" | "cursor" | "codex";
+export type AgentId = "claude-code" | "cursor" | "codex" | "kimi-code" | "kiro";
 
 /**
  * A coding agent dufflebag probed for.
@@ -35,6 +35,8 @@ export interface AgentProbe {
   claudeCode: boolean;
   cursor: boolean;
   codex: boolean;
+  kimiCode: boolean;
+  kiro: boolean;
 }
 
 /** Map raw probe signals to the agent list, in a stable order. Pure. */
@@ -43,6 +45,8 @@ export function classifyAgents(probe: AgentProbe): DetectedAgent[] {
     { id: "claude-code", name: "Claude Code", installed: probe.claudeCode, supported: true },
     { id: "cursor", name: "Cursor", installed: probe.cursor, supported: false },
     { id: "codex", name: "Codex", installed: probe.codex, supported: false },
+    { id: "kimi-code", name: "Kimi Code CLI", installed: probe.kimiCode, supported: true },
+    { id: "kiro", name: "Kiro", installed: probe.kiro, supported: true },
   ];
 }
 
@@ -65,6 +69,8 @@ export function realProbe(): AgentProbe {
     claudeCode: existsSync(path.join(home, ".claude")) || onPath("claude"),
     cursor: existsSync("/Applications/Cursor.app") || existsSync(path.join(home, ".cursor")) || onPath("cursor"),
     codex: existsSync(path.join(home, ".codex")) || onPath("codex"),
+    kimiCode: existsSync(path.join(home, ".kimi-code")) || onPath("kimi"),
+    kiro: existsSync(path.join(home, ".kiro")) || onPath("kiro"),
   };
 }
 
