@@ -17,3 +17,9 @@ skills/png-to-code/scripts/node_modules/
 
 # Playwright browser cache (when installed from scripts/)
 skills/png-to-code/scripts/.playwright/
+
+# Kiro CLI agent config (local)
+.kiro
+
+# Kimi Code CLI local config + skills
+.kimi-code/

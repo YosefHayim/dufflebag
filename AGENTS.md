@@ -57,6 +57,12 @@ Feature docs live under `src/skills/<feature>/`. The png-to-code harness is Type
 
 > **Migrations landed.** The code conforms to the digest migration (camelCase filenames, barrels, harness restructure, biome-enforced lint+format), the **dufflebag pivot** (rename across four contracts, vertical per-feature layout, catalog ship-allowlist, reusable workflows), the **2026-07-02 style refresh** (TSDoc on the exported surface, biome linter on, co-located tests, single-command `autorun` — ADRs [0012](docs/adr/current/0012-tsdoc-on-the-exported-surface.md)–[0013](docs/adr/current/0013-style-refresh-colocated-tests-single-command-autorun-templates.md)), and the **source consolidation** (all source under `src/` — adding `src/skills/` + `src/scripts/` — and all copyable templates under `templates/` — `templates/workflows/` + `templates/mdFiles/`; [ADR 0014](docs/adr/current/0014-consolidate-under-src-and-templates.md)). Where code and this digest drift, the digest wins; the full guide is `templates/mdFiles/CODE-STYLE.md` and `deslop` enforces per-diff.
 
+### `scripts/dev/` — local-only tooling (gitignored)
+
+Scripts for local debugging, one-off experiments, or personal dev utilities go in `scripts/dev/`. This folder is **gitignored** — it never reaches the remote. Production/CI scripts stay in `src/scripts/` (committed).
+
+When creating a new script, ask: _"Would CI, the build, or the shipped CLI need this?"_ If **no** → `scripts/dev/`.
+
 ## Validate changes
 
 From repo root:
