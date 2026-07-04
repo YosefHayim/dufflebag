@@ -1,20 +1,21 @@
 name: Publish Package
 
-# Publishes dufflebag to npm via OIDC trusted publishing (no NPM_TOKEN). A per-repo
-# COPY of templates/workflows/publish.yml (kept in sync by `dufflebag scaffold-ci`),
-# NOT a referenced reusable workflow: OIDC binds provenance to THIS repo AND this
-# exact filename (publish.yml), so it cannot be centralized (ADR 0009).
+# CANONICAL COPY-TEMPLATE — scaffolded per repo by `dufflebag scaffold-ci`, which
+# fills in this repo's owner/name and package below. Publish is a per-repo COPY
+# (not a referenced reusable workflow): npm OIDC trusted publishing binds provenance to
+# THIS repo AND this exact filename (publish.yml), so it cannot be centralized
+# behind workflow_call (ADR 0009). Keep the file named publish.yml.
 #
 # ONE-TIME SETUP (then every release is automatic):
 #   1. Publish v0.1.0 once manually (npm publish --access public) to create the package.
-#   2. On npmjs.com → the dufflebag package → Settings → Trusted Publisher, add this
-#      repo (YosefHayim/dufflebag) and workflow file `publish.yml`. Renaming this
+#   2. On npmjs.com → the {{PACKAGE}} package → Settings → Trusted Publisher, add
+#      this repo ({{OWNER}}/{{REPO}}) and workflow file `publish.yml`. Renaming this
 #      file invalidates the OIDC match.
 #
 # Triggers:
 #   - push of a v*.*.* tag (e.g. `git tag v0.2.0 && git push --tags`)
-#   - a completed `Release` workflow run (gated to success below; inert until a
-#     Release workflow exists in this repo)
+#   - a completed `Release` workflow run (for repos that cut releases via a Release
+#     workflow, e.g. release-please) — gated to success below
 #   - workflow_dispatch (manual recovery, e.g. re-publish an existing tag)
 
 on:
@@ -82,13 +83,13 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Type check
-        run: ppnpm typecheck
+        run: pnpm run typecheck
 
       - name: Run tests
         run: pnpm test
 
       - name: Build
-        run: ppnpm build
+        run: pnpm run build
 
       - name: Publish to npm (trusted publishing)
         run: pnpm publish --no-git-checks --access public --provenance
