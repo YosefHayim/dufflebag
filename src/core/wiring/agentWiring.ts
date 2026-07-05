@@ -71,7 +71,7 @@ export const DEDUP_AGENTS_RULE = [
   "",
   "Before adding a function or an `interface`/`type`, search for an existing one to reuse — never paste a structural copy of a body or shape under a new name. Reuse it (import the function, or derive the type via `Pick`/`Omit`/`extends`/`.extend()`).",
   "",
-  "Run `npx dufflebag dedup check --since main` (or `--staged`) to find duplicates — it exits non-zero on findings (CI/pre-commit gate). Annotate a genuine exception with `// dup-ignore` on the declaration's first line.",
+  "Run `npx ys-dufflebag dedup check --since main` (or `--staged`) to find duplicates — it exits non-zero on findings (CI/pre-commit gate). Annotate a genuine exception with `// dup-ignore` on the declaration's first line.",
 ].join("\n");
 
 /** A managed block, ready to splice into a markdown file. */

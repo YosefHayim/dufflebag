@@ -382,7 +382,7 @@ byte-identical by a test. `biome ci` is one gate (lint + format); matrix only on
 | Types / interfaces | `PascalCase` | `Feature`, `BagConfig`, `DedupMode` |
 | Feature IDs · skill dirs · CLI flags | `kebab-case` | `png-to-code`, `--dedup-mode` |
 
-_Why:_ the last row is an **external contract** — `npx dufflebag install --features
+_Why:_ the last row is an **external contract** — `npx ys-dufflebag install --features
 png-to-code` and existing installs depend on it; never casing-convert product IDs.
 
 ### Types & contracts
