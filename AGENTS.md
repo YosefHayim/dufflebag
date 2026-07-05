@@ -11,7 +11,7 @@
 Install features with:
 
 ```bash
-npx dufflebag install --features png-to-code
+npx ys-dufflebag install --features png-to-code
 ```
 
 Feature docs live under `src/skills/<feature>/`. The png-to-code harness is TypeScript under `src/skills/png-to-code/scripts/`.

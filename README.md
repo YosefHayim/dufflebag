@@ -7,7 +7,7 @@
 > A one-command installer for a personal bag of [Claude Code](https://claude.com/claude-code) skills and hooks. Pure TypeScript, Node-only, **no Python**.
 
 ```bash
-npx dufflebag install
+npx ys-dufflebag install
 ```
 
 `dufflebag` wires hooks and skills into your `~/.claude` (or a project's `.claude/`), tunes them to your taste, and removes them just as cleanly. It edits your `settings.json` **surgically** — every bag-owned entry is path-identified, so `uninstall` takes back exactly what it added and never touches your own hooks or config.
@@ -101,13 +101,13 @@ These are the runtime features dufflebag installs as hooks. Some features also s
 
 ```bash
 # Interactive — pick features, install to ~/.claude
-npx dufflebag install
+npx ys-dufflebag install
 
 # Non-interactive (CI / scripted)
-npx dufflebag install --yes --features context-guard,dedup-guard,autonomous-loop,speak-response,png-to-code
+npx ys-dufflebag install --yes --features context-guard,dedup-guard,autonomous-loop,speak-response,png-to-code
 
 # Project scope — writes ./.claude and commits the payload so teammates get it on clone
-npx dufflebag install --project
+npx ys-dufflebag install --project
 ```
 
 After installing, **restart Claude Code** (or start a new session) so the hooks load.
@@ -116,7 +116,7 @@ Requirements: **Node ≥ 20**. The autonomous loop additionally needs **macOS + 
 
 ### Interactive setup
 
-Run `npx dufflebag install` with no flags and it walks you through a short, animated TUI:
+Run `npx ys-dufflebag install` with no flags and it walks you through a short, animated TUI:
 
 ```text
 ┌   dufflebag · install · global
@@ -211,7 +211,7 @@ While armed, **you** make each compaction safe: run `/handoff` to save a resume 
 
 ```bash
 # add it to any TypeScript repo (--project commits the wiring for teammates)
-npx dufflebag install --project --features dedup-guard
+npx ys-dufflebag install --project --features dedup-guard
 ```
 
 **Enforcement is per-agent — bounded by what each platform actually allows:**
@@ -242,7 +242,7 @@ Tune it with `dufflebagDedupEnforcement` (`deny` · `warn` · `off`) and exclude
 
 ```bash
 # add just this skill (any OS)
-npx dufflebag install --features png-to-code
+npx ys-dufflebag install --features png-to-code
 ```
 
 The loop: **decompose** the image into ordered regions → **reuse or build** vectors (search existing SVG libraries first, trace/hand-build only the gap) → **render + screenshot-diff** against the target → **refine the biggest hotspot** and re-measure, one change per iteration, until the mismatch ratio is below 0.1%. Animated figures follow a **rig-first doctrine** (slice at joints, pivot at the joint, parent, overlap) so motion is trivial keyframes on already-correct pivots.

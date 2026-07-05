@@ -6,7 +6,7 @@
 
 ## Actors
 
-- **The owner / user** — runs `npx dufflebag install` to wire guardrails into `~/.claude` (global) or `./.claude` (project).
+- **The owner / user** — runs `npx ys-dufflebag install` to wire guardrails into `~/.claude` (global) or `./.claude` (project).
 - **Claude Code** — the primary install target; the hook payload runs inside Claude's hook lifecycle.
 - **Other agents** (Cursor, Codex) — detected but not actively wired today; adapters are tracked in GitHub issue #5.
 - **CI / `scaffold-ci` consumers** — repos that copy the reusable workflow set from `templates/workflows/`.
