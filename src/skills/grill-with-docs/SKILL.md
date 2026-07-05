@@ -53,7 +53,7 @@ If a `CONTEXT-MAP.md` exists at the root, the repo has multiple contexts. The ma
 │       └── docs/adr/current|archived/
 ```
 
-Create files lazily — only when you have something to write. If no `CONTEXT.md` exists, create one when the first term is resolved. If no `PROJECT.md` exists, create one when the project's purpose/direction is being pinned down (format in [PROJECT-FORMAT.md](./PROJECT-FORMAT.md)). If no `docs/adr/` exists, create `docs/adr/current/` when the first ADR is needed.
+Create files lazily — only when you have something to write. If no `CONTEXT.md` exists, create one when the first term is resolved. If no `PROJECT.md` exists, create one when the project's purpose/direction is being pinned down (format in [PROJECT-FORMAT.md](../grill-me-code-style/_shared/PROJECT-FORMAT.md)). If no `docs/adr/` exists, create `docs/adr/current/` when the first ADR is needed.
 
 ## During the session
 
@@ -81,9 +81,9 @@ When a term is resolved, update `CONTEXT.md` right there. Don't batch these up �
 
 ### Capture purpose in PROJECT.md
 
-Purpose, goals, and product direction do NOT belong in `CONTEXT.md` (glossary) or in ADRs (individual decisions) — they live in `PROJECT.md`. When the project's "why" or "where it's going" comes up — or when you notice a `CONTEXT.md` that has bloated into problem statements and roadmaps — capture/extract it into `PROJECT.md` using the format in [PROJECT-FORMAT.md](./PROJECT-FORMAT.md), and keep `CONTEXT.md` a pure glossary.
+Purpose, goals, and product direction do NOT belong in `CONTEXT.md` (glossary) or in ADRs (individual decisions) — they live in `PROJECT.md`. When the project's "why" or "where it's going" comes up — or when you notice a `CONTEXT.md` that has bloated into problem statements and roadmaps — capture/extract it into `PROJECT.md` using the format in [PROJECT-FORMAT.md](../grill-me-code-style/_shared/PROJECT-FORMAT.md), and keep `CONTEXT.md` a pure glossary.
 
-This skill is the **single owner of PROJECT.md** — for any repo, new or existing. When purpose is thin or absent, walk the seven-part **"What to ask"** checklist in [PROJECT-FORMAT.md](./PROJECT-FORMAT.md), one question at a time with a recommended default, to produce a professional PROJECT.md. Other skills (the `grill-me-code-style` pair) don't write their own purpose questions — they offer to run this flow and hand off here.
+This skill is the **single owner of PROJECT.md** — for any repo, new or existing. When purpose is thin or absent, walk the seven-part **"What to ask"** checklist in [PROJECT-FORMAT.md](../grill-me-code-style/_shared/PROJECT-FORMAT.md), one question at a time with a recommended default, to produce a professional PROJECT.md. Other skills (the `grill-me-code-style` pair) don't write their own purpose questions — they offer to run this flow and hand off here.
 
 ### Offer ADRs sparingly
 
