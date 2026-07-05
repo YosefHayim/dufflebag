@@ -12,6 +12,16 @@ name: CI
 # - E2E is opt-in: if this repo has a `test:e2e` script, uncomment the `e2e:` job
 #   below and add `e2e` to the gate's `needs` + success check (e2e.yml ships
 #   alongside).
+#
+# REQUIRED package.json scripts:
+#   "check:ci": "biome ci ."     — biome lint+format (deterministic, CI-only)
+#   "typecheck": "tsc --noEmit"  — type checking
+#   "test": "vitest run"         — test suite
+#   "build": "tsup"              — production build (or your bundler)
+#
+# BRANCH PROTECTION (set once after scaffold):
+#   gh api repos/{owner}/{repo}/rulesets --method POST --input .github/ruleset.json
+#   Or: Settings → Branches → Require "CI Gate" status check before merging.
 
 on:
   push:
