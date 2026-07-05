@@ -3,6 +3,12 @@
  * generateReadme.mjs — auto-generates the feature table and agent skills
  * section of README.md from the source of truth (features.ts + SKILL.md files).
  *
+ * Skills are discovered across the whole personal skill bag:
+ *   - src/skills/              (dufflebag source)
+ *   - ~/.claude/skills/        (Claude Code)
+ *   - ~/.kimi-code/skills/     (Kimi Code CLI)
+ *   - ~/.kiro/skills/          (Kiro)
+ *
  * Sections between marker comments are replaced on every run; everything else
  * in the README is preserved verbatim.
  *
@@ -14,11 +20,22 @@
  */
 
 import { readdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "../..");
+const HOME = os.homedir();
+
+// Skill collections to scan. Missing directories are skipped, so this also
+// works on CI or fresh clones where the user's global skill dirs do not exist.
+const SKILL_ROOTS = [
+  { root: path.join(ROOT, "src/skills"), label: "dufflebag source" },
+  { root: path.join(HOME, ".claude/skills"), label: "Claude" },
+  { root: path.join(HOME, ".kimi-code/skills"), label: "Kimi" },
+  { root: path.join(HOME, ".kiro/skills"), label: "Kiro" },
+];
 
 // ─── Extract features from features.ts ──────────────────────────────────────
 
@@ -56,38 +73,94 @@ function parseFeatures() {
 
 // ─── Extract skills from SKILL.md frontmatter ───────────────────────────────
 
-function parseSkills() {
-  const skillsDir = path.join(ROOT, "src/skills");
-  const skills = [];
+/**
+ * Parse a minimal YAML frontmatter block into a key/value map.
+ * Only handles single-line scalar values; that is all this generator needs.
+ */
+function parseFrontmatter(content) {
+  const fmMatch = content.match(/^---\n([\s\S]*?)\n---/);
+  if (!fmMatch) return {};
 
-  for (const name of readdirSync(skillsDir, { withFileTypes: true })) {
-    if (!name.isDirectory()) continue;
-    const skillMd = path.join(skillsDir, name.name, "SKILL.md");
+  const map = {};
+  for (const line of fmMatch[1].split("\n")) {
+    const colonIdx = line.indexOf(":");
+    if (colonIdx === -1) continue;
+    const key = line.slice(0, colonIdx).trim();
+    let value = line.slice(colonIdx + 1).trim();
+    value = value.replace(/^["']|["']$/g, "");
+    if (key && value) map[key] = value;
+  }
+  return map;
+}
+
+/**
+ * Fallback description for SKILL.md files without frontmatter.
+ * Strips the optional frontmatter and the H1 title, then returns the first
+ * non-empty prose line (truncated if it runs long).
+ */
+function fallbackDescription(content) {
+  const body = content.replace(/^---\n[\s\S]*?\n---/, "").replace(/^#\s+.*$/m, "");
+  for (const line of body.split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#") || trimmed.startsWith("```")) continue;
+    const plain = trimmed.replace(/\*\*/g, "").replace(/\[([^\]]+)\]\([^)]+\)/g, "$1");
+    if (plain.length > 240) return `${plain.slice(0, 237)}…`;
+    return plain;
+  }
+  return "";
+}
+
+function scanSkillRoot(root, label) {
+  if (!existsSync(root)) return [];
+
+  const skills = [];
+  for (const entry of readdirSync(root, { withFileTypes: true })) {
+    if (!entry.isDirectory() && !entry.isSymbolicLink()) continue;
+
+    const skillMd = path.join(root, entry.name, "SKILL.md");
     if (!existsSync(skillMd)) continue;
 
     const content = readFileSync(skillMd, "utf8");
-    // Parse YAML frontmatter
-    const fmMatch = content.match(/^---\n([\s\S]*?)\n---/);
-    if (!fmMatch) continue;
+    const fm = parseFrontmatter(content);
+    const description = fm.description || fallbackDescription(content);
 
-    const fm = fmMatch[1];
-    const desc =
-      fm.match(/description:\s*"([^"]+)"/)?.[1] ??
-      fm.match(/description:\s*'([^']+)'/)?.[1] ??
-      fm.match(/description:\s*(.+)/)?.[1]?.replace(/^["']|["']$/g, "") ??
-      "";
-    const trigger =
-      fm.match(/trigger:\s*"([^"]+)"/)?.[1] ??
-      fm.match(/trigger:\s*'([^']+)'/)?.[1] ??
-      fm.match(/trigger:\s*(.+)/)?.[1]?.replace(/^["']|["']$/g, "") ??
-      "";
+    skills.push({
+      dirName: entry.name,
+      name: fm.name ?? entry.name,
+      description,
+      trigger: fm.trigger ?? "",
+      label,
+    });
+  }
+  return skills;
+}
 
-    if (desc) {
-      skills.push({ name: name.name, description: desc, trigger });
+function parseSkills() {
+  const byName = new Map();
+
+  for (const { root, label } of SKILL_ROOTS) {
+    for (const skill of scanSkillRoot(root, label)) {
+      if (!skill.description) {
+        console.warn(`⚠️  Skipping ${skill.name}: no description or fallback prose in ${path.join(root, skill.dirName, "SKILL.md")}`);
+        continue;
+      }
+
+      const existing = byName.get(skill.name);
+      if (!existing) {
+        byName.set(skill.name, {
+          name: skill.name,
+          description: skill.description,
+          trigger: skill.trigger,
+          labels: [label],
+        });
+      } else {
+        existing.labels.push(label);
+        if (skill.trigger && !existing.trigger) existing.trigger = skill.trigger;
+      }
     }
   }
 
-  return skills.sort((a, b) => a.name.localeCompare(b.name));
+  return [...byName.values()].sort((a, b) => a.name.localeCompare(b.name));
 }
 
 // ─── Generate the sections ──────────────────────────────────────────────────
@@ -104,17 +177,31 @@ function generateFeaturesTable(features) {
 }
 
 function generateSkillsSection(skills) {
+  const hasTrigger = skills.some((s) => s.trigger);
+
+  const header = hasTrigger
+    ? ["| Skill | Description | Where | Trigger |", "| --- | --- | --- | --- |"]
+    : ["| Skill | Description | Where |", "| --- | --- | --- |"];
+
   const lines = [
     "Beyond the installable hooks, dufflebag ships **agent skills** — instruction sets that coding agents (Claude Code, Kiro, Cursor) follow when triggered by natural language:",
     "",
-    "| Skill | Description |",
-    "| --- | --- |",
+    ...header,
   ];
+
   for (const s of skills) {
-    lines.push(`| **${s.name}** | ${s.description} |`);
+    const where = s.labels.join(" · ");
+    if (hasTrigger) {
+      lines.push(`| **${s.name}** | ${s.description} | ${where} | ${s.trigger || "—"} |`);
+    } else {
+      lines.push(`| **${s.name}** | ${s.description} | ${where} |`);
+    }
   }
+
   lines.push("");
-  lines.push(`Skills are installed alongside hooks into your agent's skills directory. They require no configuration — just ask your agent to do the thing (e.g. "deslop this", "grill me", "convert this PNG to code").`);
+  lines.push(
+    `Skills are installed alongside hooks into your agent's skills directory. They require no configuration — just ask your agent to do the thing (e.g. "deslop this", "grill me", "convert this PNG to code").`,
+  );
   return lines.join("\n");
 }
 
