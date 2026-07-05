@@ -17,6 +17,7 @@
   "scripts": {
     "dev": "pnpm cli",
     "cli": "tsx src/cli.ts",
+    "prepare": "husky",
     "prebuild": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
     "build": "tsc && node src/scripts/assembleHooks.mjs",
     "test": "vitest run",
@@ -68,6 +69,7 @@
   "devDependencies": {
     "@biomejs/biome": "^2.5.2",
     "@types/node": "^22.10.0",
+    "husky": "^9.1.7",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2",
     "vitest": "^2.1.8"
