@@ -33,6 +33,10 @@ describe("resolveFeatures", () => {
   it("resolves refresh-agent-docs as a standalone feature with no dependencies", () => {
     expect(resolveFeatures(["refresh-agent-docs"])).toEqual(["refresh-agent-docs"]);
   });
+
+  it("resolves readme-editor as a standalone feature with no dependencies", () => {
+    expect(resolveFeatures(["readme-editor"])).toEqual(["readme-editor"]);
+  });
 });
 
 describe("skillsFor", () => {
@@ -47,5 +51,9 @@ describe("skillsFor", () => {
 
   it("maps refresh-agent-docs to its own skill directory", () => {
     expect(skillsFor(["refresh-agent-docs"])).toEqual(["refresh-agent-docs"]);
+  });
+
+  it("maps readme-editor to its own skill directory", () => {
+    expect(skillsFor(["readme-editor"])).toEqual(["readme-editor"]);
   });
 });
