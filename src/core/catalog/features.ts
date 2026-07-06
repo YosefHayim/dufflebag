@@ -95,6 +95,17 @@ export const FEATURES: Record<FeatureId, Feature> = {
     ships: ["SKILL.md"],
     hooks: [],
   },
+  "readme-editor": {
+    id: "readme-editor",
+    title: "README editor",
+    summary:
+      "A skill that audits and rewrites README.md, AGENTS.md, CLAUDE.md, Copilot instructions, and llms.txt from repo evidence, with official links for named tools and technologies. Pure skill (no hooks).",
+    requires: [],
+    platform: "any",
+    skills: ["readme-editor"],
+    ships: ["SKILL.md", "references"],
+    hooks: [],
+  },
   "refresh-agent-docs": {
     id: "refresh-agent-docs",
     title: "Refresh agent docs",
@@ -116,6 +127,7 @@ export const ALL_FEATURES: FeatureId[] = [
   "speak-response",
   "png-to-code",
   "write-a-post",
+  "readme-editor",
   "refresh-agent-docs",
 ];
 

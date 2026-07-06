@@ -63,6 +63,7 @@ export type FeatureId =
   | "dedup-guard"
   | "png-to-code"
   | "write-a-post"
+  | "readme-editor"
   | "refresh-agent-docs";
 
 /**
