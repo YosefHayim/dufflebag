@@ -9,9 +9,9 @@ Like `mcp-ui`, but for terminal skills. This skill is a **thin consumer of the o
 
 ## What the package gives you
 
-- **Components** — `SectionCard`, `PickBlock`, `DiffBlock`, `TreePanel`, `Flow`, `CodeBlock`, plus plan-native pieces: `Callout`, `RiskList`, `Steps`, `Timeline`, `OptionCompare`, `PlanSummary`, `Accordion`, `AnnotatedCode`. Browse them live: `npx planpage library --open`.
-- **Templates** — `plan-brief` (a whole agent plan on one page), `before-after`, `code-style-plan`, `library`.
-- **`render()`** — `render(<Template {...data} />)` → a self-contained HTML string (Tailwind + Mermaid from CDN, light/dark theme).
+- **Components** — `SectionCard`, `PickBlock`, `DiffBlock`, `TreePanel`, `Flow`, `CodeBlock`, `CodeExplorer` (IDE-style file tree + editor pane, per-file before/after), plus plan-native pieces: `Callout`, `RiskList`, `Steps`, `Timeline`, `OptionCompare`, `PlanSummary`, `Accordion`, `AnnotatedCode`. Browse them live: `npx planpage library --open`.
+- **Templates** — `plan-brief` (a whole agent plan on one page), `before-after`, `code-style-plan` (its `canonical` takes either a single `code` snippet or a multi-file `files` list → the `CodeExplorer`), `library`.
+- **`render()` / `renderHighlighted()`** — `render(<Template {...data} />)` → a self-contained HTML string (Tailwind + Mermaid from CDN, light/dark theme). `await renderHighlighted(…)` also bakes in **real VSCode syntax colour** (Shiki, TS/JS-first) at render time — no CDN, no client JS to read colour. `npx planpage render …` highlights for you.
 - **`serve`** — a never-hang post-back server (OS-assigned ephemeral port 49152+, idle timeout, `file://` + clipboard fallback) that collects one `Decision`.
 
 ## Quick start (how a skill uses it)
@@ -50,6 +50,6 @@ Every interactive component carries a stable `data-id`; that id is what appears 
 ## Rules
 
 - **The package owns the HTML; the skill owns the content.** Reference `planpage` and plug in content — don't re-derive the shell. When a report needs a new widget, add it to the package (with a gallery entry) so every skill inherits it.
-- **Self-contained + CDN-only.** No repo assets, no build step at render time; Tailwind + Mermaid from CDN.
+- **Self-contained.** No repo assets, no build step at render time; Tailwind + Mermaid from CDN, and syntax colour baked into the HTML by Shiki (no CDN, no client JS).
 - **Never block a script.** `serve` carries an idle timeout; the fallback is copy-paste. A headless / non-TTY caller must still reach a decision.
 - **Installing the package adds no skills.** `npx planpage init` scaffolds one ready `render-plan` skill (wired to `npx planpage`) into `.claude/skills/` — ship that to end users; the package itself is just the engine.

@@ -6,7 +6,8 @@ Goal: surface the **most-repeated** patterns in an existing codebase as evidence
 
 Spawn a small set of read-only sub-agents in parallel (prefer the `Explore` agent type), each on a different angle. Scale to repo size — 2-3 for a small repo, 5-6 for a large one:
 
-- **Structure** — folder/module layout; where features live; feature- vs layer-based. Also capture the **directory tree** (gitignore-aware, depth-capped) and the **import edges** among top-level modules, so the plan's §④ can render a before/after structure map.
+- **Structure** — folder/module layout; where features live; feature- vs layer-based. Also capture the **directory tree** (gitignore-aware, depth-capped) and the **import edges** among top-level modules, so the plan's §⑤ can render a before/after structure map.
+- **How a {unit} gets added** — reconstruct the **de-facto extension path** that feeds the Step 6 golden path. From git history, find the **last 1–3 units** added (the project's real unit — feature / endpoint / screen / component / module) and report, for each, the **ordered seams it touched**: files/folders created, the barrel or **registration/manifest** point edited, route table, DI container, migration, test file, docs. Bring back the **common sequence** and whether it's **consistent or ad-hoc** (no repeatable path is itself a finding — the golden path becomes the road that didn't exist yet).
 - **Boundaries & contracts** — what's shared vs local; where types/contracts live; import direction.
 - **Data vs side effects** — pure core vs I/O; where side effects happen.
 - **Errors & validation** — throw vs return; error types; boundary validation.
@@ -24,4 +25,4 @@ Spawn a small set of read-only sub-agents in parallel (prefer the `Explore` agen
 
 ## Bring back
 
-Merge into one compact "current reality" brief: for each dimension, the dominant pattern + a real *before* candidate. Feed that into the grill — "the code does X here; keep it, or is this the slop to kill?" Do not treat the dominant pattern as correct by default; it's just the starting evidence. Include the **directory tree + import edges** (for §④), the **AI-slop fingerprint tally** (each tell + count + a real offender, to drive the `Never`-list grill), and each dimension's **verbatim incumbent snippet** (variant A of its pick-the-code choice — see [STYLE-CATALOG.md](../grill-me-code-style/_shared/STYLE-CATALOG.md)).
+Merge into one compact "current reality" brief: for each dimension, the dominant pattern + a real *before* candidate. Feed that into the grill — "the code does X here; keep it, or is this the slop to kill?" Do not treat the dominant pattern as correct by default; it's just the starting evidence. Include the **directory tree + import edges** (for §⑤), the **de-facto extension path** (the ordered seams recent units touched, for the Step 6 golden path), the **AI-slop fingerprint tally** (each tell + count + a real offender, to drive the `Never`-list grill), and each dimension's **verbatim incumbent snippet** (variant A of its pick-the-code choice — see [STYLE-CATALOG.md](../grill-me-code-style/_shared/STYLE-CATALOG.md)).

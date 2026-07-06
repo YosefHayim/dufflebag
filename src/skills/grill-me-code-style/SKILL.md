@@ -11,7 +11,7 @@ Ask the questions one at a time, waiting for feedback on each before continuing.
 
 This is the **greenfield** variant: there is little or no code to read. Your source of truth is my **taste** (grill me) plus the project's **purpose** and its **language/framework** conventions. Never write generic advice ("use clear names", "keep functions small") — every rule must be a real, load-bearing decision for THIS project. If the project already has meaningful code, stop and use `grill-me-code-style-with-docs` instead.
 
-**Nothing is written to disk until I approve.** You grill (Steps 0–4) — the code-style grill is a **pick-the-code gallery**: I pick from illustrative code variants shown in the TUI, dimension by dimension (Step 2). You render an **interactive HTML plan** as the review gate (Steps 5–6, built with the **planpage** kit — I approve, adjust, or flip any decision in the browser), and only then write the files (Step 7).
+**Nothing is written to disk until I approve.** You grill (Steps 0–5) — the code-style grill is a **pick-the-code gallery**: I pick from illustrative code variants shown in the TUI, dimension by dimension (Step 2); then you compose the **golden path for adding a unit + its slop guard** (Step 5). You render an **interactive HTML plan** as the review gate (Step 6, built with the **planpage** kit — I approve, adjust, or flip any decision in the browser), and only then write the files (Step 7).
 
 </what-to-do>
 
@@ -92,19 +92,30 @@ Record the command surface as an **ADR** (the "why this surface"); the CLI conve
 
 ## Step 4 — Establish dependency policy & research libraries
 
-Grill the dependency policy (2–3 quick picks — see [STEPS-5-8.md](_shared/STEPS-5-8.md) § "Greenfield" for the questions). Record it as an ADR.
+Grill the dependency policy (2–3 quick picks — see [STEPS.md](_shared/STEPS.md) § "Greenfield" for the questions). Record it as an ADR.
 
 When a library choice comes up, research + recommend a stable option (WebSearch / the `deep-research` skill), then record the choice + rationale as a separate ADR. `CODE-STYLE.md` documents only how to USE the chosen library — never the choice rationale.
 
 ---
 
-## Steps 5–8 — Framework references, plan, write, re-run
+## Step 5 — Compose the golden path + slop guard
 
-See **[STEPS-5-8.md](_shared/STEPS-5-8.md)** for the shared procedures:
+With the picks, CLI, structure, and dependency policy settled, compose the one artifact a future contributor reaches for: **"if tomorrow we add a thing, how do we add it, and how do we not slop it up?"** See **[EXTENSION-PATTERN.md](_shared/EXTENSION-PATTERN.md)** for the full procedure. Greenfield-specific: with no code yet, the path is **derived from the picks** (illustrative, not mined from history) — but still concrete to THIS project, never abstract "add tests" prose.
 
-- **Step 5** → Reference framework practices (detect stack, point to official skills).
-- **Step 6** → Render the interactive planpage plan (the review gate).
-- **Step 7** → On approval, write the files (CODE-STYLE.md, formatter config, structure docs, ADRs, AGENTS.md digest).
+- **Name the unit** of extension (feature / endpoint / screen / component / Actor / module) — parameterize the section to the project's real word.
+- **Derive a draft numbered path** from the picks + canonical example, then grill it **step-by-step** (keep / adjust / reorder / cut); end with a **definition-of-done** checklist.
+- **Wire the guard** in layers: machine-catchable `## Never` tells → the **lint config** (CI blocks; flips `[taste]`→`[lint]`); taste tells → **`deslop` per-diff**; the checklist → the human/agent gate. Slop is "off the golden path".
+
+Lands a first-class `## Golden path — adding a {unit}` in `CODE-STYLE.md` + a tight mirror in the `AGENTS.md` digest.
+
+---
+
+## Steps 6–8 — Framework references, plan, write, re-run
+
+See **[STEPS.md](_shared/STEPS.md)** for the shared procedures (the golden-path step above is shared Step 6; greenfield handles dependencies as its Step 4):
+
+- **Step 6** → Reference framework practices (detect stack, point to official skills), then render the interactive planpage plan (the review gate) — including the **golden-path + guard block**.
+- **Step 7** → On approval, write the files (CODE-STYLE.md incl. `## Golden path`, formatter + lint config, structure docs, ADRs, AGENTS.md digest incl. the tight golden-path mirror).
 - **Re-running** → Idempotent refresh; once real code exists, hand off to `grill-me-code-style-with-docs`.
 
 > **Step 8 (capstone reorg) does not apply to greenfield** — there's no code to reorganize.
