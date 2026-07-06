@@ -48,22 +48,49 @@ Run scripts from `scripts/` with `npx tsx src/...` or the npm shortcuts below.
 | `stitch.ts` | Side-by-side PNG compare sheet |
 | `renderShot.ts` | Quick Playwright screenshot of HTML |
 
-## Robot case study (`src/examples/robot/`)
+## Canonical iteration
 
-Reference pipeline for an animated illustration. **Assets are local-only** — see [`demo/README.md`](demo/README.md).
+Use this shape for any PNG → SVG/HTML task. The file names are examples; replace them with the user's real target and build output.
 
-| Script | Purpose |
-|--------|---------|
-| `rigArm.ts` | Split arm/body PNG layers |
-| `compose.ts` | Assemble animated robot SVG + HTML |
-| `armscan.ts` / `facescan.ts` | Debug SVG path overlap |
-| `cropcmp.ts` | Visual mask quality check |
+```bash
+npm run inspect -- --input design.png
+npm run diff -- --target design.png --input build/index.html --out diff.png
+```
+
+Read the ratio and top hotspot, then make exactly one edit. When the hotspot is hard to interpret, ask a second agent or browser model to act only as a visual judge:
+
+```bash
+bridge ask "Compare design.png, current.png, and diff.png. List the exact visual changes needed next; do not rewrite code." --provider chatgpt --attach design.png current.png diff.png --json
+```
+
+Use `bridge --help` / `bridge ask --help` for the installed attachment syntax. Feed the judge the target, current screenshot, and diff image. The judge's answer is feedback, not a pass condition; re-run `npm run diff` after every edit.
+
+Example loop:
+
+```text
+before: ratio 0.1842; hotspot top-left; judge says header is too low
+edit: move header up 14px
+after:  ratio 0.1217; next hotspot is the icon
+
+before: ratio 0.1217; judge says icon is too small
+edit: scale icon to the measured bbox
+after:  ratio 0.0086; next hotspot is button shadow
+
+before: ratio 0.0086; judge says shadow is too soft
+edit: reduce blur
+after:  ratio 0.0008; measured pass
+```
+
+## Local case-study scripts (`src/examples/robot/`)
+
+The repository still includes local-only exploratory scripts from an animated illustration case study. They are useful as implementation references, but their binary assets are not shipped, so do not use them as the canonical example for future work.
+
+Use `scripts/robot.svgo.config.mjs` only for that case-study style of animated SVG where IDs and opacity-zero rest frames must be preserved.
 
 ## SVGO
 
 ```bash
 npx svgo --config scripts/svgo.config.mjs -i in.svg -o out.svg
-npx svgo --config scripts/robot.svgo.config.mjs -i robot.svg -o robot.min.svg
 ```
 
 ## Output stack
