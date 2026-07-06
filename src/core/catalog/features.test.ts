@@ -29,6 +29,10 @@ describe("resolveFeatures", () => {
   it("resolves png-to-code as a standalone feature with no dependencies", () => {
     expect(resolveFeatures(["png-to-code"])).toEqual(["png-to-code"]);
   });
+
+  it("resolves refresh-agent-docs as a standalone feature with no dependencies", () => {
+    expect(resolveFeatures(["refresh-agent-docs"])).toEqual(["refresh-agent-docs"]);
+  });
 });
 
 describe("skillsFor", () => {
@@ -39,5 +43,9 @@ describe("skillsFor", () => {
 
   it("maps png-to-code to its own skill directory", () => {
     expect(skillsFor(["png-to-code"])).toEqual(["png-to-code"]);
+  });
+
+  it("maps refresh-agent-docs to its own skill directory", () => {
+    expect(skillsFor(["refresh-agent-docs"])).toEqual(["refresh-agent-docs"]);
   });
 });

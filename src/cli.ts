@@ -75,7 +75,7 @@ const withScope = (cmd: Command): Command =>
 
 withScope(program.command("install"))
   .description("Install (or re-run to refresh) the selected features")
-  .option("--features <list>", "comma list: context-guard, autonomous-loop, speak-response")
+  .option("--features <list>", "comma-separated feature ids from the catalog")
   .option("-y, --yes", "skip prompts (CI / scripted)")
   .action(async (opts) => {
     await install({ scope: scopeOf(opts), features: parseFeatures(opts.features), assumeYes: Boolean(opts.yes) });
@@ -83,7 +83,7 @@ withScope(program.command("install"))
 
 withScope(program.command("update"))
   .description("Refresh hook code, keep your features + config")
-  .option("--features <list>", "override the installed feature set")
+  .option("--features <list>", "override with comma-separated feature ids from the catalog")
   .option("-y, --yes", "skip prompts")
   .action(async (opts) => {
     await install({ scope: scopeOf(opts), features: parseFeatures(opts.features), assumeYes: Boolean(opts.yes), isUpdate: true });

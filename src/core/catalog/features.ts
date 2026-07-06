@@ -95,6 +95,17 @@ export const FEATURES: Record<FeatureId, Feature> = {
     ships: ["SKILL.md"],
     hooks: [],
   },
+  "refresh-agent-docs": {
+    id: "refresh-agent-docs",
+    title: "Refresh agent docs",
+    summary:
+      "A skill that refetches current official guidance for AGENTS.md, CLAUDE.md, GEMINI.md, Cursor rules, Kiro steering, Roo rules, and Codex instructions before rewriting repo agent docs. Pure skill (no hooks).",
+    requires: [],
+    platform: "any",
+    skills: ["refresh-agent-docs"],
+    ships: ["SKILL.md", "sources.json", "scripts"],
+    hooks: [],
+  },
 };
 
 /** Every feature id, in display/install order. */
@@ -105,6 +116,7 @@ export const ALL_FEATURES: FeatureId[] = [
   "speak-response",
   "png-to-code",
   "write-a-post",
+  "refresh-agent-docs",
 ];
 
 /** The safe-by-default selection: works on any OS, no GUI automation. */
