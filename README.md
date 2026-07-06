@@ -1,8 +1,8 @@
-# dufflebag
-
 <p align="center">
-  <img src="public/dufflebag.png" alt="dufflebag logo" width="220" />
+  <img src="public/hero.svg" alt="dufflebag — reusable agent skills, hooks, and repo templates" width="100%" />
 </p>
+
+# dufflebag
 
 `dufflebag` is a one-command installer for Yosef's reusable [Claude Code](https://code.claude.com/docs/en/overview) skills, hooks, and repo templates. It is a [TypeScript](https://www.typescriptlang.org/) CLI for [Node.js](https://nodejs.org/en), built with [pnpm](https://pnpm.io/), [Biome](https://biomejs.dev/), and [Vitest](https://vitest.dev/).
 
