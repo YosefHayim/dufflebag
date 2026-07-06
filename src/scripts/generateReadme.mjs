@@ -3,11 +3,8 @@
  * generateReadme.mjs — auto-generates the feature table and agent skills
  * section of README.md from the source of truth (features.ts + SKILL.md files).
  *
- * Skills are discovered across the whole personal skill bag:
- *   - src/skills/              (dufflebag source)
- *   - ~/.claude/skills/        (Claude Code)
- *   - ~/.kimi-code/skills/     (Kimi Code CLI)
- *   - ~/.kiro/skills/          (Kiro)
+ * Skills are discovered from dufflebag's source tree only:
+ *   - src/skills/              (dufflebag-owned skills)
  *
  * Sections between marker comments are replaced on every run; everything else
  * in the README is preserved verbatim.
@@ -20,21 +17,14 @@
  */
 
 import { readdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "../..");
-const HOME = os.homedir();
 
-// Skill collections to scan. Missing directories are skipped, so this also
-// works on CI or fresh clones where the user's global skill dirs do not exist.
 const SKILL_ROOTS = [
   { root: path.join(ROOT, "src/skills"), label: "dufflebag source" },
-  { root: path.join(HOME, ".claude/skills"), label: "Claude" },
-  { root: path.join(HOME, ".kimi-code/skills"), label: "Kimi" },
-  { root: path.join(HOME, ".kiro/skills"), label: "Kiro" },
 ];
 
 // ─── Extract features from features.ts ──────────────────────────────────────

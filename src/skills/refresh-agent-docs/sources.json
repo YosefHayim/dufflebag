@@ -1,0 +1,51 @@
+[
+  {
+    "id": "openai-codex-agents",
+    "name": "OpenAI Codex AGENTS.md",
+    "url": "https://developers.openai.com/codex/guides/agents-md",
+    "format": "html",
+    "notes": "Codex AGENTS.md discovery and layering."
+  },
+  {
+    "id": "cursor-rules",
+    "name": "Cursor rules and AGENTS.md",
+    "url": "https://cursor.com/docs/rules.md",
+    "format": "markdown",
+    "notes": "Cursor project rules, AGENTS.md support, and scoped MDC rules."
+  },
+  {
+    "id": "claude-memory",
+    "name": "Claude Code CLAUDE.md and memory",
+    "url": "https://code.claude.com/docs/en/memory.md",
+    "format": "markdown",
+    "notes": "CLAUDE.md, imports, and path-scoped memory files."
+  },
+  {
+    "id": "kiro-steering",
+    "name": "Kiro steering",
+    "url": "https://kiro.dev/docs/steering/",
+    "format": "html",
+    "notes": "Kiro steering files and AGENTS.md handling."
+  },
+  {
+    "id": "gemini-md",
+    "name": "Gemini CLI GEMINI.md",
+    "url": "https://raw.githubusercontent.com/google-gemini/gemini-cli/main/docs/cli/gemini-md.md",
+    "format": "markdown",
+    "notes": "Gemini CLI context files, hierarchy, and imports."
+  },
+  {
+    "id": "roo-custom-instructions",
+    "name": "Roo Code custom instructions",
+    "url": "https://docs.roocode.com/features/custom-instructions/",
+    "format": "html",
+    "notes": "Roo global and project rules/custom instructions."
+  },
+  {
+    "id": "agents-md",
+    "name": "AGENTS.md standard",
+    "url": "https://agents.md/",
+    "format": "html",
+    "notes": "Vendor-neutral AGENTS.md convention."
+  }
+]
