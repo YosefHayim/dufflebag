@@ -84,10 +84,28 @@ export const FEATURES: Record<FeatureId, Feature> = {
     ships: ["SKILL.md", "README.md", "CONTEXT.md", "TECH-GLOSSARY.md", "reference", "demo", "scripts"],
     hooks: [],
   },
+  "write-a-post": {
+    id: "write-a-post",
+    title: "Write a blog post (voice + cover)",
+    summary:
+      "A skill that writes a portfolio blog post in the owner's exact voice, scaffolds it into the blog data file via a one-command dev script, and generates a matching cover image by driving a real ChatGPT browser conversation through ai-browser-bridge (attaching the likeness photo + an existing cover so the character and flat-2D style stay consistent). Pure skill (no hooks).",
+    requires: [],
+    platform: "any",
+    skills: ["write-a-post"],
+    ships: ["SKILL.md"],
+    hooks: [],
+  },
 };
 
 /** Every feature id, in display/install order. */
-export const ALL_FEATURES: FeatureId[] = ["context-guard", "dedup-guard", "autonomous-loop", "speak-response", "png-to-code"];
+export const ALL_FEATURES: FeatureId[] = [
+  "context-guard",
+  "dedup-guard",
+  "autonomous-loop",
+  "speak-response",
+  "png-to-code",
+  "write-a-post",
+];
 
 /** The safe-by-default selection: works on any OS, no GUI automation. */
 export const DEFAULT_FEATURES: FeatureId[] = ["context-guard"];

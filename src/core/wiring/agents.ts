@@ -22,6 +22,7 @@ export type AgentId =
   | "codex"
   | "kimi-code"
   | "kiro"
+  | "devin"
   | "windsurf"
   | "cline"
   | "gemini"
@@ -62,6 +63,7 @@ export const AGENT_CONFIGS: Record<AgentId, AgentInstallConfig> = {
   "claude-code": { id: "claude-code", name: "Claude Code", mode: "skills-dir", skillsDir: ".claude/skills" },
   kiro: { id: "kiro", name: "Kiro", mode: "skills-dir", skillsDir: ".kiro/skills" },
   "kimi-code": { id: "kimi-code", name: "Kimi Code CLI", mode: "skills-dir", skillsDir: ".kimi-code/skills" },
+  devin: { id: "devin", name: "Devin CLI", mode: "skills-dir", skillsDir: ".devin/skills" },
   cursor: { id: "cursor", name: "Cursor", mode: "rules-file", rulesDir: ".cursor/rules", ruleExt: ".mdc" },
   windsurf: { id: "windsurf", name: "Windsurf", mode: "single-file", targetFile: ".windsurfrules" },
   cline: { id: "cline", name: "Cline", mode: "single-file", targetFile: ".clinerules" },
@@ -93,6 +95,7 @@ export interface AgentProbe {
   codex: boolean;
   kimiCode: boolean;
   kiro: boolean;
+  devin: boolean;
   windsurf: boolean;
   cline: boolean;
   gemini: boolean;
@@ -108,6 +111,7 @@ export function classifyAgents(probe: AgentProbe): DetectedAgent[] {
     { id: "claude-code", name: "Claude Code", installed: probe.claudeCode, supported: true },
     { id: "kiro", name: "Kiro", installed: probe.kiro, supported: true },
     { id: "kimi-code", name: "Kimi Code CLI", installed: probe.kimiCode, supported: true },
+    { id: "devin", name: "Devin CLI", installed: probe.devin, supported: true },
     { id: "cursor", name: "Cursor", installed: probe.cursor, supported: true },
     { id: "windsurf", name: "Windsurf", installed: probe.windsurf, supported: true },
     { id: "cline", name: "Cline", installed: probe.cline, supported: true },
@@ -141,6 +145,7 @@ export function realProbe(): AgentProbe {
     codex: existsSync(path.join(home, ".codex")) || onPath("codex"),
     kimiCode: existsSync(path.join(home, ".kimi-code")) || onPath("kimi"),
     kiro: existsSync(path.join(home, ".kiro")) || onPath("kiro"),
+    devin: existsSync(path.join(home, ".devin")) || existsSync(path.join(home, ".config", "devin")) || onPath("devin"),
     windsurf: existsSync("/Applications/Windsurf.app") || existsSync(path.join(home, ".windsurf")) || onPath("windsurf"),
     cline: existsSync(path.join(home, ".cline")) || onPath("cline"),
     gemini: onPath("gemini"),

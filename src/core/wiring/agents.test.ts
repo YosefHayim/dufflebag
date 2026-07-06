@@ -14,6 +14,7 @@ const allTrue = {
   codex: true,
   kimiCode: true,
   kiro: true,
+  devin: true,
   windsurf: true,
   cline: true,
   gemini: true,
@@ -29,6 +30,7 @@ const allFalse = {
   codex: false,
   kimiCode: false,
   kiro: false,
+  devin: false,
   windsurf: false,
   cline: false,
   gemini: false,
@@ -51,6 +53,7 @@ describe("classifyAgents", () => {
     expect(agents.find((a) => a.id === "codex")?.installed).toBe(true);
     expect(agents.find((a) => a.id === "kimi-code")?.installed).toBe(false);
     expect(agents.find((a) => a.id === "kiro")?.installed).toBe(true);
+    expect(agents.find((a) => a.id === "devin")?.installed).toBe(false);
     expect(agents.find((a) => a.id === "windsurf")?.installed).toBe(false);
     expect(agents.find((a) => a.id === "cline")?.installed).toBe(false);
     expect(agents.find((a) => a.id === "gemini")?.installed).toBe(false);
@@ -66,6 +69,7 @@ describe("classifyAgents", () => {
       "claude-code",
       "kiro",
       "kimi-code",
+      "devin",
       "cursor",
       "windsurf",
       "cline",

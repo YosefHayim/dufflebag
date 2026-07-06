@@ -51,6 +51,10 @@ export interface Layout {
   kiroDir: string;
   /** Skills are copied here: <kiroDir>/skills */
   kiroSkillsDir: string;
+  /** ~/.devin or <root>/.devin */
+  devinDir: string;
+  /** Skills are copied here: <devinDir>/skills */
+  devinSkillsDir: string;
   /** Cross-tool Agent Skills dir: ~/.agents/skills or <root>/.agents/skills */
   agentsSkillsDir: string;
 }
@@ -63,6 +67,7 @@ export function resolveLayout(scope: Scope, projectRoot: string = process.cwd())
   const claudeDir = scope === "global" ? path.join(homedir(), ".claude") : path.join(projectRoot, ".claude");
   const kimiDir = scope === "global" ? path.join(homedir(), ".kimi-code") : path.join(projectRoot, ".kimi-code");
   const kiroDir = scope === "global" ? path.join(homedir(), ".kiro") : path.join(projectRoot, ".kiro");
+  const devinDir = scope === "global" ? path.join(homedir(), ".devin") : path.join(projectRoot, ".devin");
   const agentsDir = scope === "global" ? path.join(homedir(), ".agents") : path.join(projectRoot, ".agents");
   const installDir = path.join(claudeDir, INSTALL_DIR_NAME);
   return {
@@ -76,6 +81,8 @@ export function resolveLayout(scope: Scope, projectRoot: string = process.cwd())
     kimiSkillsDir: path.join(kimiDir, "skills"),
     kiroDir,
     kiroSkillsDir: path.join(kiroDir, "skills"),
+    devinDir,
+    devinSkillsDir: path.join(devinDir, "skills"),
     agentsSkillsDir: path.join(agentsDir, "skills"),
   };
 }
