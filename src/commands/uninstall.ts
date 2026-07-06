@@ -52,7 +52,7 @@ export function uninstall(opts: { scope: Scope; projectRoot?: string }): void {
   const manifest = readManifest(layout.installDir);
 
   intro(`dufflebag · uninstall · ${opts.scope}`);
-  step(c.dim(`targets: ${layout.claudeDir}, ${layout.kimiDir}, ${layout.kiroDir}`));
+  step(c.dim(`targets: ${layout.claudeDir}, ${layout.kimiDir}, ${layout.kiroDir}, ${layout.devinDir}`));
 
   if (!manifest && !existsSync(layout.installDir)) {
     outro(c.yellow("Nothing installed at this scope — nothing to remove."));
@@ -81,12 +81,13 @@ export function uninstall(opts: { scope: Scope; projectRoot?: string }): void {
     removePath(path.join(layout.skillsDir, name));
     removePath(path.join(layout.kimiSkillsDir, name));
     removePath(path.join(layout.kiroSkillsDir, name));
+    removePath(path.join(layout.devinSkillsDir, name));
     removePath(path.join(layout.agentsSkillsDir, name));
   }
 
-  // Also remove any mirrored skills in Kiro/Kimi dirs that were synced from
-  // .agents/skills/ (the full skill set, not just feature-declared ones).
-  for (const dir of [layout.kiroSkillsDir, layout.kimiSkillsDir]) {
+  // Also remove any mirrored skills in Kiro/Kimi/Devin dirs that were synced
+  // from .agents/skills/ (the full skill set, not just feature-declared ones).
+  for (const dir of [layout.kiroSkillsDir, layout.kimiSkillsDir, layout.devinSkillsDir]) {
     if (!existsSync(dir)) continue;
     for (const entry of readdirSync(dir, { withFileTypes: true })) {
       if (entry.isDirectory()) removePath(path.join(dir, entry.name));
@@ -98,5 +99,5 @@ export function uninstall(opts: { scope: Scope; projectRoot?: string }): void {
   s.stop("Removed bag hooks, config, skills, payload, and agent wiring");
 
   if (backup) step(c.dim(`backup: ${path.basename(backup)} (roll back any time)`));
-  outro(c.green("Uninstalled. Restart Claude Code / Kimi / Kiro so the hooks/skills unload."));
+  outro(c.green("Uninstalled. Restart Claude Code / Kimi / Kiro / Devin so the hooks/skills unload."));
 }

@@ -181,9 +181,9 @@ function installSkillsInto(features: FeatureId[], targetDir: string, ctl: string
 /**
  * Mirror every skill directory from the cross-tool source of truth
  * (`~/.agents/skills/` for global, `./.agents/skills/` for project) into the
- * Kiro and Kimi skills directories. This ensures that skills installed by any
- * tool (Claude Code, manual, third-party) are available in all three editors.
- * Returns the list of skill names that were synced.
+ * Kiro, Kimi, and Devin skills directories. This ensures that skills installed
+ * by any tool (Claude Code, manual, third-party) are available in every
+ * skills-dir editor. Returns the list of skill names that were synced.
  */
 function mirrorAllSkills(layout: Layout): string[] {
   const src = layout.agentsSkillsDir;
@@ -192,11 +192,10 @@ function mirrorAllSkills(layout: Layout): string[] {
     (d) => d.isDirectory() && existsSync(path.join(src, d.name, "SKILL.md")),
   );
   if (entries.length === 0) return [];
-  ensureDir(layout.kiroSkillsDir);
-  ensureDir(layout.kimiSkillsDir);
+  const mirrors = [layout.kiroSkillsDir, layout.kimiSkillsDir, layout.devinSkillsDir];
+  for (const dir of mirrors) ensureDir(dir);
   for (const entry of entries) {
-    copyDir(path.join(src, entry.name), path.join(layout.kiroSkillsDir, entry.name));
-    copyDir(path.join(src, entry.name), path.join(layout.kimiSkillsDir, entry.name));
+    for (const dir of mirrors) copyDir(path.join(src, entry.name), path.join(dir, entry.name));
   }
   return entries.map((d) => d.name);
 }
@@ -337,7 +336,7 @@ export async function install(opts: InstallOptions): Promise<void> {
   s.stop(`Installed ${c.bold(features.join(", "))} → ${agentsSummary.join(", ")}`);
 
   if (backup) step(c.dim(`backup: ${path.basename(backup)}`));
-  if (synced.length > 0) step(c.dim(`synced ${synced.length} skill(s) from .agents/skills/ → Kiro + Kimi`));
+  if (synced.length > 0) step(c.dim(`synced ${synced.length} skill(s) from .agents/skills/ → Kiro + Kimi + Devin`));
   if (dedupWiring.length > 0) {
     const root = rootDirOf(layout.claudeDir);
     step(c.dim(`dedup-guard also wired: ${dedupWiring.map((f) => path.relative(root, f)).join(", ")}`));

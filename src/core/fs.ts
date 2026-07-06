@@ -42,9 +42,15 @@ export function ensureDir(dir: string): void {
   mkdirSync(dir, { recursive: true });
 }
 
-/** Recursively copy `src` to `dest`, replacing whatever is there. */
+/**
+ * Recursively copy `src` to `dest`, replacing whatever is there. The existing
+ * `dest` is removed first so a real directory can replace a symlink or file left
+ * by a prior install (e.g. a symlinked personal skill in a mirror target) —
+ * `cpSync` alone throws when overwriting a non-directory with a directory.
+ */
 export function copyDir(src: string, dest: string): void {
   ensureDir(path.dirname(dest));
+  rmSync(dest, { recursive: true, force: true });
   cpSync(src, dest, { recursive: true, force: true });
 }
 
