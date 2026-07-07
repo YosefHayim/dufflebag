@@ -13,6 +13,7 @@ Refresh repo agent guidance from current official docs without turning prompts i
 - Keep one repo instruction source of truth when possible, usually `AGENTS.md`.
 - Tool-specific files are adapters or scoped rules, not duplicated style guides.
 - Root docs point to canonical details by relevance; they do not inline entire `CODE-STYLE.md`, `PROJECT.md`, `CONTEXT.md`, or `LANGUAGE.md`.
+- Inspect `README.md` only for repo context. For README structure, landing docs, or public project onboarding, use `readme-editor`.
 - Show a before/after plan and wait for approval before writing.
 
 ## Workflow

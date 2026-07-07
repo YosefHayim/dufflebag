@@ -23,9 +23,10 @@ A good README is not just polished Markdown. Decide **what each artifact owns** 
 
 1. **Inspect the repo** before asking anything discoverable.
 2. **Capture official links** for public tools, runtimes, frameworks, languages, agents, and package managers named in the README.
-3. **Grill the user**, one question at a time, each with a recommended answer and a one-line reason.
-4. **Build a README map** and get explicit approval.
-5. **Write**, then report what changed.
+3. **Choose the README style** from repo evidence. Use [references/readme-styles.md](references/readme-styles.md) when the project is UI, CLI, SaaS/product, frontend app/tooling, backend/API, library, or docs-heavy.
+4. **Grill the user**, one question at a time, each with a recommended answer and a one-line reason.
+5. **Build a README map** and get explicit approval.
+6. **Write**, then report what changed.
 
 ## Step 1 — Inspect first
 
@@ -41,7 +42,25 @@ Read what is discoverable before asking. Capture:
 
 If something is discoverable, **do not ask**. State it and confirm in one line.
 
-## Step 2 — Grill, one question at a time
+## Step 2 — Choose the README style
+
+Pick one dominant structure before asking subjective questions. Use repo evidence, not the user's labels alone:
+
+- UI/design system or component library
+- Frontend app
+- Frontend framework or tooling
+- CLI or developer tool
+- SaaS/product or self-hosted app
+- Backend/API framework
+- Library/package
+- Tiny demo
+- Docs-heavy portal
+
+Read [references/readme-styles.md](references/readme-styles.md) for the section order, first-success shape, link-out strategy, and anti-patterns for each style.
+
+If the repo mixes styles, choose by the first reader and first success. Example: a monorepo with a hosted app and SDKs can have a product README at the root and package READMEs under `packages/*`.
+
+## Step 3 — Grill, one question at a time
 
 Each question follows this shape:
 
@@ -61,12 +80,13 @@ Skip any question the inspection already answered. Order:
 6. **Deeper docs** — Where do they live? `docs/`, website, internal wiki, none
 7. **Artifacts** — Confirm the final list of files to write.
 
-## Step 3 — Build the README map
+## Step 4 — Build the README map
 
 Produce this map and get approval before writing:
 
 ```text
 Reader:
+README style:
 First success:
 Builder path:
 Agent path:
@@ -80,7 +100,7 @@ Recommended artifacts:
 
 See [references/examples.md](references/examples.md) for filled maps across project types.
 
-## Step 4 — Write
+## Step 5 — Write
 
 Follow [references/artifacts.md](references/artifacts.md) for the structure of each file.
 

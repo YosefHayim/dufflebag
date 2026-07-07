@@ -15,6 +15,8 @@ The landing page for humans and builders. Answers six questions, in order:
 5. **What is intentionally out of scope?** — short, honest. Prevents readers from expecting features that don't exist.
 6. **Where do deeper docs live?** — links to `docs/`, `AGENTS.md`, `ARCHITECTURE.md`, website, official tool docs, etc.
 
+Before writing, choose the dominant README style from [readme-styles.md](readme-styles.md). The six questions stay stable; the section order and emphasis change by project type.
+
 ### Suggested skeleton
 
 ```md
