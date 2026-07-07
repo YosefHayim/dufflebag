@@ -1,6 +1,6 @@
-# Local demo assets
+# Local case-study assets
 
-Binary assets for the robot case study are **not committed** to git. Keep them here locally when running the pipeline.
+These files are for a legacy animated-illustration case study. Its binary assets are **not committed** to git, so this folder is not the canonical example for normal PNG → SVG/HTML work. Use the canonical before/after loop in [`../README.md`](../README.md#canonical-iteration) for new tasks.
 
 ## Quick start
 

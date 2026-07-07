@@ -8,7 +8,7 @@
  * same under `npx`, a global install, or `pnpm dev`.
  */
 
-import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, lstatSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -42,14 +42,26 @@ export function ensureDir(dir: string): void {
   mkdirSync(dir, { recursive: true });
 }
 
+/** Remove a path only if it is a symbolic link (does not follow the link). */
+export function removeSymlink(target: string): void {
+  const stat = lstatSync(target, { throwIfNoEntry: false });
+  if (stat?.isSymbolicLink()) {
+    rmSync(target, { force: true });
+  }
+}
+
 /**
  * Recursively copy `src` to `dest`, replacing whatever is there. The existing
  * `dest` is removed first so a real directory can replace a symlink or file left
  * by a prior install (e.g. a symlinked personal skill in a mirror target) —
  * `cpSync` alone throws when overwriting a non-directory with a directory.
+ *
+ * If `dest` itself is a symlink, the symlink is removed (not followed) so the
+ * copy never writes through the link and mutates an unrelated target.
  */
 export function copyDir(src: string, dest: string): void {
   ensureDir(path.dirname(dest));
+  removeSymlink(dest);
   rmSync(dest, { recursive: true, force: true });
   cpSync(src, dest, { recursive: true, force: true });
 }

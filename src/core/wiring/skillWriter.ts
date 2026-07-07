@@ -12,7 +12,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
 import type { FeatureId } from "../catalog/types.js";
-import { bundledSkillsDir, copyDir, ensureDir } from "../fs.js";
+import { bundledSkillsDir, copyDir, ensureDir, removeSymlink } from "../fs.js";
 import { AGENT_CONFIGS, type AgentId, type AgentInstallConfig } from "./agents.js";
 
 // Re-export for the install command's convenience.
@@ -85,6 +85,9 @@ function installSkillsDir(
     for (const name of feature.skills) {
       const src = path.join(bundledSkillsDir(), name);
       const dest = path.join(targetDir, name);
+      // Replace pre-existing symlinks with real directories so we don't follow
+      // the link and corrupt the symlink target during the copy.
+      removeSymlink(dest);
       for (const rel of feature.ships) copyDir(path.join(src, rel), path.join(dest, rel));
       const skillMd = path.join(dest, "SKILL.md");
       if (existsSync(skillMd)) {

@@ -65,7 +65,13 @@ export type FeatureId =
   | "github-repo-metadata"
   | "write-a-post"
   | "readme-editor"
-  | "refresh-agent-docs";
+  | "refresh-agent-docs"
+  | "deslop"
+  | "grill-me"
+  | "grill-me-code-style"
+  | "grill-me-code-style-with-docs"
+  | "grill-with-docs"
+  | "planpage";
 
 /**
  * dedup-guard enforcement level (`dufflebagDedupEnforcement`):

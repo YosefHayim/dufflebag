@@ -44,6 +44,7 @@ import {
   platformBlocker,
   readJson,
   readSettings,
+  removeSymlink,
   resolveFeatures,
   resolveLayout,
   rootDirOf,
@@ -171,6 +172,10 @@ function installSkillsInto(features: FeatureId[], targetDir: string, ctl: string
     for (const name of feature.skills) {
       const src = path.join(bundledSkillsDir(), name);
       const dest = path.join(targetDir, name);
+      // A pre-existing symlink (e.g. a manually linked dev skill) must be
+      // replaced with a real directory, otherwise copyDir follows the link and
+      // corrupts the link target instead of installing into the agent's skills dir.
+      removeSymlink(dest);
       for (const rel of feature.ships) copyDir(path.join(src, rel), path.join(dest, rel));
       const skillMd = path.join(dest, "SKILL.md");
       if (existsSync(skillMd)) writeFileSync(skillMd, readFileSync(skillMd, "utf8").replaceAll("@@CTL@@", ctl), "utf8");
@@ -195,7 +200,11 @@ function mirrorAllSkills(layout: Layout): string[] {
   const mirrors = [layout.kiroSkillsDir, layout.kimiSkillsDir, layout.devinSkillsDir];
   for (const dir of mirrors) ensureDir(dir);
   for (const entry of entries) {
-    for (const dir of mirrors) copyDir(path.join(src, entry.name), path.join(dir, entry.name));
+    for (const dir of mirrors) {
+      const dest = path.join(dir, entry.name);
+      removeSymlink(dest);
+      copyDir(path.join(src, entry.name), dest);
+    }
   }
   return entries.map((d) => d.name);
 }
