@@ -128,6 +128,72 @@ export const FEATURES: Record<FeatureId, Feature> = {
     ships: ["SKILL.md", "sources.json", "scripts"],
     hooks: [],
   },
+  "deslop": {
+    id: "deslop",
+    title: "Deslop",
+    summary:
+      "A skill that reviews code readability first, then applies approved cleanup to make the full pipeline understandable in seconds. Use when the user asks to clean up, rename, or make code less AI-generated.",
+    requires: [],
+    platform: "any",
+    skills: ["deslop"],
+    ships: ["SKILL.md", "references"],
+    hooks: [],
+  },
+  "grill-me": {
+    id: "grill-me",
+    title: "Grill me",
+    summary:
+      "A skill that interviews the user relentlessly about a plan or design until reaching shared understanding, resolving each branch of the decision tree one question at a time.",
+    requires: [],
+    platform: "any",
+    skills: ["grill-me"],
+    ships: ["SKILL.md"],
+    hooks: [],
+  },
+  "grill-me-code-style": {
+    id: "grill-me-code-style",
+    title: "Grill me — code style (greenfield)",
+    summary:
+      "A greenfield code-style grilling skill. Interviews the user about how a new project is built, then renders an interactive HTML plan and writes CODE-STYLE.md, formatter config, and AGENTS.md digest on approval.",
+    requires: [],
+    platform: "any",
+    skills: ["grill-me-code-style"],
+    ships: ["SKILL.md", "_shared"],
+    hooks: [],
+  },
+  "grill-me-code-style-with-docs": {
+    id: "grill-me-code-style-with-docs",
+    title: "Grill me — code style (existing codebase)",
+    summary:
+      "An existing-codebase code-style grilling skill. Uses real code as evidence, fans out sub-agents for repeated patterns, then writes/updates CODE-STYLE.md and the AGENTS.md digest on approval.",
+    requires: ["grill-me-code-style"],
+    platform: "any",
+    skills: ["grill-me-code-style-with-docs"],
+    ships: ["SKILL.md", "SCAN.md"],
+    hooks: [],
+  },
+  "grill-with-docs": {
+    id: "grill-with-docs",
+    title: "Grill with docs",
+    summary:
+      "A grilling session that challenges a plan against the existing domain model, sharpens terminology, and updates CONTEXT.md, PROJECT.md, and ADRs inline as decisions crystallise.",
+    requires: ["grill-me-code-style"],
+    platform: "any",
+    skills: ["grill-with-docs"],
+    ships: ["SKILL.md", "CONTEXT-FORMAT.md", "ADR-FORMAT.md"],
+    hooks: [],
+  },
+  "planpage": {
+    id: "planpage",
+    title: "planpage",
+    summary:
+      "A skill for rendering agent plans, review gates, and reports as beautiful interactive HTML pages using the open-source planpage package.",
+    requires: [],
+    platform: "any",
+    skills: ["planpage"],
+    ships: ["SKILL.md", "COMPONENTS.md"],
+    hooks: [],
+  },
 };
 
 /** Every feature id, in display/install order. */
@@ -141,6 +207,12 @@ export const ALL_FEATURES: FeatureId[] = [
   "write-a-post",
   "readme-editor",
   "refresh-agent-docs",
+  "deslop",
+  "grill-me",
+  "grill-me-code-style",
+  "grill-me-code-style-with-docs",
+  "grill-with-docs",
+  "planpage",
 ];
 
 /** The safe-by-default selection: works on any OS, no GUI automation. */

@@ -1,8 +1,3 @@
----
-name: png-to-code
-description: Convert a PNG design into pixel-perfect code — SVG illustrations/logos, HTML/CSS UI, and animations — using a decompose → reuse-or-build → render → screenshot-diff → refine loop that measurably converges to a 1:1 match instead of eyeballing. Use when the user provides a PNG, screenshot, mockup, or inspiration image and wants it turned into SVG, HTML/CSS, a web component, or an animated illustration, or asks to match a design "pixel-perfect" / "1:1".
----
-
 # PNG → Pixel-Perfect Code
 
 Reproduce a PNG (illustration, logo, UI screen, or full mockup) as code that matches the original **1:1**. Go slowly: build one region at a time and **re-measure after every change**. The agent reaches pixel-perfect the same way a designer did with a PerfectPixel overlay — except the overlay is a **measured pixel diff**, not a human eye.

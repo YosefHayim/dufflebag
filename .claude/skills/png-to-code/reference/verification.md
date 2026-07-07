@@ -57,6 +57,80 @@ JSON report:
 3. Re-run. Confirm the ratio dropped and no new hotspot appeared.
 4. Repeat. Stop when `ratio < 0.1%` or improvements stall — then **report the final ratio**. Do not claim a 1:1 you did not measure.
 
+## Visual judge loop (second agent)
+
+Pixel diff tells you **where** pixels differ; a visual judge can explain **what** the design difference is. Use it when the top hotspot is hard to interpret, a low-threshold sweep reveals a broad mismatch, or the developer wants a human-style comparison before the next edit.
+
+The judge is not the builder. It only compares images and returns concrete deltas. The builder still makes one edit, runs the harness, and checks whether the score improved.
+
+### Inputs
+
+Give the judge three artifacts whenever possible:
+
+- `target.png` — the original design.
+- `current.png` — a screenshot of the current build at the exact target dimensions.
+- `diff.png` — the pixelDiff output.
+
+Create `current.png` with the browser or any screenshot tool that preserves the target dimensions. If the bridge cannot attach files in the current shell, open the browser-attached target/current/diff images and ask the judge from that attached browser session. If neither path works, do the comparison yourself and say the judge loop was skipped.
+
+### Bridge prompt
+
+Use `bridge --help` or `bridge ask --help` for the installed syntax. The expected shape is:
+
+```
+bridge ask "You are only a visual comparison judge. Compare target.png, current.png, and diff.png. Return the top 5 concrete visual deltas in priority order: geometry, spacing, color, typography, shadows, missing elements. Do not rewrite code. Do not speculate beyond the images." --provider chatgpt --attach target.png current.png diff.png --json
+```
+
+`bridge ask --help` exposes `--attach <path...>` in the local install. If that changes, use the help output as the source of truth and attach the three images by the current mechanism.
+
+### Iteration rule
+
+1. Run `pixelDiff.ts` and capture the ratio + hotspots.
+2. Ask the judge for prioritized visual deltas.
+3. Pick **one** delta that corresponds to the top hotspot or an obvious missing region.
+4. Edit only that thing.
+5. Re-run `pixelDiff.ts`.
+6. Keep the change only if the score improves or the developer agrees the visual match is better.
+
+Stop when one of these is true:
+
+- `ratio < 0.1%`.
+- The judge no longer identifies meaningful deltas.
+- Further numeric changes make the design worse.
+- The developer approves the current match.
+
+Report both signals at the end: final mismatch ratio and the judge/developer verdict.
+
+### Canonical iteration example
+
+```text
+Target: design.png
+Build: build/index.html
+
+Iteration 1
+ratio: 0.1842
+hotspot: x=0..160, y=0..90
+judge: header sits 12-16px too low; title color is too dark; icon is missing
+edit: move header up 14px
+
+Iteration 2
+ratio: 0.1217
+hotspot: x=412..520, y=24..88
+judge: icon is 8px too small and uses rounded joins instead of square joins
+edit: increase icon viewBox scale and set stroke-linejoin="miter"
+
+Iteration 3
+ratio: 0.0086
+hotspot: x=220..360, y=310..340
+judge: button shadow is slightly too soft
+edit: tighten box-shadow blur from 18px to 12px
+
+Final
+ratio: 0.0008
+judge: no meaningful visual deltas remain
+verdict: measured pass
+```
+
 ## Blind spots — what a low ratio can still miss
 
 A passing `ratio` is necessary, not sufficient. The default per-pixel threshold (`0.1`) is **blind to large, very pale fills**: a soft pastel background (e.g. lavender `#f4edfd` on white `#fefefe`, a ~15/255 gap) scores as "same" on every pixel, so an entire missing background element reads as ~1% while it is **completely absent**. The score looked held; a whole region was gone.

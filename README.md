@@ -82,6 +82,12 @@ dufflebag config --warn 0.15 --block 0.22 --budget 5
 | **write-a-post** | A skill that writes a portfolio blog post in the owner's exact voice, scaffolds it into the blog data file via a one-command dev script, and generates a matching cover image by driving a real ChatGPT browser conversation through ai-browser-bridge (attaching the likeness photo + an existing cover so the character and flat-2D style stay consistent). Pure skill (no hooks). | 🟢 any OS |
 | **readme-editor** | A skill that audits and rewrites README.md, AGENTS.md, CLAUDE.md, Copilot instructions, and llms.txt from repo evidence, with official links for named tools and technologies. Pure skill (no hooks). | 🟢 any OS |
 | **refresh-agent-docs** | A skill that refetches current official guidance for AGENTS.md, CLAUDE.md, GEMINI.md, Cursor rules, Kiro steering, Roo rules, and Codex instructions before rewriting repo agent docs. Pure skill (no hooks). | 🟢 any OS |
+| **deslop** | A skill that reviews code readability first, then applies approved cleanup to make the full pipeline understandable in seconds. Use when the user asks to clean up, rename, or make code less AI-generated. | 🟢 any OS |
+| **grill-me** | A skill that interviews the user relentlessly about a plan or design until reaching shared understanding, resolving each branch of the decision tree one question at a time. | 🟢 any OS |
+| **grill-me-code-style** | A greenfield code-style grilling skill. Interviews the user about how a new project is built, then renders an interactive HTML plan and writes CODE-STYLE.md, formatter config, and AGENTS.md digest on approval. | 🟢 any OS |
+| **grill-me-code-style-with-docs** | An existing-codebase code-style grilling skill. Uses real code as evidence, fans out sub-agents for repeated patterns, then writes/updates CODE-STYLE.md and the AGENTS.md digest on approval. | 🟢 any OS |
+| **grill-with-docs** | A grilling session that challenges a plan against the existing domain model, sharpens terminology, and updates CONTEXT.md, PROJECT.md, and ADRs inline as decisions crystallise. | 🟢 any OS |
+| **planpage** | A skill for rendering agent plans, review gates, and reports as beautiful interactive HTML pages using the open-source planpage package. | 🟢 any OS |
 <!-- AUTO:FEATURES:END -->
 
 ## Agent skills
