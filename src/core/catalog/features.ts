@@ -84,6 +84,17 @@ export const FEATURES: Record<FeatureId, Feature> = {
     ships: ["SKILL.md", "README.md", "CONTEXT.md", "TECH-GLOSSARY.md", "reference", "demo", "scripts"],
     hooks: [],
   },
+  "github-repo-metadata": {
+    id: "github-repo-metadata",
+    title: "GitHub repo metadata",
+    summary:
+      "A skill that writes and audits GitHub repository About metadata: concise descriptions, homepage/demo links, and topics/tags grounded in official GitHub guidance. Pure skill (no hooks).",
+    requires: [],
+    platform: "any",
+    skills: ["github-repo-metadata"],
+    ships: ["SKILL.md"],
+    hooks: [],
+  },
   "write-a-post": {
     id: "write-a-post",
     title: "Write a blog post (voice + cover)",
@@ -126,6 +137,7 @@ export const ALL_FEATURES: FeatureId[] = [
   "autonomous-loop",
   "speak-response",
   "png-to-code",
+  "github-repo-metadata",
   "write-a-post",
   "readme-editor",
   "refresh-agent-docs",

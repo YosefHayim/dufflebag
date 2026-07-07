@@ -62,6 +62,7 @@ export type FeatureId =
   | "speak-response"
   | "dedup-guard"
   | "png-to-code"
+  | "github-repo-metadata"
   | "write-a-post"
   | "readme-editor"
   | "refresh-agent-docs";
