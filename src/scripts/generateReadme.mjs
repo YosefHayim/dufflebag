@@ -16,9 +16,10 @@
  * Run: `node src/scripts/generateReadme.mjs`
  */
 
-import { readdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { globSync } from "glob";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "../..");
@@ -104,19 +105,16 @@ function scanSkillRoot(root, label) {
   if (!existsSync(root)) return [];
 
   const skills = [];
-  for (const entry of readdirSync(root, { withFileTypes: true })) {
-    if (!entry.isDirectory() && !entry.isSymbolicLink()) continue;
-
-    const skillMd = path.join(root, entry.name, "SKILL.md");
-    if (!existsSync(skillMd)) continue;
-
+  const skillFiles = globSync("*/SKILL.md", { cwd: root, absolute: true }).sort();
+  for (const skillMd of skillFiles) {
+    const dirName = path.basename(path.dirname(skillMd));
     const content = readFileSync(skillMd, "utf8");
     const fm = parseFrontmatter(content);
     const description = fm.description || fallbackDescription(content);
 
     skills.push({
-      dirName: entry.name,
-      name: fm.name ?? entry.name,
+      dirName,
+      name: fm.name ?? dirName,
       description,
       trigger: fm.trigger ?? "",
       label,

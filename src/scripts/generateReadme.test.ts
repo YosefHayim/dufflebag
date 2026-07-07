@@ -19,6 +19,7 @@ describe("README generation", () => {
 
     expect(skillsSection).toContain("**readme-editor**");
     expect(skillsSection).toContain("**refresh-agent-docs**");
+    expect(skillsSection).toContain("**github-repo-metadata**");
     expect(skillsSection).toContain("**png-to-code**");
     expect(skillsSection).not.toContain("**agents-sdk**");
     expect(skillsSection).not.toContain("**cloudflare**");

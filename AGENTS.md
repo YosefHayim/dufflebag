@@ -4,7 +4,7 @@
 
 ## What this is
 
-**dufflebag** — a one-command installer for a personal bag of Claude Code skills, hooks, **and reusable CI/publish workflow templates**: context guard, dedup guard, autonomous loop, speak-response, the **png-to-code** skill (PNG → measured pixel-perfect code), **readme-editor**, **refresh-agent-docs**, and `scaffold-ci` (copy the CI + publish workflows into any repo).
+**dufflebag** — a one-command installer for a personal bag of Claude Code skills, hooks, **and reusable CI/publish workflow templates**: context guard, dedup guard, autonomous loop, speak-response, the **png-to-code** skill (PNG → measured pixel-perfect code), **github-repo-metadata** (GitHub description + topics), **readme-editor**, **refresh-agent-docs**, and `scaffold-ci` (copy the CI + publish workflows into any repo).
 
 > **Renamed `skills-bag → dufflebag` (landed 2026-07-01).** A **clean break** — total across four contracts (repo, npm + bin, payload marker `/dufflebag/`, env prefix `dufflebag*`), **no back-compat shim**, and the code is now vertical per feature. See [`templates/mdFiles/CODE-STYLE.md` → refresh log](templates/mdFiles/CODE-STYLE.md) and ADRs [0007](docs/adr/current/0007-rename-to-dufflebag-broadened-remit.md)–[0009](docs/adr/current/0009-reusable-workflows-and-cli-scaffolding.md). No `skills-bag`/`skillsBag*`/`SKILLS_BAG_*` strings remain anywhere in the tree.
 
@@ -32,7 +32,7 @@ Feature docs live under `src/skills/<feature>/`. The png-to-code harness is Type
 
 **Two kinds of skill live under `src/skills/`:**
 
-- **Shipped features** — `autorun`, `png-to-code`, `write-a-post`, `readme-editor`, and `refresh-agent-docs` are registered in the CLI (`src/core/catalog/features.ts`) and **copied** into `~/.claude/skills/` by `npx dufflebag install` when their feature is selected.
+- **Shipped features** — `autorun`, `png-to-code`, `github-repo-metadata`, `write-a-post`, `readme-editor`, and `refresh-agent-docs` are registered in the CLI (`src/core/catalog/features.ts`) and **copied** into `~/.claude/skills/` by `npx dufflebag install` when their feature is selected.
 - **Personal skills** — `grill-me`, `grill-with-docs`, `grill-me-code-style`, `grill-me-code-style-with-docs`, `deslop`, and `planpage` (the `planpage`-package consumer skill) are the owner's own skills: git-tracked here as their SSOT but not registered CLI features. Edit them here; installation/symlink behavior is handled outside the catalog.
 
 ## Conventions

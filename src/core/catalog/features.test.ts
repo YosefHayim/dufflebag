@@ -30,6 +30,10 @@ describe("resolveFeatures", () => {
     expect(resolveFeatures(["png-to-code"])).toEqual(["png-to-code"]);
   });
 
+  it("resolves github-repo-metadata as a standalone feature with no dependencies", () => {
+    expect(resolveFeatures(["github-repo-metadata"])).toEqual(["github-repo-metadata"]);
+  });
+
   it("resolves refresh-agent-docs as a standalone feature with no dependencies", () => {
     expect(resolveFeatures(["refresh-agent-docs"])).toEqual(["refresh-agent-docs"]);
   });
@@ -47,6 +51,10 @@ describe("skillsFor", () => {
 
   it("maps png-to-code to its own skill directory", () => {
     expect(skillsFor(["png-to-code"])).toEqual(["png-to-code"]);
+  });
+
+  it("maps github-repo-metadata to its own skill directory", () => {
+    expect(skillsFor(["github-repo-metadata"])).toEqual(["github-repo-metadata"]);
   });
 
   it("maps refresh-agent-docs to its own skill directory", () => {
