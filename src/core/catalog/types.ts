@@ -71,7 +71,8 @@ export type FeatureId =
   | "grill-me-code-style"
   | "grill-me-code-style-with-docs"
   | "grill-with-docs"
-  | "planpage";
+  | "planpage"
+  | "web-perf-ci";
 
 /**
  * dedup-guard enforcement level (`dufflebagDedupEnforcement`):

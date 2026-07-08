@@ -1,0 +1,37 @@
+# Field check — real-user Core Web Vitals from the Chrome UX Report (CrUX) API,
+# the durable field source (PSI is discontinuing its CrUX data). Runs weekly and
+# after a successful deploy. CrUX is a 28-day rolling aggregate, so this monitors
+# the real-user trend, not the just-shipped change. Requires:
+#   - secret   PSI_API_KEY     (a Google API key with the "Chrome UX Report API" enabled)
+#   - variable PSI_TARGET_URL  (fallback URL for scheduled runs)
+#   - .github/perf/runCrux.mjs (copied from the skill's scripts/)
+name: Field check (Core Web Vitals)
+on:
+  deployment_status:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: URL to check
+        required: true
+  schedule:
+    - cron: "0 12 * * 1"
+
+jobs:
+  field:
+    # Only run on a successful deployment (or manual / scheduled trigger).
+    if: github.event_name != 'deployment_status' || github.event.deployment_status.state == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Resolve target URL
+        id: target
+        run: |
+          URL="${{ github.event.inputs.url || github.event.deployment_status.target_url || vars.PSI_TARGET_URL }}"
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+      - name: CrUX field check (real users)
+        run: node .github/perf/runCrux.mjs "${{ steps.target.outputs.url }}" --form-factor=PHONE
+        env:
+          CRUX_API_KEY: ${{ secrets.PSI_API_KEY }}

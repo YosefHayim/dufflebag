@@ -128,7 +128,7 @@ export const FEATURES: Record<FeatureId, Feature> = {
     ships: ["SKILL.md", "sources.json", "scripts"],
     hooks: [],
   },
-  "deslop": {
+  deslop: {
     id: "deslop",
     title: "Deslop",
     summary:
@@ -183,7 +183,7 @@ export const FEATURES: Record<FeatureId, Feature> = {
     ships: ["SKILL.md", "CONTEXT-FORMAT.md", "ADR-FORMAT.md"],
     hooks: [],
   },
-  "planpage": {
+  planpage: {
     id: "planpage",
     title: "planpage",
     summary:
@@ -192,6 +192,17 @@ export const FEATURES: Record<FeatureId, Feature> = {
     platform: "any",
     skills: ["planpage"],
     ships: ["SKILL.md", "COMPONENTS.md"],
+    hooks: [],
+  },
+  "web-perf-ci": {
+    id: "web-perf-ci",
+    title: "Website performance CI (Core Web Vitals)",
+    summary:
+      "A skill that wires automated performance gates into a website's CI/CD: a Lighthouse CI budget check on every PR (lab), a Chrome UX Report (CrUX) real-user field check after deploy, and an optional web-vitals RUM snippet — all enforcing Core Web Vitals budgets (LCP, INP, CLS). It interviews the repo to detect the stack and run mode, then writes lighthouserc, the GitHub Actions workflows, and zero-dep CrUX + PSI checkers. Pure skill (no hooks); the checks need Node 18+ and a free Google API key (Chrome UX Report + PageSpeed Insights APIs).",
+    requires: [],
+    platform: "any",
+    skills: ["web-perf-ci"],
+    ships: ["SKILL.md", "README.md", "CONTEXT.md", "TECH-GLOSSARY.md", "reference", "scripts", "templates"],
     hooks: [],
   },
 };
@@ -213,6 +224,7 @@ export const ALL_FEATURES: FeatureId[] = [
   "grill-me-code-style-with-docs",
   "grill-with-docs",
   "planpage",
+  "web-perf-ci",
 ];
 
 /** The safe-by-default selection: works on any OS, no GUI automation. */

@@ -1,0 +1,25 @@
+# Lab gate — runs Lighthouse against every PR and asserts the budget in
+# lighthouserc.json. Swap the build step / run mode to match the repo.
+name: Lighthouse CI
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  lighthouse:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      # Build the output lighthouserc.json's `collect` points at (staticDistDir).
+      # For a startServerCommand/preview-URL run mode this may be a no-op.
+      - run: npm run build --if-present
+      - run: npx --yes @lhci/cli@0.14.x autorun
+        env:
+          # Optional: set for richer PR status checks via the LHCI GitHub App.
+          LHCI_GITHUB_APP_TOKEN: ${{ secrets.LHCI_GITHUB_APP_TOKEN }}
