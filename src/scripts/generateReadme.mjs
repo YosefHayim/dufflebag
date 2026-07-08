@@ -36,8 +36,9 @@ const featuresSource = readFileSync(featuresPath, "utf8");
 /** Parse the FEATURES record from TypeScript source (regex, no eval). */
 function parseFeatures() {
   const features = [];
-  // Match each feature block: "feature-id": { ... }
-  const featureRegex = /"([^"]+)":\s*\{([^}]+(?:\{[^}]*\}[^}]*)*)\}/g;
+  // Match each feature block: `"feature-id": { ... }` or `feature-id: { ... }`
+  // (biome unquotes single-word keys, so accept both quoted and bare keys).
+  const featureRegex = /"?([a-z][a-z0-9-]*)"?:\s*\{([^}]+(?:\{[^}]*\}[^}]*)*)\}/g;
   let match;
 
   while ((match = featureRegex.exec(featuresSource)) !== null) {

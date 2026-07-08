@@ -1,0 +1,8 @@
+{
+  "lcpMs": 2500,
+  "inpMs": 200,
+  "clsScore": 0.1,
+  "fcpMs": 1800,
+  "ttfbMs": 800,
+  "performanceScore": 0.9
+}
