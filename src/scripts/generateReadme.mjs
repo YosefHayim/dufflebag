@@ -16,10 +16,9 @@
  * Run: `node src/scripts/generateReadme.mjs`
  */
 
-import { readFileSync, writeFileSync, existsSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { globSync } from "glob";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "../..");
@@ -106,7 +105,13 @@ function scanSkillRoot(root, label) {
   if (!existsSync(root)) return [];
 
   const skills = [];
-  const skillFiles = globSync("*/SKILL.md", { cwd: root, absolute: true }).sort();
+  // Zero-dep scan (no `glob`) so this runs in CI without `pnpm install`:
+  // every `<root>/<dir>/SKILL.md` that exists, sorted for stable output.
+  const skillFiles = readdirSync(root, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => path.join(root, entry.name, "SKILL.md"))
+    .filter((file) => existsSync(file))
+    .sort();
   for (const skillMd of skillFiles) {
     const dirName = path.basename(path.dirname(skillMd));
     const content = readFileSync(skillMd, "utf8");
