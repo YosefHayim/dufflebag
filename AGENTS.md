@@ -33,7 +33,7 @@ Feature docs live under `src/skills/<feature>/`. The png-to-code harness is Type
 **Two kinds of skill live under `src/skills/`:**
 
 - **Shipped features** — `autorun`, `png-to-code`, `github-repo-metadata`, `write-a-post`, `readme-editor`, and `refresh-agent-docs` are registered in the CLI (`src/core/catalog/features.ts`) and **copied** into `~/.claude/skills/` by `npx dufflebag install` when their feature is selected.
-- **Personal skills** — `grill-me`, `grill-with-docs`, `grill-me-code-style`, `grill-me-code-style-with-docs`, `deslop`, and `planpage` (the `planpage`-package consumer skill) are the owner's own skills: git-tracked here as their SSOT but not registered CLI features. Edit them here; installation/symlink behavior is handled outside the catalog.
+- **Vendored community skills vs. personal skills** — `grill-me`, `grill-with-docs` (by [Matt Pocock](https://github.com/mattpocock/skills)) and `deslop` (by [Mike Cann](https://github.com/mikecann/agent-skills)) are **third-party** — bundled with credit and surfaced in the README's "Recommended community skills" table, not claimed as ours. `grill-me-code-style`, `grill-me-code-style-with-docs` (dufflebag-original, building on Matt's grilling pattern), and `planpage` (the `planpage`-package consumer skill) are the owner's own. All are git-tracked here as their SSOT; installation/symlink behavior is handled outside the catalog.
 
 ## Conventions
 

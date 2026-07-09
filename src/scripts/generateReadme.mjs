@@ -1,17 +1,22 @@
 #!/usr/bin/env node
 /**
- * generateReadme.mjs — auto-generates the feature table and agent skills
- * section of README.md from the source of truth (features.ts + SKILL.md files).
+ * generateReadme.mjs — auto-generates two README tables from the source of truth
+ * (features.ts + SKILL.md files):
+ *   - the OWNED feature catalog ("What it installs"), and
+ *   - the third-party "Recommended community skills" table.
  *
  * Skills are discovered from dufflebag's source tree only:
  *   - src/skills/              (dufflebag-owned skills)
+ *
+ * Ownership routing: ids listed in COMMUNITY_SKILLS are filtered OUT of the owned
+ * catalog and rendered (credited + linked upstream) in the community table instead.
  *
  * Sections between marker comments are replaced on every run; everything else
  * in the README is preserved verbatim.
  *
  * Markers:
- *   <!-- AUTO:FEATURES:START --> … <!-- AUTO:FEATURES:END -->
- *   <!-- AUTO:SKILLS:START -->  … <!-- AUTO:SKILLS:END -->
+ *   <!-- AUTO:FEATURES:START --> … <!-- AUTO:FEATURES:END -->  (owned catalog)
+ *   <!-- AUTO:SKILLS:START -->  … <!-- AUTO:SKILLS:END -->     (community skills)
  *
  * Run: `node src/scripts/generateReadme.mjs`
  */
@@ -26,6 +31,21 @@ const ROOT = path.resolve(__dirname, "../..");
 const SKILL_ROOTS = [
   { root: path.join(ROOT, "src/skills"), label: "dufflebag source" },
 ];
+
+/**
+ * Shipped skills that are NOT dufflebag-original — bundled for convenience but
+ * authored by others. This is the SSOT for third-party attribution: these ids are
+ * filtered out of the owned catalog and listed (credited + linked) in a separate
+ * "Recommended community skills" table. The typed feature catalog (features.ts)
+ * and the vendored skill folders are deliberately left untouched.
+ *
+ * @type {Record<string, { author: string; url: string }>}
+ */
+const COMMUNITY_SKILLS = {
+  deslop: { author: "Mike Cann", url: "https://github.com/mikecann/agent-skills" },
+  "grill-me": { author: "Matt Pocock", url: "https://github.com/mattpocock/skills" },
+  "grill-with-docs": { author: "Matt Pocock", url: "https://github.com/mattpocock/skills" },
+};
 
 // ─── Extract features from features.ts ──────────────────────────────────────
 
@@ -165,36 +185,30 @@ function generateFeaturesTable(features) {
     "| --- | --- | --- |",
   ];
   for (const f of features) {
+    if (COMMUNITY_SKILLS[f.id]) continue; // credited in the community table instead
     lines.push(`| **${f.id}** | ${f.summary} | ${f.platform} |`);
   }
   return lines.join("\n");
 }
 
-function generateSkillsSection(skills) {
-  const hasTrigger = skills.some((s) => s.trigger);
-
-  const header = hasTrigger
-    ? ["| Skill | Description | Where | Trigger |", "| --- | --- | --- | --- |"]
-    : ["| Skill | Description | Where |", "| --- | --- | --- |"];
+function generateCommunitySection(skills) {
+  const community = skills.filter((s) => COMMUNITY_SKILLS[s.name]);
 
   const lines = [
-    "Beyond the installable hooks, dufflebag ships **agent skills** — instruction sets that coding agents (Claude Code, Kiro, Cursor) follow when triggered by natural language:",
+    "These skills ship in the bag for convenience — installable the same way (`npx ys-dufflebag install --features <id>`) — but they are **authored by others**, not by dufflebag. Full credit and upstream sources:",
     "",
-    ...header,
+    "| Skill | What it does | By |",
+    "| --- | --- | --- |",
   ];
 
-  for (const s of skills) {
-    const where = s.labels.join(" · ");
-    if (hasTrigger) {
-      lines.push(`| **${s.name}** | ${s.description} | ${where} | ${s.trigger || "—"} |`);
-    } else {
-      lines.push(`| **${s.name}** | ${s.description} | ${where} |`);
-    }
+  for (const s of community) {
+    const { author, url } = COMMUNITY_SKILLS[s.name];
+    lines.push(`| **${s.name}** | ${s.description} | [${author}](${url}) |`);
   }
 
   lines.push("");
   lines.push(
-    `Skills are installed alongside hooks into your agent's skills directory. They require no configuration — just ask your agent to do the thing (e.g. "deslop this", "grill me", "convert this PNG to code").`,
+    "> `grill-me-code-style` and `grill-me-code-style-with-docs` are dufflebag-original skills that build on Matt Pocock's grilling pattern — they stay in the owned catalog above.",
   );
   return lines.join("\n");
 }
@@ -233,12 +247,12 @@ readme = replaceSection(
   generateFeaturesTable(features),
 );
 
-// Replace skills section
+// Replace community-skills section
 readme = replaceSection(
   readme,
   "<!-- AUTO:SKILLS:START -->",
   "<!-- AUTO:SKILLS:END -->",
-  generateSkillsSection(skills),
+  generateCommunitySection(skills),
 );
 
 writeFileSync(path.join(ROOT, "README.md"), readme);
