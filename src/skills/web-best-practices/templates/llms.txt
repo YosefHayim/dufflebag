@@ -1,0 +1,19 @@
+# {Project Name}
+
+> {One sentence: what this product does and who it is for.}
+
+{Optional short paragraph of context — what the site offers and the key facts an
+agent should know before acting. Keep the whole file concise; a bloated llms.txt
+defeats the purpose.}
+
+## Docs
+- [Getting started]({https://example.com/docs/start}): {what it covers}
+- [API reference]({https://example.com/docs/api}): {auth + endpoints}
+
+## Product
+- [Features]({https://example.com/features}): {the core capabilities}
+- [Pricing]({https://example.com/pricing}): {plans and limits}
+
+## Optional
+- [Changelog]({https://example.com/changelog}): secondary; skip when context is tight
+- [Blog]({https://example.com/blog}): secondary
