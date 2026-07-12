@@ -264,8 +264,11 @@ function collectSignals(root) {
       }
     }
     if (rel.includes("llms.txt") || base === "llms-full.txt") files.llmsTxt = true;
-    if (base === "robots.txt" || base === "robots.ts" || base === "robots.js") files.robots = true;
-    if (base === "sitemap.xml" || base === "sitemap.ts" || base === "sitemap.js") files.sitemap = true;
+    // `.txt.ts` / `.xml.ts` catch Astro/Next endpoint files (e.g. `sitemap.xml.ts` → route `/sitemap.xml`).
+    if (base === "robots.txt" || base.startsWith("robots.txt.") || base === "robots.ts" || base === "robots.js")
+      files.robots = true;
+    if (base === "sitemap.xml" || base.startsWith("sitemap.xml.") || base === "sitemap.ts" || base === "sitemap.js")
+      files.sitemap = true;
     if (/^next\.config\.(?:js|mjs|ts|cjs)$/.test(base)) files.nextConfig = true;
     if (ext === ".webp" || ext === ".avif") modernAsset = true;
 

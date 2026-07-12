@@ -9,6 +9,8 @@ Make code feel deliberate and easy to understand quickly. The default mode is re
 
 Do not apply edits until the user approves the style, unless the user explicitly says to apply immediately.
 
+> **Companion skill:** `deslop` makes code *readable* (naming, ordering, splitting for clarity); `deslop-v2` makes it *lean* (removing over-engineering — pass-through wrappers, `??` confetti, nested ternaries, grab-bag returns, and over-nested folders/packages). If the real problem is too much abstraction or structure rather than unclear naming, use `deslop-v2`. When both apply, deslop-v2 removes the excess first, then deslop names what remains.
+
 ## Core Contract
 
 Optimize for a developer understanding the important path in about 5 seconds:

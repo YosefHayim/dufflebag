@@ -1,6 +1,6 @@
 {
   "name": "ys-dufflebag",
-  "version": "0.8.2",
+  "version": "0.9.0",
   "description": "One-command installer for a personal bag of AI coding agent skills, hooks, and reusable CI/publish workflow templates for Claude Code, Kimi, and Kiro: a context guardrail that forces a graceful /handoff before the window fills, a DRY dedup-guard, a hands-free autonomous-compact loop (autorun), a macOS text-to-speech hook, and a png-to-code skill that converts PNG designs into pixel-perfect animated SVG via a measured screenshot-diff loop. Pure TypeScript, Node-only, no Python.",
   "type": "module",
   "bin": {
