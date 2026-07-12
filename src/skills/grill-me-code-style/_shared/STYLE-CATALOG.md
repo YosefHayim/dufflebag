@@ -502,3 +502,27 @@ When a dimension is language-specific, a note like `[TS/JS only]` appears in the
   - When do CONTEXT.md / LANGUAGE.md get updated? (same PR that introduces a new concept)
   - Does a new module need its own README, or is colocated doc-comments sufficient?
   - Who owns the update — the PR author, or a periodic sweep?
+
+---
+
+## Round 7 — Over-engineering (the "too much" fingerprint)
+
+Round 1's slop fingerprint catches *unreadable* code; this round catches *excess* code — abstraction, indirection, and structure that costs more than it buys. It is the grill-time twin of the **`deslop-v2`** skill: every family below has a concrete before/after in [`deslop-v2/references/line-smells.md`](../../deslop-v2/references/line-smells.md) (line-level) and [`deslop-v2/references/structure-smells.md`](../../deslop-v2/references/structure-smells.md) (structural) — pull the matching example as the `✗ not this` when you grill it.
+
+**The one test — state it, then grill each family against it:** *an abstraction (wrapper, layer, helper, folder, package) earns its place only if it has a second real caller or names a genuine domain concept; otherwise inline or flatten it.* For an existing repo, each family is a **keep/kill** against real offenders (cite `file:symbol`); greenfield, each is a **will-we-allow-this** with an illustrative snippet. Killed families become concrete `## Never` entries with an enforced-vs-taste tag.
+
+The five line-level families (each collapses to one TUI question):
+
+- **Needless indirection** — pass-through wrappers, one-line helpers around a single operator, identity functions (`(x) => x`), a `Manager`/`Service` class that is one static method, single-implementation interfaces. `[taste]` (some catchable via `no-restricted-syntax`)
+- **Fake robustness** — scattered `??` fallback chains, hand-rolled `isRecord`-style type guards where a schema belongs, deep optional chaining (`a?.b?.c?.d`), `catch { return null }` swallows, speculative unused config knobs (YAGNI). `[lint: no-restricted-syntax for banned guard shapes]` + `[taste]`
+- **Control-flow contortion** — nested ternaries, self-restating conditions (`=== true`, `? true : false`), boolean flag params, redundant `async`+`return await` / `new Promise(res => res(x))`. `[lint: no-nested-ternary, no-unnecessary-condition]`
+- **Shape noise** — pointless from→to remaps (same shape in and out), grab-bag object returns (caller uses 2 of 15 fields), `data`/`result`/`temp`/`final` variable soup. `[taste]`
+- **Dead space** — comments that restate code, function bodies with no breathing room, one function doing several jobs. `[taste]`
+
+The structural families (grill these against the repo tree — `ls`/tree first):
+
+- **Too much structure** — deep nesting for a handful of files, one-export-per-file + barrel, layer-first folders (`controllers/services/repositories/`) for a tiny app, single-implementation interface folders, `utils/helpers/common/misc` dumping grounds, package/module-itis (a package per one-file thing).
+- **Too little structure** — the mirror twin: a god-file crossing several domains that should split along domain seams.
+- **Calibration** — the target is the middle: one folder per real sub-domain, one file per cohesive unit, one package per real consumer boundary. Count concepts, not lines. This lands as the `## Structure` guidance in `CODE-STYLE.md` and a tight `AGENTS.md` digest line.
+
+Fold the kills into the existing `## Never` list (Round 1's fingerprint) rather than a separate list, and wire the machine-catchable ones (`no-nested-ternary`, banned guard shapes, complexity/length caps) into the **Lint tells** in Round 6 so CI prevents them, not just documents them. Point the repo's ongoing enforcement at `deslop-v2` (per-diff, over-engineering) alongside `deslop` (per-diff, readability).

@@ -139,6 +139,17 @@ export const FEATURES: Record<FeatureId, Feature> = {
     ships: ["SKILL.md", "references"],
     hooks: [],
   },
+  "deslop-v2": {
+    id: "deslop-v2",
+    title: "Deslop v2 — kill over-engineering",
+    summary:
+      "The over-engineering companion to deslop: reviews code and repo structure for excess — pass-through wrappers, `??` fallback chains, nested ternaries, grab-bag returns, and over-nested folders/packages — then removes it so the code does exactly what it needs and no more. Use when the user says code is over-engineered, over-abstracted, or too complicated, or asks to simplify, flatten, or cut needless indirection and layers. Pure skill (no hooks).",
+    requires: [],
+    platform: "any",
+    skills: ["deslop-v2"],
+    ships: ["SKILL.md", "references"],
+    hooks: [],
+  },
   "grill-me": {
     id: "grill-me",
     title: "Grill me",
@@ -205,6 +216,17 @@ export const FEATURES: Record<FeatureId, Feature> = {
     ships: ["SKILL.md", "README.md", "CONTEXT.md", "TECH-GLOSSARY.md", "reference", "scripts", "templates"],
     hooks: [],
   },
+  "cws-listing-seo": {
+    id: "cws-listing-seo",
+    title: "Chrome Web Store listing SEO (+ GEO)",
+    summary:
+      "A skill that optimizes Chrome Web Store listing copy (name, summary, Overview) and marketing-site GEO using official Chrome/Google guidance. Ships a zero-dep validator for limits + Keyword Spam heuristics; CWS keyword volume stays manual/browser research (no official free API). Pure skill (no hooks).",
+    requires: [],
+    platform: "any",
+    skills: ["cws-listing-seo"],
+    ships: ["SKILL.md", "REFERENCE.md", "scripts", "templates"],
+    hooks: [],
+  },
 };
 
 /** Every feature id, in display/install order. */
@@ -219,12 +241,14 @@ export const ALL_FEATURES: FeatureId[] = [
   "readme-editor",
   "refresh-agent-docs",
   "deslop",
+  "deslop-v2",
   "grill-me",
   "grill-me-code-style",
   "grill-me-code-style-with-docs",
   "grill-with-docs",
   "planpage",
   "web-perf-ci",
+  "cws-listing-seo",
 ];
 
 /** The safe-by-default selection: works on any OS, no GUI automation. */
