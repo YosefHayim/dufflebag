@@ -227,6 +227,17 @@ export const FEATURES: Record<FeatureId, Feature> = {
     ships: ["SKILL.md", "REFERENCE.md", "scripts", "templates"],
     hooks: [],
   },
+  "make-a-trailer": {
+    id: "make-a-trailer",
+    title: "Make a trailer (cinematic project video)",
+    summary:
+      "A skill that directs a cinematic, viral-ready vertical trailer for any project: it reads the repo's own docs to derive the story, consults ChatGPT (GPT-5.5 Thinking) over ai-browser-bridge to write the transcript + storyboard, batch-generates the keyframes as ChatGPT images, animates them with Higgsfield or Flow/Veo, produces voiceover + music (ElevenLabs → Higgsfield → local synth), and assembles a 9:16 master + 16:9/1:1/4:5 cuts with ffmpeg — behind two planpage approval gates and a resumable generation manifest. macOS + Chrome (ai-browser-bridge), the Higgsfield MCP, and ffmpeg required. Pure skill (no hooks).",
+    requires: ["planpage"],
+    platform: "macos",
+    skills: ["make-a-trailer"],
+    ships: ["SKILL.md", "reference", "scripts"],
+    hooks: [],
+  },
 };
 
 /** Every feature id, in display/install order. */
@@ -238,6 +249,7 @@ export const ALL_FEATURES: FeatureId[] = [
   "png-to-code",
   "github-repo-metadata",
   "write-a-post",
+  "make-a-trailer",
   "readme-editor",
   "refresh-agent-docs",
   "deslop",

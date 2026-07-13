@@ -74,7 +74,8 @@ export type FeatureId =
   | "planpage"
   | "web-perf-ci"
   | "cws-listing-seo"
-  | "deslop-v2";
+  | "deslop-v2"
+  | "make-a-trailer";
 
 /**
  * dedup-guard enforcement level (`dufflebagDedupEnforcement`):
