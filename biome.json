@@ -25,5 +25,31 @@
         "noNonNullAssertion": "off"
       }
     }
-  }
+  },
+  "plugins": ["./biome-rules/no-focused-tests.grit"],
+  "overrides": [
+    {
+      "includes": ["src/core/**", "src/commands/**"],
+      "linter": { "rules": { "suspicious": { "noConsole": "error" } } }
+    },
+    {
+      "includes": ["src/skills/*/hooks/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "paths": {
+                  "commander": "Zero-dep hook payload: import only node:*, src/payload/*, and the feature's own lib/ (CODE-STYLE.md -> Never; ADR 0001).",
+                  "@clack/prompts": "Zero-dep hook payload: import only node:*, src/payload/*, and the feature's own lib/ (CODE-STYLE.md -> Never; ADR 0001).",
+                  "picocolors": "Zero-dep hook payload: import only node:*, src/payload/*, and the feature's own lib/ (CODE-STYLE.md -> Never; ADR 0001)."
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
 }

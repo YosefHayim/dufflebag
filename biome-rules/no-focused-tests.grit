@@ -1,0 +1,9 @@
+// Generated from templates/mdFiles/code-style.rules.json (rule: no-focused-tests).
+// GritQL custom rule — the "biome-grit-plugin" enforcement channel.
+`$suite.only($...)` as $call where {
+  register_diagnostic(
+    span = $call,
+    message = "Remove `.only(` before committing — it silently skips the rest of the suite (CODE-STYLE.md → Tests co-locate).",
+    severity = "error"
+  )
+}
