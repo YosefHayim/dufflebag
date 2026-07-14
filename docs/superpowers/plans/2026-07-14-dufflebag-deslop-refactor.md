@@ -11,19 +11,22 @@
 ## Global Constraints
 
 - The approved design is [`docs/superpowers/specs/2026-07-14-dufflebag-deslop-design.md`](../specs/2026-07-14-dufflebag-deslop-design.md). It wins over this execution plan if wording drifts.
-- Preserve these user-owned files byte-for-byte, including after their directory moves to `src/skills/makeATrailer/`:
-  - `src/skills/make-a-trailer/SKILL.md` — SHA-256 `5bf0ec33ac92acd73b816f8c61c422c49f518f3cfcc5763986a8108d451cc297`
-  - `src/skills/make-a-trailer/reference/pipeline.md` — SHA-256 `3bb89d856d28995c50fba23aca6a6a1af1fe56f10d67546a0515fe0d276f1669`
-  - `src/skills/make-a-trailer/scripts/assembleCut.mjs` — SHA-256 `6dceccae4b1f49bc7b64b89bd164882c29e57142ef9193d0208ccc1f9d2291ad`
+- Preserve the approved overlay bytes in these user-owned files, including after their directory moves to `src/skills/makeATrailer/`. The checker records exactly two immutable SHA-256 states per path while the overlay remains uncommitted:
+
+  | Protected path | Committed baseline SHA-256 | Approved overlay SHA-256 |
+  | --- | --- | --- |
+  | `src/skills/make-a-trailer/SKILL.md` | `5f9c3f49658d976168d4c6dfaea9f636bb3cf7cb219011486c4949e33b17a1e6` | `5bf0ec33ac92acd73b816f8c61c422c49f518f3cfcc5763986a8108d451cc297` |
+  | `src/skills/make-a-trailer/reference/pipeline.md` | `10f5da547d792f7ca2067621082e08cdbf5826070c612c3e248c4276cdd01c73` | `3bb89d856d28995c50fba23aca6a6a1af1fe56f10d67546a0515fe0d276f1669` |
+  | `src/skills/make-a-trailer/scripts/assembleCut.mjs` | `d6f05101b3fdbcd966696a7e4b144f1eca082744b7262d0b82ff32f6fea2b2a5` | `6dceccae4b1f49bc7b64b89bd164882c29e57142ef9193d0208ccc1f9d2291ad` |
 - Never reset, stash, format, stage, or commit those three working-tree edits. Commit their clean `HEAD` content as pure renames while leaving their user edits unstaged at the new paths.
 - The isolated refactor worktree begins clean; the protected dirty bytes and possible unrelated concurrent WIP live in `/Users/yosefhayimsabag/Desktop/Code/dufflebag`. Before Task 13, audit both worktrees and transfer only the three protected diffs with a reviewed binary patch unless main has no other changes and a verified pre-rename fast-forward is safe. Never overwrite, reset, stash, or normalize main WIP.
-- Treat clean committed-source verification and dirty protected-overlay verification as separate gates. The clean gate validates rule structure rather than pretending the uncommitted overlay hashes exist; the dirty gate verifies live hashes/counts and full `pnpm verify`.
+- Treat clean committed-source verification and dirty protected-overlay verification as separate evidence states of the same full `pnpm verify` gate. The checker selects per protected file only by exact SHA-256: committed hash reports `protected-committed` and skips that file's overlay-only count comparison; overlay hash reports `protected-overlay` and enforces exact 13/5/2 equality for `assembleCut.mjs`; any third hash fails. No environment, CI, dirty-tree, or path-only heuristic exists, and every unprotected file is checked identically.
 - Use `apply_patch` for authored file edits. Use `git mv` for ordinary clean renames. Scope every commit explicitly; never use `git add .` or `git add -A` in this dirty worktree.
 - Every runtime or persisted authored object is an Effect Schema value first. Its type is `Schema.Schema.Type<typeof schema>`; encoded forms use `Schema.Schema.Encoded<typeof schema>`. Do not add a parallel runtime-data interface or object alias. Interfaces remain valid only for declaration augmentation or genuinely substitutable feature-owned external capability ports.
 - Decode authored and persisted objects with `{ onExcessProperty: "error" }`. Invalid input fails; it is never clamped, case-folded, partially parsed, or silently defaulted.
 - New and migrated code follows the approved arrow-function, guard-clause, no-assertion, schema-owned-data, signal-TSDoc, absence-boundary, named-export, camelCase-path, non-obvious-loop-comment, mutation, no-internal-barrel, one-expression-extraction, and collection rules from the first edit. One dependent Effect handoff may use one `flatMap`; two or more dependent steps use `Effect.gen`.
 - Every rule uses only `formatter | linter | regex | ast | path | importGraph | typecheck | test | manual`. Anchored regex/text checks own textual/path-local rules; AST/lint/import graphs own semantic/boundary rules; typecheck/tests own types and behavior; manual owns judgment. Only proven-safe formatter/linter fixes may autofix.
-- Exception `exitCondition` text is required but manually reviewed. Mechanical staleness is exact: a missing path, zero violations, a count below `maxViolations`, or a count above it fails; only equality passes. Broad/wildcard paths and maximum increases fail.
+- Exception `exitCondition` text is required but manually reviewed. When the exact overlay hash activates an exception, mechanical staleness is exact: a missing path, zero violations, a count below `maxViolations`, or a count above it fails; only equality passes. The exact committed hash has no active overlay-count comparison. Broad/wildcard paths, unknown hashes, and maximum increases fail.
 - A cutover task does not end with both legacy and replacement consumers. Foundation tasks may prove a replacement behind tests; the named cutover then moves every intended consumer and deletes the superseded path without a compatibility wrapper.
 - Before every commit, run the task's focused command, `pnpm typecheck`, and the currently available `pnpm verify`. Record broad-gate failures separately from task-owned failures; do not edit unrelated code to silence them.
 - Keep tests beside their owner. Use real temporary directories and public seams. Application tests use `it.effect`; dependency-free hook tests use ordinary Vitest.
@@ -141,7 +144,9 @@ Do not show a handwritten runtime-data `Feature` interface, conditional type, or
 
 Use a flat ordered `rules` array. Each entry contains one globally unique `id`, `applicability`, concise `summary`, `rationale`, good and bad examples, and a non-empty `enforcement` array containing only `formatter`, `linter`, `regex`, `ast`, `path`, `importGraph`, `typecheck`, `test`, or `manual`. Manual rules remain machine-enumerated so human and machine IDs are bijective; they are reported for review, not pretended to be mechanically proven. Optional `autofix` is true only for a formatter/linter transformation proven safe by fixtures.
 
-Store the three named files and hashes in separate exact `protectedPaths` metadata. The `exceptions` array contains only three entries for `assembleCut.mjs`: function form with `maxViolations: 13`, function inputs with `maxViolations: 5`, and non-obvious loop comments with `maxViolations: 2`. The Markdown protected paths are not AST exceptions. Each exception references an existing rule ID and exact repository-relative paths plus a reason and required human-readable `exitCondition`; the prose is manually reviewed, not machine-evaluated. Machine validation fails for a missing path, zero violations, a count below or above the maximum, a wildcard/broad path, an unknown ID, or a maximum increase. Only exact count equality passes.
+Store the three named files in separate exact `protectedPaths` metadata. Each record contains its repository-relative path, immutable `committedSha256`, and immutable `overlaySha256` from Global Constraints. The full checker selects a state only by exact file hash: `committedSha256` reports `protected-committed`; `overlaySha256` reports `protected-overlay`; any other hash fails. It never consults CI, environment variables, Git status, or path presence alone.
+
+The `exceptions` array contains only three overlay-state entries for `assembleCut.mjs`: function form with `maxViolations: 13`, function inputs with `maxViolations: 5`, and non-obvious loop comments with `maxViolations: 2`. The Markdown protected paths are not AST exceptions. Each exception references an existing rule ID and exact repository-relative paths plus a reason and required human-readable `exitCondition`; the prose is manually reviewed, not machine-evaluated. When `overlaySha256` is active, machine validation fails for a missing path, zero violations, a count below or above the maximum, a wildcard/broad path, an unknown ID, or a maximum increase. Only exact count equality passes. When `committedSha256` is active, the checker skips those overlay-only counts for that unchanged file; the exact hash is the proof, not a second count allowlist.
 
 Surgically extend `biome.json` from its current `src/**/*.ts` migration scope to include exactly `src/**/*.ts`, `scripts/**/*.ts`, and `code-style.rules.json` for this task. Retain the current 140-column migration baseline; the final 120-column cutover remains Task 15. Extend `tsconfig.json` to typecheck `scripts/**/*.ts`. Do not edit `vitest.config.ts`: its existing `src/**/*.test.ts` discovery already finds the co-located checker test.
 
@@ -153,7 +158,7 @@ For the bootstrap phase through Task 15, make root `CODE-STYLE.md` and `code-sty
 
 Use the existing Vitest discovery and the expanded TypeScript coverage for the thin `scripts/**/*.ts` entrypoints and substantive `src/style/**/*.ts` owner. Fixture tests must prove rule-ID bijection, complete required rule fields, valid enforcement vocabulary, every regex/AST/path/import-graph detector, exact line/rule reporting, generated-path exclusion, and fail-closed protected-path configuration. Plant both good and bad fixtures for the interface exceptions, internal barrels/`export *`, camelCase/repeated-suffix paths, non-obvious versus self-evident loops, one-expression extraction, and one-`flatMap` versus multi-step-`Effect.gen`. Only an anonymous generator directly passed to `Effect.gen` and a `Schema.TaggedError` class may pass their otherwise forbidden forms.
 
-Fixture metadata contains exactly the three protected paths and hashes. Only `assembleCut.mjs` receives code-rule exemptions: 13 function-form, 5 function-input, and 2 non-obvious-loop-comment violations. The two protected Markdown paths are enumerated in the report but are not AST inputs or rule exceptions. Any wildcard, missing/fourth path, extra exempt rule, zero count, count below or above 13/5/2, or later ratchet increase must fail; only exact equality passes.
+Fixture metadata contains exactly the three protected paths and both exact hashes per path. Only the overlay state of `assembleCut.mjs` receives code-rule exemptions: 13 function-form, 5 function-input, and 2 non-obvious-loop-comment violations. The two protected Markdown paths are enumerated in the report but are not AST inputs or rule exceptions. Any wildcard, missing/fourth path, extra exempt rule, unknown hash, overlay count at zero or below/above 13/5/2, or later ratchet increase must fail; only exact overlay equality passes. The exact committed state reports `protected-committed` without activating those overlay counts.
 
 Run:
 
@@ -165,7 +170,7 @@ Expected: RED before `checkCodeStyle.ts` exists, then GREEN against isolated fix
 
 - [ ] **Step 5: Implement the focused checker**
 
-Keep `scripts/checkCodeStyle.ts` as argument decoding, one call, rendering, and process status only. Use the TypeScript compiler AST directly in `src/style/checkCodeStyle.ts`; anchored regex/text checks may handle declared textual/path-local rules. Export `checkCodeStyle(repositoryRoot)` returning violations and the three protected paths. The checker owns only rules that formatter/linter/typecheck/test cannot express; it is not a second formatter or general linter. Do not use assertions inside the checker. `--validate-rules` validates JSON structure, human/machine IDs, protected-path hash syntax, exception references, and ratchet shape without comparing the clean isolated worktree's bytes; live mode performs byte/count checks later.
+Keep `scripts/checkCodeStyle.ts` as argument decoding, one call, rendering, and process status only. Use the TypeScript compiler AST directly in `src/style/checkCodeStyle.ts`; anchored regex/text checks may handle declared textual/path-local rules. Export `checkCodeStyle(repositoryRoot)` returning violations and the three protected states. The checker owns only rules that formatter/linter/typecheck/test cannot express; it is not a second formatter or general linter. Do not use assertions inside the checker. `--validate-rules` remains metadata-only: it validates JSON structure, human/machine IDs, both protected hash fields and syntax, exception references, and ratchet shape without reading repository bytes. Full mode performs exact hash-state selection and active overlay-count checks.
 
 - [ ] **Step 6: Validate the contract artifacts**
 
@@ -839,9 +844,13 @@ shasum -a 256 \
   "$MAIN/src/skills/make-a-trailer/SKILL.md" \
   "$MAIN/src/skills/make-a-trailer/reference/pipeline.md" \
   "$MAIN/src/skills/make-a-trailer/scripts/assembleCut.mjs"
+shasum -a 256 \
+  "$ISOLATED/src/skills/make-a-trailer/SKILL.md" \
+  "$ISOLATED/src/skills/make-a-trailer/reference/pipeline.md" \
+  "$ISOLATED/src/skills/make-a-trailer/scripts/assembleCut.mjs"
 ```
 
-Expected: isolated is clean at the implementation commit; the committed branch range has not touched the protected trio; main contains their working changes and may contain unrelated concurrent WIP. Never reset, stash, overwrite, or normalize main.
+Expected: isolated is clean at the implementation commit; its three files match the committed baseline hashes in Global Constraints; the committed branch range has not touched them; and main matches the three approved overlay hashes while possibly containing unrelated concurrent WIP. Never reset, stash, overwrite, or normalize main.
 
 The default path—and the mandatory path when main has any unrelated change—is to transfer only the protected diffs:
 
@@ -898,19 +907,22 @@ mv src/skills/make-a-trailer src/skills/makeATrailer
 git apply --cached /tmp/makeATrailer-rename.patch
 ```
 
-The redirection creates only a disposable patch. Verify the three new working paths still match the protected SHA-256 values. Assert all three index blobs equal their old committed blobs:
+The redirection creates only a disposable patch. Verify the three new working paths still match the approved overlay SHA-256 values. Assert all three index blobs equal their old committed blobs and still produce the immutable committed SHA-256 values:
 
 ```bash
 test "$(git rev-parse HEAD:src/skills/make-a-trailer/SKILL.md)" = "$(git rev-parse :src/skills/makeATrailer/SKILL.md)"
 test "$(git rev-parse HEAD:src/skills/make-a-trailer/reference/pipeline.md)" = "$(git rev-parse :src/skills/makeATrailer/reference/pipeline.md)"
 test "$(git rev-parse HEAD:src/skills/make-a-trailer/scripts/assembleCut.mjs)" = "$(git rev-parse :src/skills/makeATrailer/scripts/assembleCut.mjs)"
+test "$(git show :src/skills/makeATrailer/SKILL.md | shasum -a 256 | awk '{print $1}')" = "5f9c3f49658d976168d4c6dfaea9f636bb3cf7cb219011486c4949e33b17a1e6"
+test "$(git show :src/skills/makeATrailer/reference/pipeline.md | shasum -a 256 | awk '{print $1}')" = "10f5da547d792f7ca2067621082e08cdbf5826070c612c3e248c4276cdd01c73"
+test "$(git show :src/skills/makeATrailer/scripts/assembleCut.mjs | shasum -a 256 | awk '{print $1}')" = "d6f05101b3fdbcd966696a7e4b144f1eca082744b7262d0b82ff32f6fea2b2a5"
 ```
 
 - [ ] **Step 6: Atomically cut every exact protected-path reference over**
 
-In the same commit as the rename, replace all three old `protectedPaths` and all three `assembleCut.mjs` exception paths in `code-style.rules.json` with `src/skills/makeATrailer/**`. Update exact path constants, fixtures, and report expectations in `src/style/checkCodeStyle.ts`, `src/style/checkCodeStyle.test.ts`, and root `CODE-STYLE.md` when present. Search the maintained tree for every old protected path and leave none. The public feature ID and installed skill ID remain `make-a-trailer`; only repository paths change.
+In the same commit as the rename, replace all three old `protectedPaths` and all three `assembleCut.mjs` exception paths in `code-style.rules.json` with `src/skills/makeATrailer/**`. Preserve and reassert both immutable `committedSha256` and `overlaySha256` fields for every path. Update exact path/hash constants, state fixtures, and report expectations in `src/style/checkCodeStyle.ts`, `src/style/checkCodeStyle.test.ts`, and root `CODE-STYLE.md` when present. Search the maintained tree for every old protected path and leave none. The public feature ID and installed skill ID remain `make-a-trailer`; only repository paths change.
 
-Run `pnpm tsx scripts/checkCodeStyle.ts --validate-rules` here. This mode validates structure, ID references, hash syntax, and ratchet shape without comparing isolated bytes. Task 15's first live scan performs the actual new-path hash/count comparison.
+Run `pnpm tsx scripts/checkCodeStyle.ts --validate-rules` here. This mode validates structure, ID references, both hash fields and syntax, and ratchet shape without reading repository bytes. Task 15's full checker performs exact new-path hash-state selection and active overlay-count comparison.
 
 - [ ] **Step 7: Activate catalog-closed build, tarball verification, and smoke tests**
 
@@ -941,7 +953,7 @@ if rg -n 'src/skills/make-a-trailer/(SKILL\.md|reference/pipeline\.md|scripts/as
 git status --short
 ```
 
-Expected: 23 cataloged features stage exact allowlists; every packed entrypoint runs; no `dist/src/skills`, raw hook TypeScript, `dist/hooks`, or rewritten import ships; the old protected repository paths produce no findings; all three cached paths are baseline-identical renames; and their transferred user hunks remain unstaged at the new paths.
+Expected: 23 cataloged features stage exact allowlists; every packed entrypoint runs; no `dist/src/skills`, raw hook TypeScript, `dist/hooks`, or rewritten import ships; the old protected repository paths produce no findings; all three cached paths are baseline-identical renames with the committed hashes; and their transferred user hunks remain unstaged at the new paths with the overlay hashes.
 
 - [ ] **Step 9: Commit the atomic shipping and protected-path cutover**
 
@@ -964,11 +976,18 @@ TASK13_COMMIT=$(git rev-parse HEAD)
 test "$(git rev-parse "${TASK13_COMMIT}^:src/skills/make-a-trailer/SKILL.md")" = "$(git rev-parse "${TASK13_COMMIT}:src/skills/makeATrailer/SKILL.md")"
 test "$(git rev-parse "${TASK13_COMMIT}^:src/skills/make-a-trailer/reference/pipeline.md")" = "$(git rev-parse "${TASK13_COMMIT}:src/skills/makeATrailer/reference/pipeline.md")"
 test "$(git rev-parse "${TASK13_COMMIT}^:src/skills/make-a-trailer/scripts/assembleCut.mjs")" = "$(git rev-parse "${TASK13_COMMIT}:src/skills/makeATrailer/scripts/assembleCut.mjs")"
+test "$(git show "${TASK13_COMMIT}:src/skills/makeATrailer/SKILL.md" | shasum -a 256 | awk '{print $1}')" = "5f9c3f49658d976168d4c6dfaea9f636bb3cf7cb219011486c4949e33b17a1e6"
+test "$(git show "${TASK13_COMMIT}:src/skills/makeATrailer/reference/pipeline.md" | shasum -a 256 | awk '{print $1}')" = "10f5da547d792f7ca2067621082e08cdbf5826070c612c3e248c4276cdd01c73"
+test "$(git show "${TASK13_COMMIT}:src/skills/makeATrailer/scripts/assembleCut.mjs" | shasum -a 256 | awk '{print $1}')" = "d6f05101b3fdbcd966696a7e4b144f1eca082744b7262d0b82ff32f6fea2b2a5"
+shasum -a 256 \
+  src/skills/makeATrailer/SKILL.md \
+  src/skills/makeATrailer/reference/pipeline.md \
+  src/skills/makeATrailer/scripts/assembleCut.mjs
 pnpm tsx scripts/checkCodeStyle.ts --validate-rules
 git status --short
 ```
 
-Expected: only the three protected new paths remain modified in the active protected-overlay worktree. When the binary-patch route was used, main remains byte-untouched.
+Expected: the commit contains the three committed hashes, the working files contain the three approved overlay hashes, and only those protected new paths remain modified in the active protected-overlay worktree. When the binary-patch route was used, main remains byte-untouched.
 
 ---
 
@@ -1006,7 +1025,7 @@ git add -u .agents .cursor .devin
 git commit -m "chore: stop tracking generated provider projections"
 ```
 
-Recheck the three protected hashes and confirm they remain the only dirty files.
+Recheck the three approved overlay hashes and confirm they remain the only dirty files.
 
 ---
 
@@ -1027,7 +1046,14 @@ Recheck the three protected hashes and confirm they remain the only dirty files.
 
 Plant one focused violation per mechanical detector: function declarations; disallowed generators/classes/runtime-data interfaces/enums/conditional types/assertions/directives; invalid capability-port interfaces; too many raw parameters; missing blank lines; missing explanation on non-obvious loops while accepting self-evident loops without ceremony; missing indexed-access safety proofs; ordered-pipeline comments; internal barrels and `export *`; vague/bucket names; camelCase and repeated-role-suffix paths; default exports; forbidden imports; input mutation; reducer builders; pointless one-expression extraction; invalid multi-step `flatMap`; `Effect.run*`; application `console.*`; hook import edges; thin-script boundaries; and external SDK imports outside an earned feature-owned adapter. Prove every rule has applicability, summary, rationale, good/bad examples, valid enforcement, and that guide IDs and JSON IDs are a bijection.
 
-Test the exception contract separately: exactly the three new `makeATrailer` paths and live transferred hashes are reported as protected metadata. Only `assembleCut.mjs` has code-rule exemptions, ratcheted to 13 function-form, 5 function-input, and 2 non-obvious-loop-comment violations. The two Markdown files are not AST exceptions. Missing/broad/wildcard paths, a fourth path, an additional exempt rule, zero violations, a count below or above its maximum, or an attempted maximum increase fail closed; only equality passes. `exitCondition` remains required human-readable review text and is not machine-interpreted.
+Test the dual-exact-byte contract separately for every protected path:
+
+- the exact three committed hashes report `protected-committed`; committed `assembleCut.mjs` may contain its observed 11/4/2 findings, but emits no overlay-exception records and performs no overlay-count comparison;
+- the exact three overlay hashes report `protected-overlay`, and overlay `assembleCut.mjs` emits exactly the three 13/5/2 equality-checked exception records;
+- a one-byte change from either approved hash on any protected path fails, including in an otherwise valid mixed committed/overlay fixture; and
+- mixed exact committed/overlay states select independently per file while every unprotected file produces the same violations in both runs.
+
+The two Markdown files are not AST exceptions. Missing/broad/wildcard paths, a fourth path, an additional exempt rule, an unknown hash, overlay count at zero or below/above its maximum, or an attempted maximum increase fail closed; only overlay equality passes. `exitCondition` remains required human-readable review text and is not machine-interpreted. No fixture or implementation may branch on CI, environment, Git status, or path alone.
 
 Run:
 
@@ -1036,7 +1062,7 @@ pnpm vitest run src/style/checkCodeStyle.test.ts
 pnpm tsx scripts/checkCodeStyle.ts
 ```
 
-Expected: fixture tests stay GREEN; the first live repository scan confirms all three new paths and hashes plus exact 13/5/2 counts, then is RED only for the complete migration-owned violation list. Save that output as the worklist, not as a baseline allowlist.
+Expected: fixture tests stay GREEN across committed, overlay, mixed, and unknown-hash branches. The first live repository scan confirms all three new paths as `protected-overlay` plus exact 13/5/2 counts, then is RED only for the complete migration-owned violation list. Save that output as the worklist, not as a baseline allowlist.
 
 - [ ] **Step 2: Expand Biome to every maintained supported file**
 
@@ -1046,13 +1072,15 @@ Set 2-space indentation, double quotes, semicolons, trailing commas, 120 columns
 
 Tighten the already fixture-tested `src/style/checkCodeStyle.ts` owner as real migration cases reveal gaps. The thin root entrypoint delegates once. The owner reads `code-style.rules.json`, walks authored sources, dispatches only declared `regex`, `ast`, `path`, or `importGraph` detectors, and reports file/line/rule ID. Formatter/linter/typecheck/test/manual channels remain with their real owners. It is not a second general linter. Use anchored text checks and TypeScript's public node guards; do not use assertions or add an AST wrapper layer.
 
+Protected reporting has a stable audit form: one `protected-state path=<path> state=protected-committed|protected-overlay sha256=<hash>` line per exact protected file, followed only in the overlay `assembleCut.mjs` state by three `protected-exception rule=<id> count=<n> max=<n>` lines. Hash selection occurs before exception counting. An unknown hash is a violation, never a fallback to path-based exemption.
+
 - [ ] **Step 4: Deslop every reported maintained violation**
 
 Fix causes, not checker rules. Prefer removing wrappers, renaming owners, flattening branches, deriving schema types, and moving declarations before use. Comment only a non-obvious explicit loop, explaining intent, invariant, ordering, performance, batching, or early exit. Add a proof comment above indexed access only when its safety is not obvious, without adding a TypeScript assertion, and contract/numbered comments only on real ordered pipelines. Do not add ceremonial comments to silence the gate. Autofix only through proven-safe formatter/linter rules; every other channel reports for an authored fix.
 
 - [ ] **Step 5: Wire and run the complete style sequence**
 
-Add `check:style` and make `verify` run exactly Biome → typecheck → checker → tests → build → shipping verification → hook smoke. Update the real CI gate to run `pnpm verify` (or required jobs with exactly the same coverage) so the GitHub `CI Gate` cannot pass while the new stages are skipped.
+Add `check:style` and make `verify` run exactly Biome → typecheck → full checker → tests → build → shipping verification → hook smoke. Update the real CI gate to run that same unparameterized `pnpm verify`; no CI-specific checker mode, environment flag, or structural-validation substitute is allowed.
 
 ```bash
 git status --short --untracked-files=all
@@ -1070,10 +1098,17 @@ git diff --name-only
 pnpm check:style
 pnpm vitest run src/style/checkCodeStyle.test.ts
 pnpm typecheck
-pnpm verify
+set -o pipefail
+pnpm verify 2>&1 | tee /tmp/dufflebag-overlay-verify.log
+test "$(rg -c 'state=protected-overlay' /tmp/dufflebag-overlay-verify.log)" = "3"
+test "$(rg -c '^protected-exception ' /tmp/dufflebag-overlay-verify.log)" = "3"
+rg -q 'count=13 max=13' /tmp/dufflebag-overlay-verify.log
+rg -q 'count=5 max=5' /tmp/dufflebag-overlay-verify.log
+rg -q 'count=2 max=2' /tmp/dufflebag-overlay-verify.log
+if rg -q 'state=protected-committed' /tmp/dufflebag-overlay-verify.log; then exit 1; fi
 ```
 
-Before formatting, review every `??` path. For each migration-owned maintained source that this task genuinely created, use an explicit `git add -N -- <exact-path>` so it enters `git ls-files` and the unstaged diff without staging its contents; stop on unexplained or out-of-scope untracked files. Inspect every name reported after the write. The only names outside the exact formatter candidate scope may be the three already-dirty protected paths; rehash them and refuse any other path or any protected-byte change before staging. Expected: Biome and the checker pass; the checker prints exactly three named protected paths, the three equal 13/5/2 `assembleCut.mjs` rule exceptions, and zero unprotected violations.
+Before formatting, review every `??` path. For each migration-owned maintained source that this task genuinely created, use an explicit `git add -N -- <exact-path>` so it enters `git ls-files` and the unstaged diff without staging its contents; stop on unexplained or out-of-scope untracked files. Inspect every name reported after the write. The only names outside the exact formatter candidate scope may be the three already-dirty protected paths; rehash them and refuse any other path or any protected-byte change before staging. Expected: Biome and the checker pass; the active overlay emits exactly three `protected-overlay` states, three equal 13/5/2 `assembleCut.mjs` exception records, and zero unprotected violations.
 
 - [ ] **Step 6: Commit enforcement and cleanup**
 
@@ -1094,7 +1129,28 @@ git status --short --untracked-files=all
 git commit -m "refactor(style): enforce the readable code contract"
 ```
 
-Confirm the cached name list matches the reviewed migration-owned diff, the protected cached diff is empty, no `??` path remains, and all three protected files remain unstaged with the same hashes.
+Confirm the cached name list matches the reviewed migration-owned diff, the protected cached diff is empty, no `??` path remains, and all three protected files remain unstaged with the approved overlay hashes.
+
+- [ ] **Step 7: Prove the committed Task 15 slice with the exact CI command**
+
+After the commit, create a disposable detached worktree from `HEAD` and run the same full command configured in CI:
+
+```bash
+CLEAN_WORKTREE=$(mktemp -d /tmp/dufflebag-style-clean.XXXXXX)
+rmdir "$CLEAN_WORKTREE"
+git worktree add --detach "$CLEAN_WORKTREE" HEAD
+(
+  cd "$CLEAN_WORKTREE"
+  pnpm install --frozen-lockfile
+  set -o pipefail
+  pnpm verify 2>&1 | tee /tmp/dufflebag-committed-verify.log
+  test "$(rg -c 'state=protected-committed' /tmp/dufflebag-committed-verify.log)" = "3"
+  if rg -q 'state=protected-overlay|^protected-exception ' /tmp/dufflebag-committed-verify.log; then exit 1; fi
+)
+git worktree remove "$CLEAN_WORKTREE"
+```
+
+Expected: the same `pnpm verify` passes against the three committed baseline hashes, reports exactly three `protected-committed` states, does not compare the committed 11/4/2 findings to overlay ratchets, and checks every unprotected file identically. GitHub `CI Gate` invokes this same package command with no mode or environment override.
 
 ---
 
@@ -1199,7 +1255,7 @@ Both must produce local `CODE-STYLE.md`, `code-style.rules.json`, formatter/lint
 
 Run the installed skill on Dufflebag itself with exactly `ownerBase`, `typescriptEffect`, and `scriptsCli`, followed by evidence-backed repository additions named `dufflebag.*` for dependency-free hook isolation, transactional artifact planning/receipts, and catalog-closed shipping, then the protected exceptions. Repository additions cannot duplicate or weaken canonical rules.
 
-Rewrite root `CODE-STYLE.md` and `code-style.rules.json` from that composition and refresh only the bounded AGENTS digest. The Task 2 pair is now a generated local projection of canonical profile JSON plus Dufflebag additions, not a competing SSOT. Run the same factory workflow a second time and prove all three files are byte-for-byte unchanged.
+Rewrite root `CODE-STYLE.md` and `code-style.rules.json` from that composition and refresh only the bounded AGENTS digest. Preserve the three exact protected paths, both immutable hash fields per path, and the three overlay-only 13/5/2 exceptions without converting them into a canonical profile. The Task 2 pair is now a generated local projection of canonical profile JSON plus Dufflebag additions, not a competing SSOT. Run the same factory workflow a second time and prove all three files are byte-for-byte unchanged.
 
 - [ ] **Step 6: Prove the exact packed skill surface and final factory behavior**
 
@@ -1211,7 +1267,7 @@ pnpm typecheck
 pnpm verify
 ```
 
-Expected: the packed `grill-me-code-style` skill contains `SKILL.md`, `profileComposition.md`, all 11 profiles, and every direct reference in its exact feature allowlist; static contracts pass; both forward evaluations resolve the exact sets above; Dufflebag resolves exactly three canonical profiles plus non-duplicating `dufflebag.*` additions; existing config and unowned AGENTS bytes survive; planted violations exercise every mechanical detector; only exact exception-count equality passes; and all reruns are byte no-ops.
+Expected: the packed `grill-me-code-style` skill contains `SKILL.md`, `profileComposition.md`, all 11 profiles, and every direct reference in its exact feature allowlist; static contracts pass; both forward evaluations resolve the exact sets above; Dufflebag resolves exactly three canonical profiles plus non-duplicating `dufflebag.*` additions; existing config and unowned AGENTS bytes survive; the dual exact-hash protected contract survives self-application; planted violations exercise every mechanical detector; only exact active-overlay exception-count equality passes; and all reruns are byte no-ops.
 
 - [ ] **Step 7: Commit the canonical profiles and their Dufflebag projection**
 
@@ -1220,7 +1276,7 @@ git add CODE-STYLE.md code-style.rules.json AGENTS.md docs/superpowers/evals src
 git commit -m "feat(style): ship the composable code-style factory"
 ```
 
-Recheck the protected make-a-trailer hashes and keep their user hunks unstaged.
+Recheck the protected make-a-trailer overlay hashes and keep their user hunks unstaged.
 
 ---
 
@@ -1313,13 +1369,16 @@ git commit -m "docs: align the repository with the Effect architecture"
 
 - [ ] **Step 1: Audit the active protected-overlay worktree, rename blobs, and main separately**
 
-In the default isolated route, run SHA-256 on the three `src/skills/makeATrailer/**` files and compare to Global Constraints. Verify exactly those three paths are dirty, their user hunks are unstaged, and the index is otherwise clean. If Task 13 used the verified pre-rename main route, perform the same checks in main and treat that as the active overlay for every remaining command. Find the Task 13 commit and reassert all three baseline rename blobs:
+In the default isolated route, run SHA-256 on the three `src/skills/makeATrailer/**` files and compare to the approved overlay hashes in Global Constraints. Verify exactly those three paths are dirty, their user hunks are unstaged, and the index is otherwise clean. If Task 13 used the verified pre-rename main route, perform the same checks in main and treat that as the active overlay for every remaining command. Find the Task 13 commit and reassert all three baseline rename blobs and committed SHA-256 values:
 
 ```bash
 TASK13_COMMIT=$(git log -1 --format=%H --grep='^refactor(runtime): ship cataloged skills and nested hooks$')
 test "$(git rev-parse "${TASK13_COMMIT}^:src/skills/make-a-trailer/SKILL.md")" = "$(git rev-parse "${TASK13_COMMIT}:src/skills/makeATrailer/SKILL.md")"
 test "$(git rev-parse "${TASK13_COMMIT}^:src/skills/make-a-trailer/reference/pipeline.md")" = "$(git rev-parse "${TASK13_COMMIT}:src/skills/makeATrailer/reference/pipeline.md")"
 test "$(git rev-parse "${TASK13_COMMIT}^:src/skills/make-a-trailer/scripts/assembleCut.mjs")" = "$(git rev-parse "${TASK13_COMMIT}:src/skills/makeATrailer/scripts/assembleCut.mjs")"
+test "$(git show "${TASK13_COMMIT}:src/skills/makeATrailer/SKILL.md" | shasum -a 256 | awk '{print $1}')" = "5f9c3f49658d976168d4c6dfaea9f636bb3cf7cb219011486c4949e33b17a1e6"
+test "$(git show "${TASK13_COMMIT}:src/skills/makeATrailer/reference/pipeline.md" | shasum -a 256 | awk '{print $1}')" = "10f5da547d792f7ca2067621082e08cdbf5826070c612c3e248c4276cdd01c73"
+test "$(git show "${TASK13_COMMIT}:src/skills/makeATrailer/scripts/assembleCut.mjs" | shasum -a 256 | awk '{print $1}')" = "d6f05101b3fdbcd966696a7e4b144f1eca082744b7262d0b82ff32f6fea2b2a5"
 git diff --cached --name-only
 git status --short
 git -C /Users/yosefhayimsabag/Desktop/Code/dufflebag status --short
@@ -1327,26 +1386,23 @@ git -C /Users/yosefhayimsabag/Desktop/Code/dufflebag status --short
 
 On the default route, main may contain unrelated concurrent WIP. This audit is read-only; do not reset, stash, merge, or overwrite anything. Stop on an unexpected active-overlay byte or staged path.
 
-- [ ] **Step 2: Run the clean committed-source gate without pretending the overlay is committed**
+- [ ] **Step 2: Run the clean committed-source gate with the exact CI command**
 
-Create a disposable detached worktree from `HEAD` and run the reproducible committed-source gates. Rule validation is structural here because the protected dirty bytes intentionally are not in the commit:
+Create a disposable detached worktree from `HEAD` and run the same full `pnpm verify` command used locally and by CI. The full checker must select the committed state from exact file hashes; `--validate-rules` is not a substitute for this gate:
 
 ```bash
 git worktree add --detach /tmp/dufflebag-clean-final HEAD
 cd /tmp/dufflebag-clean-final
 pnpm install --frozen-lockfile
-pnpm exec biome check .
-pnpm typecheck
-pnpm tsx scripts/checkCodeStyle.ts --validate-rules
-pnpm test
-pnpm build
-pnpm verify:shipping
-pnpm smoke:hooks
+set -o pipefail
+pnpm verify 2>&1 | tee /tmp/dufflebag-clean-final-verify.log
+test "$(rg -c 'state=protected-committed' /tmp/dufflebag-clean-final-verify.log)" = "3"
+if rg -q 'state=protected-overlay|^protected-exception ' /tmp/dufflebag-clean-final-verify.log; then exit 1; fi
 cd -
 git worktree remove /tmp/dufflebag-clean-final
 ```
 
-Expected: formatting, typecheck, structural rule validation, tests, build, shipping, and hook smoke pass from committed source. Do not run or report the live protected-hash/count check against absent overlay bytes.
+Expected: the complete Biome → typecheck → full checker → tests → build → shipping → hook-smoke sequence passes from committed source. The checker reports exactly three `protected-committed` states, recognizes the three committed baseline hashes, skips the overlay-only 13/5/2 comparison for committed `assembleCut.mjs` despite its observed 11/4/2 findings, and still checks every unprotected file identically. Any third hash would fail this same command.
 
 - [ ] **Step 3: Run focused architecture and live protected-path searches in the overlay worktree**
 
@@ -1357,12 +1413,19 @@ rg -n 'from ["\x27](commander|@clack/prompts|picocolors)["\x27]' src scripts
 rg -n 'src/(core|commands|payload)|function [A-Za-z_$]|class [A-Za-z_$]|export \*' src scripts --glob '*.{ts,tsx,js,mjs}'
 ```
 
-Expected: the live checker verifies the three new paths/hashes and equal 13/5/2 counts. No maintained application violation remains. Raw interface findings are reviewed as declaration augmentation or genuinely substitutable feature-owned external capability ports; all other findings are only exact protected-path violations already reported by the checker or permitted `Effect.gen(function* ()` / `Schema.TaggedError` forms. The checker also proves thin root scripts, no internal barrels/`export *`, and external SDK import confinement.
+Expected: the live checker reports exactly three `protected-overlay` states from the approved overlay hashes and equal 13/5/2 exception counts. No maintained application violation remains. Raw interface findings are reviewed as declaration augmentation or genuinely substitutable feature-owned external capability ports; all other findings are only exact protected-path violations already reported by the checker or permitted `Effect.gen(function* ()` / `Schema.TaggedError` forms. The checker also proves thin root scripts, no internal barrels/`export *`, and external SDK import confinement.
 
 - [ ] **Step 4: Run the exact protected-overlay final gate from a clean index**
 
 ```bash
-pnpm verify
+set -o pipefail
+pnpm verify 2>&1 | tee /tmp/dufflebag-overlay-final-verify.log
+test "$(rg -c 'state=protected-overlay' /tmp/dufflebag-overlay-final-verify.log)" = "3"
+test "$(rg -c '^protected-exception ' /tmp/dufflebag-overlay-final-verify.log)" = "3"
+rg -q 'count=13 max=13' /tmp/dufflebag-overlay-final-verify.log
+rg -q 'count=5 max=5' /tmp/dufflebag-overlay-final-verify.log
+rg -q 'count=2 max=2' /tmp/dufflebag-overlay-final-verify.log
+if rg -q 'state=protected-committed' /tmp/dufflebag-overlay-final-verify.log; then exit 1; fi
 ```
 
 Expected order and result:
@@ -1370,7 +1433,7 @@ Expected order and result:
 ```text
 Biome PASS
 Typecheck PASS
-Contract checker PASS (3 exact protected paths and 3 ratcheted assembleCut rule exceptions reported)
+Contract checker PASS (3 exact `protected-overlay` paths and 3 equal assembleCut rule exceptions reported)
 Vitest PASS
 Build PASS
 Shipping verification PASS
@@ -1394,7 +1457,7 @@ Use `superpowers:requesting-code-review` plus the repo's code-style review workf
 
 - [ ] **Step 7: Verify both gates again, then make a non-destructive integration decision**
 
-Repeat the clean committed-source gate, then run `pnpm verify`, CLI subprocess contracts, `src/style/codeStyleProfiles.test.ts`, packed verification, protected hashes/counts, rename-blob equality, generic-template neutrality checks, `git diff --check`, and `git status --short` in the active overlay worktree. Expected: both gates pass, profile composition reruns are no-ops, and exactly the three protected new paths are modified there.
+Repeat the clean committed-source full `pnpm verify` gate and assert three `protected-committed` states, then run the protected-overlay full `pnpm verify` gate and assert three `protected-overlay` states plus exact 13/5/2 exception records. Also rerun CLI subprocess contracts, `src/style/codeStyleProfiles.test.ts`, packed verification, both hash sets, rename-blob equality, generic-template neutrality checks, `git diff --check`, and `git status --short` in the active overlay worktree. Expected: both executions use the identical package command, all gates pass, profile composition reruns are no-ops, and exactly the three protected new paths are modified there.
 
 On the default isolated route, audit main again and compare its dirty paths with the branch range. Fast-forward/integrate only when the audit proves no unrelated or overlapping main WIP can be overwritten and Git accepts a non-destructive fast-forward. If main contains concurrent Task-2-shaped work, old protected-path edits, or any overlapping/unrelated WIP, stop and report the ready branch plus protected-patch procedure. On the optional verified-main route, do not merge again; report main's final status. Never stash, reset, force, or replace main files to manufacture integration.
 
@@ -1404,4 +1467,6 @@ Use one narrow commit per confirmed issue. Do not fold user-owned make-a-trailer
 
 - [ ] **Step 9: Hand off the completed branch state**
 
-Report commit list, exact clean-gate and overlay-gate results, test/build counts, packed skill/resources result, forward-evaluation profile sets, three protected paths/hashes/counts, rename-blob equality, isolated and main statuses separately, and whether integration safely occurred or stopped for WIP. Do not claim completion from an earlier run; cite the final command outputs.
+Report commit list, exact clean-gate `protected-committed` and overlay-gate `protected-overlay` results, test/build counts, packed skill/resources result, forward-evaluation profile sets, all six protected hashes, overlay 13/5/2 counts, rename-blob equality, isolated and main statuses separately, and whether integration safely occurred or stopped for WIP. Do not claim completion from an earlier run; cite the final command outputs.
+
+Once the owner work is independently committed, perform a separate owner-reviewed contract change that collapses each protected record to its one committed hash and removes the overlay-only exceptions. Do not fold that lifecycle change into this refactor or infer it from CI/environment state.

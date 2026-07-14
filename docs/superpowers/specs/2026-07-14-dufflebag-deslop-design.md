@@ -32,13 +32,23 @@ Three user-owned files changed after the clean baseline in the main worktree:
 
 Their content must be preserved byte-for-byte while the directory moves to `src/skills/makeATrailer/`. They must never be reset, stashed, normalized, or absorbed into a refactor-authored diff. The isolated refactor worktree starts clean and does not contain those dirty bytes; the main worktree may also contain unrelated concurrent work.
 
-Before the Task 13 rename, both worktrees and all three hashes are audited. The default path, and the mandatory path when main contains unrelated work, creates a binary patch containing only the three protected diffs from main, inspects its paths, and checks and applies it to the isolated worktree. Main is not reset, stashed, or modified. A verified fast-forward into main before Task 13 is allowed only when main has no change beyond the protected trio; when taken, main becomes the active protected-overlay worktree for every remaining gate. After transfer or verified fast-forward, all hashes are rechecked and the clean committed index blobs are renamed while the protected bytes remain unstaged.
+Before the Task 13 rename, both worktrees and both three-file hash sets are audited. The default path, and the mandatory path when main contains unrelated work, creates a binary patch containing only the three protected diffs from main, inspects its paths, and checks and applies it to the isolated worktree. Main is not reset, stashed, or modified. A verified fast-forward into main before Task 13 is allowed only when main has no change beyond the protected trio; when taken, main becomes the active protected-overlay worktree for every remaining gate. After transfer or verified fast-forward, all hashes are rechecked and the clean committed index blobs are renamed while the protected bytes remain unstaged.
 
 Final integration is also non-destructive. Main is audited again, and integration stops rather than overwriting, stashing, or normalizing any overlapping or unrelated main-worktree change.
 
-The checker records all three files as exact `protectedPaths` metadata so their hashes remain visible. Only `assembleCut.mjs` receives code-rule exceptions: 13 function-form violations, 5 function-input violations, and 2 non-obvious uncommented-loop violations. Those three `maxViolations` values cannot increase; the two Markdown files are not fake AST exceptions. The exceptions are removed in a separate owner-reviewed cleanup after the concurrent make-a-trailer patch is committed independently; this refactor does not rewrite those bytes to manufacture a clean result.
+The checker records all three files as exact `protectedPaths` metadata with two immutable SHA-256 fields while the user work remains uncommitted:
 
-Task 2 bootstraps metadata with the old kebab-case paths. Task 13 atomically changes all three protected paths, all three exception paths, and every exact checker fixture/report reference to `src/skills/makeATrailer/**` in the same commit as the baseline-only rename. The public feature and installed skill ID remain `make-a-trailer`; only repository paths change. `--validate-rules` checks structure, ID references, hash syntax, and ratchet shape without comparing isolated-worktree bytes. Task 15 live mode verifies the actual transferred hashes and violation counts at the new paths.
+| Protected file | `committedSha256` | `overlaySha256` |
+| --- | --- | --- |
+| `SKILL.md` | `5f9c3f49658d976168d4c6dfaea9f636bb3cf7cb219011486c4949e33b17a1e6` | `5bf0ec33ac92acd73b816f8c61c422c49f518f3cfcc5763986a8108d451cc297` |
+| `reference/pipeline.md` | `10f5da547d792f7ca2067621082e08cdbf5826070c612c3e248c4276cdd01c73` | `3bb89d856d28995c50fba23aca6a6a1af1fe56f10d67546a0515fe0d276f1669` |
+| `scripts/assembleCut.mjs` | `d6f05101b3fdbcd966696a7e4b144f1eca082744b7262d0b82ff32f6fea2b2a5` | `6dceccae4b1f49bc7b64b89bd164882c29e57142ef9193d0208ccc1f9d2291ad` |
+
+Full verification selects a protected state per file only by exact content hash. The committed hash reports `protected-committed`; the overlay hash reports `protected-overlay`; any third hash fails. There is no CI, environment, dirty-tree, or path-only bypass. Every unprotected file follows the identical checks in both states.
+
+Only the overlay state of `assembleCut.mjs` receives code-rule exceptions: 13 function-form violations, 5 function-input violations, and 2 non-obvious uncommented-loop violations. Those three `maxViolations` values cannot increase; the two Markdown files are not fake AST exceptions. The exact committed `assembleCut.mjs` bytes currently contain 11/4/2 corresponding findings, but those are not a second ratchet: `protected-committed` skips the overlay-only count comparison because the complete file hash already proves the unchanged baseline. The exceptions are removed in a separate owner-reviewed change after the concurrent make-a-trailer work is committed independently; this refactor does not rewrite those bytes to manufacture a clean result.
+
+Task 2 bootstraps both hash fields with the old kebab-case paths. Task 13 atomically changes all three protected paths, all three exception paths, and every exact checker fixture/report reference to `src/skills/makeATrailer/**` in the same commit as the baseline-only rename while reasserting both committed and overlay hashes. The public feature and installed skill ID remain `make-a-trailer`; only repository paths change. `--validate-rules` checks structure, ID references, both hash fields and syntax, and ratchet shape without reading repository bytes. Task 15 full mode verifies exact committed, overlay, and unknown-hash behavior at the new paths.
 
 ## Goals
 
@@ -496,11 +506,11 @@ Every profile ID and rule ID is globally unique. Every rule records `applicabili
 
 Anchored regex or text checks enforce textual and path-local rules. AST, linter, and import-graph checks enforce semantic structure and boundaries. Typechecking and tests prove types and behavior. Manual review owns judgment and taste. Only a formatter or linter transformation proven safe by fixtures may autofix; regex, AST, path, import-graph, typecheck, test, and manual channels are report-only.
 
-The Task 2 root `CODE-STYLE.md` and `code-style.rules.json` are bootstrap contracts. Once canonical profiles ship in Task 16, the installed skill composes and rewrites Dufflebag's root pair from `ownerBase`, `typescriptEffect`, and `scriptsCli`, followed by evidence-backed `dufflebag.*` additions for hook isolation, transactional artifacts, and catalog-closed shipping, then the protected exceptions. That second self-application changes no bytes.
+The Task 2 root `CODE-STYLE.md` and `code-style.rules.json` are bootstrap contracts. Once canonical profiles ship in Task 16, the installed skill composes and rewrites Dufflebag's root pair from `ownerBase`, `typescriptEffect`, and `scriptsCli`, followed by evidence-backed `dufflebag.*` additions for hook isolation, transactional artifacts, and catalog-closed shipping, then the protected metadata and overlay-only exceptions. Dufflebag self-application preserves both immutable protected hashes per path until the separate owner-reviewed collapse. That second self-application changes no bytes.
 
 Every resolved human `CODE-STYLE.md` and machine `code-style.rules.json` projection contains a bijective set of rule IDs. The factory also merges formatter/linter/checker wiring and package verification commands into the target repository rather than replacing existing configuration.
 
-An exception references an existing rule ID and contains exact repository-relative paths, a reason, a required human-readable `exitCondition`, and a non-negative `maxViolations`. The exit text is reviewed manually; free-form prose is not machine-evaluated. Machine validation fails when an exact path is missing, the current count is zero, the current count is below the maximum, or the current count exceeds the maximum. Only equality passes, forcing removal at zero and a lower ratchet when debt decreases. Broad or wildcard paths, unknown rules, and attempted maximum increases also fail. An exception is debt with a ratchet, not a second style profile.
+An exception references an existing rule ID and contains exact repository-relative paths, a reason, a required human-readable `exitCondition`, and a non-negative `maxViolations`. The exit text is reviewed manually; free-form prose is not machine-evaluated. When its exact overlay hash is active, machine validation fails when an exact path is missing, the current count is zero, the current count is below the maximum, or the current count exceeds the maximum. Only equality passes, forcing removal at zero and a lower ratchet when debt decreases. An exact committed protected hash leaves the overlay exception inactive; any unknown hash fails before counting. Broad or wildcard paths, unknown rules, and attempted maximum increases also fail. An exception is debt with a ratchet, not a second style profile.
 
 The resolved target owns all resulting artifacts:
 
@@ -821,18 +831,20 @@ Biome covers every maintained TypeScript, TSX, JavaScript, MJS, JSON, and JSONC 
 
 `scripts/checkCodeStyle.ts` is a thin entrypoint into the focused repository contract verifier in `src/style/checkCodeStyle.ts`, not a second general linter. The verifier dispatches each rule only through its declared enforcement channels from `formatter | linter | regex | ast | path | importGraph | typecheck | test | manual`. Anchored regex/text checks own textual and path-local violations; AST, lint, and import-graph checks own semantic structure and boundaries; typecheck and tests own types and behavior; manual review owns judgment. It also proves that every `CODE-STYLE.md` rule ID has one matching `code-style.rules.json` entry and that the machine file contains no undocumented rule ID. Only proven-safe formatter/linter transformations may autofix.
 
-Generated projections and `dist` are excluded from authored-source checks. The verifier reports the three named make-a-trailer `protectedPaths` and hashes without accepting a wildcard. Only `assembleCut.mjs` has temporary maintained-source rule exceptions, ratcheted at 13 function-form, 5 function-input, and 2 non-obvious-loop violations.
+Generated projections and `dist` are excluded from authored-source checks. The verifier reports the three named make-a-trailer `protectedPaths`, exact state, and selected hash without accepting a wildcard. Only the exact overlay state of `assembleCut.mjs` activates temporary maintained-source rule exceptions, ratcheted at 13 function-form, 5 function-input, and 2 non-obvious-loop violations. Exact committed bytes report `protected-committed` with no overlay exception records; exact overlay bytes report `protected-overlay` with equality-checked exception records; any third hash fails.
 
 `pnpm verify` runs exactly:
 
 `Biome → typecheck → contract checker → tests → build → shipping verification → hook smoke`
 
-Verification has two distinct evidence gates while the protected changes remain user-owned and uncommitted:
+Verification has two exact-byte evidence states of the same unparameterized `pnpm verify` command while the protected changes remain user-owned and uncommitted:
 
-- a clean detached clone/worktree proves committed-source reproducibility with Biome, typecheck, rule structure/ID/hash-syntax/ratchet validation, tests, build, shipping verification, and hook smoke without claiming the absent protected overlay bytes; and
-- the isolated protected-overlay worktree proves byte preservation with the three live hashes, exact dirty paths, clean-index rename blobs, live rule counts, and the complete `pnpm verify` sequence.
+- a clean detached clone/worktree must run the full command, select all three immutable committed hashes, report three `protected-committed` states, skip only the inactive overlay-count comparison, and pass every ordinary checker, test, build, shipping, and hook gate; and
+- the isolated protected-overlay worktree must run the same full command, select all three immutable overlay hashes, report three `protected-overlay` states, enforce exact 13/5/2 equality, prove the clean-index rename blobs, and pass every otherwise identical gate.
 
-Once the owner independently commits the protected bytes, the ordinary clean-checkout live-hash `pnpm verify` gate resumes against those committed bytes. The ratchets remain until an owner-reviewed cleanup removes the violations; that cleanup then removes the exceptions. Committing the protected bytes without cleaning them does not by itself retire the ratchets.
+GitHub `CI Gate` runs that same `pnpm verify` command. No environment flag, CI detection, Git-status check, wildcard, path-only exemption, or `--validate-rules` substitution chooses a state. `--validate-rules` remains useful only for metadata structure, IDs, both hash fields and syntax, and ratchet shape.
+
+Once the owner work is independently committed, a separate owner-reviewed contract change collapses each protected record to its one committed hash and removes the overlay-only exceptions. This lifecycle change is not inferred from environment state and is not folded into the refactor commits.
 
 ## Documentation and decision records
 
@@ -890,7 +902,7 @@ The implementation lands as independently green slices:
 
 Every slice starts with a failing or characterization test, ends with its focused tests and `pnpm verify` green, and is committed separately. Legacy paths are removed only after their replacement is proven.
 
-The make-a-trailer move is staged as a pure rename of the committed baseline while its three transferred modifications remain unstaged at the new path. Verification reports the three exact protected paths and the `assembleCut.mjs` ratchets separately from clean committed-source conformance. Final integration audits main again and stops on any overlapping or unrelated main-worktree WIP.
+The make-a-trailer move is staged as a pure rename of the committed baseline while its three transferred modifications remain unstaged at the new path. Verification reports the three exact protected paths as either `protected-committed` or `protected-overlay` solely by immutable hash, and reports the `assembleCut.mjs` ratchets only in the overlay state. Final integration audits main again and stops on any overlapping or unrelated main-worktree WIP.
 
 ## Success criteria
 
@@ -909,8 +921,9 @@ The refactor is complete only when:
 - root maintenance scripts remain thin, build-only owners do not ship, and external SDK imports are confined to earned feature-owned adapters;
 - all CODE-STYLE profiles compose without irrelevant-profile leakage, produce repo-neutral local artifacts, preserve existing configuration and unowned AGENTS bytes, ratchet exceptions, and rerun as a no-op;
 - no forbidden syntax, naming, wrapper, internal barrel, ceremonial comment, or path pattern remains outside the three exact protected make-a-trailer baseline files;
-- the contract checker reports all three protected paths plus only the 13/5/2 `assembleCut.mjs` ratchets and accepts no additional exception;
+- for each exact protected path, the contract checker accepts only its committed or approved overlay hash, rejects every third hash, and reports the 13/5/2 `assembleCut.mjs` ratchets only for the overlay state;
 - root and template docs describe their correct audiences;
 - the packed tarball contains only declared output;
-- the clean committed-source gate passes without pretending the uncommitted protected overlay exists; and
-- the protected-overlay gate passes live hashes, exact dirty-path/index-blob checks, and `pnpm verify`.
+- the clean committed-source gate runs full `pnpm verify` and reports exactly three `protected-committed` states;
+- the protected-overlay gate runs the same full `pnpm verify`, reports exactly three `protected-overlay` states, and passes live hashes, 13/5/2 counts, and exact dirty-path/index-blob checks; and
+- CI invokes the identical `pnpm verify` command without an environment-specific bypass.
