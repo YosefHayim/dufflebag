@@ -4,6 +4,7 @@ dist/
 .DS_Store
 coverage/
 *.tsbuildinfo
+.worktrees/
 
 # png-to-code local/demo artifacts (never commit binaries)
 skills/png-to-code/demo/*
