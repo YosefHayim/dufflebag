@@ -667,11 +667,11 @@ export const selectedFeatureIds: ReadonlyArray<FeatureId> = featureCatalog
 export const resolveFeatureSelection = (
   requestedFeatureIds: ReadonlyArray<string>,
 ): Either.Either<ReadonlyArray<FeatureId>, UnknownFeatureError> => {
-  const unknownFeatureId = requestedFeatureIds.find((featureId) => Option.isNone(findFeature(featureId)));
-  if (unknownFeatureId) {
+  const unknownFeatureId = Option.fromNullable(requestedFeatureIds.find((featureId) => Option.isNone(findFeature(featureId))));
+  if (Option.isSome(unknownFeatureId)) {
     return Either.left(
       new UnknownFeatureError({
-        featureId: unknownFeatureId,
+        featureId: unknownFeatureId.value,
       }),
     );
   }

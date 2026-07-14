@@ -303,6 +303,17 @@ describe("featureCatalog", () => {
     });
   });
 
+  it("returns a tagged error when the first unknown selection is empty", () => {
+    const result = resolveFeatureSelection(["png-to-code", "", "planpage"]);
+    const error = Option.getOrThrow(Either.getLeft(result));
+
+    expect(error).toBeInstanceOf(UnknownFeatureError);
+    expect(error).toMatchObject({
+      _tag: "UnknownFeatureError",
+      featureId: "",
+    });
+  });
+
   it("rejects excess properties at every owned object boundary", () => {
     const contextGuard = featureNamed("context-guard");
     const pngToCode = featureNamed("png-to-code");
@@ -321,11 +332,84 @@ describe("featureCatalog", () => {
         },
       ]);
     }).toThrow();
+    expect(() => {
+      decodeCatalog([
+        {
+          ...pngToCode,
+          installedSkill: {
+            _tag: "skill",
+            id: "png-to-code",
+            shippedPaths: [
+              {
+                path: "SKILL.md",
+                extra: true,
+              },
+            ],
+          },
+        },
+      ]);
+    }).toThrow();
+    expect(() => {
+      decodeCatalog([
+        {
+          ...contextGuard,
+          runtime: {
+            _tag: "hook",
+            sourceEntrypoint: "hooks/contextGuard.ts",
+            registrations: [],
+            extra: true,
+          },
+        },
+      ]);
+    }).toThrow();
+    expect(() => {
+      decodeCatalog([
+        {
+          ...contextGuard,
+          runtime: {
+            _tag: "hook",
+            sourceEntrypoint: "hooks/contextGuard.ts",
+            registrations: [
+              {
+                event: "UserPromptSubmit",
+                matcher: {
+                  _tag: "none",
+                },
+                extra: true,
+              },
+            ],
+          },
+        },
+      ]);
+    }).toThrow();
+    expect(() => {
+      decodeCatalog([
+        {
+          ...contextGuard,
+          runtime: {
+            _tag: "hook",
+            sourceEntrypoint: "hooks/contextGuard.ts",
+            registrations: [
+              {
+                event: "PreToolUse",
+                matcher: {
+                  _tag: "pattern",
+                  value: "Write",
+                  extra: true,
+                },
+              },
+            ],
+          },
+        },
+      ]);
+    }).toThrow();
   });
 
   it("rejects malformed IDs, generated entrypoints, duplicates, missing dependencies, and cycles", () => {
     const contextGuard = featureNamed("context-guard");
     const autonomousLoop = featureNamed("autonomous-loop");
+    const githubRepoMetadata = featureNamed("github-repo-metadata");
+    const pngToCode = featureNamed("png-to-code");
     const speakResponse = featureNamed("speak-response");
 
     expect(() => {
@@ -348,6 +432,19 @@ describe("featureCatalog", () => {
     expect(() => {
       decodeCatalog([contextGuard, { ...speakResponse, sourceDirectory: contextGuard.sourceDirectory }]);
     }).toThrow("Source directories must be unique.");
+    expect(() => {
+      decodeCatalog([
+        pngToCode,
+        {
+          ...githubRepoMetadata,
+          installedSkill: {
+            _tag: "skill",
+            id: "png-to-code",
+            shippedPaths: ["SKILL.md"],
+          },
+        },
+      ]);
+    }).toThrow("Installed skill IDs must be unique.");
     expect(() => {
       decodeCatalog([{ ...autonomousLoop, dependencies: ["missing-feature"] }]);
     }).toThrow("Every dependency must identify a catalog feature.");
