@@ -661,6 +661,29 @@ describe("forbidden type declarations and directives", () => {
     ]);
   });
 
+  it.each([
+    "// biome-ignore lint/suspicious/noExplicitAny: fixture",
+    "// prettier-ignore",
+    "// eslint-disable-next-line no-console",
+    "/* c8 ignore next */",
+    "/* istanbul ignore next */",
+    "/* v8 ignore next */",
+  ])("rejects tool suppression %s", (directive) => {
+    const report = checkSource(
+      "src/config/example.ts",
+      `${directive}\nexport const value: string = input;\n`,
+    );
+
+    expect(report.violations).toEqual([
+      {
+        ruleId: "type.no-suppression",
+        file: "src/config/example.ts",
+        line: 1,
+        message: expect.any(String),
+      },
+    ]);
+  });
+
   it("does not inspect directive-looking string content", () => {
     const report = checkSource("src/config/example.ts", 'export const copy = "@ts-ignore";\n');
 
@@ -746,6 +769,16 @@ describe("schema-owned object types", () => {
 
     expect(report.violations).toEqual([]);
   });
+
+  it.each([
+    "src/runtime/hookInput.ts",
+    "src/skills/contextGuard/hooks/hookInput.ts",
+    "src/skills/contextGuard/runtime/runtimeState.ts",
+  ])("allows a small structural transport type in the dependency-free runtime at %s", (path) => {
+    const report = checkSource(path, "export type HookInput = { sessionId: string };\n");
+
+    expect(report.violations).toEqual([]);
+  });
 });
 
 describe("barrels, names, and paths", () => {
@@ -762,6 +795,23 @@ describe("barrels, names, and paths", () => {
     { name: "a chained index export", source: 'export * from "./catalog/index.js";\n' },
   ])("rejects $name in a barrel", ({ source }) => {
     const report = checkSource("src/index.ts", source);
+
+    expect(report.violations).toEqual([
+      {
+        ruleId: "barrel.direct-wildcard",
+        file: "src/index.ts",
+        line: 1,
+        message: expect.any(String),
+      },
+    ]);
+  });
+
+  it("rejects a barrel chain hidden behind a regular module filename", () => {
+    const report = checkSources({
+      "src/index.ts": 'export * from "./catalog.js";\n',
+      "src/catalog.ts": 'export * from "./catalog/featureCatalog.js";\n',
+      "src/catalog/featureCatalog.ts": "export const featureCatalog = [];\n",
+    });
 
     expect(report.violations).toEqual([
       {
@@ -825,6 +875,39 @@ describe("mutation, collections, runtime, and presentation", () => {
         ruleId: "mutation.no-input",
         file: "src/install/example.ts",
         line: 2,
+        message: expect.any(String),
+      },
+    ]);
+  });
+
+  it.each([
+    {
+      name: "a mutating method",
+      source:
+        'export const append = (request: { items: string[] }) => { request.items.push("next"); };\n',
+    },
+    {
+      name: "a postfix increment",
+      source: "export const increment = (request: { count: number }) => { request.count++; };\n",
+    },
+    {
+      name: "a delete expression",
+      source:
+        "export const clear = (request: { cache?: string }) => { delete request.cache; };\n",
+    },
+    {
+      name: "a destructured input binding",
+      source:
+        'export const append = ({ items }: { items: string[] }) => { items.push("next"); };\n',
+    },
+  ])("rejects input mutation through $name", ({ source }) => {
+    const report = checkSource("src/install/example.ts", source);
+
+    expect(report.violations).toEqual([
+      {
+        ruleId: "mutation.no-input",
+        file: "src/install/example.ts",
+        line: 1,
         message: expect.any(String),
       },
     ]);
