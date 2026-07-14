@@ -2,7 +2,7 @@
   "$schema": "https://biomejs.dev/schemas/2.5.2/schema.json",
   "vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
   "files": {
-    "includes": ["src/**/*.ts"]
+    "includes": ["src/**/*.ts", "scripts/**/*.ts", "code-style.rules.json"]
   },
   "formatter": {
     "enabled": true,
@@ -29,7 +29,7 @@
   "plugins": ["./biome-rules/no-focused-tests.grit"],
   "overrides": [
     {
-      "includes": ["src/core/**", "src/commands/**"],
+      "includes": ["src/cli/**", "src/catalog/**", "src/config/**", "src/install/**"],
       "linter": { "rules": { "suspicious": { "noConsole": "error" } } }
     },
     {
@@ -41,9 +41,9 @@
               "level": "error",
               "options": {
                 "paths": {
-                  "commander": "Zero-dep hook payload: import only node:*, src/payload/*, and the feature's own lib/ (CODE-STYLE.md -> Never; ADR 0001).",
-                  "@clack/prompts": "Zero-dep hook payload: import only node:*, src/payload/*, and the feature's own lib/ (CODE-STYLE.md -> Never; ADR 0001).",
-                  "picocolors": "Zero-dep hook payload: import only node:*, src/payload/*, and the feature's own lib/ (CODE-STYLE.md -> Never; ADR 0001)."
+                  "commander": "Dependency-free hook runtime: import only node:*, shared src/runtime/*, and the feature's own hooks/runtime subtree.",
+                  "@clack/prompts": "Dependency-free hook runtime: import only node:*, shared src/runtime/*, and the feature's own hooks/runtime subtree.",
+                  "picocolors": "Dependency-free hook runtime: import only node:*, shared src/runtime/*, and the feature's own hooks/runtime subtree."
                 }
               }
             }

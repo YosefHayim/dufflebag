@@ -27,12 +27,14 @@ Feature documentation lives with its authored source under `src/skills/<sourceDi
 
 | Path | Ownership |
 | --- | --- |
+| `src/build/` | Package assembly, shipping verification, and hook smoke owners |
 | `src/cli/` | Effect CLI definitions, command capabilities, and `TerminalUI` presentation |
 | `src/catalog/` | Decoded feature and agent catalogs |
 | `src/config/` | Schema-owned managed configuration and migration |
 | `src/install/` | Artifact planning, transactional application, receipts, and agent formats |
 | `src/runtime/` | Dependency-free transport shared by installed hooks |
 | `src/skills/<sourceDirectory>/` | Authored skill content and feature-local dependency-free runtime |
+| `src/style/` | Importable code-style metadata and focused AST/import-graph verification |
 | `src/doctor.ts` | Structured installation diagnostics |
 | `src/scaffoldWorkflows.ts` | Workflow-template scaffolding capability |
 | `scripts/` | Repository build, generation, contract, shipping, and smoke tooling |
@@ -44,20 +46,21 @@ This layout is the approved destination. During the migration, legacy technical-
 
 ## Working contract
 
-This is a routing digest. [`CODE-STYLE.md`](CODE-STYLE.md) is authoritative and every enforceable rule maps to [`code-style.rules.json`](code-style.rules.json). Architectural reasons belong in `docs/adr/current/`.
+This is a routing digest. Through Task 15, root [`CODE-STYLE.md`](CODE-STYLE.md) and [`code-style.rules.json`](code-style.rules.json) are the only active local style contract. Task 16 composes the canonical profiles and regenerates this same root pair as Dufflebag's projection; it does not leave a competing rule source. Architectural reasons belong in `docs/adr/current/`.
 
-- **One strict style bar for all TypeScript** — `src/` *and* the png harness (`src/skills/png-to-code/scripts/`). **biome is the linter (`recommended`) *and* formatter** (double quotes), committed as `biome.json` with `biome ci` the one CI gate. One root `tsconfig` governs the project; the png harness's own `tsconfig` is the single sanctioned exception ([ADR 0013](docs/adr/current/0013-style-refresh-colocated-tests-single-command-autorun-templates.md)).
+- **One explicit mechanical owner** — Biome owns formatting, organized imports, and recommended linting. Task 2 deliberately maintains `src/**/*.ts`, `scripts/**/*.ts`, and the machine-contract JSON at the existing 140-column migration baseline. Task 15 performs the reviewed whole-maintained-tree 120-column cutover. The png harness keeps its one sanctioned nested package configuration ([ADR 0013](docs/adr/current/0013-style-refresh-colocated-tests-single-command-autorun-templates.md)).
 - **Effect application** — capabilities return Effect values. Only `src/cli/main.ts` starts the runtime. Use official platform services directly; do not add pass-through tags, layers, managers, helpers, or utility wrappers.
 - **Schema-owned data** — runtime, persisted, catalog, CLI, environment, and agent-format objects begin as Effect Schema. Derive types with `Schema.Schema.Type`; keep descriptions, defaults, checks, messages, and legacy transformations on their properties.
 - **Tagged errors** — application failures use `Schema.TaggedError`. Installed hooks remain dependency-free plain Node and keep their explicit fail-open behavior where the event contract requires it.
 - **One command path** — interactive and explicit commands invoke the same capability. `TerminalUI` owns presentation. A non-TTY process never prompts and missing input becomes a structured usage error.
 - **Dependency-free hook island** — hook graphs import only `node:*`, shared `src/runtime/**`, and their own feature runtime subtree. Application code never imports installed hook code.
-- **Functions** — named functions are arrow constants declared before use. Prefer one cohesive input, allow two only as a natural pair, and use a named request for three or more. Do not add ceremonial one-property requests or positional boolean behavior flags.
-- **Readable bodies** — one visible job per function, no input mutation, no builder `reduce`, no `Promise.all`, and at most two control-flow nesting levels. Keep one blank line between functions.
-- **Comments with evidence** — explicit loops have a short intent comment; indexed non-null access has a proof comment; real ordered pipelines have one contract plus numbered phase comments.
-- **Names and exports** — authored paths use `camelCase`, UI files use `PascalCase`, and public IDs/flags remain hyphenated data. Optional barrels contain only direct wildcard exports. Avoid vague manager/helper/utils/data/info buckets and names.
-- **No type escape hatches** — no authored interfaces outside declaration augmentation, enums, conditional/infer machinery, assertions, or suppression directives.
-- **Tests co-locate** — keep `foo.test.ts` beside `foo.ts`; root repository-tool tests live under `scripts/`. Use behavior-level fixtures and integration tests for transaction, migration, shipping, and CLI boundaries.
+- **Functions** — named functions are arrow constants declared before use; only the direct anonymous `Effect.gen(function* () {})` callback is exempt. Prefer one cohesive input, allow two only as a natural pair, and use a named request for three or more. Variadic rest inputs are allowed; positional boolean behavior flags are not.
+- **Readable bodies** — one visible job per function, guard clauses before a third nesting level, no input mutation, no builder `reduce`, and no one-use pass-through extraction. Local collection mutation is allowed when ownership is contained. One dependent Effect handoff may use one `flatMap`; two or more use `Effect.gen`.
+- **Comments with evidence** — comment only a non-obvious explicit loop, prove non-obvious indexed access without an assertion, and give a real ordered pipeline one contract plus numbered phases. TSDoc is signal-based and never restates names or schemas.
+- **Names and exports** — authored paths use `camelCase`, UI files use `PascalCase`, repeated role suffixes and dotted role filenames are forbidden, and public IDs/flags remain hyphenated data. Named exports and direct internal imports are the default; every `export *`, internal barrel, and import cycle is forbidden.
+- **Types and absence** — runtime data derives from Effect Schema. Interfaces are limited to declaration augmentation and earned feature-owned external capability ports. Enums, conditional/infer machinery, assertions, and suppression directives are forbidden. Keep application `undefined`, protocol `null`, and business `Option` distinct.
+- **Executable boundaries** — root scripts only decode arguments, call one owner under `src/`, render, and set process status; application code never imports scripts. Provider SDKs stay inside earned feature-owned adapters. Main application presentation goes through `TerminalUI`.
+- **Tests co-locate** — keep `foo.test.ts` beside `foo.ts`, including repository-tool owners under `src/style/` and `src/build/`. Use behavior-level fixtures and integration tests for transaction, migration, shipping, and CLI boundaries.
 - **Transactional writes** — inspect, plan, validate, apply, then write the receipt last. Roll back in reverse order. A receipt is the only deletion authority; detection may inform migration but never authorize deletion.
 - **Catalog-closed shipping** — the decoded feature catalog owns exact shipped paths and runtime entrypoints. Build and packed-tarball verification reject missing, duplicate, extra, rewritten, or uncataloged content.
 - **README regeneration** — the pre-commit hook regenerates README content. After committing, inspect the index and commit scope because the hook may stage `README.md`.

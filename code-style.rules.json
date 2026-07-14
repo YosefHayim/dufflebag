@@ -2,171 +2,442 @@
   "rules": [
     {
       "id": "path.capability-layout",
+      "applicability": "Maintained source",
       "summary": "Source paths expose named capabilities instead of generic technical layers.",
-      "enforcement": "path"
+      "rationale": "Capability ownership keeps behavior and its policy discoverable together.",
+      "goodExample": "src/install/applyArtifactPlan.ts",
+      "badExample": "src/core/utils/fileManager.ts",
+      "enforcement": ["path", "manual"]
     },
     {
       "id": "path.no-generic-bucket",
+      "applicability": "Maintained source files",
       "summary": "Generic bucket filenames are forbidden.",
-      "enforcement": "path"
+      "rationale": "A filename should identify the domain job a reader will find inside.",
+      "goodExample": "artifactReceipt.ts",
+      "badExample": "helpers.ts",
+      "enforcement": ["path"]
     },
     {
-      "id": "path.source-directory-case",
-      "summary": "Authored source directories use camelCase.",
-      "enforcement": "path"
+      "id": "path.authored-file-name",
+      "applicability": "Authored TypeScript and JavaScript paths",
+      "summary": "Authored directories and non-component files use camelCase and never repeat role suffixes.",
+      "rationale": "One predictable authored name avoids encoded layer tax such as order.repository.ts.",
+      "goodExample": "orderStore.ts and OrderCard.tsx",
+      "badExample": "order.repository.ts or orderRepositoryRepository.ts",
+      "enforcement": ["path"]
     },
     {
       "id": "architecture.no-wrapper-layer",
-      "summary": "Capabilities call official services without pass-through wrapper layers.",
-      "enforcement": "manual"
+      "applicability": "Application capabilities",
+      "summary": "Pass-through service and wrapper layers are forbidden.",
+      "rationale": "A local abstraction must own policy or a real external boundary.",
+      "goodExample": "Call FileSystem.FileSystem from applyArtifactPlan.",
+      "badExample": "FileSystemManager.read delegates unchanged to FileSystem.readFileString.",
+      "enforcement": ["manual"]
+    },
+    {
+      "id": "architecture.no-cycle",
+      "applicability": "Maintained relative imports",
+      "summary": "Internal import cycles are forbidden.",
+      "rationale": "Acyclic capability dependencies keep ownership and initialization deterministic.",
+      "goodExample": "cli imports install; install does not import cli.",
+      "badExample": "catalog imports config and config imports catalog.",
+      "enforcement": ["importGraph"]
     },
     {
       "id": "function.arrow-only",
-      "summary": "Named functions use arrow constants declared before use.",
-      "enforcement": "ast"
+      "applicability": "Authored named functions",
+      "summary": "Named functions are arrow constants declared before use.",
+      "rationale": "Lexical declarations make execution order readable without hoisting.",
+      "goodExample": "const decodeConfig = (input: unknown) => decode(input);",
+      "badExample": "function decodeConfig(input: unknown) { return decode(input); }",
+      "enforcement": ["ast"]
     },
     {
       "id": "function.effect-generator",
-      "summary": "Anonymous generators appear only as the direct Effect.gen callback.",
-      "enforcement": "ast"
+      "applicability": "Generator functions",
+      "summary": "Only an anonymous generator directly passed to Effect.gen is allowed.",
+      "rationale": "The exception keeps dependent Effect workflows readable without reopening function declarations.",
+      "goodExample": "Effect.gen(function* () { return yield* load; })",
+      "badExample": "function* loadAll() { yield* load; }",
+      "enforcement": ["ast"]
     },
     {
       "id": "function.input-shape",
-      "summary": "Functions use cohesive inputs and no positional boolean flags.",
-      "enforcement": "ast"
+      "applicability": "Authored functions",
+      "summary": "Use cohesive inputs, at most two natural positional values, and no boolean behavior flags.",
+      "rationale": "Named requests make three-way coordination explicit without ceremonial single-value wrappers.",
+      "goodExample": "const install = (request: InstallRequest) => program;",
+      "badExample": "const install = (root, feature, force, dryRun) => program;",
+      "enforcement": ["ast", "manual"]
     },
     {
       "id": "function.one-job",
-      "summary": "A function performs one visible domain job without ceremonial wrappers.",
-      "enforcement": "manual"
+      "applicability": "Authored functions",
+      "summary": "Each function owns one visible domain job.",
+      "rationale": "Cohesive bodies are easier to verify than mixed policy, I/O, and presentation.",
+      "goodExample": "applyArtifactPlan owns transactional application.",
+      "badExample": "installAndPrintAndPersist mixes three owners.",
+      "enforcement": ["manual"]
+    },
+    {
+      "id": "function.no-pointless-extraction",
+      "applicability": "Private one-use functions",
+      "summary": "One-expression pass-through helpers need a concept, policy, boundary, or second caller.",
+      "rationale": "Names that add no information force readers to jump without reducing complexity.",
+      "goodExample": "const isOwnedArtifact = (path) => receipt.paths.includes(path);",
+      "badExample": "const getName = (item) => item.name; used once immediately below",
+      "enforcement": ["ast", "manual"]
     },
     {
       "id": "function.blank-line",
-      "summary": "Adjacent function declarations have one blank line between them.",
-      "enforcement": "ast"
+      "applicability": "Adjacent function declarations",
+      "summary": "Adjacent functions have one blank line between them.",
+      "rationale": "A single visual boundary separates declarations without vertical noise.",
+      "goodExample": "const first = () => 1;\n\nconst second = () => 2;",
+      "badExample": "const first = () => 1;\nconst second = () => 2;",
+      "enforcement": ["ast"]
     },
     {
       "id": "function.nesting",
-      "summary": "Function control flow nests no more than two levels.",
-      "enforcement": "ast"
+      "applicability": "Function control flow",
+      "summary": "Control flow nests no more than two levels.",
+      "rationale": "Guard clauses preserve a straight-line reading path.",
+      "goodExample": "Return early before the main path.",
+      "badExample": "Three nested if or loop blocks.",
+      "enforcement": ["ast"]
     },
     {
       "id": "class.tagged-error-only",
+      "applicability": "Authored classes",
       "summary": "Schema.TaggedError is the only authored class form.",
-      "enforcement": "ast"
+      "rationale": "Data, functions, and official services are the default; expected errors keep executable schemas.",
+      "goodExample": "class ConfigError extends Schema.TaggedError<ConfigError>()(...) {}",
+      "badExample": "class ConfigManager {}",
+      "enforcement": ["ast"]
     },
     {
       "id": "comment.loop-intent",
-      "summary": "Every explicit loop has an immediately preceding intent comment.",
-      "enforcement": "ast"
+      "applicability": "Non-obvious explicit loops",
+      "summary": "Only a non-obvious loop receives an immediate intent or invariant comment.",
+      "rationale": "Comments explain ordering, batching, mutation, performance, or early exit rather than narrating syntax.",
+      "goodExample": "// Preserve receipt order during rollback.\nfor (const artifact of reversed) { ... }",
+      "badExample": "// Loop through items.\nfor (const item of items) { print(item); }",
+      "enforcement": ["ast", "manual"]
     },
     {
       "id": "comment.index-proof",
-      "summary": "Indexed non-null access has an immediately preceding proof comment.",
-      "enforcement": "ast"
+      "applicability": "Non-literal indexed access",
+      "summary": "A non-obvious indexed access has an immediate proof comment and no assertion.",
+      "rationale": "The proof records why the index is safe while TypeScript remains honest.",
+      "goodExample": "// The bounds guard proves index is present.\nreturn items[index];",
+      "badExample": "return items[index]!;",
+      "enforcement": ["ast", "manual"]
     },
     {
       "id": "comment.pipeline-contract",
-      "summary": "Ordered multi-phase pipelines have a contract and numbered phases.",
-      "enforcement": "manual"
+      "applicability": "Ordered workflows with three or more dependent phases",
+      "summary": "A real ordered pipeline has one contract and numbered phase comments.",
+      "rationale": "The contract makes ordering and failure ownership reviewable at the orchestration point.",
+      "goodExample": "Contract comment plus // 1., // 2., and // 3. before dependent phases.",
+      "badExample": "A long Effect.gen workflow with unexplained ordering.",
+      "enforcement": ["ast", "manual"]
+    },
+    {
+      "id": "documentation.signal-tsdoc",
+      "applicability": "Exported APIs",
+      "summary": "TSDoc exists only when it adds caller-relevant contract information.",
+      "rationale": "Documentation should explain behavior, ownership, errors, ordering, security, or performance instead of restating syntax.",
+      "goodExample": "/** Deletes only paths proven owned by the receipt. */",
+      "badExample": "/** Gets the name. @param item The item. @returns The name. */",
+      "enforcement": ["ast", "manual"]
     },
     {
       "id": "type.schema-owned-runtime",
-      "summary": "Runtime object types derive from executable Effect Schema definitions.",
-      "enforcement": "ast"
+      "applicability": "Runtime, persisted, and boundary data",
+      "summary": "Effect Schema owns validation, derived types, descriptions, messages, and generated contracts.",
+      "rationale": "One executable source prevents drift between runtime validation and TypeScript claims.",
+      "goodExample": "type Feature = Schema.Schema.Type<typeof featureSchema>;",
+      "badExample": "type Feature = { id: string }; const featureSchema = validator(...);",
+      "enforcement": ["ast", "manual"]
     },
     {
-      "id": "type.no-interface",
-      "summary": "Interfaces are reserved for declaration-file augmentation.",
-      "enforcement": "ast"
+      "id": "type.interface-cases",
+      "applicability": "Authored interfaces",
+      "summary": "Interfaces are limited to declaration augmentation and earned feature-owned external capability ports.",
+      "rationale": "Runtime objects come from schemas; substitutable external capabilities may need structural ports.",
+      "goodExample": "A feature adapter owns GitHubPort with multiple substitutable operations.",
+      "badExample": "interface Feature { id: string }",
+      "enforcement": ["ast", "manual"]
     },
     {
       "id": "type.no-enum",
+      "applicability": "Authored TypeScript",
       "summary": "Enums are forbidden.",
-      "enforcement": "ast"
+      "rationale": "Schema literals provide runtime validation and a derived union from one source.",
+      "goodExample": "Schema.Literal(\"global\", \"project\")",
+      "badExample": "enum Scope { Global, Project }",
+      "enforcement": ["ast"]
     },
     {
       "id": "type.no-conditional",
-      "summary": "Authored conditional and infer type machinery is forbidden.",
-      "enforcement": "ast"
+      "applicability": "Authored TypeScript types",
+      "summary": "Authored conditional and infer machinery is forbidden.",
+      "rationale": "Direct schema-derived types are clearer than recovering types from descriptors.",
+      "goodExample": "Schema.Schema.Type<typeof configSchema>",
+      "badExample": "type Item<T> = T extends Array<infer U> ? U : T",
+      "enforcement": ["ast"]
     },
     {
       "id": "type.no-assertion",
-      "summary": "Authored TypeScript assertions are forbidden.",
-      "enforcement": "ast"
+      "applicability": "Authored TypeScript",
+      "summary": "Type assertions and non-null assertions are forbidden.",
+      "rationale": "Decode or narrow unknown values so runtime evidence supports the type.",
+      "goodExample": "if (typeof value === \"string\") return value;",
+      "badExample": "return value as string;",
+      "enforcement": ["ast"]
     },
     {
       "id": "type.no-suppression",
-      "summary": "TypeScript and tool suppression directives are forbidden.",
-      "enforcement": "ast"
+      "applicability": "Maintained source comments",
+      "summary": "Type, lint, format, and coverage suppression directives are forbidden.",
+      "rationale": "The underlying boundary must remain visible and fixed.",
+      "goodExample": "Narrow the value and keep the rule active.",
+      "badExample": "// @ts-expect-error",
+      "enforcement": ["regex"]
     },
     {
-      "id": "barrel.direct-wildcard",
-      "summary": "Barrels contain direct wildcard exports only.",
-      "enforcement": "ast"
+      "id": "type.absence-boundary",
+      "applicability": "Application and protocol values",
+      "summary": "Use undefined for ordinary absence, protocol null only at adapters, and Option for business absence.",
+      "rationale": "One value should not carry three competing absence representations.",
+      "goodExample": "Option<User> in policy; null translated inside an HTTP adapter.",
+      "badExample": "User | null | undefined in application code.",
+      "enforcement": ["ast", "manual"]
+    },
+    {
+      "id": "export.named-only",
+      "applicability": "Authored modules",
+      "summary": "Use named exports unless a framework requires a default export.",
+      "rationale": "Named imports remain searchable and refactorable across internal modules.",
+      "goodExample": "export const install = ...;",
+      "badExample": "export default install;",
+      "enforcement": ["ast"]
+    },
+    {
+      "id": "export.no-internal-barrel",
+      "applicability": "Internal module exports",
+      "summary": "Internal barrels and every export star are forbidden.",
+      "rationale": "Direct imports expose real ownership and prevent hidden dependency fan-out.",
+      "goodExample": "import { install } from \"./install/install.js\";",
+      "badExample": "export * from \"./install.js\";",
+      "enforcement": ["ast", "importGraph"]
     },
     {
       "id": "name.domain-specific",
-      "summary": "Identifiers use domain-specific names instead of vague generic roles.",
-      "enforcement": "ast"
+      "applicability": "Authored identifiers",
+      "summary": "Identifiers use domain jobs instead of vague manager, helper, utils, data, or info roles.",
+      "rationale": "A specific name tells readers what policy or value the owner provides.",
+      "goodExample": "artifactReceipt and applyArtifactPlan",
+      "badExample": "artifactManager and configUtils",
+      "enforcement": ["ast"]
+    },
+    {
+      "id": "module.no-fragmentation",
+      "applicability": "Module boundaries",
+      "summary": "A split needs an independent change reason, second caller, or genuine domain concept.",
+      "rationale": "One-export files and speculative layers add navigation without isolating change.",
+      "goodExample": "artifactPlan.ts owns its schema and planning operations.",
+      "badExample": "getArtifactName.ts contains one one-line accessor.",
+      "enforcement": ["manual"]
     },
     {
       "id": "mutation.no-input",
-      "summary": "Function inputs are never mutated.",
-      "enforcement": "ast"
+      "applicability": "Function inputs",
+      "summary": "Inputs are never mutated.",
+      "rationale": "Borrowed values retain stable ownership across a call boundary.",
+      "goodExample": "const next = [...request.items, item];",
+      "badExample": "request.items.push(item);",
+      "enforcement": ["ast"]
+    },
+    {
+      "id": "mutation.local-ownership",
+      "applicability": "Locally created collections",
+      "summary": "Local push, Map.set, and Set.add are allowed when the function owns the collection.",
+      "rationale": "Contained mutation can make a multi-step algorithm clearer without leaking state.",
+      "goodExample": "const results = []; results.push(value); return results;",
+      "badExample": "Mutating an array received from a caller.",
+      "enforcement": ["manual"]
     },
     {
       "id": "collection.no-builder-reduce",
+      "applicability": "Collection transformations",
       "summary": "Reduce is not used to build arrays or objects.",
-      "enforcement": "ast"
+      "rationale": "Map, filter, flatMap, Object.fromEntries, or a local loop states construction more directly.",
+      "goodExample": "Object.fromEntries(entries.map(toPair))",
+      "badExample": "items.reduce((result, item) => ({ ...result, [item.id]: item }), {})",
+      "enforcement": ["ast"]
+    },
+    {
+      "id": "collection.loop-choice",
+      "applicability": "Collection work",
+      "summary": "Use collection methods for direct transforms and for-of for branching or local multi-step state.",
+      "rationale": "The construct should expose the algorithm rather than satisfy a blanket preference.",
+      "goodExample": "items.map(render) or a documented multi-step for-of.",
+      "badExample": "A stateful map callback or ceremonial loop.",
+      "enforcement": ["manual"]
+    },
+    {
+      "id": "effect.composition-depth",
+      "applicability": "Dependent Effect workflows",
+      "summary": "One dependent handoff may use one flatMap; two or more use Effect.gen.",
+      "rationale": "The composition form should expose dependency depth without a flatMap pyramid.",
+      "goodExample": "load.pipe(Effect.flatMap(decode)) or Effect.gen for load, decode, and persist.",
+      "badExample": "load.pipe(Effect.flatMap(decode), Effect.flatMap(persist))",
+      "enforcement": ["ast", "manual"]
     },
     {
       "id": "effect.no-promise-all",
-      "summary": "Application effects do not use Promise.all.",
-      "enforcement": "ast"
+      "applicability": "Application effects",
+      "summary": "Application code does not use Promise.all for effectful work.",
+      "rationale": "Effect operators preserve typed failures and explicit concurrency policy.",
+      "goodExample": "Effect.forEach(items, apply, { concurrency: 4 })",
+      "badExample": "Promise.all(items.map(apply))",
+      "enforcement": ["ast"]
     },
     {
       "id": "effect.runtime-edge",
+      "applicability": "Main application",
       "summary": "Effect.run calls exist only at src/cli/main.ts.",
-      "enforcement": "ast"
+      "rationale": "One deployable runtime edge preserves composition and lifecycle ownership.",
+      "goodExample": "NodeRuntime.runMain(program) in src/cli/main.ts",
+      "badExample": "Effect.runPromise inside install.ts",
+      "enforcement": ["ast"]
     },
     {
       "id": "effect.official-services",
-      "summary": "Capabilities use official Effect services without pass-through wrappers.",
-      "enforcement": "manual"
+      "applicability": "Effect capabilities",
+      "summary": "Use official services directly unless a repository owner adds real policy.",
+      "rationale": "Renaming an official service behind a local tag adds indirection without control.",
+      "goodExample": "yield* FileSystem.FileSystem",
+      "badExample": "yield* FileManager where every method delegates unchanged",
+      "enforcement": ["manual"]
+    },
+    {
+      "id": "effect.sequential-default",
+      "applicability": "Effectful collections",
+      "summary": "Effectful collections are sequential unless bounded concurrency is justified.",
+      "rationale": "Filesystem and provider mutations need predictable ordering and load.",
+      "goodExample": "Effect.forEach(items, apply)",
+      "badExample": "Unbounded concurrent writes.",
+      "enforcement": ["manual"]
     },
     {
       "id": "import.hook-runtime",
-      "summary": "Installed hook graphs import only node modules and their runtime island.",
-      "enforcement": "importGraph"
+      "applicability": "Installed hook graphs",
+      "summary": "Hook graphs import only node modules, shared runtime transport, and their feature runtime.",
+      "rationale": "Installed hooks execute in foreign processes without package dependencies.",
+      "goodExample": "A contextGuard hook imports node:fs and ../runtime/decide.js.",
+      "badExample": "A hook imports effect or src/install.",
+      "enforcement": ["importGraph"]
     },
     {
       "id": "import.application-boundary",
-      "summary": "Application modules do not import the installed hook runtime.",
-      "enforcement": "importGraph"
+      "applicability": "Main application modules",
+      "summary": "Application modules do not import installed hook runtime code.",
+      "rationale": "Shared transport parsing and application orchestration remain separate owners.",
+      "goodExample": "Application and hook both consume a dependency-free wire format separately.",
+      "badExample": "install.ts imports a hook entrypoint.",
+      "enforcement": ["importGraph"]
     },
     {
       "id": "presentation.terminal-ui",
-      "summary": "Application presentation routes through TerminalUI.",
-      "enforcement": "ast"
+      "applicability": "Main application modules",
+      "summary": "Application presentation routes through TerminalUI instead of console calls.",
+      "rationale": "One boundary owns TTY behavior, rendering, and structured non-interactive results.",
+      "goodExample": "yield* terminalUI.success(result)",
+      "badExample": "console.log(\"installed\") inside install.ts",
+      "enforcement": ["ast"]
+    },
+    {
+      "id": "script.thin-entrypoint",
+      "applicability": "Root scripts",
+      "summary": "Root scripts decode arguments, call one substantive owner, render, and set process status.",
+      "rationale": "Substantive tooling stays importable, testable, and co-located under src.",
+      "goodExample": "scripts/checkCodeStyle.ts imports and calls src/style/checkCodeStyle.ts.",
+      "badExample": "A root script owns AST traversal, filesystem planning, and domain types.",
+      "enforcement": ["ast", "importGraph"]
+    },
+    {
+      "id": "import.application-no-scripts",
+      "applicability": "Application imports",
+      "summary": "Application source never imports repository scripts.",
+      "rationale": "Tool entrypoints depend on substantive owners, never the reverse.",
+      "goodExample": "scripts/build.ts imports src/build/buildPackage.ts.",
+      "badExample": "src/build/buildPackage.ts imports scripts/build.ts.",
+      "enforcement": ["importGraph"]
+    },
+    {
+      "id": "adapter.external-sdk-confinement",
+      "applicability": "External provider SDK imports",
+      "summary": "Provider SDKs are confined to earned feature-owned adapter modules.",
+      "rationale": "A narrow adapter keeps provider shapes and failures out of domain operations.",
+      "goodExample": "src/publish/adapters/githubClient.ts imports @octokit/rest.",
+      "badExample": "src/install/install.ts imports stripe.",
+      "enforcement": ["importGraph", "manual"]
+    },
+    {
+      "id": "formatting.biome",
+      "applicability": "Maintained TypeScript, scripts, and machine contract JSON",
+      "summary": "Biome owns formatting, import organization, and its recommended lint rules.",
+      "rationale": "One proven formatter and linter removes subjective mechanical review.",
+      "goodExample": "Run biome check --write on an explicitly reviewed file list.",
+      "badExample": "Hand-format files differently from biome.json.",
+      "enforcement": ["formatter", "linter"]
     }
   ],
   "protectedPaths": [
     {
       "path": "src/skills/make-a-trailer/SKILL.md",
-      "codeRuleExemptions": []
+      "committedSha256": "5f9c3f49658d976168d4c6dfaea9f636bb3cf7cb219011486c4949e33b17a1e6",
+      "overlaySha256": "5bf0ec33ac92acd73b816f8c61c422c49f518f3cfcc5763986a8108d451cc297"
     },
     {
       "path": "src/skills/make-a-trailer/reference/pipeline.md",
-      "codeRuleExemptions": []
+      "committedSha256": "10f5da547d792f7ca2067621082e08cdbf5826070c612c3e248c4276cdd01c73",
+      "overlaySha256": "3bb89d856d28995c50fba23aca6a6a1af1fe56f10d67546a0515fe0d276f1669"
     },
     {
       "path": "src/skills/make-a-trailer/scripts/assembleCut.mjs",
-      "codeRuleExemptions": [
-        "function.arrow-only",
-        "function.input-shape",
-        "comment.loop-intent"
-      ]
+      "committedSha256": "d6f05101b3fdbcd966696a7e4b144f1eca082744b7262d0b82ff32f6fea2b2a5",
+      "overlaySha256": "6dceccae4b1f49bc7b64b89bd164882c29e57142ef9193d0208ccc1f9d2291ad"
+    }
+  ],
+  "exceptions": [
+    {
+      "ruleId": "function.arrow-only",
+      "path": "src/skills/make-a-trailer/scripts/assembleCut.mjs",
+      "state": "protected-overlay",
+      "maxViolations": 13,
+      "reason": "Preserve the owner's concurrent trailer assembly rewrite byte-for-byte.",
+      "exitCondition": "Remove after the owner commits and independently reviews the trailer rewrite."
+    },
+    {
+      "ruleId": "function.input-shape",
+      "path": "src/skills/make-a-trailer/scripts/assembleCut.mjs",
+      "state": "protected-overlay",
+      "maxViolations": 5,
+      "reason": "Preserve the owner's concurrent trailer assembly rewrite byte-for-byte.",
+      "exitCondition": "Remove after the owner commits and independently reviews the trailer rewrite."
+    },
+    {
+      "ruleId": "comment.loop-intent",
+      "path": "src/skills/make-a-trailer/scripts/assembleCut.mjs",
+      "state": "protected-overlay",
+      "maxViolations": 2,
+      "reason": "Preserve the owner's concurrent trailer assembly rewrite byte-for-byte.",
+      "exitCondition": "Remove after the owner commits and independently reviews the trailer rewrite."
     }
   ]
 }
