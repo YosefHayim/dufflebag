@@ -78,6 +78,40 @@ type ViolationInput = {
   readonly message: string;
 };
 
+type RuleChannelRequest = {
+  readonly rulesById: ReadonlyMap<string, MachineRule>;
+  readonly ruleId: string;
+  readonly channel: "regex" | "ast" | "path" | "importGraph";
+};
+
+type LineViolationInput = {
+  readonly ruleId: string;
+  readonly channel: "regex" | "ast" | "path" | "importGraph";
+  readonly line: number;
+  readonly message: string;
+};
+
+type SourceImportRequest = {
+  readonly repositoryRoot: string;
+  readonly file: string;
+  readonly specifier: string;
+};
+
+type SourceInspectionRequest = {
+  readonly repositoryRoot: string;
+  readonly file: string;
+  readonly protectedState: ProtectedPathState | undefined;
+  readonly rulesById: ReadonlyMap<string, MachineRule>;
+  readonly program: ts.Program;
+  readonly typeChecker: ts.TypeChecker;
+};
+
+type ImportEdgeRequest = {
+  readonly repositoryRoot: string;
+  readonly files: ReadonlyArray<string>;
+  readonly program: ts.Program;
+};
+
 type ImportEdge = {
   readonly from: string;
   readonly to: string;
@@ -162,7 +196,15 @@ const readEnforcement = (value: object, ruleId: string): ReadonlyArray<Enforceme
   return candidate.filter(isEnforcement);
 };
 
-const readAutofix = (value: object, ruleId: string, enforcement: ReadonlyArray<Enforcement>): boolean => {
+const readAutofix = ({
+  value,
+  ruleId,
+  enforcement,
+}: {
+  readonly value: object;
+  readonly ruleId: string;
+  readonly enforcement: ReadonlyArray<Enforcement>;
+}): boolean => {
   const candidate = readProperty(value, "autofix");
   if (candidate === undefined) {
     return false;
@@ -199,7 +241,7 @@ const readMachineRule = (value: unknown): MachineRule => {
     goodExample: readNonEmptyString(value, "goodExample"),
     badExample: readNonEmptyString(value, "badExample"),
     enforcement,
-    autofix: readAutofix(value, id, enforcement),
+    autofix: readAutofix({ value, ruleId: id, enforcement }),
   };
 };
 
@@ -255,7 +297,7 @@ const readConfiguration = (repositoryRoot: string): CodeStyleConfiguration => {
 };
 
 const sameStrings = (left: ReadonlyArray<string>, right: ReadonlyArray<string>): boolean =>
-  left.length === right.length && left.every((entry, index) => entry === right[index]);
+  left.length === right.length && left.every((entry, index) => entry === right.at(index));
 
 const validateProtectedPaths = (protectedPaths: ReadonlyArray<ProtectedPathConfiguration>): void => {
   const paths = protectedPaths.map((entry) => entry.path);
@@ -347,11 +389,8 @@ export const validateCodeStyleMetadata = (repositoryRoot: string): CodeStyleMeta
   };
 };
 
-const ruleUses = (
-  rulesById: ReadonlyMap<string, MachineRule>,
-  ruleId: string,
-  channel: "regex" | "ast" | "path" | "importGraph",
-): boolean => rulesById.get(ruleId)?.enforcement.includes(channel) ?? false;
+const ruleUses = ({ rulesById, ruleId, channel }: RuleChannelRequest): boolean =>
+  rulesById.get(ruleId)?.enforcement.includes(channel) ?? false;
 
 const sha256File = (path: string): string => createHash("sha256").update(readFileSync(path)).digest("hex");
 
@@ -395,7 +434,7 @@ const isEffectGenCall = (node: ts.FunctionExpression): boolean => {
     return false;
   }
 
-  return isNamedPropertyCall(parent, "Effect", "gen");
+  return isNamedPropertyCall({ node: parent, owner: "Effect", property: "gen" });
 };
 
 const isDirectSchemaTaggedError = (expression: ts.Expression): boolean => {
@@ -485,6 +524,9 @@ const nestingDepth = (node: ts.Node): number => {
   if (!parent || ts.isFunctionLike(parent)) {
     return 1;
   }
+  if (ts.isIfStatement(node) && ts.isIfStatement(parent) && parent.elseStatement === node) {
+    return nestingDepth(parent);
+  }
   return nestingDepth(parent) + (isControlNode(parent) ? 1 : 0);
 };
 
@@ -502,9 +544,6 @@ const isToolingFile = (file: string): boolean =>
 
 const isApplicationFile = (file: string): boolean =>
   file.startsWith("src/") && !isHookRuntimeFile(file) && !isToolingFile(file) && !file.startsWith("src/skills/png-to-code/scripts/");
-
-const isExternalProtocolFile = (file: string): boolean =>
-  /\/(?:adapters|http|protocol|transport)\//u.test(file) || file.startsWith("src/runtime/");
 
 const assignedRootIdentifier = (expression: ts.Expression): ts.Identifier | undefined => {
   if (ts.isIdentifier(expression)) {
@@ -571,7 +610,15 @@ const declaredLoopIndex = (node: ts.ForStatement): string | undefined => {
   return declaration && ts.isIdentifier(declaration.name) ? declaration.name.text : undefined;
 };
 
-const conditionBoundsCollection = (condition: ts.Expression, collectionText: string, indexName: string): boolean => {
+const conditionBoundsCollection = ({
+  condition,
+  collectionText,
+  indexName,
+}: {
+  readonly condition: ts.Expression;
+  readonly collectionText: string;
+  readonly indexName: string;
+}): boolean => {
   if (ts.isBinaryExpression(condition)) {
     const rightIsLength =
       ts.isPropertyAccessExpression(condition.right) &&
@@ -594,7 +641,7 @@ const conditionBoundsCollection = (condition: ts.Expression, collectionText: str
 
   let bounded = false;
   ts.forEachChild(condition, (child) => {
-    if (!bounded && ts.isExpression(child) && conditionBoundsCollection(child, collectionText, indexName)) {
+    if (!bounded && ts.isExpression(child) && conditionBoundsCollection({ condition: child, collectionText, indexName })) {
       bounded = true;
     }
   });
@@ -616,7 +663,7 @@ const isStructurallyBoundedAccess = (node: ts.ElementAccessExpression): boolean 
       indexName &&
       node.argumentExpression &&
       containsIdentifier(node.argumentExpression, indexName) &&
-      conditionBoundsCollection(loop.condition, node.expression.getText(), indexName),
+      conditionBoundsCollection({ condition: loop.condition, collectionText: node.expression.getText(), indexName }),
   );
 };
 
@@ -665,7 +712,15 @@ const isBuilderReduce = (node: ts.CallExpression): boolean => {
   );
 };
 
-const isNamedPropertyCall = (node: ts.CallExpression, owner: string, property: string): boolean =>
+const isNamedPropertyCall = ({
+  node,
+  owner,
+  property,
+}: {
+  readonly node: ts.CallExpression;
+  readonly owner: string;
+  readonly property: string;
+}): boolean =>
   ts.isPropertyAccessExpression(node.expression) &&
   ts.isIdentifier(node.expression.expression) &&
   node.expression.expression.text === owner &&
@@ -676,6 +731,16 @@ const isEffectRunCall = (node: ts.CallExpression): boolean =>
   ts.isIdentifier(node.expression.expression) &&
   node.expression.expression.text === "Effect" &&
   node.expression.name.text.startsWith("run");
+
+const isNamedPropertyAccess = ({
+  node,
+  owner,
+  property,
+}: {
+  readonly node: ts.PropertyAccessExpression;
+  readonly owner: string;
+  readonly property: string;
+}): boolean => ts.isIdentifier(node.expression) && node.expression.text === owner && node.name.text === property;
 
 const isConsoleCall = (node: ts.CallExpression): boolean =>
   ts.isPropertyAccessExpression(node.expression) &&
@@ -723,7 +788,7 @@ const sourceCandidates = (target: string): ReadonlyArray<string> => {
   return [target, `${target}.ts`, `${target}.tsx`, `${target}/index.ts`];
 };
 
-const resolveSourceImport = (repositoryRoot: string, file: string, specifier: string): string | undefined => {
+const resolveSourceImport = ({ repositoryRoot, file, specifier }: SourceImportRequest): string | undefined => {
   const target = resolvedImportPath(file, specifier);
   return target ? sourceCandidates(target).find((candidate) => existsSync(join(repositoryRoot, candidate))) : undefined;
 };
@@ -850,7 +915,7 @@ const collectEffectFlatMaps = (node: ts.Node): ReadonlyArray<ts.CallExpression> 
     if (candidate !== node && ts.isFunctionLike(candidate)) {
       return;
     }
-    if (ts.isCallExpression(candidate) && isNamedPropertyCall(candidate, "Effect", "flatMap")) {
+    if (ts.isCallExpression(candidate) && isNamedPropertyCall({ node: candidate, owner: "Effect", property: "flatMap" })) {
       calls.push(candidate);
     }
     ts.forEachChild(candidate, visit);
@@ -872,7 +937,15 @@ const statementContainsYield = (statement: ts.Statement): boolean => {
   return found;
 };
 
-const pipelineHasContract = (sourceFile: ts.SourceFile, call: ts.CallExpression, generator: ts.FunctionExpression): boolean => {
+const pipelineHasContract = ({
+  sourceFile,
+  call,
+  generator,
+}: {
+  readonly sourceFile: ts.SourceFile;
+  readonly call: ts.CallExpression;
+  readonly generator: ts.FunctionExpression;
+}): boolean => {
   const phases = generator.body.statements.filter(statementContainsYield);
   if (phases.length < 3) {
     return true;
@@ -888,14 +961,60 @@ const pipelineHasContract = (sourceFile: ts.SourceFile, call: ts.CallExpression,
   });
 };
 
-const inspectSourceFile = (
-  repositoryRoot: string,
-  file: string,
-  protectedState: ProtectedPathState | undefined,
-  rulesById: ReadonlyMap<string, MachineRule>,
-  program: ts.Program,
-  typeChecker: ts.TypeChecker,
-): ReadonlyArray<CodeStyleViolation> => {
+const importedScriptOwnerBindings = (sourceFile: ts.SourceFile, file: string): ReadonlySet<string> => {
+  const bindings = new Set<string>();
+  sourceFile.statements.forEach((statement) => {
+    if (!ts.isImportDeclaration(statement)) {
+      return;
+    }
+    const specifier = moduleSpecifierFor(statement);
+    if (!specifier || !resolvedImportPath(file, specifier)?.startsWith("src/")) {
+      return;
+    }
+    const clause = statement.importClause;
+    if (clause?.name) {
+      bindings.add(clause.name.text);
+    }
+    const namedBindings = clause?.namedBindings;
+    if (namedBindings && ts.isNamespaceImport(namedBindings)) {
+      bindings.add(namedBindings.name.text);
+    }
+    if (namedBindings && ts.isNamedImports(namedBindings)) {
+      namedBindings.elements.forEach((element) => {
+        bindings.add(element.name.text);
+      });
+    }
+  });
+  return bindings;
+};
+
+const delegatesToImportedOwner = (root: ts.Node, bindings: ReadonlySet<string>): boolean => {
+  let delegates = false;
+  const visit = (node: ts.Node): void => {
+    if (ts.isCallExpression(node)) {
+      const expression = node.expression;
+      if (
+        (ts.isIdentifier(expression) && bindings.has(expression.text)) ||
+        (ts.isPropertyAccessExpression(expression) && ts.isIdentifier(expression.expression) && bindings.has(expression.expression.text))
+      ) {
+        delegates = true;
+        return;
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(root);
+  return delegates;
+};
+
+const inspectSourceFile = ({
+  repositoryRoot,
+  file,
+  protectedState,
+  rulesById,
+  program,
+  typeChecker,
+}: SourceInspectionRequest): ReadonlyArray<CodeStyleViolation> => {
   if (protectedState?.state === "protected-committed") {
     return [];
   }
@@ -909,37 +1028,52 @@ const inspectSourceFile = (
   const counts = referenceCounts(sourceFile);
 
   const addViolation = ({ ruleId, channel, sourceFile: source, node, message }: ViolationInput): void => {
-    if (!ruleUses(rulesById, ruleId, channel)) {
+    if (!ruleUses({ rulesById, ruleId, channel })) {
       return;
     }
     const line = source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1;
     violations.push({ ruleId, file, line, message });
   };
 
-  const addLineViolation = (ruleId: string, channel: "regex" | "ast" | "path" | "importGraph", line: number, message: string): void => {
-    if (ruleUses(rulesById, ruleId, channel)) {
+  const addLineViolation = ({ ruleId, channel, line, message }: LineViolationInput): void => {
+    if (ruleUses({ rulesById, ruleId, channel })) {
       violations.push({ ruleId, file, line, message });
     }
   };
 
   if (!protectedState) {
     if (GENERIC_FILE_PATTERN.test(basename(file))) {
-      addLineViolation("path.no-generic-bucket", "path", 1, "Name the file after its domain job.");
+      addLineViolation({
+        ruleId: "path.no-generic-bucket",
+        channel: "path",
+        line: 1,
+        message: "Name the file after its domain job.",
+      });
     }
     const authoredDirectories = file.split("/").slice(1, -1);
     const hasInvalidDirectory = authoredDirectories.some((directory) => !/^[a-z][a-zA-Z0-9]*$/u.test(directory));
     if (invalidAuthoredFileName(file) || hasInvalidDirectory) {
-      addLineViolation("path.authored-file-name", "path", 1, "Use camelCase or PascalCase without a repeated role suffix.");
+      addLineViolation({
+        ruleId: "path.authored-file-name",
+        channel: "path",
+        line: 1,
+        message: "Use camelCase or PascalCase without a repeated role suffix.",
+      });
     }
     if (/^src\/(?:core|commands|payload)(?:\/|$)/u.test(file)) {
-      addLineViolation("path.capability-layout", "path", 1, "Move this source into the capability that owns it.");
+      addLineViolation({
+        ruleId: "path.capability-layout",
+        channel: "path",
+        line: 1,
+        message: "Move this source into the capability that owns it.",
+      });
     }
   }
 
   const inspectStatementSpacing = (node: ts.Node): void => {
     if (ts.isSourceFile(node) || ts.isBlock(node)) {
       node.statements.forEach((statement, index) => {
-        const previous = node.statements[index - 1];
+        const previous = index > 0 ? node.statements.at(index - 1) : undefined;
         if (previous && isFunctionStatement(previous) && isFunctionStatement(statement)) {
           const gap = sourceText.slice(previous.end, statement.getStart(sourceFile));
           if ((gap.match(/\r?\n/gu) ?? []).length < 2) {
@@ -979,15 +1113,15 @@ const inspectSourceFile = (
           message: "Application modules cannot import installed hook runtime code.",
         });
       }
-      if (target?.startsWith("scripts/")) {
-        addViolation({
-          ruleId: "import.application-no-scripts",
-          channel: "importGraph",
-          sourceFile,
-          node,
-          message: "Application modules cannot import root script entrypoints.",
-        });
-      }
+    }
+    if (moduleSpecifier && file.startsWith("src/") && resolvedImportPath(file, moduleSpecifier)?.startsWith("scripts/")) {
+      addViolation({
+        ruleId: "import.application-no-scripts",
+        channel: "importGraph",
+        sourceFile,
+        node,
+        message: "Authored source cannot import root script entrypoints.",
+      });
     }
     if (moduleSpecifier && PROVIDER_SDK_PATTERN.test(moduleSpecifier) && !/\/adapters\//u.test(file)) {
       addViolation({
@@ -1139,15 +1273,6 @@ const inspectSourceFile = (
         message: "Do not expose null and undefined for the same value.",
       });
     }
-    if (!isExternalProtocolFile(file) && node.kind === ts.SyntaxKind.NullKeyword && !ts.isLiteralTypeNode(node.parent)) {
-      addViolation({
-        ruleId: "type.absence-boundary",
-        channel: "ast",
-        sourceFile,
-        node,
-        message: "Translate protocol null at the external adapter boundary.",
-      });
-    }
     if ((ts.isExportAssignment(node) || hasDefaultModifier(node)) && !file.endsWith(".config.ts") && !file.endsWith(".config.js")) {
       addViolation({
         ruleId: "export.named-only",
@@ -1215,7 +1340,7 @@ const inspectSourceFile = (
       }
     }
     if (ts.isCallExpression(node) && isApplicationFile(file)) {
-      if (isNamedPropertyCall(node, "Promise", "all")) {
+      if (isNamedPropertyCall({ node, owner: "Promise", property: "all" })) {
         addViolation({
           ruleId: "effect.no-promise-all",
           channel: "ast",
@@ -1243,9 +1368,37 @@ const inspectSourceFile = (
         });
       }
     }
-    if (ts.isCallExpression(node) && isNamedPropertyCall(node, "Effect", "gen")) {
+    if (
+      file.startsWith("src/") &&
+      file !== "src/cli/main.ts" &&
+      ts.isCallExpression(node) &&
+      isNamedPropertyCall({ node, owner: "NodeRuntime", property: "runMain" })
+    ) {
+      addViolation({
+        ruleId: "effect.runtime-edge",
+        channel: "ast",
+        sourceFile,
+        node,
+        message: "Run and provide the main Effect only at src/cli/main.ts.",
+      });
+    }
+    if (
+      file.startsWith("src/") &&
+      file !== "src/cli/main.ts" &&
+      ts.isPropertyAccessExpression(node) &&
+      isNamedPropertyAccess({ node, owner: "NodeContext", property: "layer" })
+    ) {
+      addViolation({
+        ruleId: "effect.runtime-edge",
+        channel: "ast",
+        sourceFile,
+        node,
+        message: "Run and provide the main Effect only at src/cli/main.ts.",
+      });
+    }
+    if (ts.isCallExpression(node) && isNamedPropertyCall({ node, owner: "Effect", property: "gen" })) {
       const generator = node.arguments[0];
-      if (generator && ts.isFunctionExpression(generator) && !pipelineHasContract(sourceFile, node, generator)) {
+      if (generator && ts.isFunctionExpression(generator) && !pipelineHasContract({ sourceFile, call: node, generator })) {
         addViolation({
           ruleId: "comment.pipeline-contract",
           channel: "ast",
@@ -1273,7 +1426,12 @@ const inspectSourceFile = (
   };
 
   suppressionCommentLines(sourceFile).forEach((line) => {
-    addLineViolation("type.no-suppression", "regex", line, "Remove the suppression and fix the boundary.");
+    addLineViolation({
+      ruleId: "type.no-suppression",
+      channel: "regex",
+      line,
+      message: "Remove the suppression and fix the boundary.",
+    });
   });
 
   if (file.startsWith("scripts/")) {
@@ -1295,13 +1453,23 @@ const inspectSourceFile = (
       const specifier = moduleSpecifierFor(statement);
       return specifier === "typescript" || specifier === "glob" || specifier === "node:fs";
     });
-    if (ownsSubstantiveDeclaration || ownsToolEngine || rootFunctions.length > 4) {
-      addLineViolation(
-        "script.thin-entrypoint",
-        "ast",
-        1,
-        "Move substantive script logic to a co-located owner under src and keep this entrypoint thin.",
-      );
+    const ownerBindings = importedScriptOwnerBindings(sourceFile, file);
+    const delegates = delegatesToImportedOwner(sourceFile, ownerBindings);
+    const ownsLargeLocalArrow = rootFunctions.some(
+      (declaration) =>
+        declaration.initializer &&
+        ts.isArrowFunction(declaration.initializer) &&
+        ts.isBlock(declaration.initializer.body) &&
+        declaration.initializer.body.statements.length > 4 &&
+        !delegatesToImportedOwner(declaration.initializer, ownerBindings),
+    );
+    if (ownsSubstantiveDeclaration || ownsToolEngine || ownsLargeLocalArrow || rootFunctions.length > 4 || !delegates) {
+      addLineViolation({
+        ruleId: "script.thin-entrypoint",
+        channel: "ast",
+        line: 1,
+        message: "Move substantive script logic to a co-located owner under src and keep this entrypoint thin.",
+      });
     }
   }
 
@@ -1310,7 +1478,7 @@ const inspectSourceFile = (
   return violations;
 };
 
-const importEdges = (repositoryRoot: string, files: ReadonlyArray<string>, program: ts.Program): ReadonlyArray<ImportEdge> =>
+const importEdges = ({ repositoryRoot, files, program }: ImportEdgeRequest): ReadonlyArray<ImportEdge> =>
   files.flatMap((file) => {
     const sourceFile = program.getSourceFile(join(repositoryRoot, file));
     if (!sourceFile) {
@@ -1318,7 +1486,7 @@ const importEdges = (repositoryRoot: string, files: ReadonlyArray<string>, progr
     }
     return sourceFile.statements.flatMap((statement): ReadonlyArray<ImportEdge> => {
       const specifier = moduleSpecifierFor(statement);
-      const target = specifier ? resolveSourceImport(repositoryRoot, file, specifier) : undefined;
+      const target = specifier ? resolveSourceImport({ repositoryRoot, file, specifier }) : undefined;
       if (!target || !files.includes(target)) {
         return [];
       }
@@ -1336,7 +1504,7 @@ const inspectImportCycles = (
   edges: ReadonlyArray<ImportEdge>,
   rulesById: ReadonlyMap<string, MachineRule>,
 ): ReadonlyArray<CodeStyleViolation> => {
-  if (!ruleUses(rulesById, "architecture.no-cycle", "importGraph")) {
+  if (!ruleUses({ rulesById, ruleId: "architecture.no-cycle", channel: "importGraph" })) {
     return [];
   }
 
@@ -1412,9 +1580,16 @@ export const checkCodeStyle = (repositoryRoot: string): CodeStyleReport => {
   const typeChecker = program.getTypeChecker();
   const rawViolations = [
     ...files.flatMap((file) =>
-      inspectSourceFile(repositoryRoot, file, protectedStateByPath.get(file), contract.rulesById, program, typeChecker),
+      inspectSourceFile({
+        repositoryRoot,
+        file,
+        protectedState: protectedStateByPath.get(file),
+        rulesById: contract.rulesById,
+        program,
+        typeChecker,
+      }),
     ),
-    ...inspectImportCycles(importEdges(repositoryRoot, files, program), contract.rulesById),
+    ...inspectImportCycles(importEdges({ repositoryRoot, files, program }), contract.rulesById),
   ];
   const overlayActive = protectedStates.every((entry) => entry.state === "protected-overlay");
   const violations = overlayActive ? applyOverlayExceptions(rawViolations, contract.configuration.exceptions) : rawViolations;
