@@ -79,6 +79,8 @@ const yamlReferenceArtifact = {
     _tag: "yamlSequenceValue",
     filePreviouslyPresent: true,
     key: "read",
+    keyPreviouslyPresent: true,
+    insertedPrefix: "",
     reference: "AGENTS.md",
     previouslyPresent: false,
   },
@@ -887,24 +889,24 @@ describe("createUpdatePlan", () => {
       ...yamlReferenceArtifact,
       ownership: {
         ...yamlReferenceArtifact.ownership,
-        filePreviouslyPresent: false,
-        previouslyPresent: true,
+        keyPreviouslyPresent: false,
+        insertedPrefix: "\n",
       },
     };
     const desiredYaml = {
       ...yamlReferenceArtifact,
       ownership: {
         ...yamlReferenceArtifact.ownership,
-        filePreviouslyPresent: true,
-        previouslyPresent: false,
+        filePreviouslyPresent: false,
       },
     };
     const expectedYaml = {
       ...desiredYaml,
       ownership: {
         ...desiredYaml.ownership,
-        filePreviouslyPresent: false,
-        previouslyPresent: true,
+        filePreviouslyPresent: true,
+        keyPreviouslyPresent: false,
+        insertedPrefix: "\n",
       },
     };
     const plan = unwrap(

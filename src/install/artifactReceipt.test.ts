@@ -65,6 +65,8 @@ const yamlSequenceOwnership = {
   _tag: "yamlSequenceValue",
   filePreviouslyPresent: true,
   key: "read",
+  keyPreviouslyPresent: true,
+  insertedPrefix: "",
   reference: "AGENTS.md",
   previouslyPresent: false,
 };
@@ -448,6 +450,38 @@ describe("artifactReceiptSchema", () => {
         previouslyPresent: false,
       }).filePreviouslyPresent,
     ).toBe(true);
+  });
+
+  it("requires YAML key-lifetime and inserted-frame evidence to agree", () => {
+    expect(() =>
+      decodeYamlSequenceValue({
+        ...yamlSequenceOwnership,
+        keyPreviouslyPresent: false,
+        insertedPrefix: "\n",
+      }),
+    ).not.toThrow();
+    expect(() =>
+      decodeYamlSequenceValue({
+        ...yamlSequenceOwnership,
+        keyPreviouslyPresent: true,
+        insertedPrefix: "\n",
+      }),
+    ).toThrow(/prefix|frame|key/i);
+    expect(() =>
+      decodeYamlSequenceValue({
+        ...yamlSequenceOwnership,
+        keyPreviouslyPresent: false,
+        insertedPrefix: "",
+        previouslyPresent: true,
+      }),
+    ).toThrow(/previous|key/i);
+    expect(() =>
+      decodeYamlSequenceValue({
+        ...yamlSequenceOwnership,
+        keyPreviouslyPresent: false,
+        insertedPrefix: "custom",
+      }),
+    ).toThrow(/prefix|frame/i);
   });
 
   it("requires non-empty unique agent ownership IDs", () => {

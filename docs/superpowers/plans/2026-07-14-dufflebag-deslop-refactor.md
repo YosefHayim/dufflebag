@@ -410,7 +410,7 @@ Use tagged schemas for:
 - runtime, skill, rule, instruction, config-reference, settings, managed-config, and receipt artifact kinds; and
 - `wholeFile`, `managedBlock`, `jsonValues`, and `yamlSequenceValue` ownership metadata.
 
-`wholeFile` records the installed hash plus a tagged missing/prior-file value. `managedBlock` records markers and the installed-body hash. `jsonValues` records exact pointers, installed value hashes, and tagged previous values. `yamlSequenceValue` records the exact key/reference pair and its previous presence. The three partially managed ownership tags also record whether the host file existed before the receipt entry first managed it. Preserve that file lifetime independently from member-level previous states acquired by later updates. Store previous bytes only where exact restoration requires them; encode them explicitly for JSON.
+`wholeFile` records the installed hash plus a tagged missing/prior-file value. `managedBlock` records markers and the installed-body hash. `jsonValues` records exact pointers, installed value hashes, and tagged previous values. `yamlSequenceValue` records the exact key/reference pair, whether the key and reference previously existed, and the exact separator inserted before a newly managed key. The three partially managed ownership tags also record whether the host file existed before the receipt entry first managed it. Preserve that file lifetime and YAML key framing independently from member-level previous states acquired by later updates. Store previous bytes only where exact restoration requires them; encode them explicitly for JSON.
 
 `write` carries next owned bytes. `restore` carries final unowned bytes materialized by read-only inspection plus a pure format handler. `remove` is allowed only when receipt metadata proves the host file was previously absent and materialization leaves no unowned bytes. Update and uninstall inputs provide restorations one-for-one for stale receipt entries; planners reject missing, extra, duplicate, or metadata-mismatched restorations and reorder them by reverse receipt order. The receipt authorizes every path even though later tasks supply the bytes.
 
@@ -578,10 +578,16 @@ git commit -m "refactor(config): plan managed configuration"
 - Create: `src/install/agentFormats/instructionFile.test.ts`
 - Create: `src/install/agentFormats/configReference.ts`
 - Create: `src/install/agentFormats/configReference.test.ts`
+- Modify: `src/install/artifactReceipt.ts`
+- Modify: `src/install/artifactReceipt.test.ts`
+- Modify: `src/install/artifactPlan.ts`
+- Modify: `src/install/artifactPlan.test.ts`
+- Modify: `package.json`
+- Modify: `pnpm-lock.yaml`
 
 - [ ] **Step 1: Write one failing public-seam suite per output format**
 
-Cover exact allowlist copying and template substitution for skill directories; frontmatter removal and one file per skill for rule files; idempotent managed-block insertion/replacement/removal while preserving surrounding bytes for instruction files; and Aider YAML versus Continue JSON references selected by the target's `referenceFormat` tag. Every handler must return desired artifacts plus matching ownership metadata without writing.
+Cover exact allowlist copying and literal template substitution for skill directories; frontmatter removal and one file per skill for rule files; idempotent managed-block insertion/replacement/removal while preserving surrounding bytes and shared owner evolution for instruction files; and Aider YAML versus Continue JSON native references selected by the target's `referenceFormat` tag. Aider tests parse the complete YAML document and prove exact restoration of a created `read` key. Every handler returns its direct desired operation plus matching ownership metadata without writing.
 
 Run:
 
@@ -593,7 +599,7 @@ Expected: RED because the handlers do not exist.
 
 - [ ] **Step 2: Implement the four target-tag handlers**
 
-Each file owns one format and exports one planning function with one cohesive input object. Dispatch once on `agent.target._tag`; never switch on agent ID. Shared logic may stay in the caller until a second real handler needs it. Do not create `agentFormatHelper.ts`, per-agent modules, writer wrappers, or a barrel chain.
+Each file owns one format and exports one planning function with one cohesive input object. Dispatch once on `agent.target._tag`; never switch on agent ID. `instructionFile.ts` plans one shared instruction path with the complete catalog-ordered owner set. `configReference.ts` plans only the exact native config file and never imports or calls `instructionFile.ts`. Shared logic may stay in the caller until a second real handler needs it. Do not create `agentFormatHelper.ts`, per-agent modules, writer wrappers, or a barrel chain.
 
 - [ ] **Step 3: Prove all 13 agents route through four formats**
 
@@ -608,7 +614,7 @@ Expected: the catalog exhaustively reaches four handlers and no format function 
 - [ ] **Step 4: Commit the format boundary**
 
 ```bash
-git add src/install/agentFormats
+git add package.json pnpm-lock.yaml src/install/agentFormats src/install/artifactReceipt.ts src/install/artifactReceipt.test.ts src/install/artifactPlan.ts src/install/artifactPlan.test.ts docs/superpowers/specs/2026-07-14-dufflebag-deslop-design.md docs/superpowers/plans/2026-07-14-dufflebag-deslop-refactor.md
 git commit -m "refactor(install): plan four native agent formats"
 ```
 
@@ -649,6 +655,8 @@ Each capability follows the visible order:
 ```text
 decode request -> inspect current state -> resolve catalog -> create plan -> validate plan -> apply plan -> return result
 ```
+
+During plan creation, group desired and previously receipted instruction consumers by catalog instruction path and call `planInstructionFile` once per path. Plan each config-reference agent's native file separately. Codex, Aider, and Continue together therefore produce one shared `AGENTS.md` operation, one `.aider.conf.yml` operation, and one `.continue/config.json` operation with no duplicate destination.
 
 Use `Effect.gen` only for dependent effects. Keep planning pure. `install.ts`, `update.ts`, and `uninstall.ts` may invoke `applyArtifactPlan`; nothing else writes application files.
 

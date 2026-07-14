@@ -456,6 +456,10 @@ Native output behavior belongs to exactly four handlers:
 
 There are no per-agent modules, optional target-property bags, or agent-ID switches inside format handlers.
 
+`instructionFile.ts` owns one shared instruction path at a time. Its desired value contains the complete catalog-ordered owner set, so owner evolution such as Codex to Codex plus Aider changes one `AGENTS.md` receipt instead of creating competing plans for the same path. `configReference.ts` owns only an agent's native config file: `.aider.conf.yml` or `.continue/config.json`. It never plans or imports the shared instruction file.
+
+The install capability groups selected and previously receipted instruction consumers by instruction path, calls `instructionFile.ts` exactly once for each path, and plans native config references independently. Aider YAML inspection uses a real parsed document, records whether the `read` key already existed plus any exact prefix inserted with a new key, and restores those bytes without leaving an empty managed key behind.
+
 ## Managed configuration
 
 `bagConfigSchema` owns every configuration property's:

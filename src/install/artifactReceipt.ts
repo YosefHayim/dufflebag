@@ -256,13 +256,34 @@ export const yamlSequenceValueOwnershipSchema = Schema.TaggedStruct("yamlSequenc
   key: Schema.NonEmptyTrimmedString.annotations({
     description: "Exact YAML sequence key that owns the reference.",
   }),
+  keyPreviouslyPresent: Schema.Boolean.annotations({
+    description: "Whether the YAML sequence key existed before this reference first became owned.",
+  }),
+  insertedPrefix: Schema.Literal("", "\n", "\r\n").annotations({
+    description: "Exact separator inserted before a handler-created YAML key so removal can restore the prior bytes.",
+  }),
   reference: Schema.NonEmptyTrimmedString.annotations({
     description: "Exact sequence value installed under the key.",
   }),
   previouslyPresent: Schema.Boolean.annotations({
     description: "Whether the exact key/reference pair existed before that pair first became owned.",
   }),
-});
+}).pipe(
+  Schema.filter((ownership) => [
+    ownership.keyPreviouslyPresent || !ownership.previouslyPresent
+      ? undefined
+      : {
+          path: ["previouslyPresent"],
+          message: "A YAML reference cannot predate a key that did not exist.",
+        },
+    !ownership.keyPreviouslyPresent || ownership.insertedPrefix.length === 0
+      ? undefined
+      : {
+          path: ["insertedPrefix"],
+          message: "A pre-existing YAML key cannot own an inserted key prefix.",
+        },
+  ]),
+);
 
 export type YamlSequenceValueOwnership = Schema.Schema.Type<typeof yamlSequenceValueOwnershipSchema>;
 
