@@ -943,6 +943,15 @@ describe("mutation, collections, runtime, and presentation", () => {
     expect(report.violations).toEqual([]);
   });
 
+  it("accepts a locally owned collection that shadows an outer input", () => {
+    const report = checkSource(
+      "src/install/example.ts",
+      'export const collect = (items: string[]) => Effect.sync(() => {\n  const items: string[] = [];\n  items.push("value");\n  return items;\n});\n',
+    );
+
+    expect(report.violations).toEqual([]);
+  });
+
   it("rejects reduce used to build an array", () => {
     const report = checkSource(
       "src/install/example.ts",
