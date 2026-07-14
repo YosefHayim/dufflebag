@@ -63,16 +63,21 @@
   "packageManager": "pnpm@10.33.2",
   "dependencies": {
     "@clack/prompts": "^0.10.1",
+    "@effect/cli": "0.76.0",
+    "@effect/platform": "0.97.0",
+    "@effect/platform-node": "0.108.0",
     "commander": "^13.1.0",
+    "effect": "3.22.0",
     "picocolors": "^1.1.1"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.2",
+    "@effect/vitest": "0.30.0",
     "@types/node": "^22.10.0",
     "glob": "^13.0.6",
     "husky": "^9.1.7",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2",
-    "vitest": "^2.1.8"
+    "vitest": "3.2.7"
   }
 }
