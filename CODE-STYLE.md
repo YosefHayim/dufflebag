@@ -1,174 +1,152 @@
 # Dufflebag code style
 
-This file is the prescriptive source of truth for maintained code in this repository. The codebase is migrating to this contract; a rule describes the required destination even when a later refactor task still owns existing violations.
+This is the prescriptive human source of truth for maintained code in this repository. The codebase is migrating to this destination through the approved refactor plan. Existing debt does not weaken a rule and must not be hidden behind a broad allowlist.
 
-`code-style.rules.json` mirrors every rule ID and records how each rule is checked. Biome owns formatting and general linting. `scripts/checkCodeStyle.ts` owns only the AST, import-graph, path, and comment rules that Biome cannot express.
+`code-style.rules.json` mirrors every rule ID in the same order. Biome owns ordinary formatting and linting. `src/style/checkCodeStyle.ts` owns only focused AST, regex, path, and import-graph checks that those tools cannot express. Manual rules remain in the machine catalog and are reported honestly for review.
 
-Generated provider projections and `dist/` are not authored source. The three named make-a-trailer files in the machine contract are the only temporary maintained-source exception. Never broaden them to a directory or wildcard.
+Generated provider projections and `dist/` are not authored source. The three exact make-a-trailer files named in the machine contract are protected by immutable committed and overlay hashes; no directory, wildcard, CI flag, or dirty-tree heuristic can replace those hashes.
 
-## Architecture
+## Architecture and paths
 
-Keep one npm package. Organize application code by the capability that owns the behavior:
+The target is one capability-first package:
 
 ```text
 src/
+├── build/
 ├── cli/
 ├── catalog/
 ├── config/
 ├── install/
 ├── runtime/
-├── skills/
+├── skills/<sourceDirectory>/
+├── style/
 ├── doctor.ts
 └── scaffoldWorkflows.ts
 ```
 
-`src/core`, `src/commands`, `src/payload`, technical-layer buckets, and mirrored wrapper hierarchies are not part of the target structure.
+### Capability-owned layout [rule:path.capability-layout]
 
-### Capability-owned paths [rule:path.capability-layout]
+Put behavior beside the domain capability that owns its policy. `src/core`, `src/commands`, `src/payload`, generic repositories/DAOs, technical-layer trees, and mirrored wrapper hierarchies are not destinations. A genuinely tiny repository may remain flat.
 
-Put behavior in the named capability that owns it. Do not create generic technical layers or a second abstraction tree around direct library APIs.
+### Domain files, not buckets [rule:path.no-generic-bucket]
 
-### No generic bucket files [rule:path.no-generic-bucket]
+Name modules for their job. `types.ts`, `helpers.ts`, `utils.ts`, `common.ts`, and `misc.ts` are forbidden buckets.
 
-Name a file after its domain job. `types.ts`, `helpers.ts`, `utils.ts`, `common.ts`, and `misc.ts` are forbidden buckets.
+### Authored filenames [rule:path.authored-file-name]
 
-### Authored path casing [rule:path.source-directory-case]
+Use `camelCase` for authored directories and non-component source, and `PascalCase` for UI components. Standard `.test`, `.config`, and declaration suffixes are metadata, not a second role. Do not use dotted role names or repeat roles: use `orderStore.ts`, not `order.repository.ts` or `orderRepositoryRepository.ts`. Public IDs and CLI flags remain decoded kebab-case data.
 
-Authored source directories use `camelCase`. UI component files use `PascalCase`. Public feature IDs, installed IDs, and CLI flags remain hyphenated data; they do not dictate authored path casing.
+### No pass-through wrappers [rule:architecture.no-wrapper-layer]
 
-### No wrapper layers [rule:architecture.no-wrapper-layer]
+Call official Effect, platform, and filesystem services from the owning capability. A local service or adapter must own policy, translation, lifecycle, or a real external boundary—not merely rename another API. Do not create speculative manager/helper/repository layers.
 
-Call official Effect, platform, and filesystem services directly from the capability that owns the operation. Do not add `Manager`, `Helper`, `Utils`, pass-through service, `Context.Tag`, or `Layer` wrappers that do not own policy.
+### Acyclic dependencies [rule:architecture.no-cycle]
 
-## Functions
+Internal relative imports form an acyclic graph. If two capabilities depend on one another, move the shared contract to the owner both can point toward; do not conceal the cycle behind a barrel.
+
+## Functions and bodies
 
 ### Arrow constants [rule:function.arrow-only]
 
-Named functions are arrow constants declared before use.
+Every named function is an arrow constant declared before use.
 
 ```ts
 const decodeConfig = (input: unknown) => Schema.decodeUnknown(bagConfigSchema)(input);
 ```
 
-Do not write named function declarations. Declaration order should make the file read from primitives into orchestration without relying on hoisting.
-
 ### Effect generator exception [rule:function.effect-generator]
 
-The only permitted generator function is an anonymous generator passed directly to `Effect.gen`.
+The only generator function is an anonymous generator passed directly to `Effect.gen`.
 
 ```ts
 export const loadConfig = Effect.gen(function* () {
-  const file = yield* FileSystem.FileSystem;
-  return yield* file.readFileString("config.json");
+  const fileSystem = yield* FileSystem.FileSystem;
+  return yield* fileSystem.readFileString("config.json");
 });
 ```
 
-Do not name, assign, forward, or wrap that generator callback.
+Do not name, assign, forward, or wrap the generator callback.
 
 ### Cohesive inputs [rule:function.input-shape]
 
-Prefer one cohesive input. Two positional inputs are acceptable only when they are a natural pair. Three or more inputs require one named request object. Do not create a ceremonial request object for a single primitive, and do not pass behavior as a positional boolean flag.
+Prefer one cohesive input. Two positional values are allowed only as a natural pair. Three or more values use a small named request object. Rest parameters are allowed when they express a real variadic operation. Positional boolean behavior flags are forbidden; schema-decoded external boolean state belongs inside a named request. Do not create a ceremonial object for one primitive.
 
 ### One visible job [rule:function.one-job]
 
-A function should perform one job that can be understood from its name and body. Extract a second domain operation when a body mixes policy, I/O, presentation, and persistence. Do not split readable straight-line code into pass-through one-line wrappers.
+A function owns one concept, policy, boundary, or operation. Use guard clauses and keep I/O, policy, persistence, and presentation with their real owners. There is no arbitrary function line limit.
 
-### Blank lines between functions [rule:function.blank-line]
+### No pointless extraction [rule:function.no-pointless-extraction]
 
-Leave one blank line between adjacent function declarations. Keep related statements together inside a function; do not add vertical noise between every line.
+Do not extract a private one-use expression into a pass-through helper that adds no policy or meaning. Inline it until the name owns a concept, boundary, non-trivial invariant, or a second real caller.
+
+### Function spacing [rule:function.blank-line]
+
+Keep one blank line between adjacent declarations. Do not add blank lines between every statement in a body.
 
 ### Maximum nesting [rule:function.nesting]
 
-Control flow may nest at most two levels. Use a guard clause or extract one cohesive operation before introducing a third level.
+Control flow nests at most two levels. Prefer a guard clause or extract one cohesive operation before a third level.
 
-### Tagged errors are the only classes [rule:class.tagged-error-only]
+### Tagged errors are the class exception [rule:class.tagged-error-only]
 
-Do not author classes except errors that directly extend `Schema.TaggedError`. Prefer data, schemas, arrow functions, and official Effect services.
+Do not author classes except expected branch-worthy errors that directly extend `Schema.TaggedError`. Prefer schemas, values, arrow functions, and official services.
 
-## Comments
+## Comments and documentation
 
-Comments explain intent, proof, ownership, or ordering that syntax cannot make obvious. Do not narrate routine assignments.
+Comments explain intent, invariant, proof, ownership, ordering, security, or a measured tradeoff. They never narrate syntax.
 
-### Loop intent [rule:comment.loop-intent]
+### Comment only non-obvious loops [rule:comment.loop-intent]
 
-Every explicit `for`, `for...of`, `for...in`, `while`, or `do...while` loop has one short intent comment immediately above it, with no blank line.
+A simple loop whose body states its work needs no ceremony. A non-obvious explicit loop receives one short comment immediately above it explaining ordering, batching, local mutation, performance, or early exit.
 
 ```ts
-// Preserve catalog order in the generated output.
-for (const feature of featureCatalog) {
-  sections.push(renderFeature(feature));
+// Roll back in reverse commit order so dependent destinations never observe a partial owner.
+for (const artifact of committedArtifacts.toReversed()) {
+  rollback(artifact);
 }
 ```
 
-Prefer direct collection operators when they state the transformation more clearly.
+`// Loop through artifacts` is not an intent comment.
 
-### Indexed-access proof [rule:comment.index-proof]
+### Prove non-obvious indexed access [rule:comment.index-proof]
 
-An indexed non-null access is permitted only when a short proof comment sits immediately above the statement.
-
-```ts
-const itemAt = (items: ReadonlyArray<string>, index: number) => {
-  if (index < 0 || index >= items.length) {
-    return Option.none();
-  }
-
-  // The guard above proves this index is in bounds.
-  return Option.some(items[index]!);
-};
-```
-
-The comment does not excuse unrelated non-null assertions.
-
-### Ordered pipeline contracts [rule:comment.pipeline-contract]
-
-A real multi-phase pipeline has one contract comment above the orchestration and short numbered phase comments inside it. The numbers explain order and failure ownership; they are not decorative headings on ordinary functions.
+Place a short proof immediately above a non-literal indexed access when safety is not obvious. The proof never authorizes `!`, `as`, or another assertion.
 
 ```ts
-// Apply one validated artifact plan atomically: stage first, write the receipt last, and roll back in reverse order.
-export const applyArtifactPlan = (request: ApplyArtifactPlanRequest) =>
-  Effect.gen(function* () {
-    // 1. Inspect current destinations without changing disk state.
-    const inspection = yield* inspectArtifactDestinations(request);
+if (index < 0 || index >= items.length) {
+  return Option.none();
+}
 
-    // 2. Stage and validate every replacement before the first destination write.
-    const stagedArtifacts = yield* stageArtifacts({ request, inspection });
-
-    // 3. Commit destination changes in plan order.
-    const committedArtifacts = yield* commitArtifacts(stagedArtifacts);
-
-    // 4. Persist the ownership receipt only after every destination is durable.
-    return yield* writeArtifactReceipt(committedArtifacts);
-  });
+// The bounds guard proves the requested element exists.
+return Option.fromNullable(items[index]);
 ```
 
-## Schemas and types
+### Contract real pipelines [rule:comment.pipeline-contract]
 
-### Schema owns runtime objects [rule:type.schema-owned-runtime]
+An ordered workflow with three or more dependent phases has a contract comment above the orchestration and short numbered phase comments. The contract states ordering and failure ownership; ordinary leaf functions do not receive numbered headings.
 
-When data crosses a runtime, persistence, CLI, environment, catalog, or agent-format boundary, define executable Effect Schema first and derive TypeScript types from it. Do not maintain a handwritten object type beside a validator.
+### Signal-based TSDoc [rule:documentation.signal-tsdoc]
 
-Descriptions, defaults, checks, error messages, and legacy transformations live inline on the property they govern. Do not recreate parallel `DEFAULTS`, `BOUNDS`, `ENV_KEYS`, descriptor, or description maps.
+Document an exported API only when its caller needs behavior, invariant, side effect, ownership, lifecycle, error, retry, ordering, security, or performance information that its signature and schema do not show. Never restate the function name, parameter names, property types, schema descriptions, or obvious implementation steps.
 
-`FeatureDefinition` follows this pattern:
+## Schemas, types, and absence
+
+### Effect Schema owns runtime objects [rule:type.schema-owned-runtime]
+
+Effect Schema is the single source for runtime validation, derived TypeScript types, descriptions, defaults, error messages, OpenAPI, and JSON Schema. Data crossing a CLI, environment, persistence, catalog, agent-format, network, or capability boundary begins with executable Schema. Do not pair a handwritten runtime object type with a validator or parallel defaults/descriptions map.
+
+Owned requests, configuration, persisted data, and security input decode strictly with excess properties rejected. Third-party responses may tolerate fields the application deliberately does not own, but still decode every consumed field.
+
+The canonical feature pattern is executable Schema first:
 
 ```ts
 export const featureDefinitionSchema = Schema.Struct({
-  id: Schema.NonEmptyTrimmedString.pipe(
-    Schema.pattern(/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/, {
-      message: () => "Feature IDs use lowercase kebab-case.",
-    }),
-    Schema.annotations({
-      description: "Stable public feature ID.",
-    }),
-  ),
-  sourceDirectory: Schema.NonEmptyTrimmedString.pipe(
-    Schema.pattern(/^[a-z][a-zA-Z0-9]*$/, {
-      message: () => "Source directories use camelCase.",
-    }),
-    Schema.annotations({
-      description: "Authored directory under src/skills.",
-    }),
-  ),
+  id: featureIdSchema.annotations({
+    description: "Stable public feature ID.",
+  }),
+  sourceDirectory: sourceDirectorySchema.annotations({
+    description: "Authored directory under src/skills.",
+  }),
   installedSkill: installedSkillDefinitionSchema.annotations({
     description: "Installed output, separate from feature identity.",
   }),
@@ -181,13 +159,7 @@ export const featureDefinitionSchema = Schema.Struct({
   selectedByDefault: Schema.Boolean.annotations({
     description: "Whether a fresh install preselects the feature.",
   }),
-  dependencies: Schema.Array(
-    Schema.NonEmptyTrimmedString.pipe(
-      Schema.pattern(/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/, {
-        message: () => "Dependency IDs use lowercase kebab-case.",
-      }),
-    ),
-  ).annotations({
+  dependencies: Schema.Array(featureIdSchema).annotations({
     description: "Features resolved before this feature.",
   }),
   platform: featurePlatformSchema.annotations({
@@ -201,90 +173,119 @@ export const featureDefinitionSchema = Schema.Struct({
 export type FeatureDefinition = Schema.Schema.Type<typeof featureDefinitionSchema>;
 ```
 
-The dependency-free installed hook transport is the narrow exception: it may use small local structural types because Effect does not ship in that runtime island.
+The dependency-free installed-hook transport reader is a narrow exception: it may use local structural aliases while narrowing an already validated wire format. It owns no application defaults, bounds, messages, or domain validation.
 
-### No interfaces [rule:type.no-interface]
+### The two interface cases [rule:type.interface-cases]
 
-Do not author interfaces. Declaration-file augmentation is the only exception.
+Interfaces are allowed only for `.d.ts` declaration augmentation and a genuinely substitutable, feature-owned external capability port. A port lives with the feature adapter, names the external capability, and exposes meaningful operations that tests or providers can substitute. Runtime data, requests, results, and ordinary internal services derive from Schema or use a local type alias.
 
 ### No enums [rule:type.no-enum]
 
-Use schema literals and their derived union instead of enums.
+Use Schema literals and their derived union instead of an enum.
 
-### No conditional or infer machinery [rule:type.no-conditional]
+### No conditional type machinery [rule:type.no-conditional]
 
-Do not author conditional types or `infer` chains to recover types from object descriptors. Make the schema the source of truth and derive its type directly.
+Do not author conditional or `infer` chains to recover types from descriptors. Make the schema the source and derive directly.
 
 ### No assertions [rule:type.no-assertion]
 
-Do not use `as`, angle-bracket assertions, `as const`, or general non-null assertions. Decode unknown input, narrow it, or improve the schema. The documented indexed-access proof is the sole non-null exception.
+Do not use `as`, angle-bracket assertions, `as const`, double assertions, or non-null assertions. Decode external `unknown`, narrow it explicitly, or improve the schema. `satisfies` is allowed because it checks a value without changing its claimed type.
 
 ### No suppression directives [rule:type.no-suppression]
 
-Do not use `@ts-ignore`, `@ts-expect-error`, `@ts-nocheck`, formatter ignores, linter ignores, or coverage ignores. Fix the boundary or change the design.
+Do not use TypeScript, Biome, Prettier, ESLint, or coverage ignore directives. Fix the boundary or change the design.
 
-## Exports and names
+### One absence representation per boundary [rule:type.absence-boundary]
 
-### Wildcard-only barrels [rule:barrel.direct-wildcard]
+Use `undefined` for ordinary application absence, `null` only while decoding or encoding an external protocol, and `Option` for meaningful business absence. Translate once at the boundary. One value never exposes `null`, `undefined`, and `Option` together.
 
-Barrels are optional flat manifests. When an `index.ts` exists, every statement is a direct wildcard export:
+## Modules, exports, and names
 
-```ts
-export * from "./artifactPlan.js";
-export * from "./artifactReceipt.js";
-```
+### Named exports [rule:export.named-only]
 
-Selective exports, aliases, logic, and chains through another barrel are forbidden.
+Use named exports. A framework-required default export is the only exception and stays at that framework boundary.
+
+### No internal barrels or export star [rule:export.no-internal-barrel]
+
+Import internal owners directly. `export *` is always forbidden. Internal `index.ts` barrels are forbidden. A real public package entrypoint may explicitly re-export named APIs; it contains no logic and does not re-export another barrel.
 
 ### Domain-specific names [rule:name.domain-specific]
 
-Names state the domain job or value. Avoid vague standalone roles and suffixes such as `Manager`, `Helper`, `Utils`, `Data`, `Info`, `Common`, and `Misc`. Prefer names such as `artifactReceipt`, `featureCatalog`, `decodeBagConfig`, and `applyArtifactPlan`.
+Names state the domain job. Booleans are predicates and collections are plural. Avoid vague `Manager`, `Helper`, `Utils`, `Data`, `Info`, `Common`, and `Misc` names. `LANGUAGE.md` owns accepted domain terms and abbreviations.
 
-Use `camelCase` for values, functions, variables, and authored non-UI files. Use `PascalCase` only for UI components and schema tagged-error classes. Keep public hyphenated IDs as decoded data.
+### Earn module boundaries [rule:module.no-fragmentation]
 
-## Values and collections
+Do not create one-export-per-file fragmentation. A split needs an independent reason to change, a genuine domain concept, or a second real caller. Keep a schema beside the operations that own it when they change together.
+
+## Values, mutation, and collections
 
 ### Never mutate inputs [rule:mutation.no-input]
 
-Treat every function input as borrowed. Return a new value or mutate a collection created and owned inside the function.
+Treat inputs as borrowed. Return a new value or create a locally owned collection.
+
+### Local mutation is allowed [rule:mutation.local-ownership]
+
+`push`, `Map.set`, and `Set.add` are allowed when the collection is created and contained inside the operation. Do not contort a clear algorithm into repeated spreads merely to claim immutability.
 
 ### No builder reduce [rule:collection.no-builder-reduce]
 
-Do not use `reduce` to build arrays or objects. Use `map`, `filter`, `flatMap`, `Object.fromEntries`, or one clearly commented loop. Scalar reductions such as totals are acceptable.
+Do not use `reduce` to build arrays or objects. Prefer `map`, `filter`, `flatMap`, `Object.fromEntries`, or one clear local loop. Scalar reductions remain valid.
+
+### Choose the collection form that exposes the work [rule:collection.loop-choice]
+
+Use collection methods for direct transformations. Prefer `for...of` for branching or locally stateful multi-step work. Effectful collections use `Effect.forEach` or `Effect.all` sequentially unless bounded concurrency has a written reason and limit.
+
+## Effect and runtime boundaries
+
+### Match composition to dependency depth [rule:effect.composition-depth]
+
+One dependent handoff may use one `Effect.flatMap`. Two or more dependent steps use `Effect.gen`. Avoid nested or repeated `flatMap`, `Effect.Do`, long pipe pyramids, and ceremonial generators. A short plain transformation may use `pipe`.
 
 ### No Promise.all in the application [rule:effect.no-promise-all]
 
-Use Effect collection operators. Default to sequential execution; opt into bounded concurrency only when the operation is independent and the bound is explicit.
-
-## Effect boundaries
+Use Effect collection operators so failures, interruption, and concurrency remain explicit.
 
 ### One runtime edge [rule:effect.runtime-edge]
 
-Only `src/cli/main.ts` may call `Effect.run*`. Capabilities return Effect values and compose without starting nested runtimes.
+Only `src/cli/main.ts` runs the main Effect with `NodeRuntime.runMain` and provides `NodeContext.layer`. All other application capabilities return Effect values. Independent shipped hook and png-to-code harness entrypoints are separate runtime graphs.
 
 ### Official services directly [rule:effect.official-services]
 
-Use official Effect platform services directly. Add a repository-owned service only when it owns real policy or a stable external boundary; do not wrap a service merely to rename its methods.
+Use official Effect platform services directly. Add a repository service only for real policy or a stable external integration.
+
+### Sequential by default [rule:effect.sequential-default]
+
+Effectful filesystem and provider work is sequential by default. Bounded concurrency requires independent work, a measured reason, and an explicit limit.
 
 ### Dependency-free hook island [rule:import.hook-runtime]
 
-Installed hook entrypoints and their transitive graph import only `node:*`, shared `src/runtime/**`, and their own feature runtime subtree. They do not import Effect, third-party packages, CLI code, catalog code, or install code.
+Installed hook entrypoints and their transitive graph import only `node:*`, shared `src/runtime/**`, and their own feature `hooks/**` or `runtime/**`. They never import Effect, packages, CLI, catalog, config, or install capabilities.
 
-### Application cannot import hook code [rule:import.application-boundary]
+### Application does not import hooks [rule:import.application-boundary]
 
-Application capabilities do not import installed hook-runtime modules. Shared transport parsing belongs under `src/runtime/**`; application orchestration belongs outside the hook island.
+Application capabilities never import installed hook code. Shared wire parsing belongs in the dependency-free transport owner; application orchestration stays outside the hook island.
 
-## Presentation
+### TerminalUI owns presentation [rule:presentation.terminal-ui]
 
-### TerminalUI owns application output [rule:presentation.terminal-ui]
+Main application code does not call `console.*`. `TerminalUI` owns TTY interaction, rendering, and structured non-interactive behavior. A non-TTY process never prompts. Root tooling and installed-hook diagnostics may write to their own process streams.
 
-Application code does not call `console.*`. `src/cli/TerminalUI.ts` owns terminal presentation, and command capabilities return structured success or tagged errors. Root tooling and dependency-free hook diagnostics may write directly to their process streams.
+### Thin root scripts [rule:script.thin-entrypoint]
 
-Non-TTY execution never prompts. Missing required input fails with a structured usage error.
+Root scripts decode arguments, call one substantive owner under `src/`, render the result, and set process status. AST traversal, contract parsing, build planning, and other domain logic stay importable and co-located with tests under `src/`.
 
-## Formatting and verification
+### Application never imports scripts [rule:import.application-no-scripts]
 
-Biome owns 2-space indentation, double quotes, semicolons, trailing commas, 120-column width, and organized imports across maintained TS, TSX, JS, MJS, JSON, and JSONC.
+Dependency direction is `scripts/` to `src/`, never `src/` to a script entrypoint.
+
+### Confine provider SDKs [rule:adapter.external-sdk-confinement]
+
+An external provider SDK appears only in an earned feature-owned adapter. The adapter decodes provider data, translates errors, and returns domain values; routes, operations, schemas, and persistence do not import the SDK.
+
+## Formatting and enforcement
+
+### Biome owns mechanical style [rule:formatting.biome]
+
+Biome owns 2-space indentation, double quotes, semicolons, trailing commas, organized imports, and recommended linting. During Tasks 2–14 the maintained migration scope and line width remain deliberately narrow; Task 15 performs the reviewed 120-column whole-maintained-tree cutover. Autofix is allowed only for formatter/linter transformations covered by fixtures and only on an explicitly reviewed file list.
 
 The complete target verification order is:
 
@@ -292,4 +293,4 @@ The complete target verification order is:
 Biome → typecheck → code-style contract → tests → build → shipping verification → hook smoke
 ```
 
-The contract checker remains dormant in `pnpm verify` until the migration task makes the maintained tree compliant. Fixture tests are active immediately; broad legacy allowlists are forbidden.
+The live code-style scan remains dormant in `pnpm verify` until Task 15 makes maintained source compliant. Metadata validation and isolated checker fixtures are active immediately. Broad legacy exceptions are forbidden.
