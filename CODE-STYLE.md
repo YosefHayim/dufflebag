@@ -44,6 +44,10 @@ Call official Effect, platform, and filesystem services from the owning capabili
 
 Internal relative imports form an acyclic graph. If two capabilities depend on one another, move the shared contract to the owner both can point toward; do not conceal the cycle behind a barrel.
 
+### Const unless reassigned [rule:binding.const-default]
+
+Declare bindings with `const` unless the binding itself must be reassigned. Locally owned arrays, maps, and sets may still mutate under the ownership rule; mutation does not require rebinding them with `let`.
+
 ## Functions and bodies
 
 ### Arrow constants [rule:function.arrow-only]
@@ -90,6 +94,10 @@ Control flow nests at most two levels. Prefer a guard clause or extract one cohe
 ### Tagged errors are the class exception [rule:class.tagged-error-only]
 
 Do not author classes except expected branch-worthy errors that directly extend `Schema.TaggedError`. Prefer schemas, values, arrow functions, and official services.
+
+### Preserve causes and translate once [rule:error.public-boundary]
+
+Preserve the original defect cause throughout internal failure handling. Translate or redact it once at the public CLI, HTTP, or provider boundary so callers receive a stable, non-sensitive error while logs and diagnostics retain the causal chain. Test the translation boundary; do not catch merely to discard `cause`, expose a provider payload, or print a raw stack.
 
 ## Comments and documentation
 
@@ -247,7 +255,7 @@ Use Effect collection operators so failures, interruption, and concurrency remai
 
 ### One runtime edge [rule:effect.runtime-edge]
 
-Only `src/cli/main.ts` runs the main Effect with `NodeRuntime.runMain` and provides `NodeContext.layer`. All other application capabilities return Effect values. Independent shipped hook and png-to-code harness entrypoints are separate runtime graphs.
+The main application contains exactly one `NodeRuntime.runMain(program.pipe(Effect.provide(NodeContext.layer)))` occurrence, in `src/cli/main.ts`. All other application capabilities return Effect values; `Effect.run*`, `NodeRuntime.runMain`, and `NodeContext.layer` are forbidden elsewhere. Independent shipped hook and png-to-code harness entrypoints are separate runtime graphs.
 
 ### Official services directly [rule:effect.official-services]
 
@@ -271,11 +279,11 @@ Main application code does not call `console.*`. `TerminalUI` owns TTY interacti
 
 ### Thin root scripts [rule:script.thin-entrypoint]
 
-Root scripts decode arguments, call one substantive owner under `src/`, render the result, and set process status. AST traversal, contract parsing, build planning, and other domain logic stay importable and co-located with tests under `src/`.
+Root scripts decode arguments, actually call an imported substantive owner under `src/`, render the result, and set process status. Merely importing an unused owner does not make a local engine thin. AST traversal, contract parsing, build planning, and other domain logic stay importable and co-located with tests under `src/`.
 
 ### Application never imports scripts [rule:import.application-no-scripts]
 
-Dependency direction is `scripts/` to `src/`, never `src/` to a script entrypoint.
+Dependency direction is `scripts/` to `src/`, never any authored `src/**` owner—including `src/build` and `src/style`—to a script entrypoint.
 
 ### Confine provider SDKs [rule:adapter.external-sdk-confinement]
 

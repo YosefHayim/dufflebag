@@ -46,6 +46,15 @@
       "enforcement": ["importGraph"]
     },
     {
+      "id": "binding.const-default",
+      "applicability": "Authored variable bindings",
+      "summary": "Bindings use const unless the binding itself is reassigned.",
+      "rationale": "Const makes rebinding intent explicit while still allowing locally owned collection mutation.",
+      "goodExample": "const results = []; results.push(value);",
+      "badExample": "let results = [] when results is never reassigned.",
+      "enforcement": ["linter"]
+    },
+    {
       "id": "function.arrow-only",
       "applicability": "Authored named functions",
       "summary": "Named functions are arrow constants declared before use.",
@@ -116,6 +125,15 @@
       "goodExample": "class ConfigError extends Schema.TaggedError<ConfigError>()(...) {}",
       "badExample": "class ConfigManager {}",
       "enforcement": ["ast"]
+    },
+    {
+      "id": "error.public-boundary",
+      "applicability": "Defect handling and public error boundaries",
+      "summary": "Preserve defect causes internally and translate or redact once at the public boundary.",
+      "rationale": "Operators need the original diagnostic chain while callers receive stable, non-sensitive errors.",
+      "goodExample": "A tagged internal failure retains cause; the CLI boundary renders one safe translated message.",
+      "badExample": "Catch, discard cause, and leak a provider response or stack to the caller.",
+      "enforcement": ["test", "manual"]
     },
     {
       "id": "comment.loop-intent",
@@ -232,7 +250,7 @@
       "rationale": "Direct imports expose real ownership and prevent hidden dependency fan-out.",
       "goodExample": "import { install } from \"./install/install.js\";",
       "badExample": "export * from \"./install.js\";",
-      "enforcement": ["ast", "importGraph"]
+      "enforcement": ["ast"]
     },
     {
       "id": "name.domain-specific",
@@ -309,10 +327,10 @@
     {
       "id": "effect.runtime-edge",
       "applicability": "Main application",
-      "summary": "Effect.run calls exist only at src/cli/main.ts.",
+      "summary": "The main application has one Node runtime and context-provision edge in src/cli/main.ts.",
       "rationale": "One deployable runtime edge preserves composition and lifecycle ownership.",
-      "goodExample": "NodeRuntime.runMain(program) in src/cli/main.ts",
-      "badExample": "Effect.runPromise inside install.ts",
+      "goodExample": "NodeRuntime.runMain(program.pipe(Effect.provide(NodeContext.layer))) in src/cli/main.ts",
+      "badExample": "Effect.runPromise, NodeRuntime.runMain, or NodeContext.layer inside install.ts",
       "enforcement": ["ast"]
     },
     {
@@ -367,7 +385,7 @@
       "rationale": "Substantive tooling stays importable, testable, and co-located under src.",
       "goodExample": "scripts/checkCodeStyle.ts imports and calls src/style/checkCodeStyle.ts.",
       "badExample": "A root script owns AST traversal, filesystem planning, and domain types.",
-      "enforcement": ["ast", "importGraph"]
+      "enforcement": ["ast"]
     },
     {
       "id": "import.application-no-scripts",

@@ -38,6 +38,24 @@ type FixtureConfiguration = {
   exceptions: Array<FixtureException>;
 };
 
+type AutomaticChannelFixture = {
+  ruleId: string;
+  channel: "regex" | "ast" | "path" | "importGraph";
+  files: Readonly<Record<string, string>>;
+};
+
+type SourceFixtureRequest = {
+  repositoryRoot: string;
+  path: string;
+  source: string;
+};
+
+type ContractFixtureRequest = {
+  repositoryRoot: string;
+  state?: "committed" | "overlay";
+  includeProtectedFiles?: boolean;
+};
+
 const ROOT = join(import.meta.dirname, "../..");
 const PROTECTED_PATHS = [
   "src/skills/make-a-trailer/SKILL.md",
@@ -81,7 +99,218 @@ const overlayAssembleCut = [
 ].join("\n");
 
 const overlayProtectedContent = ["# overlay skill\n", "# overlay pipeline\n", overlayAssembleCut];
+const semanticOverlayAssembleCut = `${overlayAssembleCut}
+export const chooseFallback = (value, fallback) => {
+  if (value === null) return fallback;
+  else if (fallback === null) return value;
+  else if ((value ?? null) === fallback) return value;
+  return undefined;
+};
+`;
 const temporaryRepositories = new Set<string>();
+
+const automaticChannelFixtures: ReadonlyArray<AutomaticChannelFixture> = [
+  {
+    ruleId: "path.capability-layout",
+    channel: "path",
+    files: { "src/core/example.ts": "export const value = 1;\n" },
+  },
+  {
+    ruleId: "path.no-generic-bucket",
+    channel: "path",
+    files: { "src/catalog/helpers.ts": "export const value = 1;\n" },
+  },
+  {
+    ruleId: "path.authored-file-name",
+    channel: "path",
+    files: { "src/catalog/order.repository.ts": "export const value = 1;\n" },
+  },
+  {
+    ruleId: "architecture.no-cycle",
+    channel: "importGraph",
+    files: {
+      "src/catalog/featureCatalog.ts": 'import { config } from "../config/configFile.js";\nexport const features = config;\n',
+      "src/config/configFile.ts": 'import { features } from "../catalog/featureCatalog.js";\nexport const config = features;\n',
+    },
+  },
+  {
+    ruleId: "function.arrow-only",
+    channel: "ast",
+    files: { "src/catalog/example.ts": "export function loadCatalog() {}\n" },
+  },
+  {
+    ruleId: "function.effect-generator",
+    channel: "ast",
+    files: { "src/catalog/example.ts": "export const generator = function* named() { yield value; };\n" },
+  },
+  {
+    ruleId: "function.input-shape",
+    channel: "ast",
+    files: { "src/catalog/example.ts": "export const load = (one: string, two: string, three: string) => one;\n" },
+  },
+  {
+    ruleId: "function.no-pointless-extraction",
+    channel: "ast",
+    files: { "src/catalog/example.ts": "const getName = (item: Item) => item.name;\nexport const title = getName(item);\n" },
+  },
+  {
+    ruleId: "function.blank-line",
+    channel: "ast",
+    files: { "src/catalog/example.ts": "export const first = () => 1;\nexport const second = () => 2;\n" },
+  },
+  {
+    ruleId: "function.nesting",
+    channel: "ast",
+    files: {
+      "src/catalog/example.ts": "export const choose = () => { if (first) { if (second) { if (third) return value; } } };\n",
+    },
+  },
+  {
+    ruleId: "class.tagged-error-only",
+    channel: "ast",
+    files: { "src/catalog/example.ts": "export class CatalogManager {}\n" },
+  },
+  {
+    ruleId: "comment.loop-intent",
+    channel: "ast",
+    files: { "src/catalog/example.ts": "export const retry = () => { while (pending) attempt(); };\n" },
+  },
+  {
+    ruleId: "comment.index-proof",
+    channel: "ast",
+    files: { "src/catalog/example.ts": "export const at = (items: string[], index: number) => items[index];\n" },
+  },
+  {
+    ruleId: "comment.pipeline-contract",
+    channel: "ast",
+    files: {
+      "src/catalog/example.ts":
+        "export const run = Effect.gen(function* () { const a = yield* first; const b = yield* second(a); return yield* third(b); });\n",
+    },
+  },
+  {
+    ruleId: "documentation.signal-tsdoc",
+    channel: "ast",
+    files: { "src/catalog/example.ts": "/** Gets the value. */\nexport const getValue = () => value;\n" },
+  },
+  {
+    ruleId: "type.schema-owned-runtime",
+    channel: "ast",
+    files: { "src/catalog/example.ts": "export type Feature = { id: string };\n" },
+  },
+  {
+    ruleId: "type.interface-cases",
+    channel: "ast",
+    files: { "src/catalog/example.ts": "export interface Feature { id: string }\n" },
+  },
+  {
+    ruleId: "type.no-enum",
+    channel: "ast",
+    files: { "src/catalog/example.ts": "export enum Scope { Global, Project }\n" },
+  },
+  {
+    ruleId: "type.no-conditional",
+    channel: "ast",
+    files: { "src/catalog/example.ts": "export type Item<T> = T extends Array<infer U> ? U : T;\n" },
+  },
+  {
+    ruleId: "type.no-assertion",
+    channel: "ast",
+    files: { "src/catalog/example.ts": "export const value = input as string;\n" },
+  },
+  {
+    ruleId: "type.no-suppression",
+    channel: "regex",
+    files: { "src/catalog/example.ts": "// @ts-expect-error\nexport const value: string = input;\n" },
+  },
+  {
+    ruleId: "type.absence-boundary",
+    channel: "ast",
+    files: { "src/catalog/example.ts": "export type MaybeName = string | null | undefined;\n" },
+  },
+  {
+    ruleId: "export.named-only",
+    channel: "ast",
+    files: { "src/catalog/example.ts": "export default value;\n" },
+  },
+  {
+    ruleId: "export.no-internal-barrel",
+    channel: "ast",
+    files: { "src/catalog/index.ts": 'export { value } from "./value.js";\n' },
+  },
+  {
+    ruleId: "name.domain-specific",
+    channel: "ast",
+    files: { "src/catalog/example.ts": "export const catalogManager = {};\n" },
+  },
+  {
+    ruleId: "mutation.no-input",
+    channel: "ast",
+    files: { "src/catalog/example.ts": "export const append = (items: string[]) => { items.push(value); };\n" },
+  },
+  {
+    ruleId: "collection.no-builder-reduce",
+    channel: "ast",
+    files: { "src/catalog/example.ts": "export const collect = (items: string[]) => items.reduce((out, item) => [...out, item], []);\n" },
+  },
+  {
+    ruleId: "effect.composition-depth",
+    channel: "ast",
+    files: {
+      "src/catalog/example.ts": "export const run = () => source.pipe(Effect.flatMap(decode), Effect.flatMap(persist));\n",
+    },
+  },
+  {
+    ruleId: "effect.no-promise-all",
+    channel: "ast",
+    files: { "src/catalog/example.ts": "export const all = () => Promise.all(tasks);\n" },
+  },
+  {
+    ruleId: "effect.runtime-edge",
+    channel: "ast",
+    files: { "src/catalog/example.ts": "export const result = Effect.runPromise(program);\n" },
+  },
+  {
+    ruleId: "import.hook-runtime",
+    channel: "importGraph",
+    files: {
+      "src/skills/contextGuard/hooks/contextGuard.ts": 'import { Effect } from "effect";\nexport const run = Effect.void;\n',
+    },
+  },
+  {
+    ruleId: "import.application-boundary",
+    channel: "importGraph",
+    files: {
+      "src/runtime/readConfig.ts": "export const readConfig = () => ({});\n",
+      "src/install/install.ts": 'import { readConfig } from "../runtime/readConfig.js";\nexport const install = readConfig;\n',
+    },
+  },
+  {
+    ruleId: "presentation.terminal-ui",
+    channel: "ast",
+    files: { "src/catalog/example.ts": 'export const report = () => console.log("done");\n' },
+  },
+  {
+    ruleId: "script.thin-entrypoint",
+    channel: "ast",
+    files: {
+      "scripts/build.ts": "const build = () => { inspect(); validate(); stage(); publish(); summarize(); };\nbuild();\n",
+    },
+  },
+  {
+    ruleId: "import.application-no-scripts",
+    channel: "importGraph",
+    files: {
+      "scripts/build.ts": "export const build = () => undefined;\n",
+      "src/build/buildPackage.ts": 'import { build } from "../../scripts/build.js";\nexport const buildPackage = build;\n',
+    },
+  },
+  {
+    ruleId: "adapter.external-sdk-confinement",
+    channel: "importGraph",
+    files: { "src/publish/publish.ts": 'import Stripe from "stripe";\nexport const publish = Stripe;\n' },
+  },
+];
 
 const isRecord = (value: unknown): value is object => typeof value === "object" && value !== null && !Array.isArray(value);
 
@@ -183,7 +412,7 @@ const createRepository = (): string => {
   return repositoryRoot;
 };
 
-const writeSource = (repositoryRoot: string, path: string, source: string): void => {
+const writeSource = ({ repositoryRoot, path, source }: SourceFixtureRequest): void => {
   const file = join(repositoryRoot, path);
   mkdirSync(dirname(file), { recursive: true });
   writeFileSync(file, source);
@@ -191,16 +420,19 @@ const writeSource = (repositoryRoot: string, path: string, source: string): void
 
 const fixtureConfiguration = (): FixtureConfiguration => {
   const configuration = cloneConfiguration(rootConfiguration());
-  configuration.protectedPaths.forEach((entry, index) => {
+  const protectedPaths = configuration.protectedPaths.map((entry, index) => {
     const committed = committedProtectedContent.at(index);
     const overlay = overlayProtectedContent.at(index);
     if (committed === undefined || overlay === undefined) {
       throw new Error("Protected fixture content is incomplete.");
     }
-    entry.committedSha256 = sha256(committed);
-    entry.overlaySha256 = sha256(overlay);
+    return {
+      ...entry,
+      committedSha256: sha256(committed),
+      overlaySha256: sha256(overlay),
+    };
   });
-  return configuration;
+  return { ...configuration, protectedPaths };
 };
 
 const writeConfiguration = (repositoryRoot: string, configuration: FixtureConfiguration): void => {
@@ -212,22 +444,22 @@ const writeGuide = (repositoryRoot: string, configuration: FixtureConfiguration)
   writeFileSync(join(repositoryRoot, "CODE-STYLE.md"), `${guide}\n`);
 };
 
-const writeContract = (
-  repositoryRoot: string,
-  state: "committed" | "overlay" = "committed",
-  writeProtectedFiles = true,
-): FixtureConfiguration => {
+const writeContract = ({
+  repositoryRoot,
+  state = "committed",
+  includeProtectedFiles = true,
+}: ContractFixtureRequest): FixtureConfiguration => {
   const configuration = fixtureConfiguration();
   writeGuide(repositoryRoot, configuration);
   writeConfiguration(repositoryRoot, configuration);
-  if (writeProtectedFiles) {
+  if (includeProtectedFiles) {
     const contents = state === "committed" ? committedProtectedContent : overlayProtectedContent;
     PROTECTED_PATHS.forEach((path, index) => {
       const content = contents.at(index);
       if (content === undefined) {
         throw new Error("Protected fixture content is incomplete.");
       }
-      writeSource(repositoryRoot, path, content);
+      writeSource({ repositoryRoot, path, source: content });
     });
   }
   return configuration;
@@ -244,7 +476,7 @@ const writeOverlayAssemble = (repositoryRoot: string, source: string): void => {
   if (!assemblePath) {
     throw new Error("Missing protected assemble fixture path.");
   }
-  writeSource(repositoryRoot, assemblePath, source);
+  writeSource({ repositoryRoot, path: assemblePath, source });
   rewriteConfiguration(repositoryRoot, (configuration) => {
     const assembleConfiguration = configuration.protectedPaths.at(2);
     if (!assembleConfiguration) {
@@ -256,16 +488,16 @@ const writeOverlayAssemble = (repositoryRoot: string, source: string): void => {
 
 const checkSource = (path: string, source: string) => {
   const repositoryRoot = createRepository();
-  writeContract(repositoryRoot);
-  writeSource(repositoryRoot, path, source);
+  writeContract({ repositoryRoot });
+  writeSource({ repositoryRoot, path, source });
   return checkCodeStyle(repositoryRoot);
 };
 
 const checkSources = (files: Readonly<Record<string, string>>) => {
   const repositoryRoot = createRepository();
-  writeContract(repositoryRoot);
+  writeContract({ repositoryRoot });
   Object.entries(files).forEach(([path, source]) => {
-    writeSource(repositoryRoot, path, source);
+    writeSource({ repositoryRoot, path, source });
   });
   return checkCodeStyle(repositoryRoot);
 };
@@ -319,6 +551,19 @@ describe("machine contract metadata", () => {
     ).toBe(true);
   });
 
+  it("includes the approved const-default and public-error-boundary identities", () => {
+    const configuration = rootConfiguration();
+    const guide = readFileSync(join(ROOT, "CODE-STYLE.md"), "utf8");
+
+    expect(ruleNamed(configuration, "binding.const-default").enforcement).toEqual(["linter"]);
+    expect(ruleNamed(configuration, "error.public-boundary").enforcement).toEqual(["test", "manual"]);
+    expect(ruleNamed(configuration, "effect.runtime-edge").goodExample).toBe(
+      "NodeRuntime.runMain(program.pipe(Effect.provide(NodeContext.layer))) in src/cli/main.ts",
+    );
+    expect(guide).toContain("Preserve the original defect cause");
+    expect(guide).toContain("NodeRuntime.runMain(program.pipe(Effect.provide(NodeContext.layer)))");
+  });
+
   it("pins the three approved committed and overlay hashes plus only the 13/5/2 exceptions", () => {
     const configuration = rootConfiguration();
     expect(configuration.protectedPaths).toEqual([
@@ -369,7 +614,7 @@ describe("machine contract metadata", () => {
 
   it("accepts only the approved enforcement vocabulary and safe autofix channels", () => {
     const repositoryRoot = createRepository();
-    const configuration = writeContract(repositoryRoot);
+    const configuration = writeContract({ repositoryRoot });
     const approved = new Set(["formatter", "linter", "regex", "ast", "path", "importGraph", "typecheck", "test", "manual"]);
 
     expect(configuration.rules.flatMap((rule) => rule.enforcement).every((entry) => approved.has(entry))).toBe(true);
@@ -386,7 +631,7 @@ describe("machine contract metadata", () => {
 
   it("fails for a missing field, invalid channel, duplicate ID, or guide mismatch", () => {
     const repositoryRoot = createRepository();
-    const configuration = writeContract(repositoryRoot);
+    const configuration = writeContract({ repositoryRoot });
     ruleNamed(configuration, "function.arrow-only").rationale = "";
     writeConfiguration(repositoryRoot, configuration);
     expect(() => validateCodeStyleMetadata(repositoryRoot)).toThrow(/rationale/u);
@@ -413,7 +658,7 @@ describe("machine contract metadata", () => {
 
   it("enumerates manual rules instead of claiming automatic proof", () => {
     const repositoryRoot = createRepository();
-    const configuration = writeContract(repositoryRoot);
+    const configuration = writeContract({ repositoryRoot });
     const report = checkCodeStyle(repositoryRoot);
     const expected = configuration.rules.filter((rule) => rule.enforcement.includes("manual")).map((rule) => rule.id);
 
@@ -448,20 +693,43 @@ describe("machine contract metadata", () => {
     },
   ])("runs the $channel detector only through its declared channel", ({ ruleId, path, source }) => {
     const repositoryRoot = createRepository();
-    writeContract(repositoryRoot);
-    writeSource(repositoryRoot, path, source);
+    writeContract({ repositoryRoot });
+    writeSource({ repositoryRoot, path, source });
     rewriteConfiguration(repositoryRoot, (configuration) => {
       ruleNamed(configuration, ruleId).enforcement = ["manual"];
     });
 
     expect(violationsFor(checkCodeStyle(repositoryRoot), ruleId)).toEqual([]);
   });
+
+  it("has a positive dispatch fixture for every declared automatic custom channel", () => {
+    const declared = rootConfiguration().rules.flatMap((rule) =>
+      rule.enforcement
+        .filter((channel) => channel === "regex" || channel === "ast" || channel === "path" || channel === "importGraph")
+        .map((channel) => `${rule.id}:${channel}`),
+    );
+    const covered = automaticChannelFixtures.map((fixture) => `${fixture.ruleId}:${fixture.channel}`);
+    expect([...covered].sort()).toEqual([...declared].sort());
+
+    automaticChannelFixtures.forEach((fixture) => {
+      const repositoryRoot = createRepository();
+      writeContract({ repositoryRoot });
+      Object.entries(fixture.files).forEach(([path, source]) => {
+        writeSource({ repositoryRoot, path, source });
+      });
+      rewriteConfiguration(repositoryRoot, (configuration) => {
+        ruleNamed(configuration, fixture.ruleId).enforcement = [fixture.channel];
+      });
+
+      expect(violationsFor(checkCodeStyle(repositoryRoot), fixture.ruleId), `${fixture.ruleId}:${fixture.channel}`).not.toEqual([]);
+    });
+  });
 });
 
 describe("protected states and overlay ratchets", () => {
   it("reports exactly three independent committed states", () => {
     const repositoryRoot = createRepository();
-    writeContract(repositoryRoot);
+    writeContract({ repositoryRoot });
 
     expect(checkCodeStyle(repositoryRoot).protectedStates).toEqual(
       PROTECTED_PATHS.map((path, index) => ({
@@ -474,7 +742,17 @@ describe("protected states and overlay ratchets", () => {
 
   it("accepts the exact overlay hashes and equal 13/5/2 raw counts", () => {
     const repositoryRoot = createRepository();
-    writeContract(repositoryRoot, "overlay");
+    writeContract({ repositoryRoot, state: "overlay" });
+    const report = checkCodeStyle(repositoryRoot);
+
+    expect(report.protectedStates.every((entry) => entry.state === "protected-overlay")).toBe(true);
+    expect(report.violations).toEqual([]);
+  });
+
+  it("keeps JavaScript null checks and else-if chains out of overlay violations", () => {
+    const repositoryRoot = createRepository();
+    writeContract({ repositoryRoot, state: "overlay" });
+    writeOverlayAssemble(repositoryRoot, semanticOverlayAssembleCut);
     const report = checkCodeStyle(repositoryRoot);
 
     expect(report.protectedStates.every((entry) => entry.state === "protected-overlay")).toBe(true);
@@ -533,37 +811,41 @@ describe("protected states and overlay ratchets", () => {
     },
   ])("rejects $name before applying an overlay exception", ({ source, expected }) => {
     const repositoryRoot = createRepository();
-    writeContract(repositoryRoot, "overlay");
+    writeContract({ repositoryRoot, state: "overlay" });
     writeOverlayAssemble(repositoryRoot, source);
     expect(() => checkCodeStyle(repositoryRoot)).toThrow(expected);
   });
 
   it("skips overlay-only counts for exact committed bytes", () => {
     const repositoryRoot = createRepository();
-    writeContract(repositoryRoot);
+    writeContract({ repositoryRoot });
     expect(checkCodeStyle(repositoryRoot).violations).toEqual([]);
   });
 
   it("fails closed for mixed, missing, or third-hash protected bytes", () => {
     const mixedRoot = createRepository();
-    writeContract(mixedRoot);
-    writeSource(mixedRoot, PROTECTED_PATHS[0] ?? "", overlayProtectedContent[0] ?? "");
+    writeContract({ repositoryRoot: mixedRoot });
+    writeSource({
+      repositoryRoot: mixedRoot,
+      path: PROTECTED_PATHS[0] ?? "",
+      source: overlayProtectedContent[0] ?? "",
+    });
     expect(() => checkCodeStyle(mixedRoot)).toThrow(/mix/u);
 
     const missingRoot = createRepository();
-    writeContract(missingRoot);
+    writeContract({ repositoryRoot: missingRoot });
     unlinkSync(join(missingRoot, PROTECTED_PATHS[1] ?? ""));
     expect(() => checkCodeStyle(missingRoot)).toThrow(/missing/u);
 
     const unknownRoot = createRepository();
-    writeContract(unknownRoot);
-    writeSource(unknownRoot, PROTECTED_PATHS[2] ?? "", "third state\n");
+    writeContract({ repositoryRoot: unknownRoot });
+    writeSource({ repositoryRoot: unknownRoot, path: PROTECTED_PATHS[2] ?? "", source: "third state\n" });
     expect(() => checkCodeStyle(unknownRoot)).toThrow(/unknown content hash/u);
   });
 
   it("fails for wildcard, missing, or fourth protected metadata", () => {
     const repositoryRoot = createRepository();
-    const configuration = writeContract(repositoryRoot);
+    const configuration = writeContract({ repositoryRoot });
     configuration.protectedPaths[2] = {
       ...(configuration.protectedPaths.at(2) ?? configuration.protectedPaths[0]),
       path: "src/skills/make-a-trailer/**",
@@ -586,7 +868,7 @@ describe("protected states and overlay ratchets", () => {
 
   it("fails for malformed or non-independent hashes", () => {
     const repositoryRoot = createRepository();
-    const configuration = writeContract(repositoryRoot);
+    const configuration = writeContract({ repositoryRoot });
     const first = configuration.protectedPaths.at(0);
     if (!first) {
       throw new Error("Missing fixture protected path.");
@@ -602,7 +884,7 @@ describe("protected states and overlay ratchets", () => {
 
   it.each([0, 12, 14])("fails a function ratchet changed to %i", (maximum) => {
     const repositoryRoot = createRepository();
-    const configuration = writeContract(repositoryRoot);
+    const configuration = writeContract({ repositoryRoot });
     exceptionNamed(configuration, "function.arrow-only").maxViolations = maximum;
     writeConfiguration(repositoryRoot, configuration);
     expect(() => validateCodeStyleMetadata(repositoryRoot)).toThrow(/approved nonzero maximum/u);
@@ -610,7 +892,7 @@ describe("protected states and overlay ratchets", () => {
 
   it("fails unknown, extra, broad, or incomplete exception metadata", () => {
     const repositoryRoot = createRepository();
-    const configuration = writeContract(repositoryRoot);
+    const configuration = writeContract({ repositoryRoot });
     exceptionNamed(configuration, "function.arrow-only").ruleId = "unknown.rule";
     writeConfiguration(repositoryRoot, configuration);
     expect(() => validateCodeStyleMetadata(repositoryRoot)).toThrow(/unknown rule/u);
@@ -642,7 +924,7 @@ describe("protected states and overlay ratchets", () => {
 
   it("validates metadata in a subprocess without reading protected bytes", () => {
     const repositoryRoot = createRepository();
-    writeContract(repositoryRoot, "committed", false);
+    writeContract({ repositoryRoot, state: "committed", includeProtectedFiles: false });
     const result = spawnSync(
       "pnpm",
       ["tsx", join(ROOT, "scripts/checkCodeStyle.ts"), "--validate-rules", "--repository-root", repositoryRoot],
@@ -844,11 +1126,13 @@ describe("schema, interfaces, assertions, and absence", () => {
     );
   });
 
-  it("keeps protocol null at adapters and forbids mixed application absence", () => {
+  it("uses type structure for automatic absence checks and leaves expression boundaries for review", () => {
     const applicationNull = checkSource("src/config/example.ts", "export const missing = null;\n");
+    const javascriptNullCheck = checkSource("src/config/example.mjs", "export const isMissing = (value) => value === null;\n");
     const protocolNull = checkSource("src/publish/adapters/githubClient.ts", "export const missing = null;\n");
     const mixed = checkSource("src/config/example.ts", "export type MaybeName = string | null | undefined;\n");
-    expect(violationsFor(applicationNull, "type.absence-boundary")).toHaveLength(1);
+    expect(violationsFor(applicationNull, "type.absence-boundary")).toEqual([]);
+    expect(violationsFor(javascriptNullCheck, "type.absence-boundary")).toEqual([]);
     expect(violationsFor(protocolNull, "type.absence-boundary")).toEqual([]);
     expect(violationsFor(mixed, "type.absence-boundary")).toHaveLength(1);
   });
@@ -950,6 +1234,19 @@ describe("mutation, collections, and Effect composition", () => {
       violationsFor(checkSource("src/cli/main.ts", "export const result = Effect.runPromise(program);\n"), "effect.runtime-edge"),
     ).toEqual([]);
   });
+
+  it("keeps NodeRuntime.runMain and NodeContext.layer at the single CLI edge", () => {
+    const runOutsideMain = checkSource("src/install/example.ts", "export const result = NodeRuntime.runMain(program);\n");
+    const layerOutsideMain = checkSource(
+      "src/install/example.ts",
+      "export const result = program.pipe(Effect.provide(NodeContext.layer));\n",
+    );
+    const approvedMain = checkSource("src/cli/main.ts", "NodeRuntime.runMain(program.pipe(Effect.provide(NodeContext.layer)));\n");
+
+    expect(violationsFor(runOutsideMain, "effect.runtime-edge")).toHaveLength(1);
+    expect(violationsFor(layerOutsideMain, "effect.runtime-edge")).toHaveLength(1);
+    expect(violationsFor(approvedMain, "effect.runtime-edge")).toEqual([]);
+  });
 });
 
 describe("import graph and executable boundaries", () => {
@@ -981,6 +1278,14 @@ describe("import graph and executable boundaries", () => {
     expect(violationsFor(scripts, "import.application-no-scripts")).toHaveLength(1);
   });
 
+  it.each(["src/build/buildPackage.ts", "src/style/styleOwner.ts"])("rejects a scripts import from every authored owner at %s", (path) => {
+    const report = checkSources({
+      "scripts/build.ts": "export const build = () => undefined;\n",
+      [path]: 'import { build } from "../../scripts/build.js";\nexport const owner = build;\n',
+    });
+    expect(violationsFor(report, "import.application-no-scripts")).toHaveLength(1);
+  });
+
   it("detects an internal relative import cycle", () => {
     const report = checkSources({
       "src/catalog/featureCatalog.ts": 'import { config } from "../config/configFile.js";\nexport const features = config;\n',
@@ -1008,12 +1313,43 @@ describe("import graph and executable boundaries", () => {
     expect(violationsFor(bad, "script.thin-entrypoint")).toHaveLength(1);
     expect(violationsFor(good, "script.thin-entrypoint")).toEqual([]);
   });
+
+  it("rejects one large local script arrow and an imported owner that is never delegated to", () => {
+    const localArrow = checkSource(
+      "scripts/localScript.ts",
+      "const run = () => { inspect(); validate(); stage(); publish(); summarize(); };\nrun();\n",
+    );
+    const unusedOwner = checkSources({
+      "src/build/run.ts": "export const run = () => undefined;\n",
+      "scripts/unusedOwner.ts":
+        'import { run } from "../src/build/run.js";\nconst execute = () => { inspect(); validate(); stage(); publish(); summarize(); };\nexecute();\n',
+    });
+
+    expect(violationsFor(localArrow, "script.thin-entrypoint")).toHaveLength(1);
+    expect(violationsFor(unusedOwner, "script.thin-entrypoint")).toHaveLength(1);
+  });
 });
 
 describe("scan boundaries and committed artifacts", () => {
+  it("keeps the real Task 2 contract implementation automatically self-compliant", () => {
+    const repositoryRoot = createRepository();
+    [
+      "CODE-STYLE.md",
+      "code-style.rules.json",
+      "scripts/checkCodeStyle.ts",
+      "src/style/checkCodeStyle.ts",
+      "src/style/checkCodeStyle.test.ts",
+      ...PROTECTED_PATHS,
+    ].forEach((path) => {
+      writeSource({ repositoryRoot, path, source: readFileSync(join(ROOT, path), "utf8") });
+    });
+
+    expect(checkCodeStyle(repositoryRoot).violations).toEqual([]);
+  });
+
   it("excludes dependencies, build output, and generated provider projections", () => {
     const repositoryRoot = createRepository();
-    writeContract(repositoryRoot);
+    writeContract({ repositoryRoot });
     [
       "node_modules/package/index.ts",
       "dist/src/generated.ts",
@@ -1021,7 +1357,7 @@ describe("scan boundaries and committed artifacts", () => {
       ".cursor/rules/generated.ts",
       ".devin/instructions/generated.ts",
     ].forEach((path) => {
-      writeSource(repositoryRoot, path, "export function forbidden() {}\n");
+      writeSource({ repositoryRoot, path, source: "export function forbidden() {}\n" });
     });
     expect(checkCodeStyle(repositoryRoot).violations).toEqual([]);
   });
