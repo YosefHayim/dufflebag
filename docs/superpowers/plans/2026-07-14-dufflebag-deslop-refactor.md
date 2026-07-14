@@ -521,6 +521,9 @@ git commit -m "refactor(install): apply artifact plans transactionally"
 
 **Files:**
 
+- Modify: `package.json`
+- Modify: `pnpm-lock.yaml`
+- Create: `src/config/jsonDocument.ts`
 - Create: `src/config/configFile.ts`
 - Create: `src/config/configFile.test.ts`
 - Create: `src/config/configure.ts`
@@ -528,7 +531,7 @@ git commit -m "refactor(install): apply artifact plans transactionally"
 
 - [ ] **Step 1: Write failing config-file and migration tests**
 
-Cover missing-file `Option.none`, strict complete-file decoding, actionable parse/schema errors, global-first project snapshots, independent later project/global files, complete legacy environment migration, removal of owned keys only after commit, and zero writes for any invalid legacy value or cross-field invariant.
+Cover missing-file `Option.none`, strict complete-file decoding, duplicate-member and BOM rejection, actionable parse/schema errors, global-first project snapshots, independent later project/global files, complete legacy environment decoding, exact untouched settings bytes plus key/value evidence, and no plan for any invalid legacy value or cross-field invariant.
 
 Run:
 
@@ -540,9 +543,9 @@ Expected: RED because the capabilities do not exist.
 
 - [ ] **Step 2: Implement read-only inspection and pure plan creation**
 
-`configFile.ts` reads/decodes only. `configure.ts` produces managed-config and legacy-settings operations for `ArtifactPlan`; it does not write. Export schema-derived request/result/error values rather than option bags. Use tagged selection values instead of boolean behavior flags.
+`configFile.ts` reads/decodes only. `configure.ts` produces the managed-config write plus a schema-correlated legacy-settings evidence contribution; it neither edits settings bytes nor creates a settings operation. `jsonDocument.ts` uses `jsonc-parser` only for the lexical guarantee Effect Schema cannot provide: duplicate member detection before `JSON.parse` collapses them. Export schema-derived request/result/error values rather than option bags. Use tagged selection values instead of boolean behavior flags.
 
-The first project install reads the decoded global config when present and otherwise uses `defaultBagConfig`. Later writes target only the chosen scope. Legacy keys remain untouched until their validated config operation commits.
+The first project install reads the decoded global config when present and otherwise uses `defaultBagConfig`. Later writes target only the chosen scope. Task 10's single settings planner consumes the evidence, merges cleanup with hook changes, creates one settings operation after the config write, and proves a config failure leaves legacy keys untouched.
 
 - [ ] **Step 3: Run focused and broad gates**
 
@@ -557,7 +560,7 @@ Expected: malformed or contradictory input yields a tagged error and no target c
 - [ ] **Step 4: Commit managed config**
 
 ```bash
-git add src/config/configFile.ts src/config/configFile.test.ts src/config/configure.ts src/config/configure.test.ts
+git add package.json pnpm-lock.yaml src/config/jsonDocument.ts src/config/configFile.ts src/config/configFile.test.ts src/config/configure.ts src/config/configure.test.ts docs/superpowers/specs/2026-07-14-dufflebag-deslop-design.md docs/superpowers/plans/2026-07-14-dufflebag-deslop-refactor.md
 git commit -m "refactor(config): plan managed configuration"
 ```
 
@@ -625,7 +628,7 @@ git commit -m "refactor(install): plan four native agent formats"
 
 - [ ] **Step 1: Write failing end-to-end capability tests**
 
-In real temporary homes/projects, cover first install, repeat install idempotency, update with removed and added features, exact skill allowlists, all four agent targets, complete managed config, byte-preserving settings edits, receipt ownership, legacy manifest migration, uninstall symmetry, user edits outside owned regions, conflict refusal inside owned regions, and absence/no-op behavior. Prove uninstall never removes a detected-but-unreceipted path.
+In real temporary homes/projects, cover first install, repeat install idempotency, update with removed and added features, exact skill allowlists, all four agent targets, complete managed config, byte-preserving settings edits, receipt ownership, legacy manifest migration, uninstall symmetry, user edits outside owned regions, conflict refusal inside owned regions, and absence/no-op behavior. Prove uninstall never removes a detected-but-unreceipted path. For legacy configuration, prove the settings operation consumes the exact Task 8 evidence, cleanup cannot be ignored while publishing unrelated ownership, and a managed-config commit failure leaves original settings bytes untouched.
 
 Run:
 
@@ -647,7 +650,9 @@ Each capability follows the visible order:
 decode request -> inspect current state -> resolve catalog -> create plan -> validate plan -> apply plan -> return result
 ```
 
-Use `Effect.gen` only for dependent effects. Keep planning pure. `install.ts`, `update.ts`, `uninstall.ts`, and `configure.ts` may invoke `applyArtifactPlan`; nothing else writes application files.
+Use `Effect.gen` only for dependent effects. Keep planning pure. `install.ts`, `update.ts`, and `uninstall.ts` may invoke `applyArtifactPlan`; nothing else writes application files.
+
+The install planner is the single owner of settings materialization. It merges Task 8 legacy evidence with desired hook registrations into one byte-preserving settings operation, validates that operation's pointer hashes against its final JSON, and places it after the managed-config write in the artifact plan. `configure.ts` remains pure and does not invoke the writer independently during installation.
 
 - [ ] **Step 4: Move doctor to receipt/catalog evidence**
 

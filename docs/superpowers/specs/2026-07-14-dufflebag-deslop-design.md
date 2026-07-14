@@ -75,7 +75,8 @@ src/
 ├── config/
 │   ├── bagConfigSchema.ts
 │   ├── configFile.ts
-│   └── configure.ts
+│   ├── configure.ts
+│   └── jsonDocument.ts
 ├── install/
 │   ├── install.ts
 │   ├── update.ts
@@ -474,9 +475,9 @@ A first project install copies the current validated global config. If no global
 
 Legacy `dufflebag*` environment configuration is migrated once:
 
-`existing env → decode complete candidate → validate all invariants → plan config write and owned-key removal → apply transaction`
+`existing env → reject ambiguous JSON → decode complete candidate → retain exact key/value evidence → plan config write → merge cleanup and hooks into one settings operation → apply config before settings`
 
-An invalid migration performs no writes. Only validated dufflebag-owned legacy keys are removed, and only after the managed file commits.
+`configure.ts` never edits settings bytes. It returns the untouched validated settings snapshot and exact legacy key/value evidence. The single settings planner in `install.ts` consumes that evidence while merging hooks, materializes one settings operation, and orders it after the managed-config write. An invalid migration performs no writes. Only validated dufflebag-owned legacy keys are removed, and a managed-config commit failure leaves the original settings bytes untouched.
 
 Allowed representation normalization is explicit in the property schema:
 
