@@ -301,16 +301,6 @@ const assignedRootIdentifier = (expression: ts.Expression): ts.Identifier | unde
   return undefined;
 };
 
-const parameterBindsIdentifier = (name: ts.BindingName, identifier: string): boolean => {
-  if (ts.isIdentifier(name)) {
-    return name.text === identifier;
-  }
-
-  return name.elements.some(
-    (element) => ts.isBindingElement(element) && parameterBindsIdentifier(element.name, identifier),
-  );
-};
-
 type ExecutableFunction =
   | ts.ArrowFunction
   | ts.ConstructorDeclaration
@@ -335,47 +325,29 @@ const isGeneratorFunction = (
   (ts.isFunctionDeclaration(node) || ts.isFunctionExpression(node) || ts.isMethodDeclaration(node)) &&
   Boolean(node.asteriskToken);
 
-const statementBindsIdentifier = (statement: ts.Statement, identifier: string): boolean => {
-  if (ts.isVariableStatement(statement)) {
-    return statement.declarationList.declarations.some((declaration) =>
-      parameterBindsIdentifier(declaration.name, identifier),
-    );
-  }
-
-  if (ts.isFunctionDeclaration(statement) || ts.isClassDeclaration(statement)) {
-    return statement.name?.text === identifier;
-  }
-
-  return false;
-};
-
-const nearestBindingIsParameter = (node: ts.Node, identifier: string): boolean => {
-  const parent = node.parent;
-  if (!parent) {
-    return false;
-  }
-
-  if (
-    ts.isBlock(parent) &&
-    isExecutableFunction(parent.parent) &&
-    parent.parent.parameters.some((parameter) => parameterBindsIdentifier(parameter.name, identifier))
-  ) {
+const declarationBelongsToParameter = (node: ts.Node): boolean => {
+  if (ts.isParameter(node)) {
     return true;
   }
 
-  if (ts.isBlock(parent) && parent.statements.some((statement) => statementBindsIdentifier(statement, identifier))) {
+  if (
+    ts.isVariableDeclaration(node) ||
+    ts.isCatchClause(node) ||
+    isExecutableFunction(node) ||
+    ts.isSourceFile(node)
+  ) {
     return false;
   }
 
-  if (
-    isExecutableFunction(parent) &&
-    parent.parameters.some((parameter) => parameterBindsIdentifier(parameter.name, identifier))
-  ) {
-    return true;
-  }
-
-  return nearestBindingIsParameter(parent, identifier);
+  return node.parent ? declarationBelongsToParameter(node.parent) : false;
 };
+
+const identifierBindsParameter = (typeChecker: ts.TypeChecker, identifier: ts.Identifier): boolean =>
+  Boolean(
+    typeChecker
+      .getSymbolAtLocation(identifier)
+      ?.declarations?.some((declaration) => declarationBelongsToParameter(declaration)),
+  );
 
 const isAssignmentOperator = (kind: ts.SyntaxKind): boolean =>
   kind >= ts.SyntaxKind.FirstAssignment && kind <= ts.SyntaxKind.LastAssignment;
@@ -569,9 +541,12 @@ const inspectSourceFile = (
   repositoryRoot: string,
   file: string,
   protectedPaths: ReadonlyArray<ProtectedPathConfiguration>,
+  program: ts.Program,
+  typeChecker: ts.TypeChecker,
 ): ReadonlyArray<CodeStyleViolation> => {
-  const sourceText = readFileSync(join(repositoryRoot, file), "utf8");
-  const sourceFile = ts.createSourceFile(file, sourceText, ts.ScriptTarget.Latest, true);
+  const sourceFile =
+    program.getSourceFile(join(repositoryRoot, file)) ?? failConfiguration(`could not parse ${file}`);
+  const sourceText = sourceFile.text;
   const violations: Array<CodeStyleViolation> = [];
   const protectedEntry = protectedPaths.find((entry) => entry.path === file);
 
@@ -819,7 +794,7 @@ const inspectSourceFile = (
     const target = mutationTarget(node);
     if (target) {
       const root = assignedRootIdentifier(target);
-      const mutatesInput = Boolean(root && nearestBindingIsParameter(root, root.text));
+      const mutatesInput = Boolean(root && identifierBindsParameter(typeChecker, root));
       if (mutatesInput) {
         addViolation({
           ruleId: "mutation.no-input",
@@ -892,8 +867,23 @@ export const checkCodeStyle = (repositoryRoot: string): CodeStyleReport => {
   validateRuleIds(repositoryRoot, configuration.rules);
   validateProtectedPaths(configuration.protectedPaths);
 
-  const violations = relativeSourceFiles(repositoryRoot)
-    .flatMap((file) => inspectSourceFile(repositoryRoot, file, configuration.protectedPaths))
+  const files = relativeSourceFiles(repositoryRoot);
+  const program = ts.createProgram({
+    rootNames: files.map((file) => join(repositoryRoot, file)),
+    options: {
+      allowJs: true,
+      checkJs: false,
+      jsx: ts.JsxEmit.Preserve,
+      noLib: true,
+      noResolve: true,
+      target: ts.ScriptTarget.Latest,
+    },
+  });
+  const typeChecker = program.getTypeChecker();
+  const violations = files
+    .flatMap((file) =>
+      inspectSourceFile(repositoryRoot, file, configuration.protectedPaths, program, typeChecker),
+    )
     .sort(compareViolations);
 
   return {
