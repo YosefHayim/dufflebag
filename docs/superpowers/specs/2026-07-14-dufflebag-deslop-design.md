@@ -666,6 +666,7 @@ Historical ADR bodies remain unchanged. Conflicting current ADRs receive status/
 
 - 0003 → 0018
 - 0004 → 0016 and 0017
+- 0006 → 0017 where the approved Effect CLI stack replaces the prior dependency choice
 - 0008 → 0020 where tracked projections or source mapping changed
 - 0010 → 0017
 - 0011 → 0017 for the new CLI implementation while preserving the shared-path behavior
