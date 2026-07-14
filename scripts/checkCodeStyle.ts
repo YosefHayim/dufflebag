@@ -335,26 +335,46 @@ const isGeneratorFunction = (
   (ts.isFunctionDeclaration(node) || ts.isFunctionExpression(node) || ts.isMethodDeclaration(node)) &&
   Boolean(node.asteriskToken);
 
-const containingFunction = (node: ts.Node): ExecutableFunction | undefined => {
-  const parent = node.parent;
-  if (!parent) {
-    return undefined;
+const statementBindsIdentifier = (statement: ts.Statement, identifier: string): boolean => {
+  if (ts.isVariableStatement(statement)) {
+    return statement.declarationList.declarations.some((declaration) =>
+      parameterBindsIdentifier(declaration.name, identifier),
+    );
   }
 
-  return isExecutableFunction(parent) ? parent : containingFunction(parent);
+  if (ts.isFunctionDeclaration(statement) || ts.isClassDeclaration(statement)) {
+    return statement.name?.text === identifier;
+  }
+
+  return false;
 };
 
-const enclosingFunctionBindsParameter = (node: ts.Node, identifier: string): boolean => {
-  const owner = containingFunction(node);
-  if (!owner) {
+const nearestBindingIsParameter = (node: ts.Node, identifier: string): boolean => {
+  const parent = node.parent;
+  if (!parent) {
     return false;
   }
 
-  if (owner.parameters.some((parameter) => parameterBindsIdentifier(parameter.name, identifier))) {
+  if (
+    ts.isBlock(parent) &&
+    isExecutableFunction(parent.parent) &&
+    parent.parent.parameters.some((parameter) => parameterBindsIdentifier(parameter.name, identifier))
+  ) {
     return true;
   }
 
-  return enclosingFunctionBindsParameter(owner, identifier);
+  if (ts.isBlock(parent) && parent.statements.some((statement) => statementBindsIdentifier(statement, identifier))) {
+    return false;
+  }
+
+  if (
+    isExecutableFunction(parent) &&
+    parent.parameters.some((parameter) => parameterBindsIdentifier(parameter.name, identifier))
+  ) {
+    return true;
+  }
+
+  return nearestBindingIsParameter(parent, identifier);
 };
 
 const isAssignmentOperator = (kind: ts.SyntaxKind): boolean =>
@@ -799,7 +819,7 @@ const inspectSourceFile = (
     const target = mutationTarget(node);
     if (target) {
       const root = assignedRootIdentifier(target);
-      const mutatesInput = Boolean(root && enclosingFunctionBindsParameter(node, root.text));
+      const mutatesInput = Boolean(root && nearestBindingIsParameter(root, root.text));
       if (mutatesInput) {
         addViolation({
           ruleId: "mutation.no-input",
