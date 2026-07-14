@@ -502,6 +502,18 @@ Planning is pure. The complete desired state is decoded and validated before the
 - artifact kind; and
 - discriminated ownership metadata appropriate to that kind.
 
+Partially managed files also record whether the host file existed before the receipt entry first managed it. Pointer and sequence members independently record their state before each member first became owned, including members added by later updates. These lifetimes stay separate so a file originally created by dufflebag can still restore user values acquired before later ownership.
+
+Artifact operations are apply-ready filesystem actions:
+
+- `write` stages next owned bytes that must appear in the published receipt;
+- `restore` stages final user-owned bytes that must not appear in the published receipt; and
+- `remove` deletes a path only when its receipt metadata proves the host did not exist before installation and materialization leaves no unowned bytes.
+
+Read-only inspection and the pure format handlers materialize restoration bytes before application. The decoded previous receipt remains the sole authority: update and uninstall require exactly one restoration for every stale receipt entry, reject extra or mismatched paths, and order restorations by the previous receipt rather than caller order. This is what receipt-only uninstall means; detection and inspection can supply evidence or bytes, but never deletion authority.
+
+The receipt target is the canonical `receipt.json`. Its sibling `recovery.json` is reserved alongside it, case-folded path aliases are rejected, and neither path can be owned by a normal artifact.
+
 The four format handlers produce desired artifacts and their ownership metadata. Detection is diagnostic evidence only; it never authorizes deletion.
 
 Update diffs the previous receipt against the desired plan. Uninstall follows the receipt exactly. Legacy manifests migrate once through validated planning.
