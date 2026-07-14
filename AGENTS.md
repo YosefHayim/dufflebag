@@ -1,83 +1,89 @@
 # AGENTS.md
 
-**This file is the single source of truth for the rules of working in this repository** — for any coding agent (Claude Code, Cursor, etc.) and for humans. `CLAUDE.md` and `GEMINI.md` are symlinks to this file.
+This is the repository entrypoint for coding agents and maintainers. `CLAUDE.md` and `GEMINI.md` are symlinks to this file.
 
 ## What this is
 
-**dufflebag** — a one-command installer for a personal bag of Claude Code skills, hooks, **and reusable CI/publish workflow templates**: context guard, dedup guard, autonomous loop, speak-response, the **png-to-code** skill (PNG → measured pixel-perfect code), **github-repo-metadata** (GitHub description + topics), **readme-editor**, **refresh-agent-docs**, and `scaffold-ci` (copy the CI + publish workflows into any repo).
+**dufflebag** installs and reconciles an owned set of agent skills, dependency-free hooks, agent configuration, and reusable CI/publish workflow templates. Its public CLI installs, updates, uninstalls, diagnoses, configures, and scaffolds those artifacts.
 
-> **Renamed `skills-bag → dufflebag` (landed 2026-07-01).** A **clean break** — total across four contracts (repo, npm + bin, payload marker `/dufflebag/`, env prefix `dufflebag*`), **no back-compat shim**, and the code is now vertical per feature. See [`templates/mdFiles/CODE-STYLE.md` → refresh log](templates/mdFiles/CODE-STYLE.md) and ADRs [0007](docs/adr/current/0007-rename-to-dufflebag-broadened-remit.md)–[0009](docs/adr/current/0009-reusable-workflows-and-cli-scaffolding.md). No `skills-bag`/`skillsBag*`/`SKILLS_BAG_*` strings remain anywhere in the tree.
-
-Install features with:
+Install one feature with:
 
 ```bash
 npx ys-dufflebag install --features png-to-code
 ```
 
-Feature docs live under `src/skills/<feature>/`. The png-to-code harness is TypeScript under `src/skills/png-to-code/scripts/`.
+## Read before changing code
+
+- [`PROJECT.md`](PROJECT.md) defines product scope and direction.
+- [`CONTEXT.md`](CONTEXT.md) explains runtime and operational boundaries.
+- [`LANGUAGE.md`](LANGUAGE.md) owns domain terms.
+- [`CODE-STYLE.md`](CODE-STYLE.md) is the prescriptive style source of truth.
+- [`code-style.rules.json`](code-style.rules.json) is the machine-readable rule map.
+- `docs/adr/current/` records architectural decisions; do not rewrite historical bodies.
+
+Feature documentation lives with its authored source under `src/skills/<sourceDirectory>/`. Public feature and installed-skill IDs are decoded data and can differ from the authored directory name.
 
 ## Repo layout
 
-| Path | Purpose |
-|------|---------|
-| `src/core/` | CLI kernel (may use deps), grouped by domain — `catalog/` · `settings/` · `wiring/` · `host/`, plus `config`/`fs`/`ui` + the `index.ts` barrel |
-| `src/payload/` | zero-dep hook kernel (`config` SSOT + `io`), assembled into the flat payload |
-| `src/skills/<feature>/` | each feature's engine (`hooks/`, `lib/`, `command/`) **and** its shipped content |
-| `src/scripts/` | build-time only — `assembleHooks.mjs` flattens the per-feature hooks into `dist/hooks/` (not shipped) |
-| `templates/workflows/` | the CI + publish workflow set the CLI copies into any repo (`scaffold-ci`) |
-| `templates/mdFiles/` | authored long-form guides — `CODE-STYLE.md` (style SSOT) + `PROJECT.md` (purpose & direction) |
-| `.husky/pre-commit` | regenerates `README.md` from source (`pnpm generate-readme`) and stages it |
-| `.github/workflows/` | dufflebag's own CI: single-purpose `workflow_call` legs composed by `ci.yml` (mirrored into `templates/workflows/`) |
-| `*.test.ts` (co-located) | tests sit beside their source; cross-cutting ones in `src/commands/*.integration.test.ts` |
+| Path | Ownership |
+| --- | --- |
+| `src/cli/` | Effect CLI definitions, command capabilities, and `TerminalUI` presentation |
+| `src/catalog/` | Decoded feature and agent catalogs |
+| `src/config/` | Schema-owned managed configuration and migration |
+| `src/install/` | Artifact planning, transactional application, receipts, and agent formats |
+| `src/runtime/` | Dependency-free transport shared by installed hooks |
+| `src/skills/<sourceDirectory>/` | Authored skill content and feature-local dependency-free runtime |
+| `src/doctor.ts` | Structured installation diagnostics |
+| `src/scaffoldWorkflows.ts` | Workflow-template scaffolding capability |
+| `scripts/` | Repository build, generation, contract, shipping, and smoke tooling |
+| `templates/` | Files intentionally copied into another repository |
+| `docs/adr/current/` | Current architectural decisions |
+| `.husky/pre-commit` | README regeneration before commits |
 
-**Two kinds of skill live under `src/skills/`:**
+This layout is the approved destination. During the migration, legacy technical-layer directories and hyphenated authored directories may still exist; do not add new behavior there when the owning migration task has a target capability.
 
-- **Shipped features** — `autorun`, `png-to-code`, `github-repo-metadata`, `write-a-post`, `readme-editor`, and `refresh-agent-docs` are registered in the CLI (`src/core/catalog/features.ts`) and **copied** into `~/.claude/skills/` by `npx dufflebag install` when their feature is selected.
-- **Vendored community skills vs. personal skills** — `grill-me`, `grill-with-docs` (by [Matt Pocock](https://github.com/mattpocock/skills)) and `deslop` (by [Mike Cann](https://github.com/mikecann/agent-skills)) are **third-party** — bundled with credit and surfaced in the README's "Recommended community skills" table, not claimed as ours. `grill-me-code-style`, `grill-me-code-style-with-docs` (dufflebag-original, building on Matt's grilling pattern), and `planpage` (the `planpage`-package consumer skill) are the owner's own. All are git-tracked here as their SSOT; installation/symlink behavior is handled outside the catalog.
+## Working contract
 
-## Conventions
-
-<!-- rules digest — full guide in templates/mdFiles/CODE-STYLE.md; edit there. Architectural "why" in docs/adr/current/. -->
+This is a routing digest. [`CODE-STYLE.md`](CODE-STYLE.md) is authoritative and every enforceable rule maps to [`code-style.rules.json`](code-style.rules.json). Architectural reasons belong in `docs/adr/current/`.
 
 - **One strict style bar for all TypeScript** — `src/` *and* the png harness (`src/skills/png-to-code/scripts/`). **biome is the linter (`recommended`) *and* formatter** (double quotes), committed as `biome.json` with `biome ci` the one CI gate. One root `tsconfig` governs the project; the png harness's own `tsconfig` is the single sanctioned exception ([ADR 0013](docs/adr/current/0013-style-refresh-colocated-tests-single-command-autorun-templates.md)).
-- **Pure core, imperative shell** — any module that touches disk/env/process splits pure transformers (top) from effects (bottom) with a `// --- IO layer ---` divider; tests hit the pure half. **Hard rule.** Core is grouped by domain (`catalog`/`settings`/`wiring`/`host`); the split stays *within* each module ([ADR 0010](docs/adr/current/0010-core-grouped-by-domain.md)).
-- **Errors by role** — hooks **fail-open** (`try { main() } catch { exit(0) }`); CLI **throws an actionable `Error`** caught once at the top → `fail()`; gates/harness use **exit codes** (0/1/2).
-- **Interactive front door** — bare `dufflebag` in a TTY opens a menu (`src/commands/menu.ts`) that **routes into the same command functions** the flags drive (never a second implementation); any argument or a non-TTY stdin defers to commander. New prompts go through the `ui` wrappers (`select`/`text`/`confirm`/`multiselect`), which return a fallback **without prompting** off-TTY so nothing scripted hangs ([ADR 0011](docs/adr/current/0011-interactive-menu-entry.md)).
-- **Zero-dep hook payload** — each feature's `hooks/**` imports only `node:*` + `src/payload/*` + its own `lib/`; cross into `core` via `import type` only.
-- **Shared contracts: declare once, re-export** — never re-declare (config SSOT lives in `src/payload/config.ts`).
-- **Pure mutators clone in → clone out**; bag-owned entries are identified **only** by the `/dufflebag/` path marker or `dufflebag` env prefix.
-- **TSDoc on the exported surface** — every exported function/type carries a summary + `@param` each + `@returns` + one line per prop; internal one-liners stay bare (no name-restating there). `deslop` enforces per-diff ([ADR 0012](docs/adr/current/0012-tsdoc-on-the-exported-surface.md)).
-- **Naming** — files `camelCase` · fns/vars `camelCase` · constants `SCREAMING_SNAKE` · types `PascalCase` · feature IDs / skill dirs / CLI flags `kebab-case` (external contracts — never convert).
-- **Types** — `interface` for object shapes, `type` for unions; explicit return types on exports; `node:` prefix; `index.ts` barrel per CLI-kernel dir (`core/`, `commands/`); the zero-dep payload + feature libs are imported by specific file (no barrel).
-- **Tests co-locate** — `foo.test.ts` beside `foo.ts`; **no `test/` dir**. Pure modules get no-disk unit tests; cross-cutting/integration tests live in `src/commands/*.integration.test.ts` (the install/uninstall round-trip byte-restores `settings.json`) ([ADR 0013](docs/adr/current/0013-style-refresh-colocated-tests-single-command-autorun-templates.md)).
-- **Layout: everything source-y under `src/`, copyable templates under `templates/`** — `src/skills/<feature>/` holds a feature's engine (hooks, feature-local libs, its command) **and** its shipped content; the irreducible shared kernel stays in `src/core/` (CLI) + `src/payload/` (zero-dep hooks); the build script sits in `src/scripts/`. `templates/` holds what `scaffold-ci` copies into other repos — `workflows/` + `mdFiles/`. Sources vertical, build output a **flat** `dist/hooks/` payload ([ADR 0008](docs/adr/current/0008-vertical-per-feature-layout.md), [ADR 0014](docs/adr/current/0014-consolidate-under-src-and-templates.md)).
-- **One command per tool surface** — the autonomous loop is a single `autorun` skill with `stop`/`exit` verbs (`/autorun` · `/autorun stop` · `/autorun exit`), all routed to the one `ctxLoopCtl.js` engine ([ADR 0013](docs/adr/current/0013-style-refresh-colocated-tests-single-command-autorun-templates.md)).
-- **Ship boundary: catalog allowlist** — the `FEATURES` catalog declares each feature's shipped paths; the installer copies **only** those, so build-only `.ts` never leaks into a user's install (fail-safe).
-- **Workflows** — CI is single-purpose `workflow_call` legs (biome/typecheck/test/build/report-failure/e2e) composed by `ci.yml` via `./` refs; the CLI **copies** the whole set from `templates/workflows/` into a repo so each owns its CI (`scaffold-ci`; `--force` to resync). `publish.yml` is filled per repo (OIDC binds repo + filename); **a private repo omits it**. The shared legs are byte-identical in `.github/workflows/` + `templates/workflows/` — a test enforces it ([ADR 0009](docs/adr/current/0009-reusable-workflows-and-cli-scaffolding.md)).
-- **README regeneration on commit** — the `.husky/pre-commit` hook runs `pnpm generate-readme` and stages `README.md`, so the `AUTO:FEATURES`/`AUTO:SKILLS` tables never drift from `features.ts` and `src/skills/*/SKILL.md`. Run `pnpm prepare` (or `pnpm install`) after cloning to activate the hook.
-- **Scripts — one shared `package.json` surface** — the same script *names* across every owned repo in the workspace: biome `lint` (`biome check .`) / `lint:fix` (`biome check --write .`) / `format`; vitest `test` (`vitest run`) / `test:watch`; `tsc --noEmit` `typecheck`; `tsx` `cli` (the interactive front door — bare = menu, `-- <sub>` = direct); `husky` `prepare`; and a single `verify` gate = `check:ci && typecheck && test && build` (replacing `qa`/`quality`/`validate`). Variants nest under `:`; **names are the contract — only `dev`/`build`/`start` bend to the stack**. Full table + recipe in `templates/mdFiles/CODE-STYLE.md → Scripts`.
+- **Effect application** — capabilities return Effect values. Only `src/cli/main.ts` starts the runtime. Use official platform services directly; do not add pass-through tags, layers, managers, helpers, or utility wrappers.
+- **Schema-owned data** — runtime, persisted, catalog, CLI, environment, and agent-format objects begin as Effect Schema. Derive types with `Schema.Schema.Type`; keep descriptions, defaults, checks, messages, and legacy transformations on their properties.
+- **Tagged errors** — application failures use `Schema.TaggedError`. Installed hooks remain dependency-free plain Node and keep their explicit fail-open behavior where the event contract requires it.
+- **One command path** — interactive and explicit commands invoke the same capability. `TerminalUI` owns presentation. A non-TTY process never prompts and missing input becomes a structured usage error.
+- **Dependency-free hook island** — hook graphs import only `node:*`, shared `src/runtime/**`, and their own feature runtime subtree. Application code never imports installed hook code.
+- **Functions** — named functions are arrow constants declared before use. Prefer one cohesive input, allow two only as a natural pair, and use a named request for three or more. Do not add ceremonial one-property requests or positional boolean behavior flags.
+- **Readable bodies** — one visible job per function, no input mutation, no builder `reduce`, no `Promise.all`, and at most two control-flow nesting levels. Keep one blank line between functions.
+- **Comments with evidence** — explicit loops have a short intent comment; indexed non-null access has a proof comment; real ordered pipelines have one contract plus numbered phase comments.
+- **Names and exports** — authored paths use `camelCase`, UI files use `PascalCase`, and public IDs/flags remain hyphenated data. Optional barrels contain only direct wildcard exports. Avoid vague manager/helper/utils/data/info buckets and names.
+- **No type escape hatches** — no authored interfaces outside declaration augmentation, enums, conditional/infer machinery, assertions, or suppression directives.
+- **Tests co-locate** — keep `foo.test.ts` beside `foo.ts`; root repository-tool tests live under `scripts/`. Use behavior-level fixtures and integration tests for transaction, migration, shipping, and CLI boundaries.
+- **Transactional writes** — inspect, plan, validate, apply, then write the receipt last. Roll back in reverse order. A receipt is the only deletion authority; detection may inform migration but never authorize deletion.
+- **Catalog-closed shipping** — the decoded feature catalog owns exact shipped paths and runtime entrypoints. Build and packed-tarball verification reject missing, duplicate, extra, rewritten, or uncataloged content.
+- **README regeneration** — the pre-commit hook regenerates README content. After committing, inspect the index and commit scope because the hook may stage `README.md`.
 
-> **Migrations landed.** The code conforms to the digest migration (camelCase filenames, barrels, harness restructure, biome-enforced lint+format), the **dufflebag pivot** (rename across four contracts, vertical per-feature layout, catalog ship-allowlist, reusable workflows), the **2026-07-02 style refresh** (TSDoc on the exported surface, biome linter on, co-located tests, single-command `autorun` — ADRs [0012](docs/adr/current/0012-tsdoc-on-the-exported-surface.md)–[0013](docs/adr/current/0013-style-refresh-colocated-tests-single-command-autorun-templates.md)), and the **source consolidation** (all source under `src/` — adding `src/skills/` + `src/scripts/` — and all copyable templates under `templates/` — `templates/workflows/` + `templates/mdFiles/`; [ADR 0014](docs/adr/current/0014-consolidate-under-src-and-templates.md)). Where code and this digest drift, the digest wins; the full guide is `templates/mdFiles/CODE-STYLE.md` and `deslop` enforces per-diff.
+> **Migration in progress.** The root style contract describes the approved destination. Keep changed code moving toward it, but do not hide legacy violations behind a broad allowlist or mix unrelated migration work into a focused slice.
 
 ### `scripts/dev/` — local-only tooling (gitignored)
 
-Scripts for local debugging, one-off experiments, or personal dev utilities go in `scripts/dev/`. This folder is **gitignored** — it never reaches the remote. Production/CI scripts stay in `src/scripts/` (committed).
+Scripts for local debugging, one-off experiments, or personal dev utilities go in `scripts/dev/`. This folder is gitignored. Maintained production, build, CI, and verification tools live directly under root `scripts/`.
 
 When creating a new script, ask: _"Would CI, the build, or the shipped CLI need this?"_ If **no** → `scripts/dev/`.
 
 ## Validate changes
 
-From repo root:
+Run the narrow suite for the changed capability, then the repository gate from the root:
 
 ```bash
-npm test
-npm run build   # if applicable
+pnpm test
+pnpm typecheck
+pnpm verify
 ```
 
 For png-to-code script changes:
 
 ```bash
-cd src/skills/png-to-code/scripts && npm run typecheck
+pnpm --dir src/skills/png-to-code/scripts typecheck
 ```
 
 ## Agent skills
