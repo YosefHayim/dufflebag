@@ -24,15 +24,21 @@ The refactor preserves product behavior unless this document explicitly changes 
 
 Before design work, `pnpm verify` passed with 13 test files and 114 tests. That is the characterization baseline.
 
-Three user-owned files changed after the clean baseline:
+Three user-owned files changed after the clean baseline in the main worktree:
 
 - `src/skills/make-a-trailer/SKILL.md`
 - `src/skills/make-a-trailer/reference/pipeline.md`
 - `src/skills/make-a-trailer/scripts/assembleCut.mjs`
 
-Their content must be preserved byte-for-byte while the directory moves to `src/skills/makeATrailer/`. They must never be reset, stashed, normalized, or absorbed into a refactor-authored diff.
+Their content must be preserved byte-for-byte while the directory moves to `src/skills/makeATrailer/`. They must never be reset, stashed, normalized, or absorbed into a refactor-authored diff. The isolated refactor worktree starts clean and does not contain those dirty bytes; the main worktree may also contain unrelated concurrent work.
+
+Before the Task 13 rename, both worktrees and all three hashes are audited. The default path, and the mandatory path when main contains unrelated work, creates a binary patch containing only the three protected diffs from main, inspects its paths, and checks and applies it to the isolated worktree. Main is not reset, stashed, or modified. A verified fast-forward into main before Task 13 is allowed only when main has no change beyond the protected trio; when taken, main becomes the active protected-overlay worktree for every remaining gate. After transfer or verified fast-forward, all hashes are rechecked and the clean committed index blobs are renamed while the protected bytes remain unstaged.
+
+Final integration is also non-destructive. Main is audited again, and integration stops rather than overwriting, stashing, or normalizing any overlapping or unrelated main-worktree change.
 
 The checker records all three files as exact `protectedPaths` metadata so their hashes remain visible. Only `assembleCut.mjs` receives code-rule exceptions: 13 function-form violations, 5 function-input violations, and 2 non-obvious uncommented-loop violations. Those three `maxViolations` values cannot increase; the two Markdown files are not fake AST exceptions. The exceptions are removed in a separate owner-reviewed cleanup after the concurrent make-a-trailer patch is committed independently; this refactor does not rewrite those bytes to manufacture a clean result.
+
+Task 2 bootstraps metadata with the old kebab-case paths. Task 13 atomically changes all three protected paths, all three exception paths, and every exact checker fixture/report reference to `src/skills/makeATrailer/**` in the same commit as the baseline-only rename. The public feature and installed skill ID remain `make-a-trailer`; only repository paths change. `--validate-rules` checks structure, ID references, hash syntax, and ratchet shape without comparing isolated-worktree bytes. Task 15 live mode verifies the actual transferred hashes and violation counts at the new paths.
 
 ## Goals
 
@@ -101,8 +107,7 @@ src/
 ├── documentation/
 │   └── generateReadme.ts
 ├── style/
-│   ├── checkCodeStyle.ts
-│   └── codeStyleFactory.ts
+│   └── checkCodeStyle.ts
 ├── skills/
 ├── doctor.ts
 └── scaffoldWorkflows.ts
@@ -444,10 +449,11 @@ Descriptions live on the schema properties they describe. Checks and their messa
 Dufflebag is the source of a CODE-STYLE factory, not one universal guide copied unchanged into every repository. The factory resolves, in order:
 
 1. the locked owner base;
-2. every applicable stack profile detected or explicitly selected for the target repository; and
-3. explicit narrow repository exceptions.
+2. every applicable stack profile detected or explicitly selected for the target repository;
+3. repository-specific additions; and
+4. explicit narrow repository exceptions.
 
-Later layers may narrow an earlier rule but never silently weaken or replace it. Unknown applicability and genuine stack conflicts are resolved during the grill. Future grills do not re-ask locked owner tastes; they ask only about real stack conflicts, unknown applicability, or a requested exception.
+Repository-specific additions use a repository-owned namespace, add a real local invariant, or narrow a canonical rule. They cannot weaken or duplicate a canonical rule. Exceptions are the only weakening mechanism. Unknown applicability and genuine stack conflicts are resolved during the grill. Future grills do not re-ask locked owner tastes; they ask only about real stack conflicts, unknown applicability, a repository-specific invariant, or a requested exception.
 
 The post-migration canonical profile tree is:
 
@@ -468,7 +474,7 @@ src/skills/grillMeCodeStyle/references/
     └── scriptsCli.json
 ```
 
-`profileComposition.md` explains the agent workflow, detection evidence, merge order, conflict handling, exception review, and local artifact rendering. It contains no second rule catalog. Each structured JSON profile is a canonical rule reference, not a rendered guide fragment or a new universal target-repository config system. `src/style/codeStyleFactory.ts` owns strict Effect Schemas for profile, rule, example, enforcement, resolved-artifact, and exception data and derives their TypeScript types. Profile responsibilities do not overlap:
+The installed `grill-me-code-style` skill is the public factory seam: its `SKILL.md`, `profileComposition.md`, canonical profile JSON, and directly referenced rendering/checking guidance all appear in the feature's exact shipped allowlist. `profileComposition.md` explains evidence collection, merge order, conflict handling, repository additions, exception review, local artifact rendering, and no-op reruns. It contains no second rule catalog. Each structured JSON profile is the canonical owner/stack rule reference, not a rendered guide fragment or a new universal target-repository config system. Profile responsibilities do not overlap:
 
 | Profile | Sole responsibility |
 | --- | --- |
@@ -490,9 +496,11 @@ Every profile ID and rule ID is globally unique. Every rule records `applicabili
 
 Anchored regex or text checks enforce textual and path-local rules. AST, linter, and import-graph checks enforce semantic structure and boundaries. Typechecking and tests prove types and behavior. Manual review owns judgment and taste. Only a formatter or linter transformation proven safe by fixtures may autofix; regex, AST, path, import-graph, typecheck, test, and manual channels are report-only.
 
-The human `CODE-STYLE.md` projection and machine `code-style.rules.json` projection contain a bijective set of rule IDs. The factory also merges formatter/linter/checker wiring and package verification commands into the target repository rather than replacing existing configuration.
+The Task 2 root `CODE-STYLE.md` and `code-style.rules.json` are bootstrap contracts. Once canonical profiles ship in Task 16, the installed skill composes and rewrites Dufflebag's root pair from `ownerBase`, `typescriptEffect`, and `scriptsCli`, followed by evidence-backed `dufflebag.*` additions for hook isolation, transactional artifacts, and catalog-closed shipping, then the protected exceptions. That second self-application changes no bytes.
 
-An exception references an existing rule ID and contains exact repository-relative paths, a reason, an exit condition, and a non-negative `maxViolations`. Broad paths, unknown rules, exceeded counts, stale exit conditions, or an attempted increase from an already recorded maximum fail resolution. An exception is debt with a ratchet, not a second style profile.
+Every resolved human `CODE-STYLE.md` and machine `code-style.rules.json` projection contains a bijective set of rule IDs. The factory also merges formatter/linter/checker wiring and package verification commands into the target repository rather than replacing existing configuration.
+
+An exception references an existing rule ID and contains exact repository-relative paths, a reason, a required human-readable `exitCondition`, and a non-negative `maxViolations`. The exit text is reviewed manually; free-form prose is not machine-evaluated. Machine validation fails when an exact path is missing, the current count is zero, the current count is below the maximum, or the current count exceeds the maximum. Only equality passes, forcing removal at zero and a lower ratchet when debt decreases. Broad or wildcard paths, unknown rules, and attempted maximum increases also fail. An exception is debt with a ratchet, not a second style profile.
 
 The resolved target owns all resulting artifacts:
 
@@ -503,6 +511,11 @@ The resolved target owns all resulting artifacts:
 - a bounded digest inside `AGENTS.md` markers.
 
 Content outside the bounded AGENTS markers is preserved byte-for-byte. A target repository never imports dufflebag at runtime. Reapplying the same resolution is a no-op.
+
+Static contract tests inspect the exact packed skill surface, profile fields/IDs, feature allowlist, references, projection bijection, and template neutrality. Baseline-without-skill and with-skill forward evaluations follow the writing-skills workflow for exactly two targets. Fresh-context no-skill responses are recorded verbatim before skill edits; fresh agents then receive only the installed packed skill surface and the identical immutable prompts, with both results scored against the same artifact/profile contract:
+
+- a greenfield React application with an Effect HTTP server, PostgreSQL, a security boundary, maintained repository scripts, and a developer CLI resolves exactly `ownerBase`, `typescriptEffect`, `reactTailwind`, `backendHttp`, `dataPersistence`, `sql`, `securityOperations`, and `scriptsCli`; it excludes `noSql`, `asyncMessaging`, and `externalAdapters` because it has no NoSQL store, durable messaging, or provider SDK; and
+- an existing local Node CLI with legacy debt and no UI, HTTP server, database, durable messaging, provider SDK, or separate security boundary resolves exactly `ownerBase`, `typescriptEffect`, and `scriptsCli` and excludes every other profile.
 
 ### Approved profile contracts
 
@@ -804,7 +817,7 @@ Biome is the sole formatter and general linter:
 - 120-column width; and
 - organized imports.
 
-Biome covers every maintained TypeScript, TSX, JavaScript, MJS, JSON, and JSONC file in the main package, root scripts, and the png-to-code harness.
+Biome covers every maintained TypeScript, TSX, JavaScript, MJS, JSON, and JSONC file in the main package, root scripts, supported root config, the png-to-code harness, and template JSON.
 
 `scripts/checkCodeStyle.ts` is a thin entrypoint into the focused repository contract verifier in `src/style/checkCodeStyle.ts`, not a second general linter. The verifier dispatches each rule only through its declared enforcement channels from `formatter | linter | regex | ast | path | importGraph | typecheck | test | manual`. Anchored regex/text checks own textual and path-local violations; AST, lint, and import-graph checks own semantic structure and boundaries; typecheck and tests own types and behavior; manual review owns judgment. It also proves that every `CODE-STYLE.md` rule ID has one matching `code-style.rules.json` entry and that the machine file contains no undocumented rule ID. Only proven-safe formatter/linter transformations may autofix.
 
@@ -813,6 +826,13 @@ Generated projections and `dist` are excluded from authored-source checks. The v
 `pnpm verify` runs exactly:
 
 `Biome → typecheck → contract checker → tests → build → shipping verification → hook smoke`
+
+Verification has two distinct evidence gates while the protected changes remain user-owned and uncommitted:
+
+- a clean detached clone/worktree proves committed-source reproducibility with Biome, typecheck, rule structure/ID/hash-syntax/ratchet validation, tests, build, shipping verification, and hook smoke without claiming the absent protected overlay bytes; and
+- the isolated protected-overlay worktree proves byte preservation with the three live hashes, exact dirty paths, clean-index rename blobs, live rule counts, and the complete `pnpm verify` sequence.
+
+Once the owner independently commits the protected bytes, the ordinary clean-checkout live-hash `pnpm verify` gate resumes against those committed bytes. The ratchets remain until an owner-reviewed cleanup removes the violations; that cleanup then removes the exceptions. Committing the protected bytes without cleaning them does not by itself retire the ratchets.
 
 ## Documentation and decision records
 
@@ -870,13 +890,13 @@ The implementation lands as independently green slices:
 
 Every slice starts with a failing or characterization test, ends with its focused tests and `pnpm verify` green, and is committed separately. Legacy paths are removed only after their replacement is proven.
 
-The make-a-trailer move is staged as a pure rename of the committed baseline while its three concurrent modifications remain unstaged at the new path. Verification reports the three exact protected paths and the `assembleCut.mjs` ratchets separately from migration-owned conformance.
+The make-a-trailer move is staged as a pure rename of the committed baseline while its three transferred modifications remain unstaged at the new path. Verification reports the three exact protected paths and the `assembleCut.mjs` ratchets separately from clean committed-source conformance. Final integration audits main again and stops on any overlapping or unrelated main-worktree WIP.
 
 ## Success criteria
 
 The refactor is complete only when:
 
-- the protected make-a-trailer edits remain intact;
+- the protected make-a-trailer edits remain intact in the protected-overlay worktree and no main-worktree WIP is overwritten;
 - every main-application and persisted authored runtime domain object derives from Effect Schema, with only the named plain-hook transport exception;
 - every public feature and agent is declared exactly once;
 - every shipped path is cataloged and verified;
@@ -891,5 +911,6 @@ The refactor is complete only when:
 - no forbidden syntax, naming, wrapper, internal barrel, ceremonial comment, or path pattern remains outside the three exact protected make-a-trailer baseline files;
 - the contract checker reports all three protected paths plus only the 13/5/2 `assembleCut.mjs` ratchets and accepts no additional exception;
 - root and template docs describe their correct audiences;
-- the packed tarball contains only declared output; and
-- `pnpm verify` passes from a clean checkout.
+- the packed tarball contains only declared output;
+- the clean committed-source gate passes without pretending the uncommitted protected overlay exists; and
+- the protected-overlay gate passes live hashes, exact dirty-path/index-blob checks, and `pnpm verify`.

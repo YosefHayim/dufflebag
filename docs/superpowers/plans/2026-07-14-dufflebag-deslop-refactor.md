@@ -16,11 +16,14 @@
   - `src/skills/make-a-trailer/reference/pipeline.md` — SHA-256 `3bb89d856d28995c50fba23aca6a6a1af1fe56f10d67546a0515fe0d276f1669`
   - `src/skills/make-a-trailer/scripts/assembleCut.mjs` — SHA-256 `6dceccae4b1f49bc7b64b89bd164882c29e57142ef9193d0208ccc1f9d2291ad`
 - Never reset, stash, format, stage, or commit those three working-tree edits. Commit their clean `HEAD` content as pure renames while leaving their user edits unstaged at the new paths.
+- The isolated refactor worktree begins clean; the protected dirty bytes and possible unrelated concurrent WIP live in `/Users/yosefhayimsabag/Desktop/Code/dufflebag`. Before Task 13, audit both worktrees and transfer only the three protected diffs with a reviewed binary patch unless main has no other changes and a verified pre-rename fast-forward is safe. Never overwrite, reset, stash, or normalize main WIP.
+- Treat clean committed-source verification and dirty protected-overlay verification as separate gates. The clean gate validates rule structure rather than pretending the uncommitted overlay hashes exist; the dirty gate verifies live hashes/counts and full `pnpm verify`.
 - Use `apply_patch` for authored file edits. Use `git mv` for ordinary clean renames. Scope every commit explicitly; never use `git add .` or `git add -A` in this dirty worktree.
 - Every runtime or persisted authored object is an Effect Schema value first. Its type is `Schema.Schema.Type<typeof schema>`; encoded forms use `Schema.Schema.Encoded<typeof schema>`. Do not add a parallel runtime-data interface or object alias. Interfaces remain valid only for declaration augmentation or genuinely substitutable feature-owned external capability ports.
 - Decode authored and persisted objects with `{ onExcessProperty: "error" }`. Invalid input fails; it is never clamped, case-folded, partially parsed, or silently defaulted.
 - New and migrated code follows the approved arrow-function, guard-clause, no-assertion, schema-owned-data, signal-TSDoc, absence-boundary, named-export, camelCase-path, non-obvious-loop-comment, mutation, no-internal-barrel, one-expression-extraction, and collection rules from the first edit. One dependent Effect handoff may use one `flatMap`; two or more dependent steps use `Effect.gen`.
 - Every rule uses only `formatter | linter | regex | ast | path | importGraph | typecheck | test | manual`. Anchored regex/text checks own textual/path-local rules; AST/lint/import graphs own semantic/boundary rules; typecheck/tests own types and behavior; manual owns judgment. Only proven-safe formatter/linter fixes may autofix.
+- Exception `exitCondition` text is required but manually reviewed. Mechanical staleness is exact: a missing path, zero violations, a count below `maxViolations`, or a count above it fails; only equality passes. Broad/wildcard paths and maximum increases fail.
 - A cutover task does not end with both legacy and replacement consumers. Foundation tasks may prove a replacement behind tests; the named cutover then moves every intended consumer and deletes the superseded path without a compatibility wrapper.
 - Before every commit, run the task's focused command, `pnpm typecheck`, and the currently available `pnpm verify`. Record broad-gate failures separately from task-owned failures; do not edit unrelated code to silence them.
 - Keep tests beside their owner. Use real temporary directories and public seams. Application tests use `it.effect`; dependency-free hook tests use ordinary Vitest.
@@ -87,8 +90,8 @@ git commit -m "chore(effect): install application foundation"
 - Create: `src/style/checkCodeStyle.ts`
 - Create: `src/style/checkCodeStyle.test.ts`
 - Create: `scripts/checkCodeStyle.ts`
+- Modify: `biome.json`
 - Modify: `AGENTS.md`
-- Modify: `vitest.config.ts`
 - Modify: `tsconfig.json`
 
 - [ ] **Step 1: Write the prescriptive root guide from the approved design**
@@ -138,17 +141,19 @@ Do not show a handwritten runtime-data `Feature` interface, conditional type, or
 
 Use a flat ordered `rules` array. Each entry contains one globally unique `id`, `applicability`, concise `summary`, `rationale`, good and bad examples, and a non-empty `enforcement` array containing only `formatter`, `linter`, `regex`, `ast`, `path`, `importGraph`, `typecheck`, `test`, or `manual`. Manual rules remain machine-enumerated so human and machine IDs are bijective; they are reported for review, not pretended to be mechanically proven. Optional `autofix` is true only for a formatter/linter transformation proven safe by fixtures.
 
-Store the three named files and hashes in separate exact `protectedPaths` metadata. The `exceptions` array contains only three entries for `assembleCut.mjs`: function form with `maxViolations: 13`, function inputs with `maxViolations: 5`, and non-obvious loop comments with `maxViolations: 2`. The Markdown protected paths are not AST exceptions. Each exception references an existing rule ID and exact repository-relative paths plus a reason and exit condition. Wildcards, unknown IDs, exceeded counts, stale exit conditions, or an increased ratchet fail closed.
+Store the three named files and hashes in separate exact `protectedPaths` metadata. The `exceptions` array contains only three entries for `assembleCut.mjs`: function form with `maxViolations: 13`, function inputs with `maxViolations: 5`, and non-obvious loop comments with `maxViolations: 2`. The Markdown protected paths are not AST exceptions. Each exception references an existing rule ID and exact repository-relative paths plus a reason and required human-readable `exitCondition`; the prose is manually reviewed, not machine-evaluated. Machine validation fails for a missing path, zero violations, a count below or above the maximum, a wildcard/broad path, an unknown ID, or a maximum increase. Only exact count equality passes.
+
+Surgically extend `biome.json` from its current `src/**/*.ts` migration scope to include exactly `src/**/*.ts`, `scripts/**/*.ts`, and `code-style.rules.json` for this task. Retain the current 140-column migration baseline; the final 120-column cutover remains Task 15. Extend `tsconfig.json` to typecheck `scripts/**/*.ts`. Do not edit `vitest.config.ts`: its existing `src/**/*.test.ts` discovery already finds the co-located checker test.
 
 - [ ] **Step 3: Replace the stale AGENTS digest**
 
-Make root `CODE-STYLE.md` the style SSOT, point to `code-style.rules.json`, describe the approved capability layout, remove the old pure-core/imperative-shell, interface, barrel-per-folder, flat-hook-payload, and `src/core` guidance, and keep the existing issue-tracker/domain-doc routing. Remove the tracked `<!-- dufflebag:skills -->` block in Task 14 with the generated projections so this commit does not mix content deletion with the contract.
+For the bootstrap phase through Task 15, make root `CODE-STYLE.md` and `code-style.rules.json` the only active local style contract, describe the approved capability layout, remove the old pure-core/imperative-shell, interface, barrel-per-folder, flat-hook-payload, and `src/core` guidance, and keep the existing issue-tracker/domain-doc routing. Task 16 makes the canonical profile JSON the source and regenerates this root pair as Dufflebag's projection, so no second rule source survives. Remove the tracked `<!-- dufflebag:skills -->` block in Task 14 with the generated projections so this commit does not mix content deletion with the contract.
 
 - [ ] **Step 4: Write failing checker fixtures without activating the repo gate**
 
-Extend Vitest and TypeScript coverage to the thin `scripts/**/*.ts` entrypoints and the substantive `src/style/**/*.ts` owner. Fixture tests must prove rule-ID bijection, complete required rule fields, valid enforcement vocabulary, every regex/AST/path/import-graph detector, exact line/rule reporting, generated-path exclusion, and fail-closed protected-path configuration. Plant both good and bad fixtures for the interface exceptions, internal barrels/`export *`, camelCase/repeated-suffix paths, non-obvious versus self-evident loops, one-expression extraction, and one-`flatMap` versus multi-step-`Effect.gen`. Only an anonymous generator directly passed to `Effect.gen` and a `Schema.TaggedError` class may pass their otherwise forbidden forms.
+Use the existing Vitest discovery and the expanded TypeScript coverage for the thin `scripts/**/*.ts` entrypoints and substantive `src/style/**/*.ts` owner. Fixture tests must prove rule-ID bijection, complete required rule fields, valid enforcement vocabulary, every regex/AST/path/import-graph detector, exact line/rule reporting, generated-path exclusion, and fail-closed protected-path configuration. Plant both good and bad fixtures for the interface exceptions, internal barrels/`export *`, camelCase/repeated-suffix paths, non-obvious versus self-evident loops, one-expression extraction, and one-`flatMap` versus multi-step-`Effect.gen`. Only an anonymous generator directly passed to `Effect.gen` and a `Schema.TaggedError` class may pass their otherwise forbidden forms.
 
-Fixture metadata contains exactly the three protected paths and hashes. Only `assembleCut.mjs` receives code-rule exemptions: 13 function-form, 5 function-input, and 2 non-obvious-loop-comment violations. The two protected Markdown paths are enumerated in the report but are not AST inputs or rule exceptions. Any wildcard, fourth path, extra exempt rule, count above 13/5/2, or later ratchet increase must fail the checker configuration.
+Fixture metadata contains exactly the three protected paths and hashes. Only `assembleCut.mjs` receives code-rule exemptions: 13 function-form, 5 function-input, and 2 non-obvious-loop-comment violations. The two protected Markdown paths are enumerated in the report but are not AST inputs or rule exceptions. Any wildcard, missing/fourth path, extra exempt rule, zero count, count below or above 13/5/2, or later ratchet increase must fail; only exact equality passes.
 
 Run:
 
@@ -160,13 +165,14 @@ Expected: RED before `checkCodeStyle.ts` exists, then GREEN against isolated fix
 
 - [ ] **Step 5: Implement the focused checker**
 
-Keep `scripts/checkCodeStyle.ts` as argument decoding, one call, rendering, and process status only. Use the TypeScript compiler AST directly in `src/style/checkCodeStyle.ts`; anchored regex/text checks may handle declared textual/path-local rules. Export `checkCodeStyle(repositoryRoot)` returning violations and the three protected paths. The checker owns only rules that formatter/linter/typecheck/test cannot express; it is not a second formatter or general linter. Do not use assertions inside the checker.
+Keep `scripts/checkCodeStyle.ts` as argument decoding, one call, rendering, and process status only. Use the TypeScript compiler AST directly in `src/style/checkCodeStyle.ts`; anchored regex/text checks may handle declared textual/path-local rules. Export `checkCodeStyle(repositoryRoot)` returning violations and the three protected paths. The checker owns only rules that formatter/linter/typecheck/test cannot express; it is not a second formatter or general linter. Do not use assertions inside the checker. `--validate-rules` validates JSON structure, human/machine IDs, protected-path hash syntax, exception references, and ratchet shape without comparing the clean isolated worktree's bytes; live mode performs byte/count checks later.
 
 - [ ] **Step 6: Validate the contract artifacts**
 
 Run:
 
 ```bash
+pnpm exec biome check scripts/checkCodeStyle.ts src/style/checkCodeStyle.ts src/style/checkCodeStyle.test.ts code-style.rules.json
 pnpm tsx scripts/checkCodeStyle.ts --validate-rules
 pnpm vitest run src/style/checkCodeStyle.test.ts
 pnpm typecheck
@@ -178,7 +184,7 @@ Expected: JSON parses, the existing code still passes its baseline gate, and the
 - [ ] **Step 7: Commit the contract and dormant checker**
 
 ```bash
-git add CODE-STYLE.md code-style.rules.json AGENTS.md src/style/checkCodeStyle.ts src/style/checkCodeStyle.test.ts scripts/checkCodeStyle.ts vitest.config.ts tsconfig.json
+git add CODE-STYLE.md code-style.rules.json AGENTS.md biome.json src/style/checkCodeStyle.ts src/style/checkCodeStyle.test.ts scripts/checkCodeStyle.ts tsconfig.json
 git commit -m "feat(style): define and test the strict code contract"
 ```
 
@@ -808,15 +814,62 @@ git commit -m "build: define catalog-closed package verification"
 - Delete: `src/payload/config.ts`
 - Delete: `src/payload/io.ts`
 - Delete: `src/scripts/assembleHooks.mjs`
+- Modify: `CODE-STYLE.md` if it contains exact protected paths
+- Modify: `code-style.rules.json`
+- Modify: `src/style/checkCodeStyle.ts`
+- Modify: `src/style/checkCodeStyle.test.ts`
 - Modify: `package.json`
 - Modify: `tsconfig.json`
-- Modify: source-path links and catalog consumers
+- Modify: source-path links, exact protected-path fixtures/reports, and catalog consumers
 
-- [ ] **Step 1: Write failing plain-Node runtime tests before moving sources**
+- [ ] **Step 1: Transfer only the protected dirty bytes into the implementation worktree**
+
+Audit both worktrees before any rename:
+
+```bash
+MAIN=/Users/yosefhayimsabag/Desktop/Code/dufflebag
+ISOLATED=/Users/yosefhayimsabag/Desktop/Code/dufflebag/.worktrees/dufflebag-deslop
+git -C "$MAIN" status --short
+git -C "$ISOLATED" status --short
+git -C "$MAIN" diff --quiet HEAD codex/dufflebag-deslop -- \
+  src/skills/make-a-trailer/SKILL.md \
+  src/skills/make-a-trailer/reference/pipeline.md \
+  src/skills/make-a-trailer/scripts/assembleCut.mjs
+shasum -a 256 \
+  "$MAIN/src/skills/make-a-trailer/SKILL.md" \
+  "$MAIN/src/skills/make-a-trailer/reference/pipeline.md" \
+  "$MAIN/src/skills/make-a-trailer/scripts/assembleCut.mjs"
+```
+
+Expected: isolated is clean at the implementation commit; the committed branch range has not touched the protected trio; main contains their working changes and may contain unrelated concurrent WIP. Never reset, stash, overwrite, or normalize main.
+
+The default path—and the mandatory path when main has any unrelated change—is to transfer only the protected diffs:
+
+```bash
+git -C "$MAIN" diff HEAD --binary --full-index -- \
+  src/skills/make-a-trailer/SKILL.md \
+  src/skills/make-a-trailer/reference/pipeline.md \
+  src/skills/make-a-trailer/scripts/assembleCut.mjs \
+  > /tmp/dufflebag-protected.patch
+git -C "$ISOLATED" apply --numstat /tmp/dufflebag-protected.patch
+git -C "$ISOLATED" apply --check /tmp/dufflebag-protected.patch
+git -C "$ISOLATED" apply /tmp/dufflebag-protected.patch
+git -C "$ISOLATED" status --short
+shasum -a 256 \
+  "$ISOLATED/src/skills/make-a-trailer/SKILL.md" \
+  "$ISOLATED/src/skills/make-a-trailer/reference/pipeline.md" \
+  "$ISOLATED/src/skills/make-a-trailer/scripts/assembleCut.mjs"
+```
+
+Inspect `--numstat` and status: exactly the three named paths may appear, and their hashes must match Global Constraints. The disposable patch is not committed.
+
+Only if main has no change beyond the protected trio, first verify the exact status and hashes, then a pre-rename `git -C "$MAIN" merge --ff-only codex/dufflebag-deslop` may replace the transfer and implementation may continue in main. If that optional route is taken, every later reference to the isolated protected-overlay worktree means this verified active main worktree, and Task 18's integration action becomes a read-only status report because integration already occurred. If the fast-forward refuses or any additional path exists, stop that route and use the isolated binary-patch procedure without modifying main.
+
+- [ ] **Step 2: Write failing plain-Node runtime tests before moving sources**
 
 Encode config with `bagConfigSchema`, write it beside a temporary installed runtime, and exercise the shared readers plus every hook entrypoint. Cover exact transport keys, malformed/missing input, missing/unreadable config fail-open behavior, one concise warning maximum, and the absence of semantic defaults, bounds, descriptions, clamping, and legacy aliases in the runtime graph.
 
-- [ ] **Step 2: Consolidate catalog runtime entrypoints**
+- [ ] **Step 3: Consolidate catalog runtime entrypoints**
 
 The singular `runtime.sourceEntrypoint` is the executable authority for each runtime feature:
 
@@ -826,11 +879,11 @@ The singular `runtime.sourceEntrypoint` is the executable authority for each run
 
 An empty `{}` input must exit safely. Files reachable from these entrypoints import only `node:*`, `src/runtime/**`, or their own feature runtime subtree.
 
-- [ ] **Step 3: Rename the 19 clean/migration-owned directories with history**
+- [ ] **Step 4: Rename the 19 clean/migration-owned directories with history**
 
 Use `git mv` for every mapping except `make-a-trailer` → `makeATrailer`. Three source names (`autorun`, `deslop`, and `planpage`) already conform and do not move. Update authored links and catalog-path consumers; public feature IDs, installed skill IDs, and flags remain hyphenated data.
 
-- [ ] **Step 4: Stage a baseline-only `makeATrailer` rename**
+- [ ] **Step 5: Stage a baseline-only `makeATrailer` rename**
 
 Create a pure rename patch from a disposable clean worktree at the current `HEAD`:
 
@@ -840,14 +893,26 @@ cd /tmp/dufflebag-rename
 git mv src/skills/make-a-trailer src/skills/makeATrailer
 git diff --cached --binary --find-renames=100% > /tmp/makeATrailer-rename.patch
 cd -
-git worktree remove /tmp/dufflebag-rename
+git worktree remove --force /tmp/dufflebag-rename
 mv src/skills/make-a-trailer src/skills/makeATrailer
 git apply --cached /tmp/makeATrailer-rename.patch
 ```
 
-The redirection creates only a disposable patch. Verify the three new working paths still match the protected SHA-256 values. The index blobs for those paths must equal the old committed blobs.
+The redirection creates only a disposable patch. Verify the three new working paths still match the protected SHA-256 values. Assert all three index blobs equal their old committed blobs:
 
-- [ ] **Step 5: Activate catalog-closed build, tarball verification, and smoke tests**
+```bash
+test "$(git rev-parse HEAD:src/skills/make-a-trailer/SKILL.md)" = "$(git rev-parse :src/skills/makeATrailer/SKILL.md)"
+test "$(git rev-parse HEAD:src/skills/make-a-trailer/reference/pipeline.md)" = "$(git rev-parse :src/skills/makeATrailer/reference/pipeline.md)"
+test "$(git rev-parse HEAD:src/skills/make-a-trailer/scripts/assembleCut.mjs)" = "$(git rev-parse :src/skills/makeATrailer/scripts/assembleCut.mjs)"
+```
+
+- [ ] **Step 6: Atomically cut every exact protected-path reference over**
+
+In the same commit as the rename, replace all three old `protectedPaths` and all three `assembleCut.mjs` exception paths in `code-style.rules.json` with `src/skills/makeATrailer/**`. Update exact path constants, fixtures, and report expectations in `src/style/checkCodeStyle.ts`, `src/style/checkCodeStyle.test.ts`, and root `CODE-STYLE.md` when present. Search the maintained tree for every old protected path and leave none. The public feature ID and installed skill ID remain `make-a-trailer`; only repository paths change.
+
+Run `pnpm tsx scripts/checkCodeStyle.ts --validate-rules` here. This mode validates structure, ID references, hash syntax, and ratchet shape without comparing isolated bytes. Task 15's first live scan performs the actual new-path hash/count comparison.
+
+- [ ] **Step 7: Activate catalog-closed build, tarball verification, and smoke tests**
 
 Change `package.json#files` to exactly `dist`, `templates`, `README.md`, and `LICENSE`—never `src/skills`. Installation reads only staged `dist/skills` and `dist/runtime`. Wire:
 
@@ -861,7 +926,7 @@ Keep `check:style` dormant until Task 15. Replace the flat assembler completely;
 
 At this cutover, `verify` runs Biome → typecheck → tests → build → shipping verification → hook smoke. Task 15 inserts the contract checker between typecheck and tests once the full authored tree conforms.
 
-- [ ] **Step 6: Prove source, stage, tarball, and runtime agree**
+- [ ] **Step 8: Prove source, stage, tarball, and runtime agree**
 
 ```bash
 pnpm vitest run src/runtime scripts
@@ -872,17 +937,18 @@ pnpm typecheck
 pnpm verify
 git diff --cached --summary --find-renames=100%
 git diff --cached -- src/skills/makeATrailer/SKILL.md src/skills/makeATrailer/reference/pipeline.md src/skills/makeATrailer/scripts/assembleCut.mjs
+if rg -n 'src/skills/make-a-trailer/(SKILL\.md|reference/pipeline\.md|scripts/assembleCut\.mjs)' CODE-STYLE.md code-style.rules.json src scripts package.json tsconfig.json; then exit 1; fi
 git status --short
 ```
 
-Expected: 23 cataloged features stage exact allowlists; every packed entrypoint runs; no `dist/src/skills`, raw hook TypeScript, `dist/hooks`, or rewritten import ships; protected cached paths are pure renames with their user hunks still unstaged.
+Expected: 23 cataloged features stage exact allowlists; every packed entrypoint runs; no `dist/src/skills`, raw hook TypeScript, `dist/hooks`, or rewritten import ships; the old protected repository paths produce no findings; all three cached paths are baseline-identical renames; and their transferred user hunks remain unstaged at the new paths.
 
-- [ ] **Step 7: Commit the atomic shipping cutover**
+- [ ] **Step 9: Commit the atomic shipping and protected-path cutover**
 
-Stage migration-owned paths explicitly. Any pathspec that includes `src/skills` must exclude the three protected new paths; their clean baseline rename is already in the index from Step 4.
+Stage migration-owned paths explicitly. Any pathspec that includes `src/skills` must exclude the three protected new paths; their clean baseline rename is already in the index from Step 5.
 
 ```bash
-git add package.json tsconfig.json src/runtime src/catalog src/install scripts
+git add CODE-STYLE.md code-style.rules.json package.json tsconfig.json src/runtime src/catalog src/install src/style/checkCodeStyle.ts src/style/checkCodeStyle.test.ts scripts
 git add src/skills \
   ':(exclude)src/skills/makeATrailer/SKILL.md' \
   ':(exclude)src/skills/makeATrailer/reference/pipeline.md' \
@@ -891,7 +957,18 @@ git add -u src/payload src/scripts/assembleHooks.mjs
 git commit -m "refactor(runtime): ship cataloged skills and nested hooks"
 ```
 
-After commit, rerun all three hashes and `git status --short`. Expected: only the three protected new paths remain modified.
+After commit, rerun all three hashes and compare each new committed blob to the matching old blob in the commit parent:
+
+```bash
+TASK13_COMMIT=$(git rev-parse HEAD)
+test "$(git rev-parse "${TASK13_COMMIT}^:src/skills/make-a-trailer/SKILL.md")" = "$(git rev-parse "${TASK13_COMMIT}:src/skills/makeATrailer/SKILL.md")"
+test "$(git rev-parse "${TASK13_COMMIT}^:src/skills/make-a-trailer/reference/pipeline.md")" = "$(git rev-parse "${TASK13_COMMIT}:src/skills/makeATrailer/reference/pipeline.md")"
+test "$(git rev-parse "${TASK13_COMMIT}^:src/skills/make-a-trailer/scripts/assembleCut.mjs")" = "$(git rev-parse "${TASK13_COMMIT}:src/skills/makeATrailer/scripts/assembleCut.mjs")"
+pnpm tsx scripts/checkCodeStyle.ts --validate-rules
+git status --short
+```
+
+Expected: only the three protected new paths remain modified in the active protected-overlay worktree. When the binary-patch route was used, main remains byte-untouched.
 
 ---
 
@@ -938,18 +1015,19 @@ Recheck the three protected hashes and confirm they remain the only dirty files.
 **Files:**
 
 - Modify: `biome.json`
+- Modify: `code-style.rules.json`
 - Modify: `src/style/checkCodeStyle.ts`
 - Modify: `src/style/checkCodeStyle.test.ts`
 - Modify: `scripts/checkCodeStyle.ts`
 - Modify: `package.json`
 - Modify: `.github/workflows/ci.yml`
-- Modify as reported: all maintained TypeScript/JavaScript/JSON sources except protected `assembleCut.mjs`
+- Modify as reported: all maintained TypeScript/JavaScript/JSON sources, root supported config, and template JSON except protected `assembleCut.mjs`
 
 - [ ] **Step 1: Re-run the dormant fixtures, then capture the real migration failure**
 
 Plant one focused violation per mechanical detector: function declarations; disallowed generators/classes/runtime-data interfaces/enums/conditional types/assertions/directives; invalid capability-port interfaces; too many raw parameters; missing blank lines; missing explanation on non-obvious loops while accepting self-evident loops without ceremony; missing indexed-access safety proofs; ordered-pipeline comments; internal barrels and `export *`; vague/bucket names; camelCase and repeated-role-suffix paths; default exports; forbidden imports; input mutation; reducer builders; pointless one-expression extraction; invalid multi-step `flatMap`; `Effect.run*`; application `console.*`; hook import edges; thin-script boundaries; and external SDK imports outside an earned feature-owned adapter. Prove every rule has applicability, summary, rationale, good/bad examples, valid enforcement, and that guide IDs and JSON IDs are a bijection.
 
-Test the exception contract separately: exactly the three new `makeATrailer` paths and hashes are reported as protected metadata. Only `assembleCut.mjs` has code-rule exemptions, ratcheted to 13 function-form, 5 function-input, and 2 non-obvious-loop-comment violations. The two Markdown files are not AST exceptions. Wildcards, a fourth path, an additional exempt rule, an exceeded count, or an attempted increase fail closed.
+Test the exception contract separately: exactly the three new `makeATrailer` paths and live transferred hashes are reported as protected metadata. Only `assembleCut.mjs` has code-rule exemptions, ratcheted to 13 function-form, 5 function-input, and 2 non-obvious-loop-comment violations. The two Markdown files are not AST exceptions. Missing/broad/wildcard paths, a fourth path, an additional exempt rule, zero violations, a count below or above its maximum, or an attempted maximum increase fail closed; only equality passes. `exitCondition` remains required human-readable review text and is not machine-interpreted.
 
 Run:
 
@@ -958,11 +1036,11 @@ pnpm vitest run src/style/checkCodeStyle.test.ts
 pnpm tsx scripts/checkCodeStyle.ts
 ```
 
-Expected: fixture tests stay GREEN; the direct repository check is RED with the complete migration-owned violation list. Save that output as the worklist, not as a baseline allowlist.
+Expected: fixture tests stay GREEN; the first live repository scan confirms all three new paths and hashes plus exact 13/5/2 counts, then is RED only for the complete migration-owned violation list. Save that output as the worklist, not as a baseline allowlist.
 
 - [ ] **Step 2: Expand Biome to every maintained supported file**
 
-Set 2-space indentation, double quotes, semicolons, trailing commas, 120 columns, organized imports, and coverage for maintained TS, TSX, JS, MJS, JSON, and JSONC in the main package, root scripts, and png-to-code harness. Exclude generated output. Exclude only the exact protected `src/skills/makeATrailer/scripts/assembleCut.mjs` from Biome; the two protected Markdown files are outside Biome's code surface and need no formatter exemption.
+Set 2-space indentation, double quotes, semicolons, trailing commas, 120 columns, organized imports, and coverage for maintained TS, TSX, JS, MJS, JSON, and JSONC in the main package, root scripts, supported root config, png-to-code harness, and template JSON. Exclude generated output. Exclude only the exact protected `src/skills/makeATrailer/scripts/assembleCut.mjs` from Biome; the two protected Markdown files are outside Biome's code surface and need no formatter exemption. Build the write candidate list from tracked files in only those maintained roots, root supported files, and template JSON; never run a broad unreviewed `--write .`.
 
 - [ ] **Step 3: Implement the narrow checker using the TypeScript AST**
 
@@ -977,27 +1055,46 @@ Fix causes, not checker rules. Prefer removing wrappers, renaming owners, flatte
 Add `check:style` and make `verify` run exactly Biome → typecheck → checker → tests → build → shipping verification → hook smoke. Update the real CI gate to run `pnpm verify` (or required jobs with exactly the same coverage) so the GitHub `CI Gate` cannot pass while the new stages are skipped.
 
 ```bash
-pnpm exec biome check --write .
+git status --short --untracked-files=all
+git ls-files -z -- \
+  ':(top,glob)src/**/*.ts' ':(top,glob)src/**/*.tsx' ':(top,glob)src/**/*.js' ':(top,glob)src/**/*.mjs' \
+  ':(top,glob)src/**/*.json' ':(top,glob)src/**/*.jsonc' \
+  ':(top,glob)scripts/**/*.ts' ':(top,glob)scripts/**/*.tsx' ':(top,glob)scripts/**/*.js' ':(top,glob)scripts/**/*.mjs' \
+  ':(top,glob)scripts/**/*.json' ':(top,glob)scripts/**/*.jsonc' \
+  ':(top,glob)*.ts' ':(top,glob)*.tsx' ':(top,glob)*.js' ':(top,glob)*.mjs' \
+  ':(top,glob)*.json' ':(top,glob)*.jsonc' \
+  ':(top,glob)templates/**/*.json' ':(top,glob)templates/**/*.jsonc' \
+  ':(top,exclude)src/skills/makeATrailer/scripts/assembleCut.mjs' \
+  | xargs -0 pnpm exec biome check --write
+git diff --name-only
 pnpm check:style
 pnpm vitest run src/style/checkCodeStyle.test.ts
 pnpm typecheck
 pnpm verify
 ```
 
-Expected: Biome and the checker pass; the checker prints exactly three named protected paths, the three ratcheted `assembleCut.mjs` rule exceptions, and zero unprotected violations.
+Before formatting, review every `??` path. For each migration-owned maintained source that this task genuinely created, use an explicit `git add -N -- <exact-path>` so it enters `git ls-files` and the unstaged diff without staging its contents; stop on unexplained or out-of-scope untracked files. Inspect every name reported after the write. The only names outside the exact formatter candidate scope may be the three already-dirty protected paths; rehash them and refuse any other path or any protected-byte change before staging. Expected: Biome and the checker pass; the checker prints exactly three named protected paths, the three equal 13/5/2 `assembleCut.mjs` rule exceptions, and zero unprotected violations.
 
 - [ ] **Step 6: Commit enforcement and cleanup**
 
 ```bash
-git add biome.json code-style.rules.json package.json .github/workflows/ci.yml src/style/checkCodeStyle.ts src/style/checkCodeStyle.test.ts scripts/checkCodeStyle.ts scripts
-git add src \
-  ':(exclude)src/skills/makeATrailer/SKILL.md' \
-  ':(exclude)src/skills/makeATrailer/reference/pipeline.md' \
-  ':(exclude)src/skills/makeATrailer/scripts/assembleCut.mjs'
+git add biome.json code-style.rules.json package.json .github/workflows/ci.yml src/style/checkCodeStyle.ts src/style/checkCodeStyle.test.ts scripts/checkCodeStyle.ts
+git diff --name-only -z -- \
+  ':(top,glob)src/**' ':(top,glob)scripts/**' \
+  ':(top,glob)*.ts' ':(top,glob)*.tsx' ':(top,glob)*.js' ':(top,glob)*.mjs' \
+  ':(top,glob)*.json' ':(top,glob)*.jsonc' \
+  ':(top,glob)templates/**/*.json' ':(top,glob)templates/**/*.jsonc' \
+  ':(top,exclude)src/skills/makeATrailer/SKILL.md' \
+  ':(top,exclude)src/skills/makeATrailer/reference/pipeline.md' \
+  ':(top,exclude)src/skills/makeATrailer/scripts/assembleCut.mjs' \
+  | xargs -0 git add --
+git diff --cached --name-only
+git diff --cached -- src/skills/makeATrailer/SKILL.md src/skills/makeATrailer/reference/pipeline.md src/skills/makeATrailer/scripts/assembleCut.mjs
+git status --short --untracked-files=all
 git commit -m "refactor(style): enforce the readable code contract"
 ```
 
-Confirm the protected files were excluded and remain unstaged with the same hashes.
+Confirm the cached name list matches the reviewed migration-owned diff, the protected cached diff is empty, no `??` path remains, and all three protected files remain unstaged with the same hashes.
 
 ---
 
@@ -1017,8 +1114,12 @@ Confirm the protected files were excluded and remain unstaged with the same hash
 - Create: `src/skills/grillMeCodeStyle/references/profiles/asyncMessaging.json`
 - Create: `src/skills/grillMeCodeStyle/references/profiles/externalAdapters.json`
 - Create: `src/skills/grillMeCodeStyle/references/profiles/scriptsCli.json`
-- Create: `src/style/codeStyleFactory.ts`
-- Create: `src/style/codeStyleFactory.test.ts`
+- Create: `src/style/codeStyleProfiles.test.ts`
+- Create: `docs/superpowers/evals/2026-07-14-code-style-factory-greenfield.md`
+- Create: `docs/superpowers/evals/2026-07-14-code-style-factory-existing-cli.md`
+- Modify: `CODE-STYLE.md`
+- Modify: `code-style.rules.json`
+- Modify: `AGENTS.md`
 - Modify: `src/skills/grillMeCodeStyle/SKILL.md`
 - Modify: `src/skills/grillMeCodeStyleWithDocs/SKILL.md`
 - Modify: `src/skills/grillMeCodeStyleWithDocs/SCAN.md`
@@ -1034,30 +1135,30 @@ Confirm the protected files were excluded and remain unstaged with the same hash
 - Modify: `templates/mdFiles/PROJECT.md`
 - Modify: `src/catalog/featureCatalog.ts`
 
-- [ ] **Step 1: Write failing factory contract and forward tests**
+- [ ] **Step 1: Write failing static contracts and baseline forward evaluations**
 
-Start with baseline forward trials that attempt both target scenarios without the new composition references and record the missing or incorrect artifacts. Then write deterministic tests against real temporary repositories for:
+Write a static contract test for the real public seam: the packed `grill-me-code-style` skill's `SKILL.md`, `profileComposition.md`, 11 canonical profile JSON files, directly referenced guidance, and exact feature allowlist. Prove every reference exists and ships; profile and rule IDs are globally unique; every rule has applicability, summary, rationale, good/bad examples, and valid enforcement; and human/machine IDs are bijective.
 
-1. a greenfield React + Effect + PostgreSQL application, which resolves `ownerBase`, `typescriptEffect`, `reactTailwind`, `backendHttp`, `dataPersistence`, `sql`, `securityOperations`, and only the additional profiles supported by evidence; and
-2. an existing Node CLI with legacy debt and no UI or database, which resolves `ownerBase`, `typescriptEffect`, and `scriptsCli` without leaking React, HTTP, persistence, SQL, or NoSQL rules.
+Following the writing-skills workflow, run and record baseline-without-skill forward evaluations before adding the new references for exactly:
 
-Both scenarios must produce local `CODE-STYLE.md`, `code-style.rules.json`, formatter/linter/checker wiring, package verification wiring, and a bounded AGENTS digest. Test that existing formatter/linter/package configuration is structurally patched rather than replaced; bytes outside the AGENTS markers are identical; a second identical run changes no bytes; and the target imports no dufflebag runtime.
+1. a greenfield repository with React, an Effect HTTP server, PostgreSQL, a security boundary, maintained repository scripts, and a developer CLI, but no NoSQL, durable messaging, or provider SDK; and
+2. an existing local Node CLI with legacy debt and no UI, HTTP server, database, durable messaging, provider SDK, or separate security boundary.
 
-Also prove all referenced files exist and are included in the decoded feature allowlist; all profile IDs and rule IDs are globally unique; every rule has applicability, summary, rationale, good and bad examples, and valid enforcement; the human and machine rule IDs are bijective; and irrelevant profiles do not leak into either projection.
+Use a fresh-context agent for each no-skill trial and preserve its response verbatim before editing the skill. Each evaluation record contains the immutable fixture prompt, observed baseline output, missing/wrong artifacts or profile leakage, and the exact acceptance contract used again after installation. Do not rewrite a baseline after seeing the with-skill result.
 
 Run:
 
 ```bash
-pnpm vitest run src/style/codeStyleFactory.test.ts
+pnpm vitest run src/style/codeStyleProfiles.test.ts
 ```
 
-Expected: RED because the profiles and resolver do not exist and the baseline forward trials cannot produce the approved artifacts.
+Expected: RED because the packed profile surface does not exist and the baseline forward trials cannot reliably produce the approved artifacts.
 
 - [ ] **Step 2: Create the canonical profile tree and composition contract**
 
-`profileComposition.md` is the agent workflow for evidence collection, applicability, merge order, conflicts, exception review, artifact rendering, and reruns. It is not a second rule catalog. The structured profile JSON files are the canonical dufflebag rule references and use this exact composition order:
+`profileComposition.md` is the installed-skill workflow for evidence collection, applicability, merge order, conflicts, repository additions, exception review, artifact rendering, and reruns. It is not a second rule catalog. The structured profile JSON files become the canonical owner/stack rule references and use this exact composition order:
 
-`owner base -> applicable stack profiles -> explicit narrow repository exceptions`
+`owner base -> applicable stack profiles -> repository-specific additions -> explicit narrow repository exceptions`
 
 Each profile has one sole responsibility:
 
@@ -1075,36 +1176,47 @@ Each profile has one sole responsibility:
 | `externalAdapters` | Earned provider boundaries, SDK confinement, decoding, resilience, reconciliation, and contract tests. |
 | `scriptsCli` | Thin scripts, generators, automation, CLI routing, JSON schemas, streams, and exit statuses. |
 
-Every rule record contains one global ID, applicability, summary, rationale, good/bad examples, and a non-empty enforcement array from exactly `formatter | linter | regex | ast | path | importGraph | typecheck | test | manual`. The profiles encode the approved concrete contracts from the design; `STYLE-CATALOG.md` asks only evidence-backed applicability or conflict questions and never substitutes vague preferences. Canonical profile JSON remains inside the shipped dufflebag skill; it is not copied into targets as a second universal configuration system.
+Every rule record contains one global ID, applicability, summary, rationale, good/bad examples, and a non-empty enforcement array from exactly `formatter | linter | regex | ast | path | importGraph | typecheck | test | manual`. Repository-specific additions use a repository namespace, may add a real local invariant or narrow a canonical rule, and may not weaken or duplicate one. Exceptions are the sole weakening layer.
 
-- [ ] **Step 3: Implement deterministic resolution and exception ratchets**
+An exception has exact paths, a reason, required human-readable `exitCondition`, and `maxViolations`. Free-form exit text is manually reviewed. Machine validation fails for a missing path, zero violations, a count below or above the maximum, a broad/wildcard path, an unknown rule, or a maximum increase; only equality passes.
 
-`src/style/codeStyleFactory.ts` defines Effect Schemas for profiles, rules, examples, enforcement channels, resolved artifacts, and exceptions; derives their TypeScript types; decodes selected canonical profiles strictly; validates global identity and fields; composes them in declared order; and renders bijective human and machine projections. It patches existing formatter/linter/checker and package verification configuration without deleting unrelated keys. It replaces only the bounded AGENTS digest markers and byte-preserves everything outside them. It leaves no runtime import or config dependency in the target repository.
+- [ ] **Step 3: Update the packed public seam and shared teaching references**
 
-An exception must reference an existing rule ID and exact repository-relative paths and include a reason, exit condition, and non-negative `maxViolations`. Reject glob/broad paths, unknown rule IDs, an exceeded maximum, a stale exit condition, or any attempt to increase a previous maximum. Plant a violation for every mechanical detector and prove it is found through its declared channel. Only proven-safe formatter/linter fixtures may enable autofix.
-
-- [ ] **Step 4: Update all four workflows and the shared teaching references**
-
-Update both grill skills, with-docs scan, coach, reviewer, `RULESET.md`, `STYLE-CATALOG.md`, `STEPS.md`, `CODE-STYLE-FORMAT.md`, and `FORMATTERS.md` to consume the same composition contract and rule IDs. Locked owner tastes are not re-asked. The workflows ask only real stack conflicts, unknown applicability, or an explicit narrow exception, and explain examples and file placement in plain language before writing.
+Update both grill skills, with-docs scan, coach, reviewer, `RULESET.md`, `STYLE-CATALOG.md`, `STEPS.md`, `CODE-STYLE-FORMAT.md`, and `FORMATTERS.md` to consume the same composition contract and rule IDs. Locked owner tastes are not re-asked. The workflows ask only real stack conflicts, unknown applicability, a repository-specific invariant, or an explicit narrow exception, and explain examples and file placement in plain language before writing.
 
 Make `templates/mdFiles/**` repo-neutral shells for the resolved artifacts: no dufflebag paths, names, migration history, Effect/React/database mandate, or provider assumption. They are projections/placeholders, not a competing universal rule source. Existing repositories are patched, never replaced wholesale.
 
-- [ ] **Step 5: Prove shipping, no-op reruns, and forward behavior**
+- [ ] **Step 4: Run with-skill forward evaluations against the exact fixtures**
+
+Build and install the packed skill into a fresh evaluation context, then rerun the same immutable prompt with a fresh agent. Record its response verbatim beside the baseline and score the artifact/profile contract. The agent receives the installed skill resources, not an unshipped source resolver or hints copied from the expected answer.
+
+- The greenfield fixture resolves exactly `ownerBase`, `typescriptEffect`, `reactTailwind`, `backendHttp`, `dataPersistence`, `sql`, `securityOperations`, and `scriptsCli`. It excludes exactly `noSql`, `asyncMessaging`, and `externalAdapters`.
+- The existing local Node CLI resolves exactly `ownerBase`, `typescriptEffect`, and `scriptsCli`. It excludes all eight other profiles.
+
+Both must produce local `CODE-STYLE.md`, `code-style.rules.json`, formatter/linter/checker integration, package verification wiring, and a bounded AGENTS digest. Existing formatter/linter/package configuration is structurally patched rather than replaced; bytes outside AGENTS markers are identical; irrelevant profile vocabulary is absent; a second identical run changes no bytes; and the target imports no dufflebag runtime.
+
+- [ ] **Step 5: Make canonical profiles regenerate Dufflebag's bootstrap contract**
+
+Run the installed skill on Dufflebag itself with exactly `ownerBase`, `typescriptEffect`, and `scriptsCli`, followed by evidence-backed repository additions named `dufflebag.*` for dependency-free hook isolation, transactional artifact planning/receipts, and catalog-closed shipping, then the protected exceptions. Repository additions cannot duplicate or weaken canonical rules.
+
+Rewrite root `CODE-STYLE.md` and `code-style.rules.json` from that composition and refresh only the bounded AGENTS digest. The Task 2 pair is now a generated local projection of canonical profile JSON plus Dufflebag additions, not a competing SSOT. Run the same factory workflow a second time and prove all three files are byte-for-byte unchanged.
+
+- [ ] **Step 6: Prove the exact packed skill surface and final factory behavior**
 
 ```bash
-pnpm vitest run src/style/codeStyleFactory.test.ts src/style/checkCodeStyle.test.ts
+pnpm vitest run src/style/codeStyleProfiles.test.ts src/style/checkCodeStyle.test.ts
 pnpm build
 pnpm verify:shipping
 pnpm typecheck
 pnpm verify
 ```
 
-Expected: all 11 profiles and every direct reference exist and ship; both forward scenarios produce only applicable profiles; profile/rule identities and human/machine bijection pass; existing config and unowned AGENTS bytes survive; planted violations exercise every detector; exception counts can only decrease; stale exceptions fail; and identical reruns are byte-for-byte no-ops.
+Expected: the packed `grill-me-code-style` skill contains `SKILL.md`, `profileComposition.md`, all 11 profiles, and every direct reference in its exact feature allowlist; static contracts pass; both forward evaluations resolve the exact sets above; Dufflebag resolves exactly three canonical profiles plus non-duplicating `dufflebag.*` additions; existing config and unowned AGENTS bytes survive; planted violations exercise every mechanical detector; only exact exception-count equality passes; and all reruns are byte no-ops.
 
-- [ ] **Step 6: Commit the factory**
+- [ ] **Step 7: Commit the canonical profiles and their Dufflebag projection**
 
 ```bash
-git add src/skills/grillMeCodeStyle src/skills/grillMeCodeStyleWithDocs src/skills/grillMeCodeStyleCoach src/skills/grillMeCodeStyleReview src/style/codeStyleFactory.ts src/style/codeStyleFactory.test.ts src/catalog/featureCatalog.ts templates/mdFiles
+git add CODE-STYLE.md code-style.rules.json AGENTS.md docs/superpowers/evals src/skills/grillMeCodeStyle src/skills/grillMeCodeStyleWithDocs src/skills/grillMeCodeStyleCoach src/skills/grillMeCodeStyleReview src/style/codeStyleProfiles.test.ts src/catalog/featureCatalog.ts templates/mdFiles
 git commit -m "feat(style): ship the composable code-style factory"
 ```
 
@@ -1199,11 +1311,44 @@ git commit -m "docs: align the repository with the Effect architecture"
 - Modify only if a failing regression identifies a real owner
 - Verify: entire repository and packed tarball
 
-- [ ] **Step 1: Recheck protected user work**
+- [ ] **Step 1: Audit the active protected-overlay worktree, rename blobs, and main separately**
 
-Run SHA-256 on the three `src/skills/makeATrailer/**` files and compare to Global Constraints. Run `git diff --` for those paths and verify the user hunks remain unstaged. Do not proceed if any byte differs unexpectedly.
+In the default isolated route, run SHA-256 on the three `src/skills/makeATrailer/**` files and compare to Global Constraints. Verify exactly those three paths are dirty, their user hunks are unstaged, and the index is otherwise clean. If Task 13 used the verified pre-rename main route, perform the same checks in main and treat that as the active overlay for every remaining command. Find the Task 13 commit and reassert all three baseline rename blobs:
 
-- [ ] **Step 2: Run focused architecture searches**
+```bash
+TASK13_COMMIT=$(git log -1 --format=%H --grep='^refactor(runtime): ship cataloged skills and nested hooks$')
+test "$(git rev-parse "${TASK13_COMMIT}^:src/skills/make-a-trailer/SKILL.md")" = "$(git rev-parse "${TASK13_COMMIT}:src/skills/makeATrailer/SKILL.md")"
+test "$(git rev-parse "${TASK13_COMMIT}^:src/skills/make-a-trailer/reference/pipeline.md")" = "$(git rev-parse "${TASK13_COMMIT}:src/skills/makeATrailer/reference/pipeline.md")"
+test "$(git rev-parse "${TASK13_COMMIT}^:src/skills/make-a-trailer/scripts/assembleCut.mjs")" = "$(git rev-parse "${TASK13_COMMIT}:src/skills/makeATrailer/scripts/assembleCut.mjs")"
+git diff --cached --name-only
+git status --short
+git -C /Users/yosefhayimsabag/Desktop/Code/dufflebag status --short
+```
+
+On the default route, main may contain unrelated concurrent WIP. This audit is read-only; do not reset, stash, merge, or overwrite anything. Stop on an unexpected active-overlay byte or staged path.
+
+- [ ] **Step 2: Run the clean committed-source gate without pretending the overlay is committed**
+
+Create a disposable detached worktree from `HEAD` and run the reproducible committed-source gates. Rule validation is structural here because the protected dirty bytes intentionally are not in the commit:
+
+```bash
+git worktree add --detach /tmp/dufflebag-clean-final HEAD
+cd /tmp/dufflebag-clean-final
+pnpm install --frozen-lockfile
+pnpm exec biome check .
+pnpm typecheck
+pnpm tsx scripts/checkCodeStyle.ts --validate-rules
+pnpm test
+pnpm build
+pnpm verify:shipping
+pnpm smoke:hooks
+cd -
+git worktree remove /tmp/dufflebag-clean-final
+```
+
+Expected: formatting, typecheck, structural rule validation, tests, build, shipping, and hook smoke pass from committed source. Do not run or report the live protected-hash/count check against absent overlay bytes.
+
+- [ ] **Step 3: Run focused architecture and live protected-path searches in the overlay worktree**
 
 ```bash
 pnpm tsx scripts/checkCodeStyle.ts
@@ -1212,9 +1357,9 @@ rg -n 'from ["\x27](commander|@clack/prompts|picocolors)["\x27]' src scripts
 rg -n 'src/(core|commands|payload)|function [A-Za-z_$]|class [A-Za-z_$]|export \*' src scripts --glob '*.{ts,tsx,js,mjs}'
 ```
 
-Expected: no maintained application violations. Raw interface findings are reviewed as declaration augmentation or genuinely substitutable feature-owned external capability ports; all other findings are only exact protected-path violations already reported by the checker or permitted `Effect.gen(function* ()` / `Schema.TaggedError` forms. The checker also proves thin root scripts, no internal barrels/`export *`, and external SDK import confinement.
+Expected: the live checker verifies the three new paths/hashes and equal 13/5/2 counts. No maintained application violation remains. Raw interface findings are reviewed as declaration augmentation or genuinely substitutable feature-owned external capability ports; all other findings are only exact protected-path violations already reported by the checker or permitted `Effect.gen(function* ()` / `Schema.TaggedError` forms. The checker also proves thin root scripts, no internal barrels/`export *`, and external SDK import confinement.
 
-- [ ] **Step 3: Run the exact final gate from a clean index**
+- [ ] **Step 4: Run the exact protected-overlay final gate from a clean index**
 
 ```bash
 pnpm verify
@@ -1234,27 +1379,29 @@ Hook smoke PASS
 
 In the same subprocess test run, assert command-owned JSON success schemas, the shared safe error document, exactly one stdout document, stderr-only diagnostics, no interactive/ANSI output in JSON mode, help/version status 0, operational status 1, usage and bare non-TTY status 2, cancellation status 130, and `--strict` warning promotion.
 
-- [ ] **Step 4: Inspect the packed artifact**
+- [ ] **Step 5: Inspect the packed artifact and smoke the installed factory seam**
 
 ```bash
 pnpm pack --pack-destination /tmp/dufflebag-pack
 npm pack --dry-run --json
 ```
 
-Expected: no authored `src/skills`, no provider projections, no root `scripts`, no `src/build`, `src/documentation`, `src/style`, test, fixture, or other build-only files; all catalog allowlists are present under `dist/skills`; all 11 CODE-STYLE profiles plus `profileComposition.md` ship inside the grill skill allowlist; and every declared runtime entrypoint exists under `dist/runtime`.
+Expected: no authored `src/skills`, no provider projections, no root `scripts`, no `src/build`, `src/documentation`, `src/style`, test, fixture, or other build-only files; all catalog allowlists are present under `dist/skills`; the installed `grill-me-code-style` surface contains `SKILL.md`, `profileComposition.md`, all 11 canonical profiles, and every direct reference; static packed-surface tests and both writing-skills forward evaluations pass with their exact profile sets; and every declared runtime entrypoint exists under `dist/runtime`.
 
-- [ ] **Step 5: Run an independent code/style review**
+- [ ] **Step 6: Run an independent code/style review**
 
 Use `superpowers:requesting-code-review` plus the repo's code-style review workflow against the complete commit range from `946971a` to `HEAD`. Review schema/type SSOT, transaction safety, receipt deletion authority, JSON/non-TTY/exit behavior, hook isolation, thin-script and shipping closure, external SDK confinement, profile composition and leakage, template neutrality, exception ratchets, wrapper/name/body noise, docs accuracy, and protected-file preservation. Fix every confirmed blocker with a failing regression first.
 
-- [ ] **Step 6: Verify again after review fixes**
+- [ ] **Step 7: Verify both gates again, then make a non-destructive integration decision**
 
-Run `pnpm verify`, CLI subprocess contracts, `src/style/codeStyleFactory.test.ts`, packed verification, protected hashes, generic-template neutrality checks, `git diff --check`, and `git status --short` again. Expected: all gates pass, profile composition reruns are no-ops, and only the three protected user files are modified.
+Repeat the clean committed-source gate, then run `pnpm verify`, CLI subprocess contracts, `src/style/codeStyleProfiles.test.ts`, packed verification, protected hashes/counts, rename-blob equality, generic-template neutrality checks, `git diff --check`, and `git status --short` in the active overlay worktree. Expected: both gates pass, profile composition reruns are no-ops, and exactly the three protected new paths are modified there.
 
-- [ ] **Step 7: Commit any review-owned regression fixes**
+On the default isolated route, audit main again and compare its dirty paths with the branch range. Fast-forward/integrate only when the audit proves no unrelated or overlapping main WIP can be overwritten and Git accepts a non-destructive fast-forward. If main contains concurrent Task-2-shaped work, old protected-path edits, or any overlapping/unrelated WIP, stop and report the ready branch plus protected-patch procedure. On the optional verified-main route, do not merge again; report main's final status. Never stash, reset, force, or replace main files to manufacture integration.
+
+- [ ] **Step 8: Commit any review-owned regression fixes**
 
 Use one narrow commit per confirmed issue. Do not fold user-owned make-a-trailer changes into refactor commits.
 
-- [ ] **Step 8: Hand off the completed branch state**
+- [ ] **Step 9: Hand off the completed branch state**
 
-Report commit list, exact test/build counts, packed-content result, three protected paths/hashes, remaining worktree status, and any remote/publish step not explicitly authorized. Do not claim completion from an earlier run; cite the final command outputs.
+Report commit list, exact clean-gate and overlay-gate results, test/build counts, packed skill/resources result, forward-evaluation profile sets, three protected paths/hashes/counts, rename-blob equality, isolated and main statuses separately, and whether integration safely occurred or stopped for WIP. Do not claim completion from an earlier run; cite the final command outputs.
