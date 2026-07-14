@@ -952,6 +952,24 @@ describe("mutation, collections, runtime, and presentation", () => {
     expect(report.violations).toEqual([]);
   });
 
+  it("accepts a loop binding that shadows an outer input", () => {
+    const report = checkSource(
+      "src/install/example.ts",
+      'export const collect = (items: string[]) => {\n  // Visit each locally bound batch.\n  for (const items of batches) {\n    items.push("value");\n  }\n};\n',
+    );
+
+    expect(report.violations).toEqual([]);
+  });
+
+  it("accepts a catch binding that shadows an outer input", () => {
+    const report = checkSource(
+      "src/install/example.ts",
+      'export const handle = (error: Error) => {\n  try {\n    run();\n  } catch (error) {\n    error.name = "handled";\n  }\n};\n',
+    );
+
+    expect(report.violations).toEqual([]);
+  });
+
   it("rejects reduce used to build an array", () => {
     const report = checkSource(
       "src/install/example.ts",
