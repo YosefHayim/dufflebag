@@ -387,15 +387,36 @@ const presentYamlPresenceSchema = Schema.TaggedStruct("present", {}).annotations
   parseOptions: strictParseOptions,
 });
 
+const yamlPresenceSchema = Schema.Union(absentYamlPresenceSchema, presentYamlPresenceSchema);
+
 const yamlSequenceValueOwnershipSchema = Schema.TaggedStruct("yamlSequenceValue", {
   key: Schema.NonEmptyString,
   reference: Schema.NonEmptyString,
-  priorPresence: Schema.Union(absentYamlPresenceSchema, presentYamlPresenceSchema),
+  priorPresence: yamlPresenceSchema,
+  priorKeyPresence: yamlPresenceSchema,
   priorDocument: priorDocumentSchema,
 })
   .pipe(
-    Schema.filter((ownership) => ownership.priorDocument._tag === "existing" || ownership.priorPresence._tag === "absent", {
-      message: () => "A previously missing YAML document cannot contain the prior reference.",
+    Schema.filter((ownership) => {
+      if (ownership.priorDocument._tag === "missing" && ownership.priorKeyPresence._tag === "present") {
+        return [
+          {
+            path: ["priorKeyPresence"],
+            message: "A previously missing YAML document cannot contain the owned key.",
+          },
+        ];
+      }
+
+      if (ownership.priorKeyPresence._tag === "absent" && ownership.priorPresence._tag === "present") {
+        return [
+          {
+            path: ["priorPresence"],
+            message: "A previously missing YAML key cannot contain the owned reference.",
+          },
+        ];
+      }
+
+      return true;
     }),
   )
   .annotations({

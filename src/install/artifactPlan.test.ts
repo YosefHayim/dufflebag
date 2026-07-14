@@ -142,6 +142,9 @@ const yamlArtifact = decodeArtifact({
     priorPresence: {
       _tag: "absent",
     },
+    priorKeyPresence: {
+      _tag: "present",
+    },
     priorDocument: {
       _tag: "existing",
     },
@@ -615,8 +618,25 @@ describe("artifactPlanSchema", () => {
         ...yamlArtifact,
         ownership: {
           ...yamlArtifact.ownership,
+          priorKeyPresence: {
+            _tag: "absent",
+          },
           priorDocument: {
             _tag: "missing",
+          },
+        },
+      }),
+      desiredBytes: yamlBytes,
+    },
+    {
+      label: "YAML key presence",
+      previous: yamlArtifact,
+      desired: decodeArtifact({
+        ...yamlArtifact,
+        ownership: {
+          ...yamlArtifact.ownership,
+          priorKeyPresence: {
+            _tag: "absent",
           },
         },
       }),
@@ -940,6 +960,9 @@ describe("createUpdatePlan", () => {
         priorPresence: {
           _tag: "absent",
         },
+        priorKeyPresence: {
+          _tag: "absent",
+        },
         priorDocument: {
           _tag: "missing",
         },
@@ -1014,6 +1037,7 @@ describe("createUpdatePlan", () => {
     expect(updatedYaml?.ownership._tag).toBe("yamlSequenceValue");
     if (updatedYaml?.ownership._tag === "yamlSequenceValue" && yamlArtifact.ownership._tag === "yamlSequenceValue") {
       expect(updatedYaml.ownership.priorPresence).toEqual(yamlArtifact.ownership.priorPresence);
+      expect(updatedYaml.ownership.priorKeyPresence).toEqual(yamlArtifact.ownership.priorKeyPresence);
       expect(updatedYaml.ownership.priorDocument).toEqual(yamlArtifact.ownership.priorDocument);
     }
   });
