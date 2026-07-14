@@ -391,7 +391,7 @@ git commit -m "refactor(catalog): model agent targets as schema data"
 
 - [ ] **Step 1: Write failing decode and reconciliation tests**
 
-Cover a complete plan, duplicate target rejection, parent/child target conflicts, relative-path escape rejection, unknown keys, all artifact kinds, all ownership tags, receipt JSON round trips, desired-vs-receipt update diffs, receipt-only uninstall plans, and legacy manifest migration. Prove detection evidence cannot create a delete operation.
+Cover a complete plan, duplicate target rejection, parent/child target conflicts, relative-path escape rejection, case-fold aliases, unknown keys, all artifact kinds, all ownership tags, receipt JSON round trips, desired-vs-receipt update diffs, materialized receipt-only uninstall plans, canonical receipt/recovery path reservation, and legacy manifest migration. Prove detection evidence cannot create a delete operation.
 
 Run:
 
@@ -406,11 +406,15 @@ Expected: RED because both owners are absent.
 Use tagged schemas for:
 
 - application or agent ownership;
-- write, remove, and receipt-publish operations;
+- write, restore, remove, and receipt-publish operations;
 - runtime, skill, rule, instruction, config-reference, settings, managed-config, and receipt artifact kinds; and
 - `wholeFile`, `managedBlock`, `jsonValues`, and `yamlSequenceValue` ownership metadata.
 
-`wholeFile` records the installed hash plus a tagged missing/prior-file value. `managedBlock` records markers and the installed-body hash. `jsonValues` records exact pointers, installed value hashes, and tagged previous values. `yamlSequenceValue` records the exact key/reference pair and its previous presence. Store previous bytes only where exact restoration requires them; encode them explicitly for JSON.
+`wholeFile` records the installed hash plus a tagged missing/prior-file value. `managedBlock` records markers and the installed-body hash. `jsonValues` records exact pointers, installed value hashes, and tagged previous values. `yamlSequenceValue` records the exact key/reference pair and its previous presence. The three partially managed ownership tags also record whether the host file existed before the receipt entry first managed it. Preserve that file lifetime independently from member-level previous states acquired by later updates. Store previous bytes only where exact restoration requires them; encode them explicitly for JSON.
+
+`write` carries next owned bytes. `restore` carries final unowned bytes materialized by read-only inspection plus a pure format handler. `remove` is allowed only when receipt metadata proves the host file was previously absent and materialization leaves no unowned bytes. Update and uninstall inputs provide restorations one-for-one for stale receipt entries; planners reject missing, extra, duplicate, or metadata-mismatched restorations and reorder them by reverse receipt order. The receipt authorizes every path even though later tasks supply the bytes.
+
+Require the receipt target basename `receipt.json`, reserve its sibling `recovery.json`, and reject normal artifacts or operations that conflict with either path after deterministic case folding.
 
 The main public values are schemas first:
 
