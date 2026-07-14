@@ -51,6 +51,9 @@ const receiptArtifacts = [
       priorPresence: {
         _tag: "absent",
       },
+      priorKeyPresence: {
+        _tag: "present",
+      },
       priorDocument: {
         _tag: "existing",
       },
@@ -223,6 +226,64 @@ Object.defineProperty(accessorJsonObject, "value", {
 });
 
 describe("artifactReceiptSchema", () => {
+  it("requires exact prior YAML key presence and rejects impossible history", () => {
+    const yaml = receiptArtifacts[0];
+
+    expect(yaml?.ownership._tag).toBe("yamlSequenceValue");
+    if (yaml?.ownership._tag !== "yamlSequenceValue") {
+      throw new Error("The YAML fixture must use sequence-value ownership.");
+    }
+
+    const { priorKeyPresence: omittedPriorKeyPresence, ...ownershipWithoutPriorKeyPresence } = yaml.ownership;
+
+    expect(() => {
+      decodeArtifact({
+        ...yaml,
+        ownership: ownershipWithoutPriorKeyPresence,
+      });
+    }).toThrow();
+    expect(omittedPriorKeyPresence).toEqual({ _tag: "present" });
+    expect(() => {
+      decodeArtifact({
+        ...yaml,
+        ownership: {
+          ...yaml.ownership,
+          priorKeyPresence: {
+            _tag: "present",
+          },
+        },
+      });
+    }).not.toThrow();
+    expect(() => {
+      decodeArtifact({
+        ...yaml,
+        ownership: {
+          ...yaml.ownership,
+          priorKeyPresence: {
+            _tag: "absent",
+          },
+          priorPresence: {
+            _tag: "present",
+          },
+        },
+      });
+    }).toThrow();
+    expect(() => {
+      decodeArtifact({
+        ...yaml,
+        ownership: {
+          ...yaml.ownership,
+          priorKeyPresence: {
+            _tag: "present",
+          },
+          priorDocument: {
+            _tag: "missing",
+          },
+        },
+      });
+    }).toThrow();
+  });
+
   it("decodes every artifact kind, metadata tag, and ownership tag", () => {
     const decoded = decodeReceipt(completeReceipt);
 

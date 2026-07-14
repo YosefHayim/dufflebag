@@ -125,6 +125,9 @@ const yamlArtifact = decodeArtifact({
     priorPresence: {
       _tag: "absent",
     },
+    priorKeyPresence: {
+      _tag: "present",
+    },
     priorDocument: {
       _tag: "existing",
     },
@@ -463,6 +466,9 @@ describe("YAML sequence materialization", () => {
       ...yamlArtifact,
       ownership: {
         ...yamlArtifact.ownership,
+        priorKeyPresence: {
+          _tag: "absent",
+        },
         priorDocument: {
           _tag: "missing",
         },
@@ -486,6 +492,9 @@ describe("YAML sequence materialization", () => {
       ...yamlArtifact,
       ownership: {
         ...yamlArtifact.ownership,
+        priorKeyPresence: {
+          _tag: "absent",
+        },
         priorDocument: {
           _tag: "missing",
         },
@@ -544,6 +553,224 @@ describe("YAML sequence materialization", () => {
     });
   });
 
+  it("adds a missing owned key while preserving every existing byte", () => {
+    const missingKeyArtifact = decodeArtifact({
+      ...yamlArtifact,
+      ownership: {
+        ...yamlArtifact.ownership,
+        priorKeyPresence: {
+          _tag: "absent",
+        },
+      },
+    });
+    const prior = bytes('# keep this comment\r\nmode: "safe"\r\n');
+    const installed = bytes('# keep this comment\r\nmode: "safe"\r\n\r\nread:\r\n  - AGENTS.md\r\n');
+    const priorObservation = fileObservation(missingKeyArtifact.path, prior);
+    const installedObservation = fileObservation(missingKeyArtifact.path, installed);
+
+    expect(currentSnapshotMatches({ artifact: missingKeyArtifact, observation: priorObservation, target: "prior" })).toBe(true);
+    expect(
+      desiredBytesMatch({
+        artifact: missingKeyArtifact,
+        candidateBytes: installed,
+        observation: priorObservation,
+        previous: Option.none<OwnedArtifact>(),
+      }),
+    ).toBe(true);
+    expect(
+      desiredBytesMatch({
+        artifact: missingKeyArtifact,
+        candidateBytes: bytes("mode: safe\r\nread:\r\n  - AGENTS.md\r\n"),
+        observation: priorObservation,
+        previous: Option.none<OwnedArtifact>(),
+      }),
+    ).toBe(false);
+    expect(deriveRestorationBytes(missingKeyArtifact, installedObservation)).toEqual(Option.some(prior));
+  });
+
+  it("restores a missing key without adding a final newline to the prior document", () => {
+    const missingKeyArtifact = decodeArtifact({
+      ...yamlArtifact,
+      ownership: {
+        ...yamlArtifact.ownership,
+        priorKeyPresence: {
+          _tag: "absent",
+        },
+      },
+    });
+    const prior = bytes("mode: safe");
+    const installed = bytes("mode: safe\nread:\n  - AGENTS.md\n");
+    const priorObservation = fileObservation(missingKeyArtifact.path, prior);
+    const installedObservation = fileObservation(missingKeyArtifact.path, installed);
+
+    expect(
+      desiredBytesMatch({
+        artifact: missingKeyArtifact,
+        candidateBytes: installed,
+        observation: priorObservation,
+        previous: Option.none<OwnedArtifact>(),
+      }),
+    ).toBe(true);
+    expect(deriveRestorationBytes(missingKeyArtifact, installedObservation)).toEqual(Option.some(prior));
+  });
+
+  it("edits a flow sequence containing quoted values without reformatting it", () => {
+    const prior = bytes('header: "keep"\nread: ["RULES.md", \'notes file.md\'] # keep this spacing\nfooter: keep\n');
+    const installed = bytes('header: "keep"\nread: ["RULES.md", \'notes file.md\', AGENTS.md] # keep this spacing\nfooter: keep\n');
+    const priorObservation = fileObservation(yamlArtifact.path, prior);
+    const installedObservation = fileObservation(yamlArtifact.path, installed);
+
+    expect(
+      desiredBytesMatch({
+        artifact: yamlArtifact,
+        candidateBytes: installed,
+        observation: priorObservation,
+        previous: Option.none<OwnedArtifact>(),
+      }),
+    ).toBe(true);
+    expect(deriveRestorationBytes(yamlArtifact, installedObservation)).toEqual(Option.some(prior));
+  });
+
+  it("edits a BOM-prefixed block sequence containing quoted values without reformatting it", () => {
+    const bom = new Uint8Array([0xef, 0xbb, 0xbf]);
+    const prior = new Uint8Array([
+      ...bom,
+      ...bytes('read:\r\n  - "RULES.md"\r\n  - \'notes file.md\' # keep this comment\r\nother: "keep"\r\n'),
+    ]);
+    const installed = new Uint8Array([
+      ...bom,
+      ...bytes('read:\r\n  - "RULES.md"\r\n  - \'notes file.md\' # keep this comment\r\n  - AGENTS.md\r\nother: "keep"\r\n'),
+    ]);
+    const priorObservation = fileObservation(yamlArtifact.path, prior);
+    const installedObservation = fileObservation(yamlArtifact.path, installed);
+
+    expect(
+      desiredBytesMatch({
+        artifact: yamlArtifact,
+        candidateBytes: installed,
+        observation: priorObservation,
+        previous: Option.none<OwnedArtifact>(),
+      }),
+    ).toBe(true);
+    expect(deriveRestorationBytes(yamlArtifact, installedObservation)).toEqual(Option.some(prior));
+  });
+
+  it("restores a quoted block sequence without manufacturing a final newline", () => {
+    const prior = bytes('read:\n  - "RULES.md"');
+    const installed = bytes('read:\n  - "RULES.md"\n  - AGENTS.md');
+    const priorObservation = fileObservation(yamlArtifact.path, prior);
+    const installedObservation = fileObservation(yamlArtifact.path, installed);
+
+    expect(
+      desiredBytesMatch({
+        artifact: yamlArtifact,
+        candidateBytes: installed,
+        observation: priorObservation,
+        previous: Option.none<OwnedArtifact>(),
+      }),
+    ).toBe(true);
+    expect(deriveRestorationBytes(yamlArtifact, installedObservation)).toEqual(Option.some(prior));
+  });
+
+  it("rejects anchors and aliases even when the owned sequence itself is direct", () => {
+    const anchored = bytes("defaults: &paths [RULES.md]\nread: []\n");
+    const anchoredCandidate = bytes("defaults: &paths [RULES.md]\nread:\n  - AGENTS.md\n");
+    const aliased = bytes("defaults: &paths [RULES.md]\nread: *paths\n");
+
+    expect(
+      desiredBytesMatch({
+        artifact: yamlArtifact,
+        candidateBytes: anchoredCandidate,
+        observation: fileObservation(yamlArtifact.path, anchored),
+        previous: Option.none<OwnedArtifact>(),
+      }),
+    ).toBe(false);
+    expect(
+      currentSnapshotMatches({
+        artifact: yamlArtifact,
+        observation: fileObservation(yamlArtifact.path, aliased),
+        target: "prior",
+      }),
+    ).toBe(false);
+  });
+
+  it("requires one top-level key with direct unique scalar-string entries", () => {
+    const invalidDocuments = [
+      "- AGENTS.md\n",
+      'read: [AGENTS.md, "AGENTS.md"]\n',
+      "read:\n  - AGENTS.md\n  - { path: RULES.md }\n",
+      "read: [AGENTS.md, 1]\n",
+      'read: [AGENTS.md]\n"read": [RULES.md]\n',
+    ];
+
+    // Each document violates a different structural authority invariant at the same public matching boundary.
+    invalidDocuments.forEach((document) => {
+      expect(
+        currentSnapshotMatches({
+          artifact: yamlArtifact,
+          observation: fileObservation(yamlArtifact.path, bytes(document)),
+          target: "installed",
+        }),
+      ).toBe(false);
+    });
+  });
+
+  it("rejects multiline scalars in owned and unrelated document positions", () => {
+    const invalidDocuments = [
+      "read:\n  - |\n    RULES.md\n",
+      "read:\n  - >\n    RULES.md\n",
+      'read:\n  - "RULES\n    .md"\n',
+      "notes: |\n  keep\nread: []\n",
+      "notes: >\n  keep\nread: []\n",
+      'notes: "keep\n  going"\nread: []\n',
+    ];
+
+    // Every scalar range must stay on one physical line before any source offset can authorize an edit.
+    invalidDocuments.forEach((document) => {
+      expect(
+        currentSnapshotMatches({
+          artifact: yamlArtifact,
+          observation: fileObservation(yamlArtifact.path, bytes(document)),
+          target: "prior",
+        }),
+      ).toBe(false);
+    });
+  });
+
+  it("preserves spacing and comments around an empty flow sequence", () => {
+    const prior = bytes("header: keep\nread: [ ] # untouched\nfooter: keep\n");
+    const installed = bytes("header: keep\nread: [AGENTS.md ] # untouched\nfooter: keep\n");
+    const priorObservation = fileObservation(yamlArtifact.path, prior);
+    const installedObservation = fileObservation(yamlArtifact.path, installed);
+
+    expect(
+      desiredBytesMatch({
+        artifact: yamlArtifact,
+        candidateBytes: installed,
+        observation: priorObservation,
+        previous: Option.none<OwnedArtifact>(),
+      }),
+    ).toBe(true);
+    expect(deriveRestorationBytes(yamlArtifact, installedObservation)).toEqual(Option.some(prior));
+  });
+
+  it("restores an empty flow sequence without manufacturing a final newline", () => {
+    const prior = bytes("read: []");
+    const installed = bytes("read:\n  - AGENTS.md");
+    const priorObservation = fileObservation(yamlArtifact.path, prior);
+    const installedObservation = fileObservation(yamlArtifact.path, installed);
+
+    expect(
+      desiredBytesMatch({
+        artifact: yamlArtifact,
+        candidateBytes: installed,
+        observation: priorObservation,
+        previous: Option.none<OwnedArtifact>(),
+      }),
+    ).toBe(true);
+    expect(deriveRestorationBytes(yamlArtifact, installedObservation)).toEqual(Option.some(prior));
+  });
+
   it("preserves a UTF-8 BOM through desired and restoration transforms", () => {
     const bom = new Uint8Array([0xef, 0xbb, 0xbf]);
     const prior = new Uint8Array([...bom, ...bytes("read: []\nunrelated: keep\n")]);
@@ -570,6 +797,9 @@ describe("YAML sequence materialization", () => {
       path: "created-bom.yml",
       ownership: {
         ...yamlArtifact.ownership,
+        priorKeyPresence: {
+          _tag: "absent",
+        },
         priorDocument: {
           _tag: "missing",
         },

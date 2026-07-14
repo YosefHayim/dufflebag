@@ -1,5 +1,5 @@
 import { Option, Schema, type SchemaAST } from "effect";
-import { parseDocument } from "yaml";
+import { isAlias, isMap, isScalar, isSeq, parseDocument, type Range, visit } from "yaml";
 
 import {
   type JsonValue,
@@ -302,13 +302,33 @@ type YamlLine = {
   readonly end: number;
 };
 
-type YamlSequence = {
-  readonly lines: ReadonlyArray<YamlLine>;
-  readonly keyIndex: number;
-  readonly entryIndexes: ReadonlyArray<number>;
-  readonly references: ReadonlyArray<string>;
-  readonly inlineEmpty: boolean;
+type SourceRange = {
+  readonly start: number;
+  readonly valueEnd: number;
 };
+
+type YamlEntry = {
+  readonly value: string;
+  readonly range: SourceRange;
+  readonly line: YamlLine;
+};
+
+type YamlSequence = {
+  readonly _tag: "sequence";
+  readonly keyLine: YamlLine;
+  readonly range: SourceRange;
+  readonly entries: ReadonlyArray<YamlEntry>;
+  readonly references: ReadonlyArray<string>;
+  readonly flow: boolean;
+  readonly newline: string;
+};
+
+type MissingYamlKey = {
+  readonly _tag: "missingKey";
+  readonly newline: string;
+};
+
+type YamlTarget = YamlSequence | MissingYamlKey;
 
 const safeYamlToken = /^[A-Za-z0-9._/-]+$/;
 
@@ -319,7 +339,7 @@ type YamlReferenceRequest = {
 };
 
 type YamlRemovalRequest = YamlReferenceRequest & {
-  readonly removeEmptyKey: boolean;
+  readonly removeKey: boolean;
 };
 
 const splitYamlLines = (content: string): ReadonlyArray<YamlLine> => {
@@ -346,67 +366,185 @@ const splitYamlLines = (content: string): ReadonlyArray<YamlLine> => {
   return lines;
 };
 
-const isStructurallyValidYaml = (content: string): boolean => {
-  try {
-    return parseDocument(content, { strict: true, uniqueKeys: true }).errors.length === 0;
-  } catch {
-    return false;
+const readSourceRange = (range: Range | undefined): Option.Option<SourceRange> => {
+  if (range === undefined) {
+    return Option.none();
   }
+
+  const [start, valueEnd] = range;
+
+  return Option.some({ start, valueEnd });
 };
 
-const parseOwnedYamlSequence = (content: string, key: string): Option.Option<YamlSequence> => {
-  if (!safeYamlToken.test(key) || content.includes("\t") || !isStructurallyValidYaml(content)) {
+const lineContaining = (lines: ReadonlyArray<YamlLine>, offset: number): Option.Option<YamlLine> => {
+  return Option.fromNullable(lines.find((line) => line.start <= offset && offset < line.end));
+};
+
+const preferredYamlNewline = (content: string): string => {
+  const match = /\r\n|\n/.exec(content);
+
+  return match?.[0] ?? "\n";
+};
+
+type BlockYamlEntryCheck = {
+  readonly content: string;
+  readonly line: YamlLine;
+  readonly range: SourceRange;
+};
+
+const blockYamlEntryIsSafe = ({ content, line, range }: BlockYamlEntryCheck): boolean => {
+  const bodyEnd = line.end - line.newline.length;
+  const prefix = content.slice(line.start, range.start);
+  const suffix = content.slice(range.valueEnd, bodyEnd);
+
+  return /^ +-[ ]+$/.test(prefix) && /^ *(?:#.*)?$/.test(suffix);
+};
+
+const yamlUsesAnchorsOrAliases = (document: ReturnType<typeof parseDocument>): boolean => {
+  let found = false;
+
+  visit(document, {
+    Node: (_key, node) => {
+      if (isAlias(node) || node.anchor !== undefined) {
+        found = true;
+        return visit.BREAK;
+      }
+
+      return undefined;
+    },
+  });
+
+  return found;
+};
+
+const yamlScalarsStayOnSingleLines = (document: ReturnType<typeof parseDocument>, lines: ReadonlyArray<YamlLine>): boolean => {
+  let valid = true;
+
+  visit(document, {
+    Node: (_key, node) => {
+      if (!isScalar(node)) {
+        return undefined;
+      }
+
+      const range = readSourceRange(node.range ?? undefined);
+      const line = Option.isSome(range) ? lineContaining(lines, range.value.start) : Option.none<YamlLine>();
+      if (Option.isNone(range) || Option.isNone(line) || range.value.valueEnd > line.value.end - line.value.newline.length) {
+        valid = false;
+        return visit.BREAK;
+      }
+
+      return undefined;
+    },
+  });
+
+  return valid;
+};
+
+const parseOwnedYamlTarget = (content: string, key: string): Option.Option<YamlTarget> => {
+  if (!safeYamlToken.test(key) || content.includes("\t")) {
+    return Option.none();
+  }
+
+  let document: ReturnType<typeof parseDocument>;
+  try {
+    document = parseDocument(content, {
+      keepSourceTokens: true,
+      strict: true,
+      uniqueKeys: true,
+    });
+  } catch {
     return Option.none();
   }
 
   const lines = splitYamlLines(content);
-  const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const semanticKeyPattern = new RegExp(`^${escapedKey}\\s*:`);
-  const semanticKeyIndexes = lines.flatMap((line, index) => (semanticKeyPattern.test(line.body) ? [index] : []));
-  const keyIndexes = lines.flatMap((line, index) => {
-    return line.body === `${key}:` || line.body === `${key}: []` ? [index] : [];
-  });
-
-  if (semanticKeyIndexes.length !== 1 || keyIndexes.length !== 1 || semanticKeyIndexes[0] !== keyIndexes[0]) {
+  if (
+    document.errors.length > 0 ||
+    document.warnings.length > 0 ||
+    yamlUsesAnchorsOrAliases(document) ||
+    !yamlScalarsStayOnSingleLines(document, lines) ||
+    !isMap(document.contents)
+  ) {
     return Option.none();
   }
 
-  // The exactly-one-key guard proves both indexed entries exist.
-  const keyIndex = keyIndexes[0];
-  // The matching semantic and exact indexes prove this line exists.
-  const keyLine = lines[keyIndex];
-  const inlineEmpty = keyLine.body.endsWith("[]");
-  const entryIndexes: Array<number> = [];
+  const matchingPairs = document.contents.items.filter((pair) => {
+    return isScalar(pair.key) && pair.key.value === key;
+  });
+  if (matchingPairs.length === 0) {
+    return document.contents.flow === true ? Option.none() : Option.some({ _tag: "missingKey", newline: preferredYamlNewline(content) });
+  }
+
+  const pair = matchingPairs.at(0);
+  if (matchingPairs.length !== 1 || pair === undefined || !isScalar(pair.key) || !isSeq(pair.value)) {
+    return Option.none();
+  }
+
+  const keyRange = readSourceRange(pair.key.range ?? undefined);
+  const sequenceRange = readSourceRange(pair.value.range ?? undefined);
+  if (Option.isNone(keyRange) || Option.isNone(sequenceRange) || content.slice(keyRange.value.start, keyRange.value.valueEnd) !== key) {
+    return Option.none();
+  }
+
+  const keyLine = lineContaining(lines, keyRange.value.start);
+  if (Option.isNone(keyLine) || (pair.value.flow !== true && keyLine.value.body !== `${key}:`)) {
+    return Option.none();
+  }
+
+  const entries: Array<YamlEntry> = [];
   const references: Array<string> = [];
 
-  // Walk only the contiguous indented region owned by the exact top-level key.
-  for (let index = keyIndex + 1; index < lines.length; index += 1) {
-    // The loop bound proves this line exists.
-    const line = lines[index];
-
-    if (line.body.length === 0) {
+  // Validate every AST sequence item before trusting its source range for a surgical byte edit.
+  for (const item of pair.value.items) {
+    if (!isScalar(item) || typeof item.value !== "string") {
       return Option.none();
     }
 
-    if (!line.body.startsWith(" ")) {
-      break;
-    }
-
-    const match = /^ {2}- ([A-Za-z0-9._/-]+)$/.exec(line.body);
-    if (inlineEmpty || match === null) {
+    const range = readSourceRange(item.range ?? undefined);
+    if (Option.isNone(range)) {
       return Option.none();
     }
 
-    entryIndexes.push(index);
-    // The successful capture proves the safe bare-scalar reference exists.
-    references.push(match[1]);
+    const line = lineContaining(lines, range.value.start);
+    if (Option.isNone(line)) {
+      return Option.none();
+    }
+
+    if (pair.value.flow !== true && !blockYamlEntryIsSafe({ content, line: line.value, range: range.value })) {
+      return Option.none();
+    }
+
+    entries.push({ value: item.value, range: range.value, line: line.value });
+    references.push(item.value);
   }
 
-  if (!inlineEmpty && entryIndexes.length === 0) {
+  if (!uniqueValues(references)) {
     return Option.none();
   }
 
-  return uniqueValues(references) ? Option.some({ lines, keyIndex, entryIndexes, references, inlineEmpty }) : Option.none();
+  return Option.some({
+    _tag: "sequence",
+    keyLine: keyLine.value,
+    range: sequenceRange.value,
+    entries,
+    references,
+    flow: pair.value.flow === true,
+    newline: preferredYamlNewline(content),
+  });
+};
+
+type YamlRangeEdit = {
+  readonly content: string;
+  readonly start: number;
+  readonly end: number;
+  readonly replacement: string;
+};
+
+const editYamlRange = ({ content, start, end, replacement }: YamlRangeEdit): Uint8Array => {
+  return concatBytes(
+    new TextEncoder().encode(content.slice(0, start)),
+    new TextEncoder().encode(replacement),
+    new TextEncoder().encode(content.slice(end)),
+  );
 };
 
 const addYamlReference = ({ content, key, reference }: YamlReferenceRequest): Option.Option<Uint8Array> => {
@@ -414,90 +552,133 @@ const addYamlReference = ({ content, key, reference }: YamlReferenceRequest): Op
     return Option.none();
   }
 
-  const parsed = parseOwnedYamlSequence(content, key);
+  const parsed = parseOwnedYamlTarget(content, key);
   if (Option.isNone(parsed)) {
     return Option.none();
+  }
+
+  if (parsed.value._tag === "missingKey") {
+    const separator = content.length > 0 ? parsed.value.newline : "";
+    const candidate = `${content}${separator}${key}:${parsed.value.newline}  - ${reference}${parsed.value.newline}`;
+    const validated = parseOwnedYamlTarget(candidate, key);
+
+    return Option.isSome(validated) && validated.value._tag === "sequence" && validated.value.references.includes(reference)
+      ? Option.some(new TextEncoder().encode(candidate))
+      : Option.none();
   }
 
   if (parsed.value.references.includes(reference)) {
     return Option.some(new TextEncoder().encode(content));
   }
 
-  // The parsed key index is bound to the exactly-one semantic key line.
-  const keyLine = parsed.value.lines[parsed.value.keyIndex];
-  if (parsed.value.inlineEmpty) {
-    const newline = keyLine.newline || "\n";
-    const replacement = `${key}:${newline}  - ${reference}${newline}`;
+  if (parsed.value.flow && parsed.value.entries.length === 0 && parsed.value.keyLine.body === `${key}: []`) {
+    const terminalNewline = parsed.value.keyLine.newline;
+    const sequenceNewline = terminalNewline || parsed.value.newline;
 
     return Option.some(
-      concatBytes(
-        new TextEncoder().encode(content.slice(0, keyLine.start)),
-        new TextEncoder().encode(replacement),
-        new TextEncoder().encode(content.slice(keyLine.end)),
-      ),
+      editYamlRange({
+        content,
+        start: parsed.value.keyLine.start,
+        end: parsed.value.keyLine.end,
+        replacement: `${key}:${sequenceNewline}  - ${reference}${terminalNewline}`,
+      }),
     );
   }
 
-  const lastIndex = parsed.value.entryIndexes.at(-1);
-  // The parser supplied every entry index from within the bounded line array.
-  const lastLine = lastIndex === undefined ? undefined : parsed.value.lines[lastIndex];
-  if (lastLine === undefined) {
+  if (parsed.value.flow) {
+    const lastEntry = parsed.value.entries.at(-1);
+    const insertionPoint = lastEntry?.range.valueEnd ?? parsed.value.range.start + 1;
+    const insertion = lastEntry === undefined ? reference : `, ${reference}`;
+
+    return Option.some(editYamlRange({ content, start: insertionPoint, end: insertionPoint, replacement: insertion }));
+  }
+
+  const lastEntry = parsed.value.entries.at(-1);
+  if (lastEntry === undefined) {
     return Option.none();
   }
 
-  const newline = lastLine.newline || keyLine.newline || "\n";
-  const prefix = lastLine.newline.length === 0 ? newline : "";
-  const insertion = `${prefix}  - ${reference}${newline}`;
+  const prefix = content.slice(lastEntry.line.start, lastEntry.range.start);
+  const insertionPoint = lastEntry.line.end - lastEntry.line.newline.length;
+  const insertion = `${parsed.value.newline}${prefix}${reference}`;
 
-  return Option.some(
-    concatBytes(
-      new TextEncoder().encode(content.slice(0, lastLine.end)),
-      new TextEncoder().encode(insertion),
-      new TextEncoder().encode(content.slice(lastLine.end)),
-    ),
-  );
+  return Option.some(editYamlRange({ content, start: insertionPoint, end: insertionPoint, replacement: insertion }));
 };
 
-const removeYamlReference = ({ content, key, reference, removeEmptyKey }: YamlRemovalRequest): Option.Option<Uint8Array> => {
-  const parsed = parseOwnedYamlSequence(content, key);
-  if (Option.isNone(parsed)) {
+const removeYamlReference = ({ content, key, reference, removeKey }: YamlRemovalRequest): Option.Option<Uint8Array> => {
+  const parsed = parseOwnedYamlTarget(content, key);
+  if (Option.isNone(parsed) || parsed.value._tag === "missingKey") {
     return Option.none();
   }
 
-  const matches = parsed.value.references.flatMap((value, index) => {
-    // Both arrays are appended together, so each reference index has an entry index.
-    return value === reference ? [parsed.value.entryIndexes[index]] : [];
-  });
-  if (matches.length !== 1) {
+  const matches = parsed.value.entries.flatMap((entry, index) => (entry.value === reference ? [index] : []));
+  const targetIndex = matches.at(0);
+  const target = targetIndex === undefined ? undefined : parsed.value.entries.at(targetIndex);
+  if (matches.length !== 1 || targetIndex === undefined || target === undefined) {
     return Option.none();
   }
 
-  // The exactly-one-match guard proves the matched line index exists.
-  const targetLine = parsed.value.lines[matches[0]];
-  if (parsed.value.entryIndexes.length === 1) {
-    // The parser binds this index to its exactly-one semantic key line.
-    const keyLine = parsed.value.lines[parsed.value.keyIndex];
-
-    if (removeEmptyKey) {
-      return Option.some(
-        concatBytes(new TextEncoder().encode(content.slice(0, keyLine.start)), new TextEncoder().encode(content.slice(targetLine.end))),
-      );
+  if (parsed.value.entries.length === 1 && removeKey) {
+    const separatorStart = parsed.value.keyLine.start - parsed.value.newline.length;
+    const ownedStart =
+      parsed.value.keyLine.start === 0
+        ? Option.some(0)
+        : content.slice(separatorStart, parsed.value.keyLine.start) === parsed.value.newline
+          ? Option.some(separatorStart)
+          : Option.none<number>();
+    if (Option.isNone(ownedStart)) {
+      return Option.none();
     }
 
-    const newline = keyLine.newline || targetLine.newline || "\n";
+    const end = parsed.value.flow ? parsed.value.keyLine.end : target.line.end;
 
+    return Option.some(editYamlRange({ content, start: ownedStart.value, end, replacement: "" }));
+  }
+
+  if (parsed.value.flow) {
+    if (parsed.value.entries.length === 1) {
+      return Option.some(editYamlRange({ content, start: target.range.start, end: target.range.valueEnd, replacement: "" }));
+    }
+
+    if (targetIndex === 0) {
+      const next = parsed.value.entries.at(1);
+
+      return next === undefined
+        ? Option.none()
+        : Option.some(editYamlRange({ content, start: target.range.start, end: next.range.start, replacement: "" }));
+    }
+
+    const previous = parsed.value.entries.at(targetIndex - 1);
+
+    return previous === undefined
+      ? Option.none()
+      : Option.some(editYamlRange({ content, start: previous.range.valueEnd, end: target.range.valueEnd, replacement: "" }));
+  }
+
+  if (parsed.value.entries.length === 1) {
     return Option.some(
-      concatBytes(
-        new TextEncoder().encode(content.slice(0, keyLine.start)),
-        new TextEncoder().encode(`${key}: []${newline}`),
-        new TextEncoder().encode(content.slice(targetLine.end)),
-      ),
+      editYamlRange({
+        content,
+        start: parsed.value.keyLine.start,
+        end: target.line.end,
+        replacement: `${key}: []${target.line.newline}`,
+      }),
     );
   }
 
-  return Option.some(
-    concatBytes(new TextEncoder().encode(content.slice(0, targetLine.start)), new TextEncoder().encode(content.slice(targetLine.end))),
-  );
+  const targetBodyEnd = target.line.end - target.line.newline.length;
+  if (targetIndex === 0) {
+    return Option.some(editYamlRange({ content, start: target.line.start, end: targetBodyEnd, replacement: "" }));
+  }
+
+  const previous = parsed.value.entries.at(targetIndex - 1);
+  if (previous === undefined) {
+    return Option.none();
+  }
+
+  const previousBodyEnd = previous.line.end - previous.line.newline.length;
+
+  return Option.some(editYamlRange({ content, start: previousBodyEnd, end: targetBodyEnd, replacement: "" }));
 };
 
 const missingTargetSnapshotSchema = Schema.TaggedStruct("missing", {}).annotations({
@@ -599,12 +780,20 @@ const yamlSnapshotMatches = ({ artifact, observation, target }: SnapshotMatchReq
     return false;
   }
 
-  const parsed = parseOwnedYamlSequence(document.value.content, artifact.ownership.key);
+  const parsed = parseOwnedYamlTarget(document.value.content, artifact.ownership.key);
   if (Option.isNone(parsed)) {
     return false;
   }
 
   const expectedPresent = target === "installed" || artifact.ownership.priorPresence._tag === "present";
+
+  if (parsed.value._tag === "missingKey") {
+    return target === "prior" && artifact.ownership.priorKeyPresence._tag === "absent" && !expectedPresent;
+  }
+
+  if (target === "prior" && artifact.ownership.priorKeyPresence._tag === "absent") {
+    return false;
+  }
 
   return parsed.value.references.includes(artifact.ownership.reference) === expectedPresent;
 };
@@ -908,7 +1097,7 @@ export const deriveRestorationBytes = (artifact: OwnedArtifact, observation: Art
         content: document.value.content,
         key: artifact.ownership.key,
         reference: artifact.ownership.reference,
-        removeEmptyKey: artifact.ownership.priorDocument._tag === "missing",
+        removeKey: artifact.ownership.priorKeyPresence._tag === "absent",
       });
 
       return Option.isSome(restored) ? Option.some(concatBytes(document.value.prefix, restored.value)) : Option.none();

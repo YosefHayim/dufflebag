@@ -319,6 +319,7 @@ const restorationStateCarriedForward = (previous: OwnedArtifact, desired: OwnedA
       return (
         desired.ownership._tag === "yamlSequenceValue" &&
         previous.ownership.priorPresence._tag === desired.ownership.priorPresence._tag &&
+        previous.ownership.priorKeyPresence._tag === desired.ownership.priorKeyPresence._tag &&
         previous.ownership.priorDocument._tag === desired.ownership.priorDocument._tag
       );
   }
@@ -710,6 +711,7 @@ const carryRestorationState = ({ previous, desired, mode }: ReconciledArtifactRe
         ownership: {
           ...desired.ownership,
           priorPresence: previous.ownership.priorPresence,
+          priorKeyPresence: previous.ownership.priorKeyPresence,
           priorDocument: previous.ownership.priorDocument,
         },
       });
