@@ -451,19 +451,21 @@ git commit -m "refactor(install): define plans and ownership receipts"
 
 **Files:**
 
+- Create: `src/install/artifactRecovery.ts`
+- Create: `src/install/artifactRecovery.test.ts`
 - Create: `src/install/applyArtifactPlan.ts`
 - Create: `src/install/applyArtifactPlan.test.ts`
 
 - [ ] **Step 1: Write failing real-filesystem transaction tests**
 
-Use temporary directories and public `applyArtifactPlan`. Cover successful stage/commit/receipt order, receipt committed last, reverse rollback after a middle commit failure, original-byte restoration, cleanup after success/failure, receipt absence after failure, and durable `recovery.json` plus retained snapshots when restoration itself fails.
+Use temporary directories and public `applyArtifactPlan`. Cover successful stage/commit/receipt order, receipt committed last, reverse rollback after a middle commit failure, original-byte restoration, cleanup after success/failure, receipt absence after failure, and a pre-published durable `recovery.json` plus retained snapshots when restoration itself fails. Also cover foreign-host roots, symlinked parents, post-capture path/byte swaps, post-mutation byte changes, failure before and immediately after lock publication, two writers racing for one lock while the winner remains paused, changed-marker refusal, interruption after an artifact or receipt rename, preserved external content in transaction-created parents, private retained-recovery permissions, and strict recovery decoding for NULs, exact transaction UUIDs, case-preserving drive-qualified paths, marker/root/transaction targets, case/ancestor conflicts, and direct unique snapshot sources.
 
 Use real conflicts or an official platform test layer. Do not add injectable function bags, repository mocks, test-only exports, or conditional test branches.
 
 Run:
 
 ```bash
-pnpm vitest run src/install/applyArtifactPlan.test.ts
+pnpm vitest run src/install/artifactRecovery.test.ts src/install/applyArtifactPlan.test.ts
 ```
 
 Expected: RED because the writer is absent.
@@ -475,35 +477,41 @@ Expected: RED because the writer is absent.
 ```ts
 /**
  * Applies one validated artifact plan transactionally.
- * A failed stage or commit restores every target before temporary files are removed.
+ * Commit failures restore recorded mutations; incomplete recovery retains a marker and snapshots.
  */
 export const applyArtifactPlan = (plan: ArtifactPlan) =>
-  Effect.gen(function* () {
-    // 1. Assign temporary paths without touching the filesystem.
-    // 2. Capture every original target before the first mutation.
-    // 3. Write every desired artifact to its temporary path.
-    // 4. Move staged artifacts into their final locations.
-    // 5. Publish ownership only after every artifact succeeds.
-    // 6. Restore originals on failure and always remove disposable staging.
-  });
+  Effect.uninterruptibleMask((restoreInterruptibility) =>
+    Effect.gen(function* () {
+      // 1. Resolve one canonical root and derive every transaction path from it.
+      // 2. Preflight and capture every original target before destination mutation.
+      // 3. Stage every desired artifact and the next ownership receipt.
+      // 4. Publish the recovery lock, then revalidate and commit artifacts in order.
+      // 5. Publish ownership only after every artifact succeeds.
+      // 6. Restore on failure, or release the recovery marker before snapshots.
+    }),
+  );
 ```
 
-Use the official platform filesystem directly. Restore in reverse mutation order. Remove snapshots only after commit or successful rollback. If rollback fails, call `writeRecoveryRecord` before re-raising the rollback failure.
+`artifactRecovery.ts` owns the persisted Effect Schema, strict decoder, and pending error. `applyArtifactPlan.ts` owns the transaction engine and uses plain local aliases only for generated compile-time control shapes that never cross its capability boundary.
+
+Use the official platform filesystem directly except for the documented nonrecursive empty-directory `rmdir` needed to avoid recursive cleanup races. Resolve the host-qualified root once. Create transaction directories with mode `0700`; write snapshots and the hard-linked pending record with mode `0600`. Keep staged artifact modes aligned with their intended post-rename destination policy. Before destination mutation, write a complete strict pending record inside the transaction and atomically hard-link it to the fixed sibling `recovery.json`; the exclusive link is the cooperative writer lock. A losing `AlreadyExists` writer removes its unpublished transaction without inspecting or unlinking the winner's marker. Revalidate containment and exact captured state before each mutation, record the exact state produced after each syscall, and restore in reverse order only while that state still matches. Decode and compare the marker before unlinking it. Remove transaction snapshots immediately after a verified marker release, before attempted removal of transaction-created empty parents; incomplete rollback retains the marker and every snapshot. Make each artifact and receipt one uninterruptible mutation unit while keeping the overall commit interruptible between units; interruption before commit completion must run masked reverse recovery. Once commit completes, treat the receipt as authoritative and keep cleanup masked without late rollback.
+
+The path-only platform API cannot close a malicious same-user swap between final validation and the filesystem syscall. Document that narrow threat boundary; every observable pre-syscall change must be rejected without overwriting it.
 
 - [ ] **Step 3: Prove transaction safety**
 
 ```bash
-pnpm vitest run src/install/applyArtifactPlan.test.ts
+pnpm vitest run src/install/artifactRecovery.test.ts src/install/applyArtifactPlan.test.ts
 pnpm typecheck
 pnpm verify
 ```
 
-Expected: every injected real conflict leaves either original bytes or a durable recovery record; a normal failure never leaves `receipt.json`.
+Expected: every injected real conflict leaves original bytes, preserves later external bytes, or retains a strict durable pending record with complete snapshot mapping. A pre-commit failure never leaves `receipt.json`; a successful commit always publishes it after artifacts and releases the marker before snapshots. A post-commit cleanup failure can surface while the authoritative receipt remains committed.
 
 - [ ] **Step 4: Commit the writer**
 
 ```bash
-git add src/install/applyArtifactPlan.ts src/install/applyArtifactPlan.test.ts
+git add src/install/artifactRecovery.ts src/install/artifactRecovery.test.ts src/install/applyArtifactPlan.ts src/install/applyArtifactPlan.test.ts docs/superpowers/specs/2026-07-14-dufflebag-deslop-design.md docs/superpowers/plans/2026-07-14-dufflebag-deslop-refactor.md
 git commit -m "refactor(install): apply artifact plans transactionally"
 ```
 

@@ -81,8 +81,9 @@ src/
 │   ├── update.ts
 │   ├── uninstall.ts
 │   ├── artifactPlan.ts
-│   ├── applyArtifactPlan.ts
 │   ├── artifactReceipt.ts
+│   ├── artifactRecovery.ts
+│   ├── applyArtifactPlan.ts
 │   └── agentFormats/
 │       ├── skillDirectory.ts
 │       ├── ruleFile.ts
@@ -248,6 +249,7 @@ Effect Schema owns every main-application or persisted authored domain object th
 - CLI request schemas → command request types
 - `artifactPlanSchema` → `ArtifactPlan`
 - `artifactReceiptSchema` → `ArtifactReceipt`
+- `artifactRecoveryRecordSchema` → `ArtifactRecoveryRecord`
 - tagged error schemas → expected error types
 
 Authored object aliases or interfaces do not sit beside these schemas.
@@ -523,38 +525,87 @@ Update diffs the previous receipt against the desired plan. Uninstall follows th
 ```ts
 /**
  * Applies one validated artifact plan transactionally.
- * A failed stage or commit restores every target before temporary files are removed.
+ * Commit failures restore recorded mutations; incomplete recovery retains a marker and snapshots.
  */
-const applyArtifactPlan = (plan: ArtifactPlan) =>
-  Effect.gen(function* () {
-    // 1. Assign temporary paths without touching the filesystem.
-    const stagedPlan = createStagedArtifactPlan(plan);
+export const applyArtifactPlan = (plan: ArtifactPlan) =>
+  Effect.uninterruptibleMask((restoreInterruptibility) =>
+    Effect.gen(function* () {
+      // 1. Resolve one canonical root and derive every transaction path from it.
+      const validatedRoot = yield* restoreInterruptibility(validatePlanRoot(plan.root));
+      const stagedPlan = yield* createStagedPlan({ plan, validatedRoot });
+      const captureRequest = { stagedPlan, validatedRoot };
 
-    // 2. Capture every original target before the first mutation.
-    const snapshots = yield* snapshotArtifacts(stagedPlan);
+      // 2. Preflight and capture every original target before destination mutation.
+      yield* restoreInterruptibility(preflightTargets(captureRequest));
+      yield* restoreInterruptibility(ensureRecoveryAbsent(stagedPlan.receipt));
+      const snapshots = yield* captureTargets(captureRequest);
 
-    const apply = Effect.gen(function* () {
-      // 3. Write every desired artifact to its temporary path.
-      yield* stageArtifacts(stagedPlan);
+      // 3. Stage every desired artifact and the next ownership receipt.
+      const stagingExit = yield* Effect.exit(restoreInterruptibility(stageTargets(stagedPlan)));
+      if (Exit.isFailure(stagingExit)) {
+        return yield* failAfterCleanup(stagedPlan, stagingExit.cause);
+      }
 
-      // 4. Move staged artifacts into their final locations.
-      yield* commitArtifacts(stagedPlan);
+      const mutations = yield* Ref.make<ReadonlyArray<CommittedMutation>>([]);
+      const createdDirectories = yield* Ref.make<ReadonlyArray<string>>([]);
+      const transaction: TransactionRuntime = {
+        stagedPlan,
+        validatedRoot,
+        snapshots,
+        mutations,
+        createdDirectories,
+      };
 
-      // 5. Publish ownership only after every artifact succeeds.
-      yield* commitReceipt(stagedPlan.receipt);
-    });
+      // 4. Publish the recovery lock, then revalidate and commit artifacts in order.
+      const markerExit = yield* Effect.exit(publishRecoveryMarker(transaction));
+      if (Exit.isFailure(markerExit)) {
+        return yield* failAfterMarkerAttempt(transaction, markerExit.cause);
+      }
+      if (!markerExit.value) {
+        return yield* failForOccupiedMarker(transaction);
+      }
 
-    // 6. Restore originals on failure and always remove temporary files.
-    yield* apply.pipe(
-      Effect.onError(() => restoreArtifacts(snapshots)),
-      Effect.ensuring(removeStagedArtifacts(stagedPlan)),
-    );
-  });
+      const commitExit = yield* Effect.exit(
+        restoreInterruptibility(
+          Effect.gen(function* () {
+            yield* commitArtifacts(transaction);
+
+            // 5. Publish ownership only after every artifact succeeds.
+            yield* commitReceipt(transaction);
+          }),
+        ),
+      );
+
+      // 6. Restore on failure, or release the recovery marker before snapshots.
+      if (Exit.isFailure(commitExit)) {
+        return yield* recoverCommit(transaction, commitExit.cause);
+      }
+
+      const cleanupExit = yield* Effect.exit(cleanupCommittedTransaction(transaction));
+      if (Exit.isFailure(cleanupExit)) {
+        return yield* Effect.failCause(cleanupExit.cause);
+      }
+    }),
+  );
 ```
 
-Original targets are restored in reverse mutation order. `removeStagedArtifacts` always removes disposable desired-output staging files. Captured recovery snapshots are removed only after a successful commit or a successful rollback.
+The host-qualified root is resolved to one canonical real path before transaction paths are derived. Every target is checked again against that captured root and its exact captured bytes immediately before mutation. The mutation ledger records the exact state produced after each filesystem syscall; rollback refuses to overwrite a later external change.
 
-The normal `<installDir>/receipt.json` is committed last. If `restoreArtifacts` fails, `writeRecoveryRecord` writes a separate `<installDir>/recovery.json` containing the unrecovered paths and durable captured snapshot locations before the rollback failure is re-raised. Those snapshots survive cleanup. The normal receipt remains absent, and recovery evidence is never presented as a successful ownership receipt.
+The complete schema-decoded pending record is written inside the transaction and atomically hard-linked to the fixed sibling `recovery.json` before the first destination mutation. The exclusive link is also the cooperative single-writer lock. A competing writer fails before destination mutation and removes only its unpublished transaction state. An interrupted commit recovers under its published lock.
+
+The pending-record schema rejects noncanonical or NUL-containing paths, transaction directories without the exact lowercase generated UUID shape, targets that conflict by case or ancestry, targets that could overwrite the root, marker, or transaction state, and snapshot sources that are duplicated or are not direct children of the transaction snapshot directory. Separator normalization preserves case for exact ownership checks, including drive-qualified paths; case folding is used only to reject ambiguous aliases and conflicts.
+
+Original targets are restored in reverse mutation order. The marker is decoded and compared with the expected record before any unlink. Captured snapshots are removed immediately after the marker is safely released following a successful commit or complete rollback, before cleanup of transaction-created empty parents can encounter preserved external content. If rollback is incomplete, the marker, all snapshots, and their strict target mapping remain durable; only verified-disposable staging may be removed.
+
+Transaction directories use mode `0700`. Original-byte snapshots and the pending-record inode use mode `0600`, including the hard-linked recovery marker. Staged artifacts remain inside the private transaction root while retaining the mode policy intended for their final rename destination.
+
+The normal `<installDir>/receipt.json` is committed last. A pending recovery marker is never presented as a successful ownership receipt, and another apply cannot begin while it exists.
+
+Commit is interruptible only between complete target units. Each artifact and the receipt is one uninterruptible mutation unit, so its ledger always matches the last completed filesystem syscall. Interruption before commit completion runs masked reverse recovery. After commit completes, the receipt is authoritative and cleanup remains masked; a late interruption never rolls that committed state back, so callers that observe interruption at this boundary reconcile from the receipt.
+
+`@effect/platform` owns filesystem and path access except one narrow operation: rollback cleanup uses Node's nonrecursive `rmdir` because the platform service exposes only recursive directory removal, whose check-then-delete race could erase newly created user content. The direct call removes only an empty directory created and recorded by this transaction.
+
+The path-only platform API cannot provide `openat`/directory-descriptor containment. Dufflebag revalidates immediately before each syscall and preserves any observed concurrent change; a malicious same-user swap in the final validation-to-syscall interval is outside the guarantee.
 
 Fault-injection tests use real temporary filesystem conflicts or an official platform test layer. They do not export repository internals or add test-only branches.
 
