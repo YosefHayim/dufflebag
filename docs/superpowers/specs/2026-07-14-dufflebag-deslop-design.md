@@ -1,6 +1,6 @@
 # Dufflebag Deslop Refactor Design
 
-**Status:** Approved on 2026-07-14 through the interactive design gate. All 42 decisions were accepted with no flips, revisit markers, or notes.
+**Status:** Approved on 2026-07-14 through the interactive design gate and reconciled with every final follow-up approval before implementation resumed.
 
 ## Purpose
 
@@ -14,7 +14,8 @@ The end state has:
 - one transactional artifact writer with exact ownership receipts;
 - one dependency-free installed hook runtime;
 - one readable Effect application boundary;
-- one fail-closed build and shipping boundary; and
+- one fail-closed build and shipping boundary;
+- one reusable profile-composed CODE-STYLE factory for new and existing repositories; and
 - one verification command that proves the complete package.
 
 The refactor preserves product behavior unless this document explicitly changes it. The approved behavior changes are schema-owned managed config, exact receipt-owned reconciliation, fail-closed catalog shipping, and the removal of tracked generated provider projections.
@@ -31,7 +32,7 @@ Three user-owned files changed after the clean baseline:
 
 Their content must be preserved byte-for-byte while the directory moves to `src/skills/makeATrailer/`. They must never be reset, stashed, normalized, or absorbed into a refactor-authored diff.
 
-`assembleCut.mjs` contains pre-existing function-form, function-input, and loop-comment violations. The contract checker therefore carries one explicit protected-baseline exception covering only these three moved paths. The exception cannot grow, and no other file may use it. It is removed in a separate owner-reviewed cleanup after the concurrent make-a-trailer patch is committed independently; this refactor does not rewrite those bytes to manufacture a clean result.
+The checker records all three files as exact `protectedPaths` metadata so their hashes remain visible. Only `assembleCut.mjs` receives code-rule exceptions: 13 function-form violations, 5 function-input violations, and 2 non-obvious uncommented-loop violations. Those three `maxViolations` values cannot increase; the two Markdown files are not fake AST exceptions. The exceptions are removed in a separate owner-reviewed cleanup after the concurrent make-a-trailer patch is committed independently; this refactor does not rewrite those bytes to manufacture a clean result.
 
 ## Goals
 
@@ -43,13 +44,15 @@ Their content must be preserved byte-for-byte while the directory moves to `src/
 6. Keep installed hooks reliable in foreign agent processes without third-party runtime dependencies.
 7. Replace scattered formatting and style conventions with a human contract plus automated enforcement.
 8. Preserve public behavior through co-located public-seam tests and real temporary directories.
+9. Ship a repo-neutral CODE-STYLE factory that resolves owner defaults, applicable stack profiles, and narrow repository exceptions into local artifacts.
 
 ## Non-goals
 
 - No monorepo.
 - No plugin framework or speculative extension API.
 - No compatibility wrappers for removed internal module paths.
-- No JSON, quiet, or other output modes without a real consumer.
+- No universal JSON success envelope; each command owns the Effect Schema for its result.
+- No target-repository runtime dependency on dufflebag after CODE-STYLE artifacts are installed.
 - No local Effect service, logger, filesystem, or terminal abstraction around official services.
 - No one-module-per-agent provider abstraction.
 - No tracked `.agents`, `.cursor`, `.devin`, or generated managed-instruction source copies.
@@ -60,6 +63,10 @@ Their content must be preserved byte-for-byte while the directory moves to `src/
 
 ```text
 src/
+├── build/
+│   ├── buildPackage.ts
+│   ├── smokeHooks.ts
+│   └── verifyShipping.ts
 ├── cli/
 │   ├── main.ts
 │   ├── TerminalUI.ts
@@ -91,6 +98,11 @@ src/
 ├── runtime/
 │   ├── readConfig.ts
 │   └── readHookInput.ts
+├── documentation/
+│   └── generateReadme.ts
+├── style/
+│   ├── checkCodeStyle.ts
+│   └── codeStyleFactory.ts
 ├── skills/
 ├── doctor.ts
 └── scaffoldWorkflows.ts
@@ -98,14 +110,14 @@ src/
 scripts/
 ├── buildPackage.ts
 ├── checkCodeStyle.ts
-├── generateReadme.mjs
+├── generateReadme.ts
 ├── smokeHooks.ts
 └── verifyShipping.ts
 ```
 
 Directories expose product capabilities, not technical layers. `src/core/`, `src/commands/`, and `src/payload/` disappear after their behavior moves to a named owner.
 
-The root `scripts/` directory contains committed build and verification entrypoints only. It owns no application behavior. Local experiments remain under ignored `scripts/dev/`.
+The root `scripts/` directory contains thin TypeScript maintenance entrypoints only. Substantive build, documentation, and verification behavior lives under its named `src/` owner. Package scripts are aliases or simple composition, shell is reserved for simple operating-system orchestration, and local experiments remain under ignored `scripts/dev/`. Build-only modules are excluded from shipped product artifacts.
 
 The png-to-code harness remains a nested package under `src/skills/pngToCode/scripts/`. It is not promoted into a workspace package.
 
@@ -147,7 +159,7 @@ The required source-directory mapping is:
 
 ## Code readability contract
 
-The root `CODE-STYLE.md` is prescriptive. Root `code-style.rules.json` mirrors only enforceable rules. `AGENTS.md` contains a short digest and points to both.
+The root `CODE-STYLE.md` is prescriptive. Root `code-style.rules.json` mirrors the complete rule identity set, including explicitly manual-review rules, so human and machine IDs stay bijective. `AGENTS.md` contains a short digest and points to both.
 
 ### Functions and bodies
 
@@ -159,14 +171,14 @@ The root `CODE-STYLE.md` is prescriptive. Root `code-style.rules.json` mirrors o
 - Boolean behavior flag parameters are forbidden. Schema-decoded external boolean state is allowed inside a named request.
 - There is no arbitrary function line cap.
 - Blank lines separate function declarations.
-- One-use pass-through wrappers are removed.
+- Pointless one-expression extraction and one-use pass-through wrappers are removed; a named function must own a concept, policy, boundary, or second real call site.
 
 ### Comments
 
 Comments state intent, invariant, or tradeoff; they do not narrate syntax.
 
-- Every explicit loop has one short intent comment immediately above it.
-- Every indexed non-null assertion has one proof comment immediately above it.
+- Only a non-obvious explicit loop receives a short comment immediately above it. That comment explains intent, an invariant, ordering, performance, batching, or an early-exit reason.
+- Every indexed access whose safety is not obvious has one proof comment immediately above it; the proof does not authorize a TypeScript assertion.
 - Every ordered multi-phase pipeline has a contract comment above it and short numbered comments for its phases.
 - Leaf functions do not receive ceremonial comments.
 
@@ -174,11 +186,16 @@ Comments state intent, invariant, or tradeoff; they do not narrate syntax.
 
 - Effect Schema owns runtime domain objects.
 - Plain type aliases exist only for genuinely compile-time-local shapes.
-- Interfaces are allowed only for `.d.ts` augmentation.
+- Runtime-data interfaces that duplicate Effect Schemas are forbidden. Interfaces are allowed for `.d.ts` declaration augmentation and for genuinely substitutable, feature-owned external capability ports.
 - Enums, authored conditional/`infer` machinery, and authored assertions are forbidden.
 - `as`, `as const`, `as unknown as`, `@ts-ignore`, and `@ts-expect-error` are forbidden.
 - External `unknown` values are decoded or explicitly narrowed.
 - `satisfies` is allowed because it checks without changing the claimed type.
+- `undefined` is ordinary application absence, `null` exists only at an external protocol boundary, and `Option` represents meaningful business absence. One value never uses all three representations.
+
+### Documentation signals
+
+TSDoc is signal-based. Exported APIs receive documentation only when a caller needs behavior, invariant, side-effect, ownership, lifecycle, error, retry, ordering, security, or performance information that the signature and schema do not already state. Comments never restate types, parameter names, schema descriptions, or obvious implementation steps.
 
 ### Names and barrels
 
@@ -187,9 +204,10 @@ Comments state intent, invariant, or tradeoff; they do not narrate syntax.
 - `LANGUAGE.md` owns allowed abbreviations and domain terms.
 - Vague `Manager`, `Helper`, `Utils`, `Data`, `Info`, `Common`, and `Misc` names are forbidden.
 - Generic `types.ts`, `helpers.ts`, `utils.ts`, `common.ts`, and `misc.ts` buckets are forbidden.
+- Authored non-component filenames use camelCase without repeated role suffixes such as `order.repository.ts` or `orderRepository.repository.ts`; UI component modules use PascalCase.
+- Named exports are the default. Framework-required default exports are the only exception.
 - One-export-per-file fragmentation is forbidden. A split requires an independent change reason; an abstraction requires a second real caller or a genuine domain concept.
-- A barrel may be a flat manifest of direct wildcard exports only.
-- Barrels contain no logic, selective exports, aliases, or chains.
+- Internal barrels and `export *` are forbidden. Explicit re-exports are allowed only at a real public package boundary.
 
 ### Mutation and collections
 
@@ -218,7 +236,7 @@ The main dufflebag application follows the official [Effect](https://effect.webs
 
 - pure transformations remain plain arrow functions;
 - application effects return `Effect`;
-- dependent workflows use `Effect.gen`;
+- one dependent handoff may use one `Effect.flatMap`; two or more dependent steps use `Effect.gen`;
 - one short transformation may use `pipe`;
 - long pipe pyramids, `Effect.Do`, and ceremonial generators are avoided;
 - official platform services are used directly;
@@ -421,6 +439,154 @@ const featureCatalog = Schema.decodeUnknownSync(featureCatalogSchema, {
 
 Descriptions live on the schema properties they describe. Checks and their messages live with the checked property. A nested named schema is introduced only when it is a real reusable domain value, not to shorten a file.
 
+## Reusable CODE-STYLE factory
+
+Dufflebag is the source of a CODE-STYLE factory, not one universal guide copied unchanged into every repository. The factory resolves, in order:
+
+1. the locked owner base;
+2. every applicable stack profile detected or explicitly selected for the target repository; and
+3. explicit narrow repository exceptions.
+
+Later layers may narrow an earlier rule but never silently weaken or replace it. Unknown applicability and genuine stack conflicts are resolved during the grill. Future grills do not re-ask locked owner tastes; they ask only about real stack conflicts, unknown applicability, or a requested exception.
+
+The post-migration canonical profile tree is:
+
+```text
+src/skills/grillMeCodeStyle/references/
+├── profileComposition.md
+└── profiles/
+    ├── ownerBase.json
+    ├── typescriptEffect.json
+    ├── reactTailwind.json
+    ├── backendHttp.json
+    ├── dataPersistence.json
+    ├── sql.json
+    ├── noSql.json
+    ├── securityOperations.json
+    ├── asyncMessaging.json
+    ├── externalAdapters.json
+    └── scriptsCli.json
+```
+
+`profileComposition.md` explains the agent workflow, detection evidence, merge order, conflict handling, exception review, and local artifact rendering. It contains no second rule catalog. Each structured JSON profile is a canonical rule reference, not a rendered guide fragment or a new universal target-repository config system. `src/style/codeStyleFactory.ts` owns strict Effect Schemas for profile, rule, example, enforcement, resolved-artifact, and exception data and derives their TypeScript types. Profile responsibilities do not overlap:
+
+| Profile | Sole responsibility |
+| --- | --- |
+| `ownerBase` | Owner-wide readability, names, files, documentation, module boundaries, and safe enforcement defaults. |
+| `typescriptEffect` | TypeScript, Effect, Effect Schema, errors, absence, async composition, and runtime boundaries. |
+| `reactTailwind` | React ownership, UI state, accessibility, Tailwind tokens, responsive behavior, motion, themes, and localization. |
+| `backendHttp` | HTTP request flow, representations, authorization placement, tenancy, errors, and pagination. |
+| `dataPersistence` | Persistence ownership, direct-query-first design, transactions, consistency, cache boundaries, and testing. |
+| `sql` | Relational naming, constraints, identifiers, migrations, queries, indexes, concurrency, deletion, JSON, and tenant controls. |
+| `noSql` | Aggregate boundaries, validators, migrations, access-pattern indexes, concurrency, TTL, recovery, and partitioning. |
+| `securityOperations` | Configuration, secrets, hostile input, authentication, authorization, privacy, logs, audit, limits, and operational safety. |
+| `asyncMessaging` | Jobs, outbox/inbox delivery, webhooks, retries, schedules, workflows, and distributed consistency vocabulary. |
+| `externalAdapters` | Earned third-party boundaries, SDK confinement, wire decoding, resilience, reconciliation, and contract tests. |
+| `scriptsCli` | Maintenance entrypoints, generators, automation behavior, CLI routing, output schemas, and process exit contracts. |
+
+Every profile ID and rule ID is globally unique. Every rule records `applicability`, `summary`, `rationale`, good and bad examples, and one or more enforcement channels from exactly:
+
+`formatter | linter | regex | ast | path | importGraph | typecheck | test | manual`
+
+Anchored regex or text checks enforce textual and path-local rules. AST, linter, and import-graph checks enforce semantic structure and boundaries. Typechecking and tests prove types and behavior. Manual review owns judgment and taste. Only a formatter or linter transformation proven safe by fixtures may autofix; regex, AST, path, import-graph, typecheck, test, and manual channels are report-only.
+
+The human `CODE-STYLE.md` projection and machine `code-style.rules.json` projection contain a bijective set of rule IDs. The factory also merges formatter/linter/checker wiring and package verification commands into the target repository rather than replacing existing configuration.
+
+An exception references an existing rule ID and contains exact repository-relative paths, a reason, an exit condition, and a non-negative `maxViolations`. Broad paths, unknown rules, exceeded counts, stale exit conditions, or an attempted increase from an already recorded maximum fail resolution. An exception is debt with a ratchet, not a second style profile.
+
+The resolved target owns all resulting artifacts:
+
+- local `CODE-STYLE.md`;
+- local `code-style.rules.json`;
+- formatter, linter, and focused checker integration;
+- package verification wiring; and
+- a bounded digest inside `AGENTS.md` markers.
+
+Content outside the bounded AGENTS markers is preserved byte-for-byte. A target repository never imports dufflebag at runtime. Reapplying the same resolution is a no-op.
+
+### Approved profile contracts
+
+The profile catalog encodes these decisions directly; it does not reduce them to vague interview prompts.
+
+#### Owner base
+
+- Organize by feature or domain; a genuinely tiny repository may remain flat.
+- Use named exports except where a framework requires a default export. Keep internal imports direct, ban cycles and internal barrels, and allow only explicit public-package re-exports.
+- Use arrow constants, guard clauses, cohesive inputs, camelCase non-component filenames, PascalCase component filenames, and no repeated role suffixes.
+- Do not create speculative wrappers, generic CRUD/DAO/repository layers, bucket modules, one-expression helpers, or one-export-per-file fragmentation.
+- Keep owned values immutable at boundaries while allowing contained local mutation when it makes the algorithm clearer.
+- Use signal-based TSDoc and intent comments only where the signature or code cannot carry the contract.
+
+#### TypeScript and Effect
+
+- Effect Schema is the single source for runtime validation, derived types, descriptions, error messages, OpenAPI, and JSON Schema; Zod and parallel handwritten runtime-data interfaces are forbidden.
+- Decode untrusted and persisted input at the boundary with excess-property behavior chosen explicitly: strict for owned requests/config/security data and deliberately tolerant only for third-party response fields the application does not own.
+- Expected branch-worthy failures are typed; defects preserve their cause; public errors are translated and redacted once at the presentation boundary.
+- Use ordinary React rendering and local state in UI code, and Effect for backend, CLI, worker, job, and other I/O workflows.
+- Use one `flatMap` for one dependent handoff and `Effect.gen` for two or more dependent steps. Sequential execution is the default; bounded concurrency requires a reason and a limit.
+- Keep `undefined`, protocol `null`, and business `Option` distinct. Run an Effect exactly once at the deployable runtime edge.
+
+#### React and Tailwind
+
+- One exported component owns one file only when it has earned that boundary; nested component declarations are forbidden. A child with its own state, hook, or effect owns its own file.
+- `useEffect` synchronizes one concern with an external system at the smallest owning component. It is not used for derived values, event handling, or ordinary data fetching.
+- State ownership follows local state, URL state, server-query cache, form state, feature context/store, then application store. Prop passthrough across more than two component boundaries moves to a feature context, store, or hook.
+- Event handlers are named `handle<Action>`, callback props are named `on<Action>`, and JSX does not contain inline event-handler implementations. Memoization requires measured or referential evidence.
+- Every async surface explicitly handles loading, error, empty, and success while preserving existing content during refresh. Forms derive validation and messages from Effect Schema.
+- Meet WCAG 2.2 AA with semantic elements, keyboard access, visible focus, correct labels, contrast, reduced-motion support, and meaningful live-region behavior.
+- Tailwind semantic tokens are the styling source. Use the existing scale first; the second repetition of a nonstandard value earns a config token. Raw `px`, `rem`, or `em` values and unrestricted `className` escape hatches are forbidden.
+- Use typed variants, mobile-first layouts, and container queries for reusable components. Motion is purposeful, `transition-all` is forbidden, dark mode is semantic, and layouts/copy remain localization and RTL safe.
+
+#### Backend HTTP
+
+- The request path is `route -> Schema decode -> named operation -> database/external capability -> typed result/error -> representation encode`.
+- Routes own transport only. Authentication yields a typed `Actor`; authorization is performed in the named operation; tenant scope is explicit and denial is the default, reinforced with row-level security where supported.
+- HTTP success representations are explicit and expected failures use RFC 9457 problem details without leaking defects or provider errors.
+- Cursor pagination is the default for changing collections, with stable ordering and a maximum page size of 100.
+
+#### Data persistence, SQL, NoSQL, and cache
+
+- Start with direct feature-owned persistence. A repository abstraction is earned only by genuinely substitutable stores or a domain boundary with behavior beyond generic CRUD.
+- SQL is the default durable store; NoSQL requires evidence from aggregate shape, scale, latency, availability, or access patterns.
+- Transactions own invariants; the outbox bridges committed state to async delivery; idempotency protects retried commands. Tests use the real database engine for constraints, transactions, migrations, and query behavior.
+- SQL uses plural `snake_case` names, named constraints/indexes, UUIDv7 surrogate identifiers, unique natural keys, branded application IDs, explicit time zones, exact decimals, and currency-aware money values.
+- SQL migrations are immutable timestamped expand/backfill/validate/contract steps. Queries avoid `select *`, unbounded reads, and N+1 access; indexes follow measured queries and `EXPLAIN`; concurrency uses atomic updates or optimistic versions.
+- Deletion, status history, retention, tenant scope, and row-level security are explicit. JSON columns are bounded and versioned rather than an escape from modeling.
+- NoSQL documents follow aggregate boundaries, database validators, versioned migrations, access-pattern-specific indexes, explicit optimistic/conditional concurrency, TTL semantics, recovery tests, and partition-key analysis.
+- Cache is derived and disposable. Keys are versioned and tenant-scoped, TTLs use jitter where appropriate, critical coordination primitives are separated from cached data, and production code never uses global key scans such as Redis `KEYS`.
+
+#### Security and operations
+
+- One Effect Config boundary per deployable decodes configuration. Secrets are redacted, rotatable, absent from clients/logs, and separated by environment.
+- Treat hostile input capability-first: validate identifiers and allowlists; bound paths, URLs, uploads, bodies, deadlines, and responses; and block SSRF through scheme, destination, redirect, and DNS/IP policy.
+- Browser sessions use secure cookies and CSRF protection; machine/native clients use bearer credentials. Authentication and authorization remain separate typed steps.
+- Raw HTML is forbidden by default. Any exception uses one typed sanitizer and one renderer plus a strict CSP and security headers.
+- Structured logs are allowlisted and redacted. A separate typed durable audit trail records security-relevant actions. Data collection is classified and minimized; managed encryption is the default; field crypto requires a threat model; passwords use Argon2id.
+- Resource and rate limits are operation-specific. Health, readiness, timeouts, shutdown, observability, backup/restore, and recovery drills are explicit operational contracts.
+
+#### Async messaging
+
+- Durable jobs are feature-owned and versioned, published through an outbox, delivered at least once, and idempotent. Retry limits, backoff, dead-letter handling, schedules, observability, and replay ownership are explicit.
+- Verified webhooks use a durable inbox, signature/timestamp/replay checks, idempotent processing, and reconciliation for final truth.
+- Direct calls are the default. Use `query`, `command`, `job`, `event`, and `audit` precisely; an in-process event emitter cannot hide control flow. CQRS, sagas, and event sourcing require concrete evidence.
+- Persisted workflows are earned only for durable multi-step state. They define explicit states/transitions and a persisted version, commit one durable step at a time, never hold a database transaction across an external call, and use stable idempotency keys, conditional transitions, durable timers, compensation, or `manualReview`. A generic workflow manager waits for a second real workflow.
+
+#### External adapters
+
+- Generic provider registries and pass-through SDK wrappers are forbidden. A real third-party contract may earn one feature-owned, domain-shaped capability such as `authorize`, not an SDK-shaped method mirror.
+- Only that adapter imports the provider SDK. It owns domain-facing schemas, types, and expected errors; decodes critical responses; pins the provider API version; sets deadlines and cancellation; and separates test and production environments.
+- A logical command keeps one stable idempotency key. Exactly one layer owns retries. Provider errors are mapped to safe typed failures and never cross the public boundary raw.
+- Persist provider references and domain state needed for recovery. Reconciliation or verified webhooks establish final truth. Contract tests cover owned request/response assumptions and failure mapping.
+
+#### Scripts and CLI
+
+- Root `scripts/` files are thin TypeScript repo-maintenance entrypoints; shipped CLI code lives under `src/cli/`; feature-specific tooling stays beside its feature. Application modules never import root scripts.
+- Package scripts contain aliases or simple composition, not substantive shell or `node -e` programs. Shell is limited to simple operating-system orchestration and is checked with ShellCheck and shfmt when present.
+- Bulk mutations support `--dry-run`; destructive actions require explicit confirmation. Generators are deterministic, idempotent, and support `--check`.
+- Results use stdout and diagnostics use stderr. Automation does not require a TTY. Interactive menus route to the same Effect Schema requests and capabilities as explicit arguments.
+- Human output is the default; `--json` emits exactly one JSON document on stdout for success or failure. Each command owns its result Effect Schema; success has no universal wrapper. Failure is `{ "error": { "code": string, "message": string, "retryable": boolean } }`.
+- JSON mode has no prompt, ANSI color, spinner, or banner. Exit status is 0 for success or warning, 1 for operational failure or defect, 2 for usage or request-schema input failure, and 130 for cancellation. Help and version exit 0; a bare non-TTY invocation without a command exits 2; `--strict` promotes warnings to failure.
+
 ## Feature and agent catalogs
 
 `src/catalog/featureCatalog.ts` owns `featureDefinitionSchema` and one decoded ordered feature catalog. Each public ID appears once.
@@ -570,16 +736,23 @@ The CLI guarantees:
 
 - global and project scope are mutually exclusive;
 - non-TTY invocation never prompts or hangs;
+- human output is the default and explicit `--json` selects machine output;
+- each command owns an Effect Schema for its JSON success result rather than using a universal success wrapper;
+- JSON failures encode exactly `{ "error": { "code": string, "message": string, "retryable": boolean } }`;
+- success or failure emits exactly one JSON document on stdout, while diagnostics and progress use stderr;
+- JSON mode has no prompt, ANSI color, spinner, or banner;
+- exit status 0 means success or warning, 1 means operational failure or defect, 2 means usage or request-schema input failure, and 130 means cancellation;
+- help and version exit 0, a bare non-TTY invocation without a command exits 2, and `--strict` promotes warnings to failure;
 - command modules translate input and render output only;
 - domain modules do not prompt or print;
 - `TerminalUI.ts` owns prompts, progress, success, and typed error presentation; and
 - expected errors render once at the CLI edge.
 
-Human-readable output is the only current output mode.
-
 ## Build and shipping
 
 Every distributable skill belongs to one feature entry and has an exact source-relative allowlist.
+
+Root build, verification, and documentation scripts only decode arguments, call their substantive `src/build/**` or `src/documentation/**` owner, render the result, and set process status. Generators and bulk maintenance commands are deterministic and idempotent, expose `--check` or `--dry-run` as appropriate, write results to stdout and diagnostics to stderr, and never require a TTY in automation. Build-only owners, entrypoints, tests, and fixtures are excluded from product artifacts.
 
 The build:
 
@@ -616,6 +789,8 @@ Required behavior coverage includes:
 - complete config migration and zero-write invalid migration;
 - bare TTY and explicit command parity;
 - non-TTY no-prompt behavior;
+- subprocess decoding of every JSON success and failure result, with exact stdout document count, stderr separation, ANSI/prompt/spinner absence, and exit statuses 0, 1, 2, and 130;
+- help/version status 0, bare non-TTY status 2, warning behavior, and `--strict` warning promotion;
 - package contents and uncataloged-content failure;
 - hook import-graph isolation; and
 - smoke execution of every packed runtime entrypoint.
@@ -631,9 +806,9 @@ Biome is the sole formatter and general linter:
 
 Biome covers every maintained TypeScript, TSX, JavaScript, MJS, JSON, and JSONC file in the main package, root scripts, and the png-to-code harness.
 
-`scripts/checkCodeStyle.ts` is a focused repository contract verifier, not a second general linter. It enforces AST, import-graph, path, barrel, comment, assertion, and function-form rules that Biome cannot express. It also proves that every enforceable `CODE-STYLE.md` rule ID has one matching `code-style.rules.json` entry and that the machine file contains no undocumented rule ID.
+`scripts/checkCodeStyle.ts` is a thin entrypoint into the focused repository contract verifier in `src/style/checkCodeStyle.ts`, not a second general linter. The verifier dispatches each rule only through its declared enforcement channels from `formatter | linter | regex | ast | path | importGraph | typecheck | test | manual`. Anchored regex/text checks own textual and path-local violations; AST, lint, and import-graph checks own semantic structure and boundaries; typecheck and tests own types and behavior; manual review owns judgment. It also proves that every `CODE-STYLE.md` rule ID has one matching `code-style.rules.json` entry and that the machine file contains no undocumented rule ID. Only proven-safe formatter/linter transformations may autofix.
 
-Generated projections and `dist` are excluded from authored-source checks. The three named protected make-a-trailer paths are the only temporary maintained-source exception, and the verifier reports them by exact path rather than accepting a wildcard.
+Generated projections and `dist` are excluded from authored-source checks. The verifier reports the three named make-a-trailer `protectedPaths` and hashes without accepting a wildcard. Only `assembleCut.mjs` has temporary maintained-source rule exceptions, ratcheted at 13 function-form, 5 function-input, and 2 non-obvious-loop violations.
 
 `pnpm verify` runs exactly:
 
@@ -651,7 +826,8 @@ The migration creates or refreshes:
 - `LANGUAGE.md` domain vocabulary;
 - `TEACH.md` stack decisions and self-closing glossary;
 - catalog-derived `README.md` output;
-- generic `templates/mdFiles/CODE-STYLE.md`, `code-style.rules.json`, and `PROJECT.md` scaffolds; and
+- generic `templates/mdFiles/CODE-STYLE.md`, `code-style.rules.json`, and `PROJECT.md` scaffolds;
+- canonical composable profile references and forward-test fixtures for the CODE-STYLE factory; and
 - ADRs 0016 through 0020.
 
 The ADRs are:
@@ -679,20 +855,22 @@ Historical ADR bodies remain unchanged. Conflicting current ADRs receive status/
 
 The implementation lands as independently green slices:
 
-1. Commit the approved contracts and characterization coverage.
+1. Commit the approved design/plan and characterization coverage.
 2. Upgrade Vitest and the Effect foundation without changing behavior.
-3. Introduce Schema-owned config and decoded catalogs.
-4. Introduce pure artifact plans, receipts, transactional application, and migration.
-5. Move agent output into four handlers.
-6. Replace the CLI edge with `@effect/cli` and `TerminalUI`.
-7. Rebuild the nested dependency-free hook runtime and fail-closed package staging.
-8. Rehome modules and camelCase skill directories with history preserved.
-9. Remove legacy code and tracked projections only after parity.
-10. Close docs, packed-tarball checks, smoke tests, and the complete verification gate.
+3. Publish the strict root human/machine style contract with its checker dormant.
+4. Introduce Schema-owned config and decoded catalogs.
+5. Introduce pure artifact plans, receipts, transactional application, and migration.
+6. Move agent output into four handlers.
+7. Replace the CLI edge with `@effect/cli` and `TerminalUI`.
+8. Rebuild the nested dependency-free hook runtime and fail-closed package staging.
+9. Rehome modules and camelCase skill directories with history preserved.
+10. Remove legacy code and tracked projections only after parity.
+11. Build and forward-test the profile-composed CODE-STYLE factory.
+12. Close docs, packed-tarball checks, smoke tests, and the complete verification gate.
 
 Every slice starts with a failing or characterization test, ends with its focused tests and `pnpm verify` green, and is committed separately. Legacy paths are removed only after their replacement is proven.
 
-The make-a-trailer move is staged as a pure rename of the committed baseline while its three concurrent modifications remain unstaged at the new path. Verification reports their exact protected-baseline exception separately from migration-owned conformance.
+The make-a-trailer move is staged as a pure rename of the committed baseline while its three concurrent modifications remain unstaged at the new path. Verification reports the three exact protected paths and the `assembleCut.mjs` ratchets separately from migration-owned conformance.
 
 ## Success criteria
 
@@ -706,9 +884,12 @@ The refactor is complete only when:
 - rollback restores original bytes or writes explicit recovery evidence;
 - uninstall deletes only receipt-owned artifacts;
 - non-TTY CLI use cannot prompt or hang;
+- JSON CLI subprocesses emit exactly one schema-valid stdout document, keep diagnostics on stderr, and return the approved 0/1/2/130 statuses;
 - every packed hook entrypoint executes from the staged tree;
-- no forbidden syntax, naming, wrapper, barrel, comment, or path pattern remains outside the three exact protected make-a-trailer baseline files;
-- the contract checker reports that protected exception explicitly and accepts no additional exception;
+- root maintenance scripts remain thin, build-only owners do not ship, and external SDK imports are confined to earned feature-owned adapters;
+- all CODE-STYLE profiles compose without irrelevant-profile leakage, produce repo-neutral local artifacts, preserve existing configuration and unowned AGENTS bytes, ratchet exceptions, and rerun as a no-op;
+- no forbidden syntax, naming, wrapper, internal barrel, ceremonial comment, or path pattern remains outside the three exact protected make-a-trailer baseline files;
+- the contract checker reports all three protected paths plus only the 13/5/2 `assembleCut.mjs` ratchets and accepts no additional exception;
 - root and template docs describe their correct audiences;
 - the packed tarball contains only declared output; and
 - `pnpm verify` passes from a clean checkout.
