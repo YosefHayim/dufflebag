@@ -779,6 +779,22 @@ describe("schema-owned object types", () => {
 
     expect(report.violations).toEqual([]);
   });
+
+  it("keeps similarly named application directories inside the schema boundary", () => {
+    const report = checkSource(
+      "src/install/runtime/runtimeState.ts",
+      "export type RuntimeState = { sessionId: string };\n",
+    );
+
+    expect(report.violations).toEqual([
+      {
+        ruleId: "type.schema-owned-runtime",
+        file: "src/install/runtime/runtimeState.ts",
+        line: 1,
+        message: expect.any(String),
+      },
+    ]);
+  });
 });
 
 describe("barrels, names, and paths", () => {
@@ -899,6 +915,11 @@ describe("mutation, collections, runtime, and presentation", () => {
       name: "a destructured input binding",
       source:
         'export const append = ({ items }: { items: string[] }) => { items.push("next"); };\n',
+    },
+    {
+      name: "an outer input captured by a nested callback",
+      source:
+        'export const append = (request: { items: string[] }) => Effect.sync(() => request.items.push("next"));\n',
     },
   ])("rejects input mutation through $name", ({ source }) => {
     const report = checkSource("src/install/example.ts", source);

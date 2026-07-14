@@ -281,11 +281,12 @@ const nestingDepth = (node: ts.Node): number => {
 const hasExportModifier = (node: ts.Node & { modifiers?: ts.NodeArray<ts.ModifierLike> }): boolean =>
   Boolean(node.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword));
 
+const isHookRuntimeFile = (file: string): boolean =>
+  file.startsWith("src/runtime/") || /^src\/skills\/[^/]+\/(?:hooks|runtime)\//u.test(file);
+
 const isApplicationFile = (file: string): boolean =>
   file.startsWith("src/") &&
-  !file.startsWith("src/runtime/") &&
-  !file.includes("/hooks/") &&
-  !file.includes("/runtime/") &&
+  !isHookRuntimeFile(file) &&
   !file.startsWith("src/skills/png-to-code/scripts/");
 
 const assignedRootIdentifier = (expression: ts.Expression): ts.Identifier | undefined => {
@@ -341,6 +342,19 @@ const containingFunction = (node: ts.Node): ExecutableFunction | undefined => {
   }
 
   return isExecutableFunction(parent) ? parent : containingFunction(parent);
+};
+
+const enclosingFunctionBindsParameter = (node: ts.Node, identifier: string): boolean => {
+  const owner = containingFunction(node);
+  if (!owner) {
+    return false;
+  }
+
+  if (owner.parameters.some((parameter) => parameterBindsIdentifier(parameter.name, identifier))) {
+    return true;
+  }
+
+  return enclosingFunctionBindsParameter(owner, identifier);
 };
 
 const isAssignmentOperator = (kind: ts.SyntaxKind): boolean =>
@@ -432,9 +446,6 @@ const moduleSpecifierFor = (node: ts.Node): string | undefined => {
 
   return undefined;
 };
-
-const isHookRuntimeFile = (file: string): boolean =>
-  file.startsWith("src/runtime/") || file.includes("/hooks/") || file.includes("/runtime/");
 
 const resolvedImportPath = (file: string, specifier: string): string | undefined => {
   if (!specifier.startsWith(".")) {
@@ -788,11 +799,7 @@ const inspectSourceFile = (
     const target = mutationTarget(node);
     if (target) {
       const root = assignedRootIdentifier(target);
-      const owner = containingFunction(node);
-      const mutatesInput = Boolean(
-        root &&
-          owner?.parameters.some((parameter) => parameterBindsIdentifier(parameter.name, root.text)),
-      );
+      const mutatesInput = Boolean(root && enclosingFunctionBindsParameter(node, root.text));
       if (mutatesInput) {
         addViolation({
           ruleId: "mutation.no-input",
