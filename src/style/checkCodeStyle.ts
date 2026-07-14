@@ -545,6 +545,8 @@ const isToolingFile = (file: string): boolean =>
 const isApplicationFile = (file: string): boolean =>
   file.startsWith("src/") && !isHookRuntimeFile(file) && !isToolingFile(file) && !file.startsWith("src/skills/png-to-code/scripts/");
 
+const isIndependentRuntimeFile = (file: string): boolean => file.startsWith("src/skills/png-to-code/scripts/");
+
 const assignedRootIdentifier = (expression: ts.Expression): ts.Identifier | undefined => {
   if (ts.isIdentifier(expression)) {
     return expression;
@@ -741,6 +743,65 @@ const isNamedPropertyAccess = ({
   readonly owner: string;
   readonly property: string;
 }): boolean => ts.isIdentifier(node.expression) && node.expression.text === owner && node.name.text === property;
+
+const isExactNodeRuntimeEdge = (node: ts.CallExpression): boolean => {
+  if (!isNamedPropertyCall({ node, owner: "NodeRuntime", property: "runMain" }) || node.arguments.length !== 1) {
+    return false;
+  }
+  const programPipe = node.arguments[0];
+  if (
+    !programPipe ||
+    !ts.isCallExpression(programPipe) ||
+    !ts.isPropertyAccessExpression(programPipe.expression) ||
+    programPipe.expression.name.text !== "pipe" ||
+    programPipe.arguments.length !== 1
+  ) {
+    return false;
+  }
+  const provider = programPipe.arguments[0];
+  if (
+    !provider ||
+    !ts.isCallExpression(provider) ||
+    !isNamedPropertyCall({ node: provider, owner: "Effect", property: "provide" }) ||
+    provider.arguments.length !== 1
+  ) {
+    return false;
+  }
+  const contextLayer = provider.arguments[0];
+  return Boolean(
+    contextLayer &&
+      ts.isPropertyAccessExpression(contextLayer) &&
+      isNamedPropertyAccess({ node: contextLayer, owner: "NodeContext", property: "layer" }),
+  );
+};
+
+const runtimeEdgeIsExact = (sourceFile: ts.SourceFile): boolean => {
+  const nodeRuntimeCalls: Array<ts.CallExpression> = [];
+  const effectRunCalls: Array<ts.CallExpression> = [];
+  const contextLayers: Array<ts.PropertyAccessExpression> = [];
+  const visit = (node: ts.Node): void => {
+    if (ts.isCallExpression(node)) {
+      if (isNamedPropertyCall({ node, owner: "NodeRuntime", property: "runMain" })) {
+        nodeRuntimeCalls.push(node);
+      }
+      if (isEffectRunCall(node)) {
+        effectRunCalls.push(node);
+      }
+    }
+    if (ts.isPropertyAccessExpression(node) && isNamedPropertyAccess({ node, owner: "NodeContext", property: "layer" })) {
+      contextLayers.push(node);
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sourceFile);
+  const runtimeCall = nodeRuntimeCalls[0];
+  return (
+    nodeRuntimeCalls.length === 1 &&
+    Boolean(runtimeCall && isExactNodeRuntimeEdge(runtimeCall)) &&
+    effectRunCalls.length === 0 &&
+    contextLayers.length === 1
+  );
+};
 
 const isConsoleCall = (node: ts.CallExpression): boolean =>
   ts.isPropertyAccessExpression(node.expression) &&
@@ -986,6 +1047,53 @@ const importedScriptOwnerBindings = (sourceFile: ts.SourceFile, file: string): R
     }
   });
   return bindings;
+};
+
+const rootArrowBindings = (sourceFile: ts.SourceFile): ReadonlySet<string> => {
+  const bindings = new Set<string>();
+  sourceFile.statements.forEach((statement) => {
+    if (!ts.isVariableStatement(statement)) {
+      return;
+    }
+    statement.declarationList.declarations.forEach((declaration) => {
+      if (ts.isIdentifier(declaration.name) && declaration.initializer && ts.isArrowFunction(declaration.initializer)) {
+        bindings.add(declaration.name.text);
+      }
+    });
+  });
+  return bindings;
+};
+
+const SCRIPT_BOUNDARY_GLOBAL_CALLS = new Set(["Boolean", "Number", "String"]);
+
+const containsUnownedScriptPhaseCall = ({
+  root,
+  ownerBindings,
+  localBindings,
+}: {
+  readonly root: ts.Node;
+  readonly ownerBindings: ReadonlySet<string>;
+  readonly localBindings: ReadonlySet<string>;
+}): boolean => {
+  let found = false;
+  const visit = (node: ts.Node): void => {
+    if (found) {
+      return;
+    }
+    if (
+      ts.isCallExpression(node) &&
+      ts.isIdentifier(node.expression) &&
+      !ownerBindings.has(node.expression.text) &&
+      !localBindings.has(node.expression.text) &&
+      !SCRIPT_BOUNDARY_GLOBAL_CALLS.has(node.expression.text)
+    ) {
+      found = true;
+      return;
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(root);
+  return found;
 };
 
 const delegatesToImportedOwner = (root: ts.Node, bindings: ReadonlySet<string>): boolean => {
@@ -1283,9 +1391,10 @@ const inspectSourceFile = ({
       });
     }
     if (ts.isExportDeclaration(node)) {
-      const isExportStar = !node.exportClause;
+      const isExportStar = !node.exportClause || ts.isNamespaceExport(node.exportClause);
       const isInternalIndex = /(?:^|\/)index\.[cm]?[jt]sx?$/u.test(file) && file !== "src/index.ts";
-      if (isExportStar || isInternalIndex) {
+      const isInternalReexport = Boolean(node.moduleSpecifier) && file !== "src/index.ts";
+      if (isExportStar || isInternalIndex || isInternalReexport) {
         addViolation({
           ruleId: "export.no-internal-barrel",
           channel: "ast",
@@ -1371,6 +1480,7 @@ const inspectSourceFile = ({
     if (
       file.startsWith("src/") &&
       file !== "src/cli/main.ts" &&
+      !isIndependentRuntimeFile(file) &&
       ts.isCallExpression(node) &&
       isNamedPropertyCall({ node, owner: "NodeRuntime", property: "runMain" })
     ) {
@@ -1385,6 +1495,7 @@ const inspectSourceFile = ({
     if (
       file.startsWith("src/") &&
       file !== "src/cli/main.ts" &&
+      !isIndependentRuntimeFile(file) &&
       ts.isPropertyAccessExpression(node) &&
       isNamedPropertyAccess({ node, owner: "NodeContext", property: "layer" })
     ) {
@@ -1454,16 +1565,16 @@ const inspectSourceFile = ({
       return specifier === "typescript" || specifier === "glob" || specifier === "node:fs";
     });
     const ownerBindings = importedScriptOwnerBindings(sourceFile, file);
+    const localBindings = rootArrowBindings(sourceFile);
     const delegates = delegatesToImportedOwner(sourceFile, ownerBindings);
-    const ownsLargeLocalArrow = rootFunctions.some(
-      (declaration) =>
+    const ownsSubstantiveLocalExecution = rootFunctions.some((declaration) =>
+      Boolean(
         declaration.initializer &&
-        ts.isArrowFunction(declaration.initializer) &&
-        ts.isBlock(declaration.initializer.body) &&
-        declaration.initializer.body.statements.length > 4 &&
-        !delegatesToImportedOwner(declaration.initializer, ownerBindings),
+          ts.isArrowFunction(declaration.initializer) &&
+          containsUnownedScriptPhaseCall({ root: declaration.initializer, ownerBindings, localBindings }),
+      ),
     );
-    if (ownsSubstantiveDeclaration || ownsToolEngine || ownsLargeLocalArrow || rootFunctions.length > 4 || !delegates) {
+    if (ownsSubstantiveDeclaration || ownsToolEngine || ownsSubstantiveLocalExecution || !delegates) {
       addLineViolation({
         ruleId: "script.thin-entrypoint",
         channel: "ast",
@@ -1475,6 +1586,16 @@ const inspectSourceFile = ({
 
   inspectStatementSpacing(sourceFile);
   visit(sourceFile);
+  const ownsRequiredRuntimeEdge = file === "src/cli/main.ts";
+  const ownsIndependentRuntimeEdge = isIndependentRuntimeFile(file) && /(?:^|\/)main\.[cm]?[jt]sx?$/u.test(file);
+  if ((ownsRequiredRuntimeEdge || ownsIndependentRuntimeEdge) && !runtimeEdgeIsExact(sourceFile)) {
+    addLineViolation({
+      ruleId: "effect.runtime-edge",
+      channel: "ast",
+      line: 1,
+      message: "Own exactly one NodeRuntime.runMain(program.pipe(Effect.provide(NodeContext.layer))) runtime edge.",
+    });
+  }
   return violations;
 };
 

@@ -1159,6 +1159,21 @@ describe("exports, paths, and names", () => {
   });
 
   it.each([
+    ["namespace export star", 'export * as catalog from "./featureCatalog.js";\n'],
+    ["named re-export-only internal barrel", 'export { featureCatalog } from "./featureCatalog.js";\n'],
+  ])("rejects a %s", (_case, source) => {
+    const report = checkSource("src/catalog/catalogApi.ts", source);
+
+    expect(violationsFor(report, "export.no-internal-barrel")).toHaveLength(1);
+  });
+
+  it("allows an explicit named re-export at the real public package boundary", () => {
+    const report = checkSource("src/index.ts", 'export { featureCatalog } from "./catalog/featureCatalog.js";\n');
+
+    expect(violationsFor(report, "export.no-internal-barrel")).toEqual([]);
+  });
+
+  it.each([
     ["src/install/helpers.ts", "path.no-generic-bucket"],
     ["src/install/order.repository.ts", "path.authored-file-name"],
     ["src/install/orderRepositoryRepository.ts", "path.authored-file-name"],
@@ -1232,20 +1247,54 @@ describe("mutation, collections, and Effect composition", () => {
     expect(violationsFor(checkSource("src/install/example.ts", 'console.log("done");\n'), "presentation.terminal-ui")).toHaveLength(1);
     expect(
       violationsFor(checkSource("src/cli/main.ts", "export const result = Effect.runPromise(program);\n"), "effect.runtime-edge"),
-    ).toEqual([]);
+    ).toHaveLength(1);
   });
 
-  it("keeps NodeRuntime.runMain and NodeContext.layer at the single CLI edge", () => {
+  it("keeps NodeRuntime.runMain and NodeContext.layer out of application capabilities", () => {
     const runOutsideMain = checkSource("src/install/example.ts", "export const result = NodeRuntime.runMain(program);\n");
     const layerOutsideMain = checkSource(
       "src/install/example.ts",
       "export const result = program.pipe(Effect.provide(NodeContext.layer));\n",
     );
-    const approvedMain = checkSource("src/cli/main.ts", "NodeRuntime.runMain(program.pipe(Effect.provide(NodeContext.layer)));\n");
 
     expect(violationsFor(runOutsideMain, "effect.runtime-edge")).toHaveLength(1);
     expect(violationsFor(layerOutsideMain, "effect.runtime-edge")).toHaveLength(1);
-    expect(violationsFor(approvedMain, "effect.runtime-edge")).toEqual([]);
+  });
+
+  it.each([
+    ["wrong NodeRuntime.runMain shape", "NodeRuntime.runMain(program);\n"],
+    [
+      "duplicate exact edges",
+      [
+        "NodeRuntime.runMain(program.pipe(Effect.provide(NodeContext.layer)));",
+        "NodeRuntime.runMain(secondProgram.pipe(Effect.provide(NodeContext.layer)));",
+        "",
+      ].join("\n"),
+    ],
+    ["Effect.runPromise-only edge", "Effect.runPromise(program);\n"],
+    [
+      "additional Effect.runPromise runner",
+      ["NodeRuntime.runMain(program.pipe(Effect.provide(NodeContext.layer)));", "Effect.runPromise(secondProgram);", ""].join("\n"),
+    ],
+  ])("rejects a main with %s", (_case, source) => {
+    const report = checkSource("src/cli/main.ts", source);
+
+    expect(violationsFor(report, "effect.runtime-edge")).toHaveLength(1);
+  });
+
+  it("accepts one exact Node runtime and context edge at the CLI main", () => {
+    const report = checkSource("src/cli/main.ts", "NodeRuntime.runMain(program.pipe(Effect.provide(NodeContext.layer)));\n");
+
+    expect(violationsFor(report, "effect.runtime-edge")).toEqual([]);
+  });
+
+  it("allows the png-to-code harness to own its independent exact runtime graph", () => {
+    const report = checkSources({
+      "src/cli/main.ts": "NodeRuntime.runMain(program.pipe(Effect.provide(NodeContext.layer)));\n",
+      "src/skills/png-to-code/scripts/main.ts": "NodeRuntime.runMain(harness.pipe(Effect.provide(NodeContext.layer)));\n",
+    });
+
+    expect(violationsFor(report, "effect.runtime-edge")).toEqual([]);
   });
 });
 
@@ -1327,6 +1376,26 @@ describe("import graph and executable boundaries", () => {
 
     expect(violationsFor(localArrow, "script.thin-entrypoint")).toHaveLength(1);
     expect(violationsFor(unusedOwner, "script.thin-entrypoint")).toHaveLength(1);
+  });
+
+  it("rejects a four-step local engine even when the script also delegates to an imported owner", () => {
+    const report = checkSources({
+      "src/build/run.ts": "export const run = () => undefined;\n",
+      "scripts/localEngine.ts": [
+        'import { run } from "../src/build/run.js";',
+        "const execute = () => {",
+        "  inspect();",
+        "  validate();",
+        "  stage();",
+        "  publish();",
+        "};",
+        "execute();",
+        "run();",
+        "",
+      ].join("\n"),
+    });
+
+    expect(violationsFor(report, "script.thin-entrypoint")).toHaveLength(1);
   });
 });
 
