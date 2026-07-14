@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { globSync } from "glob";
 import ts from "typescript";
@@ -300,6 +300,16 @@ const assignedRootIdentifier = (expression: ts.Expression): ts.Identifier | unde
   return undefined;
 };
 
+const parameterBindsIdentifier = (name: ts.BindingName, identifier: string): boolean => {
+  if (ts.isIdentifier(name)) {
+    return name.text === identifier;
+  }
+
+  return name.elements.some(
+    (element) => ts.isBindingElement(element) && parameterBindsIdentifier(element.name, identifier),
+  );
+};
+
 type ExecutableFunction =
   | ts.ArrowFunction
   | ts.ConstructorDeclaration
@@ -335,6 +345,49 @@ const containingFunction = (node: ts.Node): ExecutableFunction | undefined => {
 
 const isAssignmentOperator = (kind: ts.SyntaxKind): boolean =>
   kind >= ts.SyntaxKind.FirstAssignment && kind <= ts.SyntaxKind.LastAssignment;
+
+const MUTATING_METHODS = new Set([
+  "add",
+  "clear",
+  "copyWithin",
+  "delete",
+  "fill",
+  "pop",
+  "push",
+  "reverse",
+  "set",
+  "shift",
+  "sort",
+  "splice",
+  "unshift",
+]);
+
+const mutationTarget = (node: ts.Node): ts.Expression | undefined => {
+  if (ts.isBinaryExpression(node) && isAssignmentOperator(node.operatorToken.kind)) {
+    return node.left;
+  }
+
+  if (
+    (ts.isPrefixUnaryExpression(node) || ts.isPostfixUnaryExpression(node)) &&
+    (node.operator === ts.SyntaxKind.PlusPlusToken || node.operator === ts.SyntaxKind.MinusMinusToken)
+  ) {
+    return node.operand;
+  }
+
+  if (ts.isDeleteExpression(node)) {
+    return node.expression;
+  }
+
+  if (
+    ts.isCallExpression(node) &&
+    ts.isPropertyAccessExpression(node.expression) &&
+    MUTATING_METHODS.has(node.expression.name.text)
+  ) {
+    return node.expression.expression;
+  }
+
+  return undefined;
+};
 
 const isBuilderReduce = (node: ts.CallExpression): boolean => {
   const expression = node.expression;
@@ -398,6 +451,61 @@ const resolvedImportPath = (file: string, specifier: string): string | undefined
     }
   });
   return segments.join("/");
+};
+
+const sourceCandidates = (target: string): ReadonlyArray<string> => {
+  if (target.endsWith(".mjs")) {
+    return [target, target.replace(/\.mjs$/u, ".mts")];
+  }
+
+  if (target.endsWith(".cjs")) {
+    return [target, target.replace(/\.cjs$/u, ".cts")];
+  }
+
+  if (target.endsWith(".js")) {
+    return [target, target.replace(/\.js$/u, ".ts"), target.replace(/\.js$/u, ".tsx")];
+  }
+
+  return [target, `${target}.ts`, `${target}.tsx`];
+};
+
+const resolvesToPureBarrel = (repositoryRoot: string, file: string, specifier: string): boolean => {
+  const target = resolvedImportPath(file, specifier);
+  const candidate = target
+    ? sourceCandidates(target).find((path) => existsSync(join(repositoryRoot, path)))
+    : undefined;
+  if (!candidate) {
+    return false;
+  }
+
+  const sourceText = readFileSync(join(repositoryRoot, candidate), "utf8");
+  const sourceFile = ts.createSourceFile(candidate, sourceText, ts.ScriptTarget.Latest, true);
+  return sourceFile.statements.length > 0 && sourceFile.statements.every(ts.isExportDeclaration);
+};
+
+const SUPPRESSION_PATTERN =
+  /(?:@ts-(?:ignore|expect-error|nocheck)|biome-ignore|prettier-ignore|eslint-disable(?:-next-line|-line)?|(?:c8|istanbul|v8)\s+ignore)\b/u;
+
+const suppressionCommentLines = (sourceFile: ts.SourceFile): ReadonlyArray<number> => {
+  const scanner = ts.createScanner(
+    ts.ScriptTarget.Latest,
+    false,
+    sourceFile.languageVariant,
+    sourceFile.text,
+  );
+  const lines: Array<number> = [];
+
+  // Read lexical comments so suppression-looking strings remain ordinary data.
+  while (scanner.scan() !== ts.SyntaxKind.EndOfFileToken) {
+    const token = scanner.getToken();
+    const isComment =
+      token === ts.SyntaxKind.SingleLineCommentTrivia || token === ts.SyntaxKind.MultiLineCommentTrivia;
+    if (isComment && SUPPRESSION_PATTERN.test(scanner.getTokenText())) {
+      lines.push(sourceFile.getLineAndCharacterOfPosition(scanner.getTokenPos()).line + 1);
+    }
+  }
+
+  return lines;
 };
 
 const featureRuntimeRoot = (file: string): string | undefined => {
@@ -626,7 +734,12 @@ const inspectSourceFile = (
       });
     }
 
-    if (ts.isTypeAliasDeclaration(node) && hasExportModifier(node) && ts.isTypeLiteralNode(node.type) && file.startsWith("src/")) {
+    if (
+      ts.isTypeAliasDeclaration(node) &&
+      hasExportModifier(node) &&
+      ts.isTypeLiteralNode(node.type) &&
+      isApplicationFile(file)
+    ) {
       addViolation({
         ruleId: "type.schema-owned-runtime",
         sourceFile,
@@ -636,13 +749,18 @@ const inspectSourceFile = (
     }
 
     if (/\/index\.[cm]?[jt]sx?$/u.test(`/${file}`) && ts.isStatement(node) && node.parent === sourceFile) {
+      const exportSpecifier =
+        ts.isExportDeclaration(node) &&
+        node.moduleSpecifier &&
+        ts.isStringLiteral(node.moduleSpecifier)
+          ? node.moduleSpecifier.text
+          : undefined;
       const directWildcard =
         ts.isExportDeclaration(node) &&
         !node.exportClause &&
-        Boolean(node.moduleSpecifier && ts.isStringLiteral(node.moduleSpecifier)) &&
-        !/(?:^|\/)index\.(?:js|mjs|cjs|ts|mts|cts)$/u.test(
-          node.moduleSpecifier && ts.isStringLiteral(node.moduleSpecifier) ? node.moduleSpecifier.text : "",
-        );
+        Boolean(exportSpecifier) &&
+        !/(?:^|\/)index\.(?:js|mjs|cjs|ts|mts|cts)$/u.test(exportSpecifier ?? "") &&
+        !resolvesToPureBarrel(repositoryRoot, file, exportSpecifier ?? "");
       if (!directWildcard) {
         addViolation({
           ruleId: "barrel.direct-wildcard",
@@ -667,14 +785,13 @@ const inspectSourceFile = (
       });
     }
 
-    if (ts.isBinaryExpression(node) && isAssignmentOperator(node.operatorToken.kind)) {
-      const root = assignedRootIdentifier(node.left);
+    const target = mutationTarget(node);
+    if (target) {
+      const root = assignedRootIdentifier(target);
       const owner = containingFunction(node);
       const mutatesInput = Boolean(
         root &&
-          owner?.parameters.some(
-            (parameter) => ts.isIdentifier(parameter.name) && parameter.name.text === root.text,
-          ),
+          owner?.parameters.some((parameter) => parameterBindsIdentifier(parameter.name, root.text)),
       );
       if (mutatesInput) {
         addViolation({
@@ -727,14 +844,12 @@ const inspectSourceFile = (
     ts.forEachChild(node, visit);
   };
 
-  sourceText.split(/\r?\n/u).forEach((lineText, index) => {
-    if (/^\s*(?:\/\/|\/\*)\s*@ts-(?:ignore|expect-error|nocheck)\b/u.test(lineText)) {
-      addLineViolation(
-        "type.no-suppression",
-        index + 1,
-        "Remove the TypeScript suppression and fix the boundary instead.",
-      );
-    }
+  suppressionCommentLines(sourceFile).forEach((line) => {
+    addLineViolation(
+      "type.no-suppression",
+      line,
+      "Remove the tool suppression and fix the boundary instead.",
+    );
   });
 
   inspectStatementSpacing(sourceFile);
