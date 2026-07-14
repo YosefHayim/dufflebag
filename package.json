@@ -68,7 +68,8 @@
     "@effect/platform-node": "0.108.0",
     "commander": "^13.1.0",
     "effect": "3.22.0",
-    "picocolors": "^1.1.1"
+    "picocolors": "^1.1.1",
+    "yaml": "2.9.0"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.2",
