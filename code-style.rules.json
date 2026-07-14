@@ -1,0 +1,172 @@
+{
+  "rules": [
+    {
+      "id": "path.capability-layout",
+      "summary": "Source paths expose named capabilities instead of generic technical layers.",
+      "enforcement": "path"
+    },
+    {
+      "id": "path.no-generic-bucket",
+      "summary": "Generic bucket filenames are forbidden.",
+      "enforcement": "path"
+    },
+    {
+      "id": "path.source-directory-case",
+      "summary": "Authored source directories use camelCase.",
+      "enforcement": "path"
+    },
+    {
+      "id": "architecture.no-wrapper-layer",
+      "summary": "Capabilities call official services without pass-through wrapper layers.",
+      "enforcement": "manual"
+    },
+    {
+      "id": "function.arrow-only",
+      "summary": "Named functions use arrow constants declared before use.",
+      "enforcement": "ast"
+    },
+    {
+      "id": "function.effect-generator",
+      "summary": "Anonymous generators appear only as the direct Effect.gen callback.",
+      "enforcement": "ast"
+    },
+    {
+      "id": "function.input-shape",
+      "summary": "Functions use cohesive inputs and no positional boolean flags.",
+      "enforcement": "ast"
+    },
+    {
+      "id": "function.one-job",
+      "summary": "A function performs one visible domain job without ceremonial wrappers.",
+      "enforcement": "manual"
+    },
+    {
+      "id": "function.blank-line",
+      "summary": "Adjacent function declarations have one blank line between them.",
+      "enforcement": "ast"
+    },
+    {
+      "id": "function.nesting",
+      "summary": "Function control flow nests no more than two levels.",
+      "enforcement": "ast"
+    },
+    {
+      "id": "class.tagged-error-only",
+      "summary": "Schema.TaggedError is the only authored class form.",
+      "enforcement": "ast"
+    },
+    {
+      "id": "comment.loop-intent",
+      "summary": "Every explicit loop has an immediately preceding intent comment.",
+      "enforcement": "ast"
+    },
+    {
+      "id": "comment.index-proof",
+      "summary": "Indexed non-null access has an immediately preceding proof comment.",
+      "enforcement": "ast"
+    },
+    {
+      "id": "comment.pipeline-contract",
+      "summary": "Ordered multi-phase pipelines have a contract and numbered phases.",
+      "enforcement": "manual"
+    },
+    {
+      "id": "type.schema-owned-runtime",
+      "summary": "Runtime object types derive from executable Effect Schema definitions.",
+      "enforcement": "ast"
+    },
+    {
+      "id": "type.no-interface",
+      "summary": "Interfaces are reserved for declaration-file augmentation.",
+      "enforcement": "ast"
+    },
+    {
+      "id": "type.no-enum",
+      "summary": "Enums are forbidden.",
+      "enforcement": "ast"
+    },
+    {
+      "id": "type.no-conditional",
+      "summary": "Authored conditional and infer type machinery is forbidden.",
+      "enforcement": "ast"
+    },
+    {
+      "id": "type.no-assertion",
+      "summary": "Authored TypeScript assertions are forbidden.",
+      "enforcement": "ast"
+    },
+    {
+      "id": "type.no-suppression",
+      "summary": "TypeScript and tool suppression directives are forbidden.",
+      "enforcement": "ast"
+    },
+    {
+      "id": "barrel.direct-wildcard",
+      "summary": "Barrels contain direct wildcard exports only.",
+      "enforcement": "ast"
+    },
+    {
+      "id": "name.domain-specific",
+      "summary": "Identifiers use domain-specific names instead of vague generic roles.",
+      "enforcement": "ast"
+    },
+    {
+      "id": "mutation.no-input",
+      "summary": "Function inputs are never mutated.",
+      "enforcement": "ast"
+    },
+    {
+      "id": "collection.no-builder-reduce",
+      "summary": "Reduce is not used to build arrays or objects.",
+      "enforcement": "ast"
+    },
+    {
+      "id": "effect.no-promise-all",
+      "summary": "Application effects do not use Promise.all.",
+      "enforcement": "ast"
+    },
+    {
+      "id": "effect.runtime-edge",
+      "summary": "Effect.run calls exist only at src/cli/main.ts.",
+      "enforcement": "ast"
+    },
+    {
+      "id": "effect.official-services",
+      "summary": "Capabilities use official Effect services without pass-through wrappers.",
+      "enforcement": "manual"
+    },
+    {
+      "id": "import.hook-runtime",
+      "summary": "Installed hook graphs import only node modules and their runtime island.",
+      "enforcement": "importGraph"
+    },
+    {
+      "id": "import.application-boundary",
+      "summary": "Application modules do not import the installed hook runtime.",
+      "enforcement": "importGraph"
+    },
+    {
+      "id": "presentation.terminal-ui",
+      "summary": "Application presentation routes through TerminalUI.",
+      "enforcement": "ast"
+    }
+  ],
+  "protectedPaths": [
+    {
+      "path": "src/skills/make-a-trailer/SKILL.md",
+      "codeRuleExemptions": []
+    },
+    {
+      "path": "src/skills/make-a-trailer/reference/pipeline.md",
+      "codeRuleExemptions": []
+    },
+    {
+      "path": "src/skills/make-a-trailer/scripts/assembleCut.mjs",
+      "codeRuleExemptions": [
+        "function.arrow-only",
+        "function.input-shape",
+        "comment.loop-intent"
+      ]
+    }
+  ]
+}
