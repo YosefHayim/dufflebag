@@ -537,6 +537,8 @@ const preserveRestoration = (previous: ArtifactOwnership, desired: ArtifactOwner
       ? {
           ...desired,
           filePreviouslyPresent: previous.filePreviouslyPresent,
+          insertedPrefix: previous.insertedPrefix,
+          keyPreviouslyPresent: previous.keyPreviouslyPresent,
           previouslyPresent: previous.previouslyPresent,
         }
       : { ...desired, filePreviouslyPresent: previous.filePreviouslyPresent };
