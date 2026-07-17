@@ -321,6 +321,23 @@ describe("planConfigReference", () => {
     expect(textDecoder.decode(unchanged.bytes)).toBe(existing);
   });
 
+  it("records Continue rules as one installed value without claiming parent containers", () => {
+    const write = writeValue(unwrap(planConfigReference(request({ agent: continueAgent }))));
+
+    expect(write.artifact.ownership).toEqual({
+      _tag: "jsonValues",
+      filePreviouslyPresent: false,
+      createdContainers: [],
+      values: [
+        {
+          pointer: "/rules",
+          installed: { _tag: "value", hash: hashJson(["AGENTS.md"]) },
+          previous: { _tag: "missing" },
+        },
+      ],
+    });
+  });
+
   it.each([
     ["malformed JSON", "{not-json"],
     ["duplicate JSON member", '{"rules":[],"rules":[]}'],
@@ -485,7 +502,10 @@ describe("planConfigReference", () => {
         ...continueWrite.artifact,
         ownership: {
           ...continueWrite.artifact.ownership,
-          values: continueWrite.artifact.ownership.values.map((value) => ({ ...value, installedValueHash: "0".repeat(64) })),
+          values: continueWrite.artifact.ownership.values.map((value) => ({
+            ...value,
+            installed: { _tag: "value", hash: "0".repeat(64) },
+          })),
         },
       },
     };
@@ -509,7 +529,7 @@ describe("planConfigReference", () => {
           ...continueWrite.artifact.ownership,
           values: continueWrite.artifact.ownership.values.map((value) => ({
             ...value,
-            installedValueHash: hashJson(["OTHER.md"]),
+            installed: { _tag: "value", hash: hashJson(["OTHER.md"]) },
           })),
         },
       },

@@ -6,18 +6,20 @@ import {
   type ArtifactReceipt,
   artifactOwnerSchema,
   artifactReceiptSchema,
+  installedJsonValueSchema,
   type JsonValuesOwnership,
   legacyManifestSchema,
   type ReceiptEntry,
   receiptEntrySchema,
   relativeArtifactPathSchema,
   scopeSchema,
+  sha256Schema,
 } from "./artifactReceipt.js";
 
 const receiptFilename = "receipt.json";
 const recoveryFilename = "recovery.json";
 
-const absoluteRootSchema = Schema.NonEmptyTrimmedString.pipe(
+export const absoluteRootSchema = Schema.NonEmptyTrimmedString.pipe(
   Schema.pattern(/^(?:\/|[A-Za-z]:\/)(?!.*(?:^|\/)\.{1,2}(?:\/|$))(?!.*\/\/)(?:[^\\/\0]+(?:\/[^\\/\0]+)*)?$/, {
     message: () => "Artifact plan roots must be canonical POSIX or drive-absolute forward-slash paths with no parent traversal.",
   }),
@@ -56,6 +58,30 @@ const plannedArtifactSchema = receiptEntrySchema.pipe(
       : undefined,
   ),
 );
+
+export const artifactExpectedCurrentSchema = Schema.Union(
+  Schema.TaggedStruct("missing", {}).annotations({
+    description: "Planning observed that the artifact target did not exist.",
+  }),
+  Schema.TaggedStruct("file", {
+    sha256: sha256Schema.annotations({
+      description: "Exact SHA-256 of the artifact bytes observed during planning.",
+    }),
+  }),
+);
+
+export type ArtifactExpectedCurrent = Schema.Schema.Type<typeof artifactExpectedCurrentSchema>;
+
+export const artifactPreconditionSchema = Schema.Struct({
+  path: relativeArtifactPathSchema.annotations({
+    description: "Owned artifact path validated even when its desired bytes are unchanged.",
+  }),
+  expectedCurrent: artifactExpectedCurrentSchema.annotations({
+    description: "Exact target state captured while planning the unchanged artifact.",
+  }),
+});
+
+export type ArtifactPrecondition = Schema.Schema.Type<typeof artifactPreconditionSchema>;
 
 export const writeOperationSchema = Schema.TaggedStruct("write", {
   artifact: plannedArtifactSchema.annotations({
@@ -136,20 +162,32 @@ export const artifactRemoveOperationSchema = Schema.TaggedStruct("remove", {
 
 export type ArtifactRemoveOperation = Schema.Schema.Type<typeof artifactRemoveOperationSchema>;
 
-const receiptRemoveOperationSchema = Schema.TaggedStruct("remove", {
-  target: receiptTargetSchema,
+const expectedCurrentFieldsSchema = Schema.Struct({
+  expectedCurrent: artifactExpectedCurrentSchema.annotations({
+    description: "Target state that must still match before this operation may be staged or committed.",
+  }),
 });
+
+const receiptRemoveOperationSchema = Schema.extend(
+  Schema.TaggedStruct("remove", {
+    target: receiptTargetSchema,
+  }),
+  expectedCurrentFieldsSchema,
+);
 
 export const removeOperationSchema = Schema.Union(artifactRemoveOperationSchema, receiptRemoveOperationSchema);
 
 export type RemoveOperation = Schema.Schema.Type<typeof removeOperationSchema>;
 
-export const receiptPublishOperationSchema = Schema.TaggedStruct("receiptPublish", {
-  target: receiptTargetSchema,
-  receipt: artifactReceiptSchema.annotations({
-    description: "Complete next ownership receipt published after every artifact operation succeeds.",
+export const receiptPublishOperationSchema = Schema.extend(
+  Schema.TaggedStruct("receiptPublish", {
+    target: receiptTargetSchema,
+    receipt: artifactReceiptSchema.annotations({
+      description: "Complete next ownership receipt published after every artifact operation succeeds.",
+    }),
   }),
-});
+  expectedCurrentFieldsSchema,
+);
 
 export type ReceiptPublishOperation = Schema.Schema.Type<typeof receiptPublishOperationSchema>;
 
@@ -157,7 +195,18 @@ export const artifactRestorationOperationSchema = Schema.Union(restoreOperationS
 
 export type ArtifactRestorationOperation = Schema.Schema.Type<typeof artifactRestorationOperationSchema>;
 
-export const artifactOperationSchema = Schema.Union(writeOperationSchema, restoreOperationSchema, artifactRemoveOperationSchema);
+const plannedWriteOperationSchema = Schema.extend(writeOperationSchema, expectedCurrentFieldsSchema);
+const plannedRestoreOperationSchema = Schema.extend(restoreOperationSchema, expectedCurrentFieldsSchema);
+const plannedRemoveOperationSchema = Schema.extend(artifactRemoveOperationSchema, expectedCurrentFieldsSchema);
+const plannedArtifactRestorationOperationSchema = Schema.Union(plannedRestoreOperationSchema, plannedRemoveOperationSchema);
+
+type PlannedArtifactRestorationOperation = Schema.Schema.Type<typeof plannedArtifactRestorationOperationSchema>;
+
+export const artifactOperationSchema = Schema.Union(
+  plannedWriteOperationSchema,
+  plannedRestoreOperationSchema,
+  plannedRemoveOperationSchema,
+);
 
 export type ArtifactOperation = Schema.Schema.Type<typeof artifactOperationSchema>;
 
@@ -229,8 +278,8 @@ const restorationConsistencyIssues = (
 
 const orderRestorations = (
   expectedArtifacts: ReadonlyArray<ReceiptEntry>,
-  restorations: ReadonlyArray<ArtifactRestorationOperation>,
-): ReadonlyArray<ArtifactRestorationOperation> =>
+  restorations: ReadonlyArray<PlannedArtifactRestorationOperation>,
+): ReadonlyArray<PlannedArtifactRestorationOperation> =>
   [...restorations].sort(
     (left, right) =>
       expectedArtifacts.findIndex((artifact) => receiptEntriesEqual(artifact, left.artifact)) -
@@ -325,6 +374,9 @@ const artifactPlanFieldsSchema = Schema.Struct({
   operations: Schema.Array(artifactOperationSchema).annotations({
     description: "Ordered desired writes, host-file restorations, and host-file deletions committed before the receipt.",
   }),
+  preconditions: Schema.Array(artifactPreconditionSchema).annotations({
+    description: "Validation-only guards retained for desired artifacts whose bytes need no write.",
+  }),
   receipt: receiptOperationSchema.annotations({
     description: "Receipt publication or removal represented separately and committed last.",
   }),
@@ -335,10 +387,36 @@ type ArtifactPlanFields = Schema.Schema.Type<typeof artifactPlanFieldsSchema>;
 const artifactPlanIssues = (plan: ArtifactPlanFields) => {
   const issues = operationPathIssues(plan.operations, plan.receipt.target);
 
+  const preconditionIssues = [
+    ...plan.preconditions.flatMap((precondition, index) =>
+      plan.preconditions.slice(0, index).some((candidate) => normalizedPath(candidate.path) === normalizedPath(precondition.path))
+        ? [
+            {
+              path: ["preconditions", index, "path"],
+              message: `Artifact precondition path ${precondition.path} must be unique.`,
+            },
+          ]
+        : [],
+    ),
+    ...plan.preconditions.flatMap((precondition, index) =>
+      plan.operations.some((operation) => normalizedPath(operation.artifact.path) === normalizedPath(precondition.path))
+        ? [
+            {
+              path: ["preconditions", index, "path"],
+              message: "Validation-only preconditions cannot duplicate mutation targets.",
+            },
+          ]
+        : [],
+    ),
+  ];
+
   if (plan.receipt._tag === "receiptPublish") {
+    const publish = plan.receipt;
+
     return [
       ...issues,
-      ...(plan.receipt.receipt.scope === plan.scope
+      ...preconditionIssues,
+      ...(publish.receipt.scope === plan.scope
         ? []
         : [
             {
@@ -346,13 +424,41 @@ const artifactPlanIssues = (plan: ArtifactPlanFields) => {
               message: "Published receipt scope must match the artifact plan scope.",
             },
           ]),
-      ...receiptArtifactIssues(plan.receipt.receipt, plan.receipt.target),
-      ...publishConsistencyIssues(plan.operations, plan.receipt),
+      ...receiptArtifactIssues(publish.receipt, publish.target),
+      ...publishConsistencyIssues(plan.operations, publish),
+      ...publish.receipt.artifacts.flatMap((artifact, index) => {
+        const mutated = plan.operations.some((operation) => operation.artifact.path === artifact.path);
+        const guarded = plan.preconditions.filter((precondition) => precondition.path === artifact.path).length === 1;
+
+        return mutated || guarded
+          ? []
+          : [
+              {
+                path: ["receipt", "receipt", "artifacts", index, "path"],
+                message: "Every published artifact requires a mutation or validation-only precondition.",
+              },
+            ];
+      }),
+      ...plan.preconditions.flatMap((precondition, index) =>
+        publish.receipt.artifacts.some((artifact) => artifact.path === precondition.path)
+          ? []
+          : [
+              {
+                path: ["preconditions", index, "path"],
+                message: "Validation-only preconditions must correspond to a published receipt artifact.",
+              },
+            ],
+      ),
     ];
   }
 
   return [
     ...issues,
+    ...preconditionIssues,
+    ...plan.preconditions.map((_, index) => ({
+      path: ["preconditions", index],
+      message: "Receipt-removal plans cannot retain validation-only desired artifacts.",
+    })),
     ...plan.operations.flatMap((operation, index) =>
       operation._tag !== "write"
         ? []
@@ -379,7 +485,7 @@ const previousReceiptSchema = Schema.Union(
 
 const desiredStateSchema = Schema.Struct({
   receipt: artifactReceiptSchema,
-  writes: Schema.Array(writeOperationSchema),
+  writes: Schema.Array(plannedWriteOperationSchema),
 }).pipe(
   Schema.filter((desired) => [
     ...desired.writes.flatMap((operation, index) => {
@@ -407,14 +513,38 @@ const desiredStateSchema = Schema.Struct({
   ]),
 );
 
+const jsonContainerAcquisitionIssues = (previous: JsonValuesOwnership, desired: JsonValuesOwnership, artifactIndex: number) =>
+  desired.createdContainers.flatMap((container, containerIndex) => {
+    if (previous.createdContainers.includes(container)) {
+      return [];
+    }
+
+    const ownsNewDescendant = desired.values.some(
+      (value) =>
+        value.pointer.startsWith(`${container}/`) && !previous.values.some((previousValue) => previousValue.pointer === value.pointer),
+    );
+
+    return ownsNewDescendant
+      ? []
+      : [
+          {
+            path: ["desired", "receipt", "artifacts", artifactIndex, "ownership", "createdContainers", containerIndex],
+            message: `Created JSON container ${container} requires a newly owned descendant pointer.`,
+          },
+        ];
+  });
+
 export const updatePlanInputSchema = Schema.Struct({
   root: absoluteRootSchema,
   previous: previousReceiptSchema,
-  restorations: Schema.Array(artifactRestorationOperationSchema).annotations({
+  restorations: Schema.Array(plannedArtifactRestorationOperationSchema).annotations({
     description: "Exact final-action set for stale prior receipt entries; the planner owns operation order.",
   }),
   desired: desiredStateSchema,
   receiptTarget: receiptTargetSchema,
+  receiptExpectedCurrent: artifactExpectedCurrentSchema.annotations({
+    description: "Receipt target state captured during capability inspection.",
+  }),
 }).pipe(
   Schema.filter((input) => {
     const previousArtifacts = input.previous._tag === "receipt" ? input.previous.receipt.artifacts : [];
@@ -447,6 +577,38 @@ export const updatePlanInputSchema = Schema.Struct({
           : [];
       }),
       ...input.desired.receipt.artifacts.flatMap((artifact, index) => {
+        const previousArtifact = previousArtifacts.find((candidate) => candidate.path === artifact.path);
+        if (previousArtifact === undefined) {
+          return [];
+        }
+
+        return [
+          ...(previousArtifact.kind._tag === artifact.kind._tag
+            ? []
+            : [
+                {
+                  path: ["desired", "receipt", "artifacts", index, "kind"],
+                  message: `Cannot change artifact kind from ${previousArtifact.kind._tag} to ${artifact.kind._tag} at ${artifact.path}; remove the prior ownership first.`,
+                },
+              ]),
+          ...(previousArtifact.owner._tag === artifact.owner._tag
+            ? []
+            : [
+                {
+                  path: ["desired", "receipt", "artifacts", index, "owner"],
+                  message: `Cannot change artifact owner from ${previousArtifact.owner._tag} to ${artifact.owner._tag} at ${artifact.path}; remove the prior ownership first.`,
+                },
+              ]),
+        ];
+      }),
+      ...input.desired.receipt.artifacts.flatMap((artifact, index) => {
+        const previousArtifact = previousArtifacts.find((candidate) => candidate.path === artifact.path);
+
+        return previousArtifact?.ownership._tag === "jsonValues" && artifact.ownership._tag === "jsonValues"
+          ? jsonContainerAcquisitionIssues(previousArtifact.ownership, artifact.ownership, index)
+          : [];
+      }),
+      ...input.desired.receipt.artifacts.flatMap((artifact, index) => {
         const reservedPath = reservedReceiptPaths(input.receiptTarget).find((path) => pathsConflict(artifact.path, path));
 
         return reservedPath !== undefined
@@ -467,10 +629,13 @@ export type UpdatePlanInput = Schema.Schema.Type<typeof updatePlanInputSchema>;
 export const uninstallPlanInputSchema = Schema.Struct({
   root: absoluteRootSchema,
   receipt: artifactReceiptSchema,
-  restorations: Schema.Array(artifactRestorationOperationSchema).annotations({
+  restorations: Schema.Array(plannedArtifactRestorationOperationSchema).annotations({
     description: "Exact final-action set for every receipt entry; the planner owns operation order.",
   }),
   receiptTarget: receiptTargetSchema,
+  receiptExpectedCurrent: artifactExpectedCurrentSchema.annotations({
+    description: "Receipt target state captured during capability inspection.",
+  }),
 }).pipe(Schema.filter((input) => restorationConsistencyIssues(reverseValues(input.receipt.artifacts), input.restorations)));
 
 export type UninstallPlanInput = Schema.Schema.Type<typeof uninstallPlanInputSchema>;
@@ -495,7 +660,7 @@ const legacyRecordedBySchema = Schema.Union(
 
 const knownLegacyArtifactSchema = Schema.Struct({
   recordedBy: legacyRecordedBySchema,
-  write: writeOperationSchema,
+  write: plannedWriteOperationSchema,
 });
 
 export const legacyMigrationInputSchema = Schema.Struct({
@@ -505,6 +670,9 @@ export const legacyMigrationInputSchema = Schema.Struct({
     description: "Explicit known artifacts filtered only by exact legacy manifest records.",
   }),
   receiptTarget: receiptTargetSchema,
+  receiptExpectedCurrent: artifactExpectedCurrentSchema.annotations({
+    description: "Receipt target state captured during legacy capability inspection.",
+  }),
 });
 
 export type LegacyMigrationInput = Schema.Schema.Type<typeof legacyMigrationInputSchema>;
@@ -512,12 +680,18 @@ export type LegacyMigrationInput = Schema.Schema.Type<typeof legacyMigrationInpu
 const preserveJsonRestoration = (previous: JsonValuesOwnership, desired: JsonValuesOwnership): ArtifactOwnership => ({
   ...desired,
   filePreviouslyPresent: previous.filePreviouslyPresent,
+  createdContainers: [
+    ...previous.createdContainers.filter((container) => desired.values.some((value) => value.pointer.startsWith(`${container}/`))),
+    ...desired.createdContainers.filter((container) => !previous.createdContainers.includes(container)),
+  ],
   values: desired.values.map((value) => {
     const priorValue = previous.values.find((candidate) => candidate.pointer === value.pointer);
 
     return priorValue === undefined ? value : { ...value, previous: priorValue.previous };
   }),
 });
+
+const installedJsonValuesEqual = Schema.equivalence(installedJsonValueSchema);
 
 const preserveRestoration = (previous: ArtifactOwnership, desired: ArtifactOwnership): ArtifactOwnership => {
   if (previous._tag === "wholeFile" && desired._tag === "wholeFile") {
@@ -569,7 +743,9 @@ const installedOwnershipEqual = (left: ArtifactOwnership, right: ArtifactOwnersh
       left.values.every((value, index) => {
         const candidate = right.values[index];
 
-        return candidate !== undefined && value.pointer === candidate.pointer && value.installedValueHash === candidate.installedValueHash;
+        return (
+          candidate !== undefined && value.pointer === candidate.pointer && installedJsonValuesEqual(value.installed, candidate.installed)
+        );
       })
     );
   }
@@ -636,6 +812,10 @@ export const createUpdatePlan = (input: unknown) =>
           return previousArtifact !== undefined && installedArtifactsEqual(previousArtifact, artifact) ? [] : [{ ...operation, artifact }];
         }),
     );
+    const changedPaths = new Set(changedWrites.map((operation) => operation.artifact.path));
+    const preconditions = request.desired.writes.flatMap((operation) =>
+      changedPaths.has(operation.artifact.path) ? [] : [{ path: operation.artifact.path, expectedCurrent: operation.expectedCurrent }],
+    );
 
     // 5. Publish the complete next receipt after every filesystem action.
     const receipt = {
@@ -647,10 +827,12 @@ export const createUpdatePlan = (input: unknown) =>
       scope: receipt.scope,
       root: request.root,
       operations: [...restorations, ...changedWrites],
+      preconditions,
       receipt: {
         _tag: "receiptPublish",
         target: request.receiptTarget,
         receipt,
+        expectedCurrent: request.receiptExpectedCurrent,
       },
     });
   });
@@ -663,9 +845,11 @@ export const createUninstallPlan = (input: unknown) =>
       scope: request.receipt.scope,
       root: request.root,
       operations: restorations,
+      preconditions: [],
       receipt: {
         _tag: "remove",
         target: request.receiptTarget,
+        expectedCurrent: request.receiptExpectedCurrent,
       },
     });
   });
@@ -692,5 +876,6 @@ export const migrateLegacyManifest = (input: unknown) =>
         writes,
       },
       receiptTarget: request.receiptTarget,
+      receiptExpectedCurrent: request.receiptExpectedCurrent,
     });
   });

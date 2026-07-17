@@ -59,7 +59,7 @@ node scripts/manifest.mjs set   --dir <dir> --id s01 --key clipPath --value buil
 
 `set` writes atomically and re-reads, so it is safe to resume after a crash: re-run the phase and only `pending-*` scenes get regenerated.
 
-## Keyframes (step 6)
+## Keyframes (step 5)
 
 ```bash
 # Lock the bible first (one image), then batch the scenes in the same conversation:
@@ -71,16 +71,73 @@ node "$BRIDGE" download --json --out <dir>/build/stills
 
 `download --json` prints `[{ id, path, bytes }]` and writes a `manifest.json` (the bridge's own, per conversation) listing every attachment with `id: "image-1"`, `role: "assistant"`. Map the newest N assistant images to scenes in order. **Verify count**: if fewer than N tiles returned, re-ask in the same conversation for only the missing indices ("regenerate images 4 and 7 only, same style"). Normalize to PNG if needed: `sips -s format png in.webp --out s04.png`.
 
+### Two browsers in parallel (the fast path)
+
+Two ChatGPT accounts halve wall-clock. Run two lanes, one per browser app, each on its own CDP port and profile:
+
+| Lane | App env | CDP port | Profile |
+| --- | --- | --- | --- |
+| A | `AI_BROWSER_BRIDGE_CHROME_APP="Google Chrome"` | `9222` | default bridge profile (`--profile ""`) |
+| B | `AI_BROWSER_BRIDGE_CHROME_APP="Brave Browser"` | `9223` | a cloned profile, e.g. `~/.ai-browser-bridge/chrome-profile-parallel` |
+
+Split the scene list **zigzag** (even → A, odd → B). Each lane opens ONE bible-anchored conversation and continues in it with `--conversation <id>` for its remaining scenes. Skip any still already on disk so a re-run only fills gaps. Sketch:
+
+```bash
+# one lane = one browser generating its half in a single bible-anchored conversation
+gen_lane() {  # $1=app  $2=port  $3=profile  $4..=scene ids
+  local app="$1" port="$2" profile="$3"; shift 3
+  local cid=""
+  for n in "$@"; do
+    [ -s "build/stills/s$n.png" ] && continue                     # resumable: skip finished
+    if [ -z "$cid" ]; then
+      AI_BROWSER_BRIDGE_CHROME_APP="$app" node "$BRIDGE" ask "$(cat prompts/s$n.txt)" \
+        --provider chatgpt --port "$port" --profile "$profile" \
+        --attach build/bible.png --images 1 --fresh --timeout 420 --json > ".ask.$n"
+      cid=$(sed -n 's/.*"conversationId":"\([^"]*\)".*/\1/p' ".ask.$n")   # raw shape: {"conversationId":"..."}
+    else
+      AI_BROWSER_BRIDGE_CHROME_APP="$app" node "$BRIDGE" ask "$(cat prompts/s$n.txt)" \
+        --provider chatgpt --port "$port" --conversation "$cid" --images 1 --timeout 420 --json > ".ask.$n"
+    fi
+    node "$BRIDGE" download --json --out build/stills               # then rename the newest → s$n.png
+  done
+}
+gen_lane "Google Chrome" 9222 ""                                            s01 s03 s05 s07 s09 &
+gen_lane "Brave Browser" 9223 ~/.ai-browser-bridge/chrome-profile-parallel  s02 s04 s06 s08 s10 &
+wait
+```
+
+Confirm the live flags first (`node "$BRIDGE" ask --help`) — port/profile/app-target names shift across bridge versions. **Don't click inside an automated window while it runs**: focusing the composer can raise a floating "orb" overlay that intercepts the send button; opening a fresh conversation clears it.
+
+### Keep every scene on-model (the lock footer)
+
+Attach the bible image **and append the full character/world bible text to the end of every scene prompt** — on first generation and especially on re-rolls. The image alone sometimes drifts; image + text together hold face, colours, and silhouette. Keep the bible text in one file and `cat` it onto each prompt so it is byte-identical everywhere (SSOT).
+
+## Static animatic (step 6) — the Gate 1 cut
+
+Assemble every keyframe into a held-still trailer and watch the whole thing before buying any motion:
+
+```bash
+# scratch music bed for pacing (no key, no credits) — set audio.musicPath to it in the manifest
+node scripts/synth.mjs --out <dir>/build/audio/scratch.wav --seconds <total> --bpm 100 --mood epic
+node scripts/assembleCut.mjs --manifest <dir>/manifest.json --mode animatic --out <dir>/build/animatic.mp4
+# quick uniform pass instead of storyboard pacing: add --hold 1
+```
+
+`--mode animatic` holds each scene's STILL for its `durationSec` (or `--hold <sec>` for a uniform beat), frames it **blurred-fill** (a darkened, blurred copy of the frame fills the 9:16 canvas while the whole 16:9 frame sits sharp and centred — no wide action cropped), lays the scratch bed under it, and skips motion, captions, and loudnorm. It uses only core ffmpeg filters (`split`/`boxblur`/`eq`/`overlay`) — **no `zoompan`, `drawtext`, or `libass`** — so it runs on a stock mac ffmpeg where the Ken-Burns/caption path can't. This mp4 is the Gate 1 artifact; re-roll flagged scenes (loop to step 5) and rebuild until the story lands, then move to motion.
+
+## Motion (step 8) — after Gate 1 only
+
 ## Motion (step 7)
 
 Per scene `motionEngine`:
 
 - **Higgsfield** — `generate_image` (if you want Higgsfield to restyle the still) → `generate_video` with the still as the first frame + the MOTION line as the prompt; poll `job_status` until `completed`; download the mp4 to `build/clips/<id>.mp4`. Recommended for hero/complex shots.
-- **Flow/Veo** — `node "$BRIDGE" ask "<MOTION prompt>" --provider flow --attach build/stills/<id>.png --timeout 600` then `node "$BRIDGE" flow download --json --out <dir>/build/clips` (writes `<clipId>.mp4`; rename to `<id>.mp4`). Needs a Google AI Pro/Ultra plan; ~minutes/clip.
+- **Flow/Veo (image-to-video)** — `node "$BRIDGE" flow generate --start build/stills/<id>.png --prompt "<MOTION prompt>" --out <dir>/build/clips --json`. One command drives Flow's new Frames UI end to end: Agent→Frames mode, drops the still into the Start slot, types the prompt, presses Create, polls the render, and downloads the mp4 (prints `{id,url,file}`; rename `file` → `<id>.mp4`). Native Veo audio comes baked in. Do NOT use `ask --provider flow` for motion — that targets the old text-composer UI and silently no-ops on the Frames studio. Set the project's Video default (Veo 3.1 Fast/Quality, aspect, count) once in Flow's *tune Settings* first; it persists on the project but resets if you reload the canvas. Needs a Google AI Pro/Ultra plan; ~1–2 min/clip. `flow_generate` is the same op as an outbound MCP tool.
+- **Seedance** — when you want higher quality per credit than Flow/Higgsfield, check for a Seedance-class model via Higgsfield `models_explore` (`action:'recommend'` with the shot's goal), then drive it with `generate_video` (still as the first frame + the MOTION line). Set the scene's `motionEngine` to `seedance` and record the credit cost so the budget stays auditable. Confirm the exact model id from `models_explore` — don't hardcode one.
 
 Write `clipPath` + `clipStatus=done` (or `clipJobId` + `queued`) to the manifest as each lands. Scenes with `motion: "kenburns"` need no clip — ffmpeg animates the still.
 
-## Audio (step 8) — the fallback chain
+## Audio (step 9) — the fallback chain
 
 Resolve each of VO and music down the chain; record which provider won in `audio.*Provider`.
 
@@ -97,7 +154,7 @@ Resolve each of VO and music down the chain; record which provider won in `audio
 
 Produce ONE continuous VO track and ONE music bed spanning the whole trailer; `assembleCut.mjs` handles ducking + timing.
 
-## Assemble, master, reframe (steps 9 & 11)
+## Assemble, master, reframe (steps 10 & 12)
 
 ```bash
 # rough cut — fast, no captions, no loudnorm
@@ -112,4 +169,4 @@ node scripts/reframe.mjs --in <dir>/build/master-9x16.mp4 --all --outdir <dir>/b
 
 ## Gates (planpage)
 
-Use the **planpage** skill for both. Gate 1 payload: the transcript + a table of scenes (all fields) + the annotated sheet image, with per-scene toggles and an Approve action. Gate 2 payload: the `rough.mp4` preview + a grid of per-scene clips + the `virality_predictor` score/notes, with "approve" or per-scene "regenerate" flags that map back to scene ids. Only these two moments block; everything else is autonomous.
+Use the **planpage** skill for both. Gate 1 payload: the **`animatic.mp4`** (the whole trailer as held stills over a scratch bed, watchable end-to-end) + the scene table (all fields) + the annotated sheet, with per-scene re-roll toggles and an Approve action — the user signs off story, order, and pacing on cheap stills before any motion spend. Gate 2 payload: the `rough.mp4` preview + a grid of per-scene clips + the `virality_predictor` score/notes, with "approve" or per-scene "regenerate" flags that map back to scene ids. Only these two moments block; everything else is autonomous.

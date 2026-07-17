@@ -24,27 +24,30 @@ const shippedPathSchema = Schema.NonEmptyTrimmedString.pipe(
   }),
 );
 
-export const installedSkillDefinitionSchema = Schema.Union(
-  Schema.TaggedStruct("none", {}),
-  Schema.TaggedStruct("skill", {
-    id: Schema.NonEmptyTrimmedString.pipe(
-      Schema.pattern(/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/, {
-        message: () => "Installed skill IDs must use lowercase kebab-case.",
-      }),
-      Schema.annotations({
-        description: "Public directory name installed for this skill.",
-      }),
-    ),
-    shippedPaths: Schema.Array(shippedPathSchema).pipe(
-      Schema.filter((paths) => paths.length === new Set(paths).size, {
-        message: () => "Shipped paths must be unique within one skill.",
-      }),
-      Schema.annotations({
-        description: "Exact feature-relative allowlist copied into dist/skills.",
-      }),
-    ),
-  }),
-);
+export const featurePlatformSchema = Schema.Literal("any", "macos", "macos+ghostty").annotations({
+  description: "Host capability required by one selected feature.",
+});
+
+export const installedSkillSchema = Schema.TaggedStruct("skill", {
+  id: Schema.NonEmptyTrimmedString.pipe(
+    Schema.pattern(/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/, {
+      message: () => "Installed skill IDs must use lowercase kebab-case.",
+    }),
+    Schema.annotations({
+      description: "Public directory name installed for this skill.",
+    }),
+  ),
+  shippedPaths: Schema.Array(shippedPathSchema).pipe(
+    Schema.filter((paths) => paths.length === new Set(paths).size, {
+      message: () => "Shipped paths must be unique within one skill.",
+    }),
+    Schema.annotations({
+      description: "Exact feature-relative allowlist copied into dist/skills.",
+    }),
+  ),
+});
+
+export const installedSkillDefinitionSchema = Schema.Union(Schema.TaggedStruct("none", {}), installedSkillSchema);
 
 const hookMatcherSchema = Schema.Union(
   Schema.TaggedStruct("none", {}),
@@ -103,7 +106,7 @@ export const featureDefinitionSchema = Schema.Struct({
   dependencies: Schema.Array(featureIdSchema).annotations({
     description: "Feature IDs resolved before this feature.",
   }),
-  platform: Schema.Literal("any", "macos", "macos+ghostty").annotations({
+  platform: featurePlatformSchema.annotations({
     description: "Host requirement surfaced by install and doctor.",
   }),
   runtime: featureRuntimeSchema.annotations({

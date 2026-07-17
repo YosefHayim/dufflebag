@@ -15,6 +15,7 @@ const previousInstructionBytes = new TextEncoder().encode("previous-instruction"
 const applicationOwner = { _tag: "application" };
 const agentOwner = (agentIds: ReadonlyArray<string>) => ({ _tag: "agent", agentIds });
 const missingPrevious = { _tag: "missing" };
+const expectedMissing = { _tag: "missing" };
 
 const runtimeArtifact = {
   path: ".claude/dufflebag/hooks/contextGuard.js",
@@ -61,10 +62,11 @@ const jsonReferenceArtifact = {
   ownership: {
     _tag: "jsonValues",
     filePreviouslyPresent: true,
+    createdContainers: [],
     values: [
       {
         pointer: "/rules/0",
-        installedValueHash: oldHash,
+        installed: { _tag: "value", hash: oldHash },
         previous: { _tag: "value", value: "user-rule.md" },
       },
     ],
@@ -93,10 +95,11 @@ const settingsArtifact = {
   ownership: {
     _tag: "jsonValues",
     filePreviouslyPresent: true,
+    createdContainers: ["/hooks"],
     values: [
       {
         pointer: "/hooks/Stop",
-        installedValueHash: oldHash,
+        installed: { _tag: "value", hash: oldHash },
         previous: missingPrevious,
       },
     ],
@@ -138,24 +141,33 @@ const write = (artifact: object, bytes = desiredBytes) => ({
   _tag: "write",
   artifact,
   bytes,
+  expectedCurrent: expectedMissing,
 });
 
 const restore = (artifact: object, bytes: Uint8Array) => ({
   _tag: "restore",
   artifact,
   bytes,
+  expectedCurrent: expectedMissing,
 });
 
-const remove = (artifact: object) => ({ _tag: "remove", artifact, unownedBytes: noUnownedBytes });
+const remove = (artifact: object) => ({
+  _tag: "remove",
+  artifact,
+  unownedBytes: noUnownedBytes,
+  expectedCurrent: expectedMissing,
+});
 
 const completePlan = {
   scope: "project",
   root: "/workspace",
   operations: desiredArtifacts.map((artifact) => write(artifact)),
+  preconditions: [],
   receipt: {
     _tag: "receiptPublish",
     target: receiptTarget,
     receipt: desiredReceipt,
+    expectedCurrent: expectedMissing,
   },
 };
 
@@ -168,6 +180,62 @@ const unwrap = <Right, Left>(result: Either.Either<Right, Left>): Right =>
   Either.getOrThrowWith(result, (error) => new Error(String(error)));
 
 describe("artifactPlanSchema", () => {
+  it("requires inspected receipt state for publish and remove operations", () => {
+    const guardedPublish = completePlan;
+    const unguardedPublish = {
+      ...completePlan,
+      receipt: { _tag: "receiptPublish", target: receiptTarget, receipt: desiredReceipt },
+    };
+    const guardedRemove = {
+      scope: "project",
+      root: "/workspace",
+      operations: [],
+      preconditions: [],
+      receipt: { _tag: "remove", target: receiptTarget, expectedCurrent: { _tag: "file", sha256: oldHash } },
+    };
+
+    expect(Either.isRight(validateArtifactPlan(guardedPublish))).toBe(true);
+    expect(Either.isRight(validateArtifactPlan(guardedRemove))).toBe(true);
+    expect(Either.isLeft(validateArtifactPlan(unguardedPublish))).toBe(true);
+    expect(
+      Either.isLeft(
+        validateArtifactPlan({
+          ...guardedPublish,
+          receipt: { ...guardedPublish.receipt, expectedCurrent: { _tag: "file", sha256: "invalid" } },
+        }),
+      ),
+    ).toBe(true);
+  });
+
+  it("requires a schema-valid expected current state for every artifact operation", () => {
+    const guardedPlan = {
+      ...completePlan,
+      operations: completePlan.operations.map((operation) => ({
+        ...operation,
+        expectedCurrent: { _tag: "file", sha256: oldHash },
+      })),
+    };
+    const unguardedPlan = {
+      ...completePlan,
+      operations: desiredArtifacts.map((artifact) => ({
+        _tag: "write",
+        artifact,
+        bytes: desiredBytes,
+      })),
+    };
+
+    expect(Either.isRight(validateArtifactPlan(guardedPlan))).toBe(true);
+    expect(Either.isLeft(validateArtifactPlan(unguardedPlan))).toBe(true);
+    expect(
+      Either.isLeft(
+        validateArtifactPlan({
+          ...completePlan,
+          operations: [{ ...completePlan.operations[0], expectedCurrent: { _tag: "file", sha256: "invalid" } }],
+        }),
+      ),
+    ).toBe(true);
+  });
+
   it("strictly decodes a published plan with every artifact kind, owner, and ownership tag", () => {
     const plan = unwrap(validateArtifactPlan(completePlan));
 
@@ -274,7 +342,8 @@ describe("artifactPlanSchema", () => {
       scope: "project",
       root: "/workspace",
       operations: [remove(first), remove(second)],
-      receipt: { _tag: "remove", target: receiptTarget },
+      preconditions: [],
+      receipt: { _tag: "remove", target: receiptTarget, expectedCurrent: expectedMissing },
     });
 
     expect(Either.isLeft(result)).toBe(true);
@@ -347,7 +416,8 @@ describe("artifactPlanSchema", () => {
       scope: "project",
       root: "/workspace",
       operations: [remove(artifact)],
-      receipt: { _tag: "remove", target: receiptTarget },
+      preconditions: [],
+      receipt: { _tag: "remove", target: receiptTarget, expectedCurrent: expectedMissing },
     });
 
     expect(Either.isLeft(result)).toBe(true);
@@ -377,7 +447,8 @@ describe("artifactPlanSchema", () => {
       scope: "project",
       root: "/workspace",
       operations: [remove(artifact)],
-      receipt: { _tag: "remove", target: receiptTarget },
+      preconditions: [],
+      receipt: { _tag: "remove", target: receiptTarget, expectedCurrent: expectedMissing },
     });
 
     expect(Either.isLeft(result)).toBe(true);
@@ -399,10 +470,12 @@ describe("artifactPlanSchema", () => {
       scope: "project",
       root: "/workspace",
       operations: [restore(skillArtifact, previousSkillBytes)],
+      preconditions: [],
       receipt: {
         _tag: "receiptPublish",
         target: receiptTarget,
         receipt: { ...desiredReceipt, artifacts: [] },
+        expectedCurrent: expectedMissing,
       },
     });
 
@@ -414,13 +487,15 @@ describe("artifactPlanSchema", () => {
       scope: "project",
       root: "/workspace",
       operations: [restore(skillArtifact, desiredBytes)],
-      receipt: { _tag: "remove", target: receiptTarget },
+      preconditions: [],
+      receipt: { _tag: "remove", target: receiptTarget, expectedCurrent: expectedMissing },
     });
     const originallyMissing = validateArtifactPlan({
       scope: "project",
       root: "/workspace",
       operations: [restore(runtimeArtifact, desiredBytes)],
-      receipt: { _tag: "remove", target: receiptTarget },
+      preconditions: [],
+      receipt: { _tag: "remove", target: receiptTarget, expectedCurrent: expectedMissing },
     });
 
     expect(Either.isLeft(wrongBytes)).toBe(true);
@@ -437,19 +512,22 @@ describe("artifactPlanSchema", () => {
       scope: "project",
       root: "/workspace",
       operations: [remove(runtimeArtifact), remove(absentPartialArtifact)],
-      receipt: { _tag: "remove", target: receiptTarget },
+      preconditions: [],
+      receipt: { _tag: "remove", target: receiptTarget, expectedCurrent: expectedMissing },
     });
     const priorWholeFile = validateArtifactPlan({
       scope: "project",
       root: "/workspace",
       operations: [remove(skillArtifact)],
-      receipt: { _tag: "remove", target: receiptTarget },
+      preconditions: [],
+      receipt: { _tag: "remove", target: receiptTarget, expectedCurrent: expectedMissing },
     });
     const priorPartialFile = validateArtifactPlan({
       scope: "project",
       root: "/workspace",
       operations: [remove(instructionArtifact)],
-      receipt: { _tag: "remove", target: receiptTarget },
+      preconditions: [],
+      receipt: { _tag: "remove", target: receiptTarget, expectedCurrent: expectedMissing },
     });
 
     expect(Either.isRight(missingWholeFile)).toBe(true);
@@ -477,13 +555,13 @@ describe("artifactPlanSchema", () => {
       scope: "project",
       root: "/workspace",
       operations: [remove(accumulatedJson)],
-      receipt: { _tag: "remove", target: receiptTarget },
+      receipt: { _tag: "remove", target: receiptTarget, expectedCurrent: expectedMissing },
     });
     const yamlRemoval = validateArtifactPlan({
       scope: "project",
       root: "/workspace",
       operations: [remove(accumulatedYaml)],
-      receipt: { _tag: "remove", target: receiptTarget },
+      receipt: { _tag: "remove", target: receiptTarget, expectedCurrent: expectedMissing },
     });
 
     expect(Either.isLeft(jsonRemoval)).toBe(true);
@@ -499,7 +577,8 @@ describe("artifactPlanSchema", () => {
       scope: "project",
       root: "/workspace",
       operations: [{ ...remove(absentPartialArtifact), unownedBytes: desiredBytes }],
-      receipt: { _tag: "remove", target: receiptTarget },
+      preconditions: [],
+      receipt: { _tag: "remove", target: receiptTarget, expectedCurrent: expectedMissing },
     });
 
     expect(Either.isLeft(result)).toBe(true);
@@ -511,7 +590,8 @@ describe("artifactPlanSchema", () => {
       scope: "project",
       root: "/workspace",
       operations: [restore(instructionArtifact, new Uint8Array())],
-      receipt: { _tag: "remove", target: receiptTarget },
+      preconditions: [],
+      receipt: { _tag: "remove", target: receiptTarget, expectedCurrent: expectedMissing },
     });
 
     expect(Either.isRight(result)).toBe(true);
@@ -522,20 +602,24 @@ describe("artifactPlanSchema", () => {
       scope: "project",
       root: "/workspace",
       operations: [restore(skillArtifact, previousSkillBytes)],
+      preconditions: [],
       receipt: {
         _tag: "receiptPublish",
         target: receiptTarget,
         receipt: { ...desiredReceipt, artifacts: [skillArtifact] },
+        expectedCurrent: expectedMissing,
       },
     });
     const removedAndPublished = validateArtifactPlan({
       scope: "project",
       root: "/workspace",
       operations: [remove(runtimeArtifact)],
+      preconditions: [],
       receipt: {
         _tag: "receiptPublish",
         target: receiptTarget,
         receipt: { ...desiredReceipt, artifacts: [runtimeArtifact] },
+        expectedCurrent: expectedMissing,
       },
     });
 
@@ -552,10 +636,12 @@ describe("artifactPlanSchema", () => {
       scope: "project",
       root: "/workspace",
       operations: [write(mismatchedArtifact)],
+      preconditions: [],
       receipt: {
         _tag: "receiptPublish",
         target: receiptTarget,
         receipt: { ...desiredReceipt, artifacts: [runtimeArtifact] },
+        expectedCurrent: expectedMissing,
       },
     });
 
@@ -568,7 +654,8 @@ describe("artifactPlanSchema", () => {
       scope: "project",
       root: "/workspace",
       operations: [write(runtimeArtifact)],
-      receipt: { _tag: "remove", target: receiptTarget },
+      preconditions: [],
+      receipt: { _tag: "remove", target: receiptTarget, expectedCurrent: expectedMissing },
     });
 
     expect(Either.isLeft(result)).toBe(true);
@@ -586,6 +673,7 @@ describe("createUpdatePlan", () => {
         writes: [write(runtimeArtifact)],
       },
       receiptTarget,
+      receiptExpectedCurrent: expectedMissing,
     });
 
     expect(Either.isLeft(result)).toBe(true);
@@ -608,6 +696,7 @@ describe("createUpdatePlan", () => {
         writes: [write(runtimeArtifact)],
       },
       receiptTarget,
+      receiptExpectedCurrent: expectedMissing,
     };
     const duplicate = createUpdatePlan({
       ...request,
@@ -659,6 +748,7 @@ describe("createUpdatePlan", () => {
           writes: [write(unchanged), write(desiredChanged, newSkillBytes), write(added, newConfigBytes)],
         },
         receiptTarget,
+        receiptExpectedCurrent: { _tag: "file", sha256: oldHash },
       }),
     );
 
@@ -676,6 +766,7 @@ describe("createUpdatePlan", () => {
     expect(plan.receipt).toEqual({
       _tag: "receiptPublish",
       target: receiptTarget,
+      expectedCurrent: { _tag: "file", sha256: oldHash },
       receipt: {
         ...nextReceipt,
         artifacts: [
@@ -688,6 +779,7 @@ describe("createUpdatePlan", () => {
         ],
       },
     });
+    expect(plan.preconditions).toEqual([{ path: unchanged.path, expectedCurrent: expectedMissing }]);
     expect(plan.operations.some((operation) => operation.artifact.path === unchanged.path)).toBe(false);
   });
 
@@ -704,6 +796,7 @@ describe("createUpdatePlan", () => {
       restorations: [remove(runtimeArtifact)],
       desired,
       receiptTarget,
+      receiptExpectedCurrent: { _tag: "file", sha256: oldHash },
     });
     const shuffled = createUpdatePlan({
       root: "/workspace",
@@ -711,6 +804,7 @@ describe("createUpdatePlan", () => {
       restorations: [...expectedRestorations].reverse(),
       desired,
       receiptTarget,
+      receiptExpectedCurrent: { _tag: "file", sha256: oldHash },
     });
     const extra = createUpdatePlan({
       root: "/workspace",
@@ -718,6 +812,7 @@ describe("createUpdatePlan", () => {
       restorations: [...expectedRestorations, remove(ruleArtifact)],
       desired,
       receiptTarget,
+      receiptExpectedCurrent: { _tag: "file", sha256: oldHash },
     });
     const duplicate = createUpdatePlan({
       root: "/workspace",
@@ -725,6 +820,7 @@ describe("createUpdatePlan", () => {
       restorations: [restore(skillArtifact, previousSkillBytes), restore(skillArtifact, previousSkillBytes)],
       desired,
       receiptTarget,
+      receiptExpectedCurrent: { _tag: "file", sha256: oldHash },
     });
     const mismatchedArtifact = {
       ...skillArtifact,
@@ -736,6 +832,7 @@ describe("createUpdatePlan", () => {
       restorations: [restore(mismatchedArtifact, previousSkillBytes), remove(runtimeArtifact)],
       desired,
       receiptTarget,
+      receiptExpectedCurrent: { _tag: "file", sha256: oldHash },
     });
 
     expect(Either.isLeft(missing)).toBe(true);
@@ -752,6 +849,7 @@ describe("createUpdatePlan", () => {
       restorations: [],
       desired: { receipt: desiredReceipt, writes: desiredArtifacts.map((artifact) => write(artifact)) },
       receiptTarget,
+      receiptExpectedCurrent: expectedMissing,
     };
 
     const first = unwrap(createUpdatePlan(request));
@@ -791,6 +889,7 @@ describe("createUpdatePlan", () => {
         writes: [write(desiredYaml)],
       },
       receiptTarget,
+      receiptExpectedCurrent: { _tag: "file", sha256: oldHash },
     });
     const plan = unwrap(result);
 
@@ -799,6 +898,7 @@ describe("createUpdatePlan", () => {
       _tag: "receiptPublish",
       target: receiptTarget,
       receipt: { ...desiredReceipt, artifacts: [preservedYaml] },
+      expectedCurrent: { _tag: "file", sha256: oldHash },
     });
   });
 
@@ -808,10 +908,11 @@ describe("createUpdatePlan", () => {
       ownership: {
         ...jsonReferenceArtifact.ownership,
         filePreviouslyPresent: false,
+        createdContainers: [],
         values: [
           {
             pointer: "/rules/0",
-            installedValueHash: oldHash,
+            installed: { _tag: "value", hash: oldHash },
             previous: missingPrevious,
           },
         ],
@@ -822,15 +923,16 @@ describe("createUpdatePlan", () => {
       ownership: {
         ...jsonReferenceArtifact.ownership,
         filePreviouslyPresent: true,
+        createdContainers: [],
         values: [
           {
             pointer: "/rules/0",
-            installedValueHash: newHash,
+            installed: { _tag: "value", hash: newHash },
             previous: { _tag: "value", value: "installed-rule.md" },
           },
           {
             pointer: "/rules/1",
-            installedValueHash: newHash,
+            installed: { _tag: "value", hash: newHash },
             previous: { _tag: "value", value: "user-rule.md" },
           },
         ],
@@ -857,6 +959,7 @@ describe("createUpdatePlan", () => {
           writes: [write(desiredArtifact)],
         },
         receiptTarget,
+        receiptExpectedCurrent: { _tag: "file", sha256: oldHash },
       }),
     );
 
@@ -865,6 +968,181 @@ describe("createUpdatePlan", () => {
       _tag: "receiptPublish",
       target: receiptTarget,
       receipt: { ...desiredReceipt, artifacts: [expectedArtifact] },
+      expectedCurrent: { _tag: "file", sha256: oldHash },
+    });
+  });
+
+  it("preserves prior created JSON containers while adding newly created ancestors", () => {
+    const previousArtifact = {
+      ...settingsArtifact,
+      ownership: {
+        _tag: "jsonValues",
+        filePreviouslyPresent: false,
+        createdContainers: ["/hooks"],
+        values: [
+          {
+            pointer: "/hooks/Stop",
+            installed: { _tag: "value", hash: oldHash },
+            previous: missingPrevious,
+          },
+        ],
+      },
+    };
+    const desiredArtifact = {
+      ...settingsArtifact,
+      ownership: {
+        _tag: "jsonValues",
+        filePreviouslyPresent: true,
+        createdContainers: ["/permissions"],
+        values: [
+          {
+            pointer: "/hooks/Stop",
+            installed: { _tag: "value", hash: oldHash },
+            previous: { _tag: "value", value: [], lexical: { _tag: "value", source: "[]" } },
+          },
+          {
+            pointer: "/permissions/allow",
+            installed: { _tag: "value", hash: newHash },
+            previous: missingPrevious,
+          },
+        ],
+      },
+    };
+    const plan = unwrap(
+      createUpdatePlan({
+        root: "/workspace",
+        previous: {
+          _tag: "receipt",
+          receipt: { ...desiredReceipt, artifacts: [previousArtifact] },
+        },
+        restorations: [],
+        desired: {
+          receipt: { ...desiredReceipt, artifacts: [desiredArtifact] },
+          writes: [write(desiredArtifact)],
+        },
+        receiptTarget,
+        receiptExpectedCurrent: { _tag: "file", sha256: oldHash },
+      }),
+    );
+
+    expect(plan.receipt).toMatchObject({
+      _tag: "receiptPublish",
+      receipt: {
+        artifacts: [
+          {
+            ownership: {
+              createdContainers: ["/hooks", "/permissions"],
+              values: [
+                { installed: { _tag: "value", hash: oldHash }, previous: missingPrevious },
+                { installed: { _tag: "value", hash: newHash }, previous: missingPrevious },
+              ],
+            },
+          },
+        ],
+      },
+    });
+  });
+
+  it("rejects acquiring JSON container deletion authority without a new owned pointer", () => {
+    const previousArtifact = {
+      ...settingsArtifact,
+      ownership: {
+        ...settingsArtifact.ownership,
+        createdContainers: [],
+      },
+    };
+    const desiredArtifact = {
+      ...settingsArtifact,
+      ownership: {
+        ...settingsArtifact.ownership,
+        createdContainers: ["/hooks"],
+      },
+    };
+    const result = createUpdatePlan({
+      root: "/workspace",
+      previous: {
+        _tag: "receipt",
+        receipt: { ...desiredReceipt, artifacts: [previousArtifact] },
+      },
+      restorations: [],
+      desired: {
+        receipt: { ...desiredReceipt, artifacts: [desiredArtifact] },
+        writes: [write(desiredArtifact)],
+      },
+      receiptTarget,
+      receiptExpectedCurrent: { _tag: "file", sha256: oldHash },
+    });
+
+    expect(Either.isLeft(result)).toBe(true);
+  });
+
+  it("preserves an unchanged installed-missing JSON value without another write", () => {
+    const previousArtifact = {
+      ...settingsArtifact,
+      ownership: {
+        _tag: "jsonValues",
+        filePreviouslyPresent: true,
+        createdContainers: [],
+        values: [
+          {
+            pointer: "/env/DUFFLEBAG_CONFIG",
+            installed: { _tag: "missing" },
+            previous: {
+              _tag: "value",
+              value: "/legacy/config.json",
+              lexical: {
+                _tag: "onlyProperty",
+                prefix: "",
+                property: '"DUFFLEBAG_CONFIG":"/legacy/config.json"',
+                suffix: "",
+              },
+            },
+          },
+        ],
+      },
+    };
+    const desiredArtifact = {
+      ...previousArtifact,
+      ownership: {
+        ...previousArtifact.ownership,
+        values: previousArtifact.ownership.values.map((value) => ({
+          ...value,
+          previous: {
+            _tag: "value",
+            value: "/wrong/new-history.json",
+            lexical: {
+              _tag: "onlyProperty",
+              prefix: "",
+              property: '"DUFFLEBAG_CONFIG":"/wrong/new-history.json"',
+              suffix: "",
+            },
+          },
+        })),
+      },
+    };
+    const plan = unwrap(
+      createUpdatePlan({
+        root: "/workspace",
+        previous: {
+          _tag: "receipt",
+          receipt: { ...desiredReceipt, artifacts: [previousArtifact] },
+        },
+        restorations: [],
+        desired: {
+          receipt: { ...desiredReceipt, artifacts: [desiredArtifact] },
+          writes: [write(desiredArtifact)],
+        },
+        receiptTarget,
+        receiptExpectedCurrent: { _tag: "file", sha256: oldHash },
+      }),
+    );
+
+    expect(plan.operations).toEqual([]);
+    expect(plan.receipt).toMatchObject({
+      _tag: "receiptPublish",
+      receipt: {
+        artifacts: [previousArtifact],
+      },
     });
   });
 
@@ -922,6 +1200,7 @@ describe("createUpdatePlan", () => {
           writes: [write(desiredInstruction), write(desiredYaml)],
         },
         receiptTarget,
+        receiptExpectedCurrent: { _tag: "file", sha256: oldHash },
       }),
     );
 
@@ -930,6 +1209,7 @@ describe("createUpdatePlan", () => {
       _tag: "receiptPublish",
       target: receiptTarget,
       receipt: { ...desiredReceipt, artifacts: [expectedInstruction, expectedYaml] },
+      expectedCurrent: { _tag: "file", sha256: oldHash },
     });
   });
 
@@ -953,10 +1233,36 @@ describe("createUpdatePlan", () => {
         writes: [write(desiredArtifact)],
       },
       receiptTarget,
+      receiptExpectedCurrent: { _tag: "file", sha256: oldHash },
     });
 
     expect(Either.isLeft(result)).toBe(true);
     expect(String(Option.getOrThrow(Either.getLeft(result)))).toContain('["desired"]["receipt"]["artifacts"][0]["ownership"]["_tag"]');
+    expect(String(Option.getOrThrow(Either.getLeft(result)))).toContain("remove the prior ownership first");
+  });
+
+  it("rejects changing the artifact kind or owner at a retained path", () => {
+    const desiredArtifact = {
+      ...settingsArtifact,
+      path: jsonReferenceArtifact.path,
+    };
+    const result = createUpdatePlan({
+      root: "/workspace",
+      previous: {
+        _tag: "receipt",
+        receipt: { ...desiredReceipt, artifacts: [jsonReferenceArtifact] },
+      },
+      restorations: [],
+      desired: {
+        receipt: { ...desiredReceipt, artifacts: [desiredArtifact] },
+        writes: [write(desiredArtifact)],
+      },
+      receiptTarget,
+      receiptExpectedCurrent: { _tag: "file", sha256: oldHash },
+    });
+
+    expect(Either.isLeft(result)).toBe(true);
+    expect(String(Option.getOrThrow(Either.getLeft(result)))).toContain('artifacts"][0]["kind"]');
     expect(String(Option.getOrThrow(Either.getLeft(result)))).toContain("remove the prior ownership first");
   });
 });
@@ -969,10 +1275,22 @@ describe("createUninstallPlan", () => {
       restore(skillArtifact, previousSkillBytes),
       remove(runtimeArtifact),
     ];
-    const plan = unwrap(createUninstallPlan({ root: "/workspace", receipt, restorations, receiptTarget }));
+    const plan = unwrap(
+      createUninstallPlan({
+        root: "/workspace",
+        receipt,
+        restorations,
+        receiptTarget,
+        receiptExpectedCurrent: { _tag: "file", sha256: oldHash },
+      }),
+    );
 
     expect(plan.operations).toEqual(restorations);
-    expect(plan.receipt).toEqual({ _tag: "remove", target: receiptTarget });
+    expect(plan.receipt).toEqual({
+      _tag: "remove",
+      target: receiptTarget,
+      expectedCurrent: { _tag: "file", sha256: oldHash },
+    });
   });
 
   it("orders a valid restoration set and rejects missing, duplicate, or non-receipted actions", () => {
@@ -983,24 +1301,28 @@ describe("createUninstallPlan", () => {
       receipt,
       restorations: [remove(runtimeArtifact)],
       receiptTarget,
+      receiptExpectedCurrent: { _tag: "file", sha256: oldHash },
     });
     const shuffled = createUninstallPlan({
       root: "/workspace",
       receipt,
       restorations: [...expectedRestorations].reverse(),
       receiptTarget,
+      receiptExpectedCurrent: { _tag: "file", sha256: oldHash },
     });
     const extra = createUninstallPlan({
       root: "/workspace",
       receipt,
       restorations: [...expectedRestorations, remove(ruleArtifact)],
       receiptTarget,
+      receiptExpectedCurrent: { _tag: "file", sha256: oldHash },
     });
     const duplicate = createUninstallPlan({
       root: "/workspace",
       receipt,
       restorations: [restore(skillArtifact, previousSkillBytes), restore(skillArtifact, previousSkillBytes)],
       receiptTarget,
+      receiptExpectedCurrent: { _tag: "file", sha256: oldHash },
     });
     const mismatchedArtifact = {
       ...skillArtifact,
@@ -1011,6 +1333,7 @@ describe("createUninstallPlan", () => {
       receipt,
       restorations: [restore(mismatchedArtifact, previousSkillBytes), remove(runtimeArtifact)],
       receiptTarget,
+      receiptExpectedCurrent: { _tag: "file", sha256: oldHash },
     });
 
     expect(Either.isLeft(missing)).toBe(true);
@@ -1027,9 +1350,18 @@ describe("createUninstallPlan", () => {
       receipt,
       restorations: [remove(runtimeArtifact)],
       receiptTarget,
+      receiptExpectedCurrent: { _tag: "file", sha256: oldHash },
       detection: { homePaths: [".cursor"], absolutePaths: [], commands: ["cursor"] },
     });
-    const plan = unwrap(createUninstallPlan({ root: "/workspace", receipt, restorations: [remove(runtimeArtifact)], receiptTarget }));
+    const plan = unwrap(
+      createUninstallPlan({
+        root: "/workspace",
+        receipt,
+        restorations: [remove(runtimeArtifact)],
+        receiptTarget,
+        receiptExpectedCurrent: { _tag: "file", sha256: oldHash },
+      }),
+    );
 
     expect(Either.isLeft(result)).toBe(true);
     expect(plan.operations).toEqual([remove(runtimeArtifact)]);
@@ -1059,6 +1391,7 @@ describe("migrateLegacyManifest", () => {
         manifest: legacyManifest,
         knownArtifacts,
         receiptTarget,
+        receiptExpectedCurrent: expectedMissing,
       }),
     );
 
@@ -1066,6 +1399,7 @@ describe("migrateLegacyManifest", () => {
     expect(plan.operations.every((operation) => operation._tag === "write")).toBe(true);
     expect(plan.receipt._tag).toBe("receiptPublish");
     if (plan.receipt._tag === "receiptPublish") {
+      expect(plan.receipt.expectedCurrent).toEqual(expectedMissing);
       expect(plan.receipt.receipt).toEqual({
         version: "0.11.0",
         scope: "project",
@@ -1081,7 +1415,13 @@ describe("migrateLegacyManifest", () => {
     { name: "unknown legacy key", manifest: { ...legacyManifest, detectedAgents: ["cursor"] } },
     { name: "duplicate feature IDs", manifest: { ...legacyManifest, features: ["context-guard", "context-guard"] } },
   ])("rejects an invalid legacy manifest with $name", ({ manifest }) => {
-    const result = migrateLegacyManifest({ root: "/workspace", manifest, knownArtifacts, receiptTarget });
+    const result = migrateLegacyManifest({
+      root: "/workspace",
+      manifest,
+      knownArtifacts,
+      receiptTarget,
+      receiptExpectedCurrent: expectedMissing,
+    });
 
     expect(Either.isLeft(result)).toBe(true);
   });

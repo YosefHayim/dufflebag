@@ -9,6 +9,7 @@ import { findDuplicateJsonProperty } from "../../config/jsonDocument.js";
 import {
   artifactKindSchema,
   artifactOwnerSchema,
+  type InstalledJsonValue,
   type JsonValuesOwnership,
   jsonValuesOwnershipSchema,
   type PreviousJsonValue,
@@ -42,12 +43,17 @@ const hashBytes = (bytes: Uint8Array): string => createHash("sha256").update(byt
 
 const hashJsonValue = (value: unknown): string => hashBytes(textEncoder.encode(Schema.encodeSync(jsonValueSchema)(value)));
 
+const installedJsonValueMatches = (installed: InstalledJsonValue, value: unknown): boolean =>
+  installed._tag === "missing" ? value === undefined : value !== undefined && hashJsonValue(value) === installed.hash;
+
 const jsonRulesOwnershipIsValid = (ownership: JsonValuesOwnership): boolean => {
   const ownedRules = ownership.values[0];
 
   return (
     ownership.values.length === 1 &&
+    ownership.createdContainers.length === 0 &&
     ownedRules?.pointer === "/rules" &&
+    ownedRules.installed._tag === "value" &&
     (ownedRules.previous._tag === "missing" || isInstructionReferences(ownedRules.previous.value))
   );
 };
@@ -547,10 +553,11 @@ const createJsonOwnership = (input: {
   return {
     _tag: "jsonValues",
     filePreviouslyPresent: previousOwnership?.filePreviouslyPresent ?? input.request.currentFile._tag === "file",
+    createdContainers: [],
     values: [
       {
         pointer: "/rules",
-        installedValueHash: hashJsonValue(input.desiredRules),
+        installed: { _tag: "value", hash: hashJsonValue(input.desiredRules) },
         previous: history?.previous ?? previousRulesValue(input.previousRules),
       },
     ],
@@ -623,7 +630,7 @@ const validateCurrentJsonOwnership = (
 
   const ownedRules = previousArtifact.artifact.ownership.values.find((value) => value.pointer === "/rules");
 
-  return rules !== undefined && ownedRules !== undefined && hashJsonValue(rules) === ownedRules.installedValueHash
+  return ownedRules !== undefined && installedJsonValueMatches(ownedRules.installed, rules)
     ? Either.right(undefined)
     : Either.left(new ConfigReferencePlanError({ issue: "Receipted Continue rules changed after installation." }));
 };
@@ -710,11 +717,7 @@ const removeJsonReference = (request: ConfigReferenceRequest): Either.Either<Con
   }
 
   const ownedRules = ownership.values.find((value) => value.pointer === "/rules");
-  if (
-    document.right.rules === undefined ||
-    ownedRules === undefined ||
-    hashJsonValue(document.right.rules) !== ownedRules.installedValueHash
-  ) {
+  if (ownedRules === undefined || !installedJsonValueMatches(ownedRules.installed, document.right.rules)) {
     return Either.left(new ConfigReferencePlanError({ issue: "Receipted Continue rules changed after installation." }));
   }
 
@@ -911,7 +914,8 @@ const configReferenceOperationSchema = configReferenceOperationFieldsSchema.pipe
       configuration.right.rules.includes(expectedReference) &&
       ownedRules.length === 1 &&
       ownedRules[0]?.pointer === "/rules" &&
-      ownedRules[0].installedValueHash === hashJsonValue(configuration.right.rules)
+      ownedRules[0].installed._tag === "value" &&
+      ownedRules[0].installed.hash === hashJsonValue(configuration.right.rules)
       ? undefined
       : {
           path: ["artifact", "ownership"],

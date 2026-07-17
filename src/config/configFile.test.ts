@@ -1,25 +1,25 @@
 import { FileSystem, Path } from "@effect/platform";
 import { NodeContext } from "@effect/platform-node";
 import { expect, layer } from "@effect/vitest";
-import { Effect, Option, Schema } from "effect";
+import { Effect, Schema } from "effect";
 
 import { bagConfigJsonSchema, defaultBagConfig } from "./bagConfigSchema.js";
 import { ConfigFileParseError, ConfigFileSchemaError, readConfigFile } from "./configFile.js";
 
 layer(NodeContext.layer)("configFile", (it) => {
-  it.effect("returns Option.none when the managed config is missing", () =>
+  it.effect("returns a tagged missing snapshot when the managed config is absent", () =>
     Effect.scoped(
       Effect.gen(function* () {
         const fileSystem = yield* FileSystem.FileSystem;
         const path = yield* Path.Path;
         const root = yield* fileSystem.makeTempDirectoryScoped({ prefix: "dufflebag-config-file-missing-" });
 
-        expect(Option.isNone(yield* readConfigFile(path.join(root, "config.json")))).toBe(true);
+        expect(yield* readConfigFile(path.join(root, "config.json"))).toEqual({ _tag: "missing" });
       }),
     ),
   );
 
-  it.effect("decodes one strict complete managed config", () =>
+  it.effect("returns exact file bytes with one strict complete managed config", () =>
     Effect.scoped(
       Effect.gen(function* () {
         const fileSystem = yield* FileSystem.FileSystem;
@@ -27,10 +27,16 @@ layer(NodeContext.layer)("configFile", (it) => {
         const root = yield* fileSystem.makeTempDirectoryScoped({ prefix: "dufflebag-config-file-complete-" });
         const configPath = path.join(root, "config.json");
         const json = yield* Schema.encode(bagConfigJsonSchema)(defaultBagConfig);
+        const bytes = new TextEncoder().encode(`\n${json}\n`);
 
-        yield* fileSystem.writeFileString(configPath, json);
+        yield* fileSystem.writeFile(configPath, bytes);
 
-        expect(yield* readConfigFile(configPath)).toEqual(Option.some(defaultBagConfig));
+        const snapshot = yield* readConfigFile(configPath);
+        expect(snapshot._tag).toBe("present");
+        if (snapshot._tag === "present") {
+          expect([...snapshot.bytes]).toEqual([...bytes]);
+          expect(snapshot.config).toEqual(defaultBagConfig);
+        }
       }),
     ),
   );
@@ -164,6 +170,7 @@ layer(NodeContext.layer)("configFile", (it) => {
 
         const error = yield* Effect.flip(readConfigFile(configPath));
         expect(error).toBeInstanceOf(ConfigFileParseError);
+        expect(error.message).toContain("byte-order mark");
       }),
     ),
   );
