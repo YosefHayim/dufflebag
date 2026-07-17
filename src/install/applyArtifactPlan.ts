@@ -1,11 +1,11 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { rmdir } from "node:fs/promises";
 
 import { FileSystem, Path } from "@effect/platform";
 import { BadArgument, type PlatformError, SystemError } from "@effect/platform/Error";
 import { Cause, Effect, Exit, Option, Ref, Schema } from "effect";
 
-import type { ArtifactOperation, ArtifactPlan, ReceiptOperation } from "./artifactPlan.js";
+import type { ArtifactOperation, ArtifactPlan, ArtifactPrecondition, ReceiptOperation } from "./artifactPlan.js";
 import { artifactReceiptJsonSchema } from "./artifactReceipt.js";
 import {
   ArtifactRecoveryPendingError,
@@ -42,6 +42,12 @@ type StagedReceipt = {
   readonly snapshotPath: string;
 };
 
+type StagedPrecondition = {
+  readonly precondition: ArtifactPrecondition;
+  readonly targetPath: string;
+  readonly snapshotPath: string;
+};
+
 type StagedPlan = {
   readonly root: string;
   readonly transactionRoot: string;
@@ -49,6 +55,7 @@ type StagedPlan = {
   readonly snapshotsDirectory: string;
   readonly pendingRecordPath: string;
   readonly artifacts: ReadonlyArray<StagedArtifact>;
+  readonly preconditions: ReadonlyArray<StagedPrecondition>;
   readonly receipt: StagedReceipt;
 };
 
@@ -73,6 +80,11 @@ type TargetCapture = TargetValidation & {
 type TargetStateValidation = {
   readonly validatedRoot: ValidatedRoot;
   readonly snapshot: TargetSnapshot;
+};
+
+type PlanPreconditionValidation = {
+  readonly stagedPlan: StagedPlan;
+  readonly snapshots: ReadonlyArray<TargetSnapshot>;
 };
 
 type StagedPlanRequest = {
@@ -135,6 +147,8 @@ const isAlreadyExists = (error: PlatformError): boolean => error._tag === "Syste
 const bytesEqual = (left: Uint8Array, right: Uint8Array): boolean =>
   left.byteLength === right.byteLength && left.every((value, index) => value === right[index]);
 
+const sha256 = (bytes: Uint8Array): string => createHash("sha256").update(bytes).digest("hex");
+
 const combineCauses = (causes: ReadonlyArray<Cause.Cause<unknown>>): Cause.Cause<unknown> =>
   causes.reduce((combined, cause) => Cause.sequential(combined, cause), Cause.empty);
 
@@ -149,6 +163,11 @@ const createStagedPlan = (request: StagedPlanRequest) =>
       stagedPath: path.join(stagedDirectory, String(index)),
       snapshotPath: path.join(snapshotsDirectory, String(index)),
     }));
+    const preconditions = request.plan.preconditions.map((precondition, index) => ({
+      precondition,
+      targetPath: path.resolve(request.validatedRoot.root, precondition.path),
+      snapshotPath: path.join(snapshotsDirectory, `precondition-${index}`),
+    }));
     const receiptTargetPath = path.resolve(request.validatedRoot.root, request.plan.receipt.target.path);
     const receiptDirectory = path.dirname(receiptTargetPath);
 
@@ -159,6 +178,7 @@ const createStagedPlan = (request: StagedPlanRequest) =>
       snapshotsDirectory,
       pendingRecordPath: path.join(transactionRoot, "pending.json"),
       artifacts,
+      preconditions,
       receipt: {
         operation: request.plan.receipt,
         targetPath: receiptTargetPath,
@@ -276,6 +296,7 @@ const preflightTargets = (request: CaptureTargetsRequest) =>
   Effect.forEach(
     [
       ...request.stagedPlan.artifacts.map((artifact) => artifact.targetPath),
+      ...request.stagedPlan.preconditions.map((precondition) => precondition.targetPath),
       request.stagedPlan.receipt.targetPath,
       request.stagedPlan.receipt.recoveryPath,
     ],
@@ -324,13 +345,20 @@ const captureTargets = (request: CaptureTargetsRequest) =>
                 snapshotPath: artifact.snapshotPath,
               }),
             );
+            const preconditionSnapshots = yield* Effect.forEach(request.stagedPlan.preconditions, (precondition) =>
+              captureTarget({
+                validatedRoot: request.validatedRoot,
+                targetPath: precondition.targetPath,
+                snapshotPath: precondition.snapshotPath,
+              }),
+            );
             const receiptSnapshot = yield* captureTarget({
               validatedRoot: request.validatedRoot,
               targetPath: request.stagedPlan.receipt.targetPath,
               snapshotPath: request.stagedPlan.receipt.snapshotPath,
             });
 
-            return [...artifactSnapshots, receiptSnapshot];
+            return [...artifactSnapshots, ...preconditionSnapshots, receiptSnapshot];
           }),
         ),
       );
@@ -462,6 +490,48 @@ const findSnapshot = (snapshots: ReadonlyArray<TargetSnapshot>, targetPath: stri
 
   return snapshot === undefined ? Effect.dieMessage(`Transaction snapshot missing for ${targetPath}`) : Effect.succeed(snapshot);
 };
+
+const validatePlanPreconditions = (validation: PlanPreconditionValidation) =>
+  Effect.forEach(
+    [
+      ...validation.stagedPlan.artifacts.map((artifact) => ({
+        targetPath: artifact.targetPath,
+        expectedCurrent: artifact.operation.expectedCurrent,
+      })),
+      ...validation.stagedPlan.preconditions.map((precondition) => ({
+        targetPath: precondition.targetPath,
+        expectedCurrent: precondition.precondition.expectedCurrent,
+      })),
+      {
+        targetPath: validation.stagedPlan.receipt.targetPath,
+        expectedCurrent: validation.stagedPlan.receipt.operation.expectedCurrent,
+      },
+    ],
+    (target) =>
+      Effect.gen(function* () {
+        const fileSystem = yield* FileSystem.FileSystem;
+        const snapshot = yield* findSnapshot(validation.snapshots, target.targetPath);
+        const expected = target.expectedCurrent;
+
+        if (expected._tag === "missing" && snapshot.original._tag === "missing") {
+          return;
+        }
+
+        if (expected._tag === "file" && snapshot.original._tag === "file") {
+          const capturedBytes = yield* fileSystem.readFile(snapshot.original.snapshotPath);
+          if (sha256(capturedBytes) === expected.sha256) {
+            return;
+          }
+        }
+
+        return yield* new BadArgument({
+          module: "FileSystem",
+          method: "stat",
+          description: `Transaction target ${target.targetPath} no longer matches the state inspected during planning.`,
+        });
+      }),
+    { discard: true },
+  );
 
 const validateTargetState = (validation: TargetStateValidation) =>
   Effect.gen(function* () {
@@ -775,7 +845,13 @@ export const applyArtifactPlan = (plan: ArtifactPlan) =>
       yield* restoreInterruptibility(ensureRecoveryAbsent(stagedPlan.receipt));
       const snapshots = yield* captureTargets(captureRequest);
 
-      // 3. Stage every desired artifact and the next ownership receipt.
+      // 3. Reject stale planning evidence before staging any desired state.
+      const preconditionExit = yield* Effect.exit(restoreInterruptibility(validatePlanPreconditions({ stagedPlan, snapshots })));
+      if (Exit.isFailure(preconditionExit)) {
+        return yield* failAfterCleanup(stagedPlan, preconditionExit.cause);
+      }
+
+      // 4. Stage every desired artifact and the next ownership receipt.
       const stagingExit = yield* Effect.exit(restoreInterruptibility(stageTargets(stagedPlan)));
       if (Exit.isFailure(stagingExit)) {
         return yield* failAfterCleanup(stagedPlan, stagingExit.cause);
@@ -791,7 +867,7 @@ export const applyArtifactPlan = (plan: ArtifactPlan) =>
         createdDirectories,
       };
 
-      // 4. Publish the recovery lock, then revalidate and commit artifacts in order.
+      // 5. Publish the recovery lock, then revalidate and commit artifacts in order.
       const markerExit = yield* Effect.exit(publishRecoveryMarker(transaction));
       if (Exit.isFailure(markerExit)) {
         return yield* failAfterMarkerAttempt(transaction, markerExit.cause);
@@ -805,13 +881,13 @@ export const applyArtifactPlan = (plan: ArtifactPlan) =>
           Effect.gen(function* () {
             yield* commitArtifacts(transaction);
 
-            // 5. Publish ownership only after every artifact succeeds.
+            // 6. Publish ownership only after every artifact succeeds.
             yield* commitReceipt(transaction);
           }),
         ),
       );
 
-      // 6. Restore on failure, or release the recovery marker before snapshots.
+      // 7. Restore on failure, or release the recovery marker before snapshots.
       if (Exit.isFailure(commitExit)) {
         return yield* recoverCommit(transaction, commitExit.cause);
       }

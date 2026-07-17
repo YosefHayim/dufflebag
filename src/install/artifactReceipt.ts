@@ -1,7 +1,10 @@
-import { Either, Encoding, Predicate, Schema } from "effect";
+import { FileSystem } from "@effect/platform";
+import type { PlatformError } from "@effect/platform/Error";
+import { Effect, Either, Encoding, Option, ParseResult, Predicate, Schema } from "effect";
 
 import { agentCatalog, agentIdSchema } from "../catalog/agentCatalog.js";
 import { featureIdSchema, resolveFeatureSelection } from "../catalog/featureCatalog.js";
+import { findDuplicateJsonProperty } from "../config/jsonDocument.js";
 
 export const scopeSchema = Schema.Literal("global", "project").annotations({
   description: "Installation scope that owns the receipt.",
@@ -154,11 +157,65 @@ export const previousFileValueSchema = Schema.Union(
 
 export type PreviousFileValue = Schema.Schema.Type<typeof previousFileValueSchema>;
 
+const jsonPropertySeparatorSchema = Schema.String.pipe(
+  Schema.pattern(/^[ \t\r\n]*,[ \t\r\n]*$/u, {
+    message: () => "A JSON property separator must contain one comma and only JSON whitespace.",
+  }),
+);
+
+export const previousJsonLexicalSchema = Schema.Union(
+  Schema.TaggedStruct("value", {
+    source: Schema.NonEmptyString.annotations({
+      description: "Exact JSON value token replaced while this pointer is owned.",
+    }),
+  }),
+  Schema.TaggedStruct("beforeProperty", {
+    property: Schema.NonEmptyString.annotations({
+      description: "Exact JSON property token removed before its next sibling.",
+    }),
+    separator: jsonPropertySeparatorSchema.annotations({
+      description: "Exact comma and whitespace between the removed property and its next sibling.",
+    }),
+    nextKey: Schema.String.annotations({
+      description: "Decoded next-sibling key anchoring exact property restoration.",
+    }),
+  }),
+  Schema.TaggedStruct("afterProperty", {
+    previousKey: Schema.String.annotations({
+      description: "Decoded previous-sibling key anchoring exact property restoration.",
+    }),
+    separator: jsonPropertySeparatorSchema.annotations({
+      description: "Exact comma and whitespace between the previous sibling and removed property.",
+    }),
+    property: Schema.NonEmptyString.annotations({
+      description: "Exact JSON property token removed after its previous sibling.",
+    }),
+  }),
+  Schema.TaggedStruct("onlyProperty", {
+    prefix: Schema.String.annotations({
+      description: "Exact whitespace before the removed sole property.",
+    }),
+    property: Schema.NonEmptyString.annotations({
+      description: "Exact JSON property token removed as its object's sole property.",
+    }),
+    suffix: Schema.String.annotations({
+      description: "Exact whitespace after the removed sole property.",
+    }),
+  }),
+).annotations({
+  description: "Exact lexical evidence needed to restore one settings value without reformatting user bytes.",
+});
+
+export type PreviousJsonLexical = Schema.Schema.Type<typeof previousJsonLexicalSchema>;
+
 export const previousJsonValueSchema = Schema.Union(
   Schema.TaggedStruct("missing", {}),
   Schema.TaggedStruct("value", {
     value: jsonValueSchema.annotations({
       description: "Exact JSON-compatible value present before this pointer first became owned.",
+    }),
+    lexical: Schema.optional(previousJsonLexicalSchema).annotations({
+      description: "Settings-only lexical evidence correlated with the previous semantic value.",
     }),
   }),
 ).annotations({
@@ -202,17 +259,41 @@ export const managedBlockOwnershipSchema = Schema.TaggedStruct("managedBlock", {
 
 export type ManagedBlockOwnership = Schema.Schema.Type<typeof managedBlockOwnershipSchema>;
 
-const ownedJsonValueSchema = Schema.Struct({
+export const installedJsonValueSchema = Schema.Union(
+  Schema.TaggedStruct("missing", {}).annotations({
+    description: "The managed JSON pointer was deliberately absent after installation.",
+  }),
+  Schema.TaggedStruct("value", {
+    hash: sha256Schema.annotations({
+      description: "Hash of the canonical JSON value present after installation.",
+    }),
+  }),
+).annotations({
+  description: "Exact installed state required before one managed JSON pointer can be restored.",
+});
+
+export type InstalledJsonValue = Schema.Schema.Type<typeof installedJsonValueSchema>;
+
+export const ownedJsonValueSchema = Schema.Struct({
   pointer: jsonPointerSchema,
-  installedValueHash: sha256Schema.annotations({
-    description: "Hash of the canonical installed JSON value.",
+  installed: installedJsonValueSchema.annotations({
+    description: "Exact missing or hashed value state installed at this pointer.",
   }),
   previous: previousJsonValueSchema.annotations({
     description: "State recorded before this JSON pointer first became owned.",
   }),
-});
+}).pipe(
+  Schema.filter((value) =>
+    value.installed._tag === "missing" && value.previous._tag === "missing"
+      ? {
+          path: ["previous"],
+          message: "Installed missing JSON ownership requires a previous value that the installation removed.",
+        }
+      : undefined,
+  ),
+);
 
-type OwnedJsonValue = Schema.Schema.Type<typeof ownedJsonValueSchema>;
+export type OwnedJsonValue = Schema.Schema.Type<typeof ownedJsonValueSchema>;
 
 const pathsConflict = (left: string, right: string): boolean =>
   left === right || left.startsWith(`${right}/`) || right.startsWith(`${left}/`);
@@ -244,8 +325,34 @@ export const jsonValuesOwnershipSchema = Schema.TaggedStruct("jsonValues", {
   filePreviouslyPresent: Schema.Boolean.annotations({
     description: "Whether the host file existed before this receipt entry first managed it.",
   }),
+  createdContainers: Schema.Array(jsonPointerSchema).annotations({
+    description: "Exact JSON object pointers created to reach owned values and removable only when empty.",
+  }),
   values: ownedJsonValuesSchema,
-});
+}).pipe(
+  Schema.filter((ownership) => [
+    ...ownership.createdContainers.flatMap((container, index) =>
+      ownership.createdContainers.indexOf(container) === index
+        ? []
+        : [
+            {
+              path: ["createdContainers", index],
+              message: `Created JSON container ${container} must be unique.`,
+            },
+          ],
+    ),
+    ...ownership.createdContainers.flatMap((container, index) =>
+      ownership.values.some((value) => value.pointer.startsWith(`${container}/`))
+        ? []
+        : [
+            {
+              path: ["createdContainers", index],
+              message: `Created JSON container ${container} must be a proper ancestor of an owned value.`,
+            },
+          ],
+    ),
+  ]),
+);
 
 export type JsonValuesOwnership = Schema.Schema.Type<typeof jsonValuesOwnershipSchema>;
 
@@ -328,6 +435,93 @@ const ownershipMatchesKind = (kind: ArtifactKind, ownership: ArtifactOwnership):
   }
 };
 
+const jsonValueTextSchema = Schema.parseJson(jsonValueSchema);
+const decodeJsonValueSource = Schema.decodeUnknownEither(jsonValueTextSchema, {
+  onExcessProperty: "error",
+});
+
+const jsonPropertyRecordSchema = Schema.Record({ key: Schema.String, value: jsonValueSchema });
+const decodeJsonPropertySource = Schema.decodeUnknownEither(Schema.parseJson(jsonPropertyRecordSchema), {
+  onExcessProperty: "error",
+});
+const jsonValuesEqual = (left: unknown, right: unknown): boolean =>
+  Schema.encodeSync(jsonValueTextSchema)(left) === Schema.encodeSync(jsonValueTextSchema)(right);
+
+const pointerKey = (pointer: string): string => {
+  const segment = pointer.slice(pointer.lastIndexOf("/") + 1);
+
+  return segment.replaceAll("~1", "/").replaceAll("~0", "~");
+};
+
+const lexicalProperty = (lexical: PreviousJsonLexical): string | undefined => {
+  switch (lexical._tag) {
+    case "value":
+      return undefined;
+    case "beforeProperty":
+    case "afterProperty":
+    case "onlyProperty":
+      return lexical.property;
+  }
+};
+
+const lexicalMatchesPrevious = (value: OwnedJsonValue): boolean => {
+  if (value.previous._tag === "missing" || value.previous.lexical === undefined) {
+    return false;
+  }
+
+  if (value.previous.lexical._tag === "value") {
+    const decoded = decodeJsonValueSource(value.previous.lexical.source);
+
+    return Either.isRight(decoded) && jsonValuesEqual(decoded.right, value.previous.value);
+  }
+
+  const property = lexicalProperty(value.previous.lexical);
+  const decoded = property === undefined ? undefined : decodeJsonPropertySource(`{${property}}`);
+  if (decoded === undefined || Either.isLeft(decoded)) {
+    return false;
+  }
+
+  const entries = Object.entries(decoded.right);
+
+  return entries.length === 1 && entries[0]?.[0] === pointerKey(value.pointer) && jsonValuesEqual(entries[0][1], value.previous.value);
+};
+
+const settingsLexicalIssues = (entry: { kind: ArtifactKind; ownership: ArtifactOwnership }) => {
+  if (entry.ownership._tag !== "jsonValues") {
+    return [];
+  }
+
+  return entry.ownership.values.flatMap((value, index) => {
+    const lexical = value.previous._tag === "value" ? value.previous.lexical : undefined;
+    if (entry.kind._tag !== "settings") {
+      return lexical === undefined
+        ? []
+        : [
+            {
+              path: ["ownership", "values", index, "previous", "lexical"],
+              message: "Only settings ownership may carry lexical JSON restoration evidence.",
+            },
+          ];
+    }
+
+    if (value.previous._tag === "missing") {
+      return [];
+    }
+
+    const expectedTag = value.installed._tag === "missing" ? "property" : "value";
+    const actualTag = lexical?._tag === "value" ? "value" : lexical === undefined ? "missing" : "property";
+
+    return actualTag === expectedTag && lexicalMatchesPrevious(value)
+      ? []
+      : [
+          {
+            path: ["ownership", "values", index, "previous", "lexical"],
+            message: `Settings ownership requires correlated ${expectedTag} lexical restoration evidence.`,
+          },
+        ];
+  });
+};
+
 export const receiptEntrySchema = Schema.Struct({
   owner: artifactOwnerSchema,
   path: relativeArtifactPathSchema,
@@ -347,6 +541,7 @@ export const receiptEntrySchema = Schema.Struct({
           path: ["ownership"],
           message: `Artifact kind ${entry.kind._tag} has incompatible ownership ${entry.ownership._tag}.`,
         },
+    ...settingsLexicalIssues(entry),
   ]),
 );
 
@@ -408,7 +603,7 @@ const receiptFeatureIssues = (features: ReadonlyArray<string>) => {
 
 const featureListSchema = Schema.Array(featureIdSchema).pipe(Schema.filter(receiptFeatureIssues));
 
-const versionSchema = Schema.NonEmptyTrimmedString.pipe(
+export const versionSchema = Schema.NonEmptyTrimmedString.pipe(
   Schema.pattern(
     /^(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/,
     {
@@ -431,6 +626,104 @@ export const artifactReceiptJsonSchema = Schema.parseJson(artifactReceiptSchema)
 export const decodeArtifactReceiptJson = Schema.decodeUnknown(artifactReceiptJsonSchema, {
   onExcessProperty: "error",
 });
+
+const artifactReceiptTextDecoder = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
+const artifactReceiptsEqual = (left: ArtifactReceipt, right: ArtifactReceipt): boolean =>
+  Schema.encodeSync(artifactReceiptJsonSchema)(left) === Schema.encodeSync(artifactReceiptJsonSchema)(right);
+
+const decodeArtifactReceiptBytes = (bytes: Uint8Array): Either.Either<ArtifactReceipt, string> => {
+  const decodedText = Either.try({
+    try: () => artifactReceiptTextDecoder.decode(bytes),
+    catch: (error) => `file bytes are not valid UTF-8: ${error instanceof Error ? error.message : String(error)}`,
+  });
+
+  return Either.flatMap(decodedText, (json) => {
+    if (json.startsWith("\uFEFF")) {
+      return Either.left("leading UTF-8 byte-order mark is not allowed");
+    }
+
+    const duplicateProperty = findDuplicateJsonProperty(json);
+    if (duplicateProperty !== undefined) {
+      return Either.left(`duplicate JSON property ${JSON.stringify(duplicateProperty)}`);
+    }
+
+    return Either.mapLeft(
+      Schema.decodeUnknownEither(artifactReceiptJsonSchema, {
+        onExcessProperty: "error",
+      })(json),
+      ParseResult.TreeFormatter.formatErrorSync,
+    );
+  });
+};
+
+export const artifactReceiptSnapshotSchema = Schema.Union(
+  Schema.TaggedStruct("missing", {}),
+  Schema.TaggedStruct("present", {
+    bytes: Schema.Uint8ArrayFromSelf.annotations({
+      description: "Exact receipt file bytes read from disk.",
+    }),
+    receipt: Schema.typeSchema(artifactReceiptSchema).annotations({
+      description: "Strict receipt decoded from the same file bytes.",
+    }),
+  }).pipe(
+    Schema.filter((snapshot) => {
+      const decodedReceipt = decodeArtifactReceiptBytes(snapshot.bytes);
+
+      return Either.isRight(decodedReceipt) && artifactReceiptsEqual(decodedReceipt.right, snapshot.receipt)
+        ? undefined
+        : {
+            path: ["receipt"],
+            message: "Decoded receipt authority must exactly match its source bytes.",
+          };
+    }),
+  ),
+).annotations({
+  description: "Missing or strictly decoded artifact receipt with its exact source bytes.",
+});
+
+export type ArtifactReceiptSnapshot = Schema.Schema.Type<typeof artifactReceiptSnapshotSchema>;
+
+export class ArtifactReceiptParseError extends Schema.TaggedError<ArtifactReceiptParseError>()("ArtifactReceiptParseError", {
+  receiptPath: Schema.NonEmptyString.annotations({
+    description: "Artifact receipt file whose contents could not be decoded.",
+  }),
+  issue: Schema.NonEmptyString.annotations({
+    description: "Actionable receipt encoding, JSON, or schema issue.",
+  }),
+}) {
+  get message(): string {
+    return `Artifact receipt at ${this.receiptPath} is invalid: ${this.issue}. Fix or remove it, then retry.`;
+  }
+}
+
+const missingArtifactReceiptSnapshot: ArtifactReceiptSnapshot = { _tag: "missing" };
+
+const isNotFound = (error: PlatformError): boolean => error._tag === "SystemError" && error.reason === "NotFound";
+
+export const readArtifactReceiptSnapshot = (receiptPath: string) =>
+  Effect.gen(function* () {
+    const fileSystem = yield* FileSystem.FileSystem;
+    const contents = yield* fileSystem.readFile(receiptPath).pipe(
+      Effect.map(Option.some),
+      Effect.catchIf(isNotFound, () => Effect.succeed(Option.none())),
+    );
+
+    if (Option.isNone(contents)) {
+      return missingArtifactReceiptSnapshot;
+    }
+
+    const bytes = contents.value;
+    const decodedReceipt = decodeArtifactReceiptBytes(bytes);
+    if (Either.isLeft(decodedReceipt)) {
+      return yield* new ArtifactReceiptParseError({ receiptPath, issue: decodedReceipt.left });
+    }
+
+    const snapshot = Schema.validateSync(artifactReceiptSnapshotSchema, {
+      onExcessProperty: "error",
+    })({ _tag: "present", bytes, receipt: decodedReceipt.right });
+
+    return snapshot;
+  });
 
 const legacySkillIdSchema = Schema.NonEmptyTrimmedString.pipe(
   Schema.pattern(/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/, {

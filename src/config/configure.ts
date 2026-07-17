@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-import { Either, Option, ParseResult, Schema } from "effect";
+import { Either, ParseResult, Schema } from "effect";
 
 import { type WriteOperation, writeOperationSchema } from "../install/artifactPlan.js";
 import {
@@ -12,7 +12,7 @@ import {
   sha256Schema,
 } from "../install/artifactReceipt.js";
 import { defaultBagConfig, legacyBagConfigEnvironmentSchema } from "./bagConfigSchema.js";
-import { configFileReadResultSchema, type ManagedConfigFile, managedConfigFileSchema } from "./configFile.js";
+import { configFileSnapshotSchema, type ManagedConfigFile, managedConfigFileSchema } from "./configFile.js";
 import { findDuplicateJsonProperty } from "./jsonDocument.js";
 
 export const managedConfigPath = ".claude/dufflebag/config.json";
@@ -63,6 +63,9 @@ const legacyEnvironmentEntries = (environment: Readonly<Record<string, unknown>>
   Object.entries(environment)
     .filter(([key]) => key.toLowerCase().startsWith("dufflebag"))
     .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0));
+
+export const hasLegacySettingsCandidate = (environment: Readonly<Record<string, unknown>>): boolean =>
+  legacyEnvironmentEntries(environment).length > 0;
 
 const decodeLegacyConfig = (entries: ReadonlyArray<readonly [string, unknown]>) => {
   if (entries.length === 0) {
@@ -200,7 +203,7 @@ export const legacySettingsEvidenceSchema = legacySettingsEvidenceFieldsSchema.p
 
 export type LegacySettingsEvidence = Schema.Schema.Type<typeof legacySettingsEvidenceSchema>;
 
-const legacySettingsPlanSchema = Schema.Union(
+export const legacySettingsPlanSchema = Schema.Union(
   Schema.TaggedStruct("none", {}).annotations({
     description: "No legacy settings cleanup is required.",
   }),
@@ -209,6 +212,8 @@ const legacySettingsPlanSchema = Schema.Union(
   description: "Optional evidence merged into the single later settings operation.",
 });
 
+export type LegacySettingsPlan = Schema.Schema.Type<typeof legacySettingsPlanSchema>;
+
 const configSelectionSchema = Schema.Union(
   Schema.TaggedStruct("selected", {
     config: managedConfigFileSchema.annotations({
@@ -216,8 +221,8 @@ const configSelectionSchema = Schema.Union(
     }),
   }),
   Schema.TaggedStruct("firstProjectInstall", {
-    globalConfig: configFileReadResultSchema.annotations({
-      description: "Validated global snapshot copied once, or none when schema defaults should be used.",
+    globalConfig: configFileSnapshotSchema.annotations({
+      description: "Exact validated global snapshot copied once, or a missing snapshot when schema defaults should be used.",
     }),
   }),
   Schema.TaggedStruct("legacyEnvironment", {
@@ -374,7 +379,7 @@ const resolveConfigSelection = (request: ConfigureRequest): Either.Either<Manage
         legacySettings: { _tag: "none" },
       });
     case "firstProjectInstall": {
-      const config = Option.getOrElse(request.selection.globalConfig, () => defaultBagConfig);
+      const config = request.selection.globalConfig._tag === "present" ? request.selection.globalConfig.config : defaultBagConfig;
 
       return Either.right({
         config,

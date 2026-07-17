@@ -5,13 +5,18 @@
  * Each scene becomes a segment — its `clipPath` when present, else a Ken-Burns
  * push on `stillPath`/`screenshot` — sized to the manifest format, concatenated
  * in `order`. Audio mixes the voiceover over a sidechain-ducked music bed.
- *   --mode rough : fast preview, no captions, no loudnorm.
- *   --mode final : burned captions + loudnorm to -14 LUFS / -1 dBTP.
+ *   --mode rough    : fast preview, no captions, no loudnorm.
+ *   --mode final    : burned captions + loudnorm to -14 LUFS / -1 dBTP.
+ *   --mode animatic : the pre-motion GATE — every scene is its STILL held for its
+ *                     beat (blurred-fill, so nothing wide is cropped; no zoompan, which
+ *                     some ffmpeg builds choke on) over a scratch music bed; no motion,
+ *                     no captions. Watch the whole story and approve order/pacing BEFORE
+ *                     spending any motion credit. `--hold <sec>` forces a uniform beat.
  *
  * Assumes referenced media exists and motion clips are >= their scene duration;
  * it fails loudly on a missing file rather than shipping a gap.
  *
- * Usage: node assembleCut.mjs --manifest <dir>/manifest.json --mode rough|final --out <file>
+ * Usage: node assembleCut.mjs --manifest <dir>/manifest.json --mode rough|final|animatic [--hold <sec>] --out <file>
  */
 
 import { spawnSync } from "node:child_process";
@@ -37,6 +42,21 @@ export function clipSegment(idx, w, h, fps, dur, label) {
   return (
     `[${idx}:v]scale=${w}:${h}:force_original_aspect_ratio=increase,crop=${w}:${h},fps=${fps},` +
     `trim=0:${dur},setpts=PTS-STARTPTS,setsar=1[${label}]`
+  );
+}
+
+/**
+ * Held-still segment for the animatic at ffmpeg index `idx`. No zoompan (many ffmpeg
+ * builds mis-render it on the first segment) and no crop — a blurred, darkened copy of
+ * the frame fills the 9:16 canvas while the whole 16:9 frame sits sharp and centred, so
+ * no wide action is sliced off. The still input is looped to its beat before this filter.
+ */
+export function animaticSegment(idx, w, h, fps, label) {
+  return (
+    `[${idx}:v]split=2[abg${idx}][afg${idx}];` +
+    `[abg${idx}]scale=${w}:${h}:force_original_aspect_ratio=increase,crop=${w}:${h},boxblur=20:1,eq=brightness=-0.32[bg${idx}];` +
+    `[afg${idx}]scale=${w}:${h}:force_original_aspect_ratio=decrease[fg${idx}];` +
+    `[bg${idx}][fg${idx}]overlay=(W-w)/2:(H-h)/2,fps=${fps},setsar=1[${label}]`
   );
 }
 
@@ -125,7 +145,16 @@ function sceneMedia(scene, baseDir) {
   return { abs, isClip: Boolean(scene.clipPath) };
 }
 
-function build(manifest, baseDir, mode, out, canBurn) {
+/** Absolute path to a scene's STILL (never its clip) — the animatic is the pre-motion gate. */
+function stillMedia(scene, baseDir) {
+  const rel = scene.stillPath ?? scene.screenshot;
+  if (!rel) throw new Error(`Scene ${scene.id} has no still or screenshot for the animatic`);
+  const abs = isAbsolute(rel) ? rel : resolve(baseDir, rel);
+  if (!existsSync(abs)) throw new Error(`Scene ${scene.id}: missing still ${abs}`);
+  return abs;
+}
+
+function build(manifest, baseDir, mode, out, canBurn, hold) {
   const { width: w, height: h, fps } = manifest.format;
   const scenes = [...manifest.scenes].sort((a, b) => a.order - b.order);
   if (scenes.length === 0) throw new Error("Manifest has no scenes");
@@ -134,19 +163,26 @@ function build(manifest, baseDir, mode, out, canBurn) {
   const segFilters = [];
   const labels = [];
   scenes.forEach((scene, i) => {
-    const { abs, isClip } = sceneMedia(scene, baseDir);
     const label = `v${i}`;
-    if (isClip) {
-      inputArgs.push("-i", abs);
-      segFilters.push(clipSegment(i, w, h, fps, scene.durationSec, label));
+    const dur = hold ?? scene.durationSec;
+    if (mode === "animatic") {
+      // Pre-motion gate: hold each still for its beat, blurred-fill so wide action survives, ignore any clip.
+      inputArgs.push("-loop", "1", "-t", String(dur), "-i", stillMedia(scene, baseDir));
+      segFilters.push(animaticSegment(i, w, h, fps, label));
     } else {
-      inputArgs.push("-loop", "1", "-t", String(scene.durationSec), "-i", abs);
-      segFilters.push(stillSegment(i, w, h, fps, scene.durationSec, label));
+      const { abs, isClip } = sceneMedia(scene, baseDir);
+      if (isClip) {
+        inputArgs.push("-i", abs);
+        segFilters.push(clipSegment(i, w, h, fps, dur, label));
+      } else {
+        inputArgs.push("-loop", "1", "-t", String(dur), "-i", abs);
+        segFilters.push(stillSegment(i, w, h, fps, dur, label));
+      }
     }
     labels.push(`[${label}]`);
   });
 
-  const total = scenes.reduce((sum, s) => sum + s.durationSec, 0);
+  const total = scenes.reduce((sum, s) => sum + (hold ?? s.durationSec), 0);
   const videoOut = "vout";
   const filters = [...segFilters, `${labels.join("")}concat=n=${scenes.length}:v=1:a=0[vcat]`];
 
@@ -169,7 +205,8 @@ function build(manifest, baseDir, mode, out, canBurn) {
 
   // Audio: index offset starts after all scene inputs.
   let idx = scenes.length;
-  const vo = manifest.audio?.voPath ? resolve(baseDir, manifest.audio.voPath) : null;
+  // The animatic judges pacing against a scratch music bed only — no VO yet.
+  const vo = mode !== "animatic" && manifest.audio?.voPath ? resolve(baseDir, manifest.audio.voPath) : null;
   const music = manifest.audio?.musicPath ? resolve(baseDir, manifest.audio.musicPath) : null;
   const aParts = [];
   let audioOut = "aout";
@@ -224,14 +261,16 @@ function build(manifest, baseDir, mode, out, canBurn) {
 
 function main() {
   const f = parseFlags(process.argv.slice(2));
-  if (!f.manifest || !f.out) throw new Error("Usage: assembleCut.mjs --manifest <manifest.json> --mode rough|final --out <file>");
-  const mode = f.mode === "final" ? "final" : "rough";
+  if (!f.manifest || !f.out)
+    throw new Error("Usage: assembleCut.mjs --manifest <manifest.json> --mode rough|final|animatic [--hold <sec>] --out <file>");
+  const mode = f.mode === "final" || f.mode === "animatic" ? f.mode : "rough";
   const manifest = JSON.parse(readFileSync(f.manifest, "utf8"));
   const baseDir = dirname(resolve(f.manifest));
   const outDir = dirname(resolve(f.out));
   mkdirSync(outDir, { recursive: true });
   const canBurn = mode === "final" && hasSubtitlesFilter();
-  run(build(manifest, baseDir, mode, f.out, canBurn), outDir);
+  const hold = mode === "animatic" && f.hold ? Number(f.hold) : null;
+  run(build(manifest, baseDir, mode, f.out, canBurn, hold), outDir);
   process.stdout.write(`Wrote ${f.out} (${mode}${mode === "final" && !canBurn ? ", captions as .srt sidecar" : ""})\n`);
 }
 

@@ -1,12 +1,15 @@
+import { FileSystem } from "@effect/platform";
+import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import { Effect, Schema } from "effect";
-import { describe, expect, expectTypeOf, it } from "vitest";
 
 import {
   type ArtifactReceipt,
+  ArtifactReceiptParseError,
   artifactKindSchema,
   artifactOwnerSchema,
   artifactReceiptJsonSchema,
   artifactReceiptSchema,
+  artifactReceiptSnapshotSchema,
   decodeArtifactReceiptJson,
   jsonPointerSchema,
   jsonValuesOwnershipSchema,
@@ -15,6 +18,7 @@ import {
   previousFileValueSchema,
   previousJsonValueSchema,
   type ReceiptEntry,
+  readArtifactReceiptSnapshot,
   receiptEntrySchema,
   relativeArtifactPathSchema,
   sha256Schema,
@@ -23,6 +27,8 @@ import {
 
 const installedHash = "a".repeat(64);
 const installedValueHash = "b".repeat(64);
+const receiptPath = "/workspace/.dufflebag/receipt.json";
+const textEncoder = new TextEncoder();
 
 const missingPreviousFile = { _tag: "missing" };
 const missingPreviousJson = { _tag: "missing" };
@@ -47,16 +53,35 @@ const managedBlockOwnership = {
 const jsonValuesOwnership = {
   _tag: "jsonValues",
   filePreviouslyPresent: true,
+  createdContainers: [],
   values: [
     {
       pointer: "/hooks/PreToolUse",
-      installedValueHash,
+      installed: { _tag: "value", hash: installedValueHash },
       previous: missingPreviousJson,
     },
     {
       pointer: "/enabled",
-      installedValueHash: installedHash,
+      installed: { _tag: "value", hash: installedHash },
       previous: { _tag: "value", value: false },
+    },
+  ],
+};
+
+const settingsJsonValuesOwnership = {
+  _tag: "jsonValues",
+  filePreviouslyPresent: true,
+  createdContainers: [],
+  values: [
+    {
+      pointer: "/hooks/PreToolUse",
+      installed: { _tag: "value", hash: installedValueHash },
+      previous: missingPreviousJson,
+    },
+    {
+      pointer: "/enabled",
+      installed: { _tag: "value", hash: installedHash },
+      previous: { _tag: "value", value: false, lexical: { _tag: "value", source: "false" } },
     },
   ],
 };
@@ -120,7 +145,7 @@ const completeReceiptInput = {
       owner: applicationOwner,
       path: ".claude/settings.json",
       kind: { _tag: "settings" },
-      ownership: jsonValuesOwnership,
+      ownership: settingsJsonValuesOwnership,
     },
     {
       owner: applicationOwner,
@@ -169,6 +194,20 @@ const receiptWithArtifacts = (artifacts: ReadonlyArray<unknown>) => ({
   features: ["context-guard"],
   artifacts,
 });
+
+const readFixtureReceipt = (bytes: Uint8Array) =>
+  readArtifactReceiptSnapshot(receiptPath).pipe(
+    Effect.provide(
+      FileSystem.layerNoop({
+        readFile: (path) =>
+          Effect.sync(() => {
+            expect(path).toBe(receiptPath);
+
+            return bytes;
+          }),
+      }),
+    ),
+  );
 
 describe("artifactReceiptSchema", () => {
   it("decodes every receiptable artifact kind and all ownership tags", () => {
@@ -292,10 +331,11 @@ describe("artifactReceiptSchema", () => {
       decodeJsonValues({
         _tag: "jsonValues",
         filePreviouslyPresent: true,
+        createdContainers: [],
         values: [
           {
             pointer: "/value",
-            installedValueHash,
+            installed: { _tag: "value", hash: installedValueHash },
             previous: missingPreviousJson,
             extra: true,
           },
@@ -365,7 +405,7 @@ describe("artifactReceiptSchema", () => {
 
   it("rejects duplicate and parent-child JSON pointers", () => {
     const value = {
-      installedValueHash,
+      installed: { _tag: "value", hash: installedValueHash },
       previous: missingPreviousJson,
     };
 
@@ -373,6 +413,7 @@ describe("artifactReceiptSchema", () => {
       decodeJsonValues({
         _tag: "jsonValues",
         filePreviouslyPresent: true,
+        createdContainers: [],
         values: [
           { ...value, pointer: "/rules" },
           { ...value, pointer: "/rules" },
@@ -383,12 +424,74 @@ describe("artifactReceiptSchema", () => {
       decodeJsonValues({
         _tag: "jsonValues",
         filePreviouslyPresent: true,
+        createdContainers: [],
         values: [
           { ...value, pointer: "/rules" },
           { ...value, pointer: "/rules/0" },
         ],
       }),
     ).toThrow(/pointer/i);
+  });
+
+  it("records missing and hashed installed JSON states with exact created containers", () => {
+    const ownership = decodeJsonValues({
+      _tag: "jsonValues",
+      filePreviouslyPresent: true,
+      createdContainers: ["/hooks"],
+      values: [
+        {
+          pointer: "/hooks/Stop",
+          installed: { _tag: "missing" },
+          previous: { _tag: "value", value: [{ command: "legacy" }] },
+        },
+        {
+          pointer: "/hooks/PreToolUse",
+          installed: { _tag: "value", hash: installedValueHash },
+          previous: missingPreviousJson,
+        },
+      ],
+    });
+
+    expect(ownership.createdContainers).toEqual(["/hooks"]);
+    expect(ownership.values.map((value) => value.installed)).toEqual([{ _tag: "missing" }, { _tag: "value", hash: installedValueHash }]);
+  });
+
+  it("rejects meaningless missing-to-missing JSON ownership", () => {
+    expect(() =>
+      decodeJsonValues({
+        _tag: "jsonValues",
+        filePreviouslyPresent: true,
+        createdContainers: [],
+        values: [
+          {
+            pointer: "/env/DUFFLEBAG_CONFIG",
+            installed: { _tag: "missing" },
+            previous: { _tag: "missing" },
+          },
+        ],
+      }),
+    ).toThrow(/missing|previous|mutation|value/i);
+  });
+
+  it.each([
+    { name: "duplicate", createdContainers: ["/hooks", "/hooks"] },
+    { name: "unrelated", createdContainers: ["/permissions"] },
+    { name: "owned value itself", createdContainers: ["/hooks/Stop"] },
+  ])("rejects $name created JSON containers", ({ createdContainers }) => {
+    expect(() =>
+      decodeJsonValues({
+        _tag: "jsonValues",
+        filePreviouslyPresent: true,
+        createdContainers,
+        values: [
+          {
+            pointer: "/hooks/Stop",
+            installed: { _tag: "missing" },
+            previous: { _tag: "value", value: [] },
+          },
+        ],
+      }),
+    ).toThrow(/container|ancestor|unique/i);
   });
 
   it("round-trips members acquired after a receipt first created their host files", () => {
@@ -434,10 +537,11 @@ describe("artifactReceiptSchema", () => {
       decodeJsonValues({
         _tag: "jsonValues",
         filePreviouslyPresent: true,
+        createdContainers: [],
         values: [
           {
             pointer: "/rules",
-            installedValueHash,
+            installed: { _tag: "value", hash: installedValueHash },
             previous: missingPreviousJson,
           },
         ],
@@ -656,4 +760,94 @@ describe("legacyManifestSchema", () => {
     expect(() => decodeLegacyManifest({ ...legacyManifest, installedAt: "2026-07-14" })).toThrow();
     expect(() => decodeLegacyManifest({ ...legacyManifest, installedAt: "2026-99-99T10:00:00.000Z" })).toThrow();
   });
+});
+
+describe("readArtifactReceiptSnapshot", () => {
+  it.effect("returns tagged missing or present snapshots from the requested path", () =>
+    Effect.gen(function* () {
+      const receipt = decodeReceipt(completeReceiptInput);
+      const json = Schema.encodeSync(artifactReceiptJsonSchema)(receipt);
+      const bytes = textEncoder.encode(`\n${json}\n`);
+      const missing = yield* readArtifactReceiptSnapshot(receiptPath).pipe(Effect.provide(FileSystem.layerNoop({})));
+      const present = yield* readFixtureReceipt(bytes);
+
+      expect(missing).toEqual({ _tag: "missing" });
+      expect(present).toEqual({ _tag: "present", bytes, receipt });
+      expect(Schema.decodeUnknownSync(artifactReceiptSnapshotSchema)(present)).toEqual(present);
+      if (present._tag === "present") {
+        expect(present.bytes).toBe(bytes);
+      }
+    }),
+  );
+
+  it.effect("rejects malformed UTF-8 instead of accepting replacement characters", () =>
+    Effect.gen(function* () {
+      const receipt = decodeReceipt(completeReceiptInput);
+      const json = Schema.encodeSync(artifactReceiptJsonSchema)(receipt);
+      const marker = "contextGuard.js";
+      const markerIndex = json.indexOf(marker);
+      const bytes = new Uint8Array([
+        ...textEncoder.encode(json.slice(0, markerIndex)),
+        0xff,
+        ...textEncoder.encode(json.slice(markerIndex + 1)),
+      ]);
+      const error = yield* Effect.flip(readFixtureReceipt(bytes));
+
+      expect(error).toBeInstanceOf(ArtifactReceiptParseError);
+      expect(error.message).toContain(receiptPath);
+      expect(error.message).toContain("UTF-8");
+    }),
+  );
+
+  it.effect("rejects a leading UTF-8 byte-order mark", () =>
+    Effect.gen(function* () {
+      const receipt = decodeReceipt(completeReceiptInput);
+      const json = Schema.encodeSync(artifactReceiptJsonSchema)(receipt);
+      const bytes = new Uint8Array([0xef, 0xbb, 0xbf, ...textEncoder.encode(json)]);
+      const error = yield* Effect.flip(readFixtureReceipt(bytes));
+
+      expect(error).toBeInstanceOf(ArtifactReceiptParseError);
+      expect(error.message).toContain("byte-order mark");
+    }),
+  );
+
+  it.effect("rejects duplicate JSON properties whose names use different escapes", () =>
+    Effect.gen(function* () {
+      const receipt = decodeReceipt(completeReceiptInput);
+      const json = Schema.encodeSync(artifactReceiptJsonSchema)(receipt).replace(
+        '"version":"1.0.0"',
+        '"\\u0076ersion":"1.0.0","version":"1.0.0"',
+      );
+      const bytes = textEncoder.encode(json);
+      const error = yield* Effect.flip(readFixtureReceipt(bytes));
+
+      expect(error).toBeInstanceOf(ArtifactReceiptParseError);
+      expect(error.message).toContain("duplicate JSON property");
+      expect(error.message).toContain("version");
+    }),
+  );
+
+  it.effect("reports malformed JSON and receipt schema failures through one tagged error", () =>
+    Effect.gen(function* () {
+      const malformed = yield* Effect.flip(readFixtureReceipt(textEncoder.encode("{not-json")));
+      const invalidSchema = yield* Effect.flip(
+        readFixtureReceipt(
+          textEncoder.encode(
+            JSON.stringify({
+              version: "1.0.0",
+              scope: "project",
+              features: [],
+              artifacts: [],
+              unexpected: true,
+            }),
+          ),
+        ),
+      );
+
+      expect(malformed).toBeInstanceOf(ArtifactReceiptParseError);
+      expect(malformed.message).toContain(receiptPath);
+      expect(invalidSchema).toBeInstanceOf(ArtifactReceiptParseError);
+      expect(invalidSchema.message).toContain("unexpected");
+    }),
+  );
 });

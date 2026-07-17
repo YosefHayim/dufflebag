@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import { FileSystem, Path } from "@effect/platform";
 import { SystemError } from "@effect/platform/Error";
 import { NodeContext, NodeFileSystem, NodePath } from "@effect/platform-node";
@@ -5,7 +7,7 @@ import { expect, layer } from "@effect/vitest";
 import { Cause, Deferred, Effect, Either, Exit, Fiber, Layer, Ref } from "effect";
 
 import { applyArtifactPlan } from "./applyArtifactPlan.js";
-import { type ArtifactPlan, validateArtifactPlan } from "./artifactPlan.js";
+import { type ArtifactExpectedCurrent, type ArtifactPlan, validateArtifactPlan } from "./artifactPlan.js";
 import { decodeArtifactReceiptJson } from "./artifactReceipt.js";
 import { decodeArtifactRecoveryRecordJson } from "./artifactRecovery.js";
 
@@ -16,23 +18,39 @@ const secondOriginalBytes = new TextEncoder().encode("second-original");
 const externallyChangedBytes = new TextEncoder().encode("changed after transaction mutation");
 const applicationOwner = { _tag: "application" };
 const missingPrevious = { _tag: "missing" };
+const expectedMissing: ArtifactExpectedCurrent = { _tag: "missing" };
 
 const portablePath = (filePath: string): string => filePath.replaceAll("\\", "/");
+
+const expectedFile = (bytes: Uint8Array): ArtifactExpectedCurrent => ({
+  _tag: "file",
+  sha256: createHash("sha256").update(bytes).digest("hex"),
+});
 
 const unwrapPlan = (input: unknown): ArtifactPlan =>
   Either.getOrThrowWith(validateArtifactPlan(input), (error) => new Error(String(error)));
 
-const createWritePlan = (root: string, artifactPaths: ReadonlyArray<string>): ArtifactPlan => {
-  const artifacts = artifactPaths.map((artifactPath) => ({
-    path: artifactPath,
-    kind: { _tag: "managedConfig" },
-    owner: applicationOwner,
-    ownership: {
-      _tag: "wholeFile",
-      installedHash,
-      previous: missingPrevious,
+type WritePlanRequest = {
+  readonly root: string;
+  readonly expectedByPath: Readonly<Record<string, ArtifactExpectedCurrent>>;
+  readonly receiptExpectedCurrent?: ArtifactExpectedCurrent;
+};
+
+const createWritePlan = (request: WritePlanRequest): ArtifactPlan => {
+  const plannedArtifacts = Object.entries(request.expectedByPath).map(([artifactPath, expectedCurrent]) => ({
+    artifact: {
+      path: artifactPath,
+      kind: { _tag: "managedConfig" },
+      owner: applicationOwner,
+      ownership: {
+        _tag: "wholeFile",
+        installedHash,
+        previous: missingPrevious,
+      },
     },
+    expectedCurrent,
   }));
+  const artifacts = plannedArtifacts.map(({ artifact }) => artifact);
   const receipt = {
     version: "0.12.0",
     scope: "project",
@@ -42,8 +60,14 @@ const createWritePlan = (root: string, artifactPaths: ReadonlyArray<string>): Ar
 
   return unwrapPlan({
     scope: "project",
-    root,
-    operations: artifacts.map((artifact) => ({ _tag: "write", artifact, bytes: installedBytes })),
+    root: request.root,
+    operations: plannedArtifacts.map(({ artifact, expectedCurrent }) => ({
+      _tag: "write",
+      artifact,
+      bytes: installedBytes,
+      expectedCurrent,
+    })),
+    preconditions: [],
     receipt: {
       _tag: "receiptPublish",
       target: {
@@ -52,6 +76,7 @@ const createWritePlan = (root: string, artifactPaths: ReadonlyArray<string>): Ar
         owner: applicationOwner,
       },
       receipt,
+      expectedCurrent: request.receiptExpectedCurrent ?? expectedMissing,
     },
   });
 };
@@ -84,10 +109,16 @@ const createMixedPlan = (root: string): ArtifactPlan => {
     scope: "project",
     root,
     operations: [
-      { _tag: "write", artifact: writeArtifact, bytes: installedBytes },
-      { _tag: "restore", artifact: restoreArtifact, bytes: originalBytes },
-      { _tag: "remove", artifact: removeArtifact, unownedBytes: new Uint8Array() },
+      { _tag: "write", artifact: writeArtifact, bytes: installedBytes, expectedCurrent: expectedMissing },
+      { _tag: "restore", artifact: restoreArtifact, bytes: originalBytes, expectedCurrent: expectedFile(installedBytes) },
+      {
+        _tag: "remove",
+        artifact: removeArtifact,
+        unownedBytes: new Uint8Array(),
+        expectedCurrent: expectedFile(installedBytes),
+      },
     ],
+    preconditions: [],
     receipt: {
       _tag: "receiptPublish",
       target: {
@@ -101,15 +132,17 @@ const createMixedPlan = (root: string): ArtifactPlan => {
         features: [],
         artifacts: [writeArtifact],
       },
+      expectedCurrent: expectedMissing,
     },
   });
 };
 
-const createReceiptRemovalPlan = (root: string): ArtifactPlan =>
+const createReceiptRemovalPlan = (root: string, receiptExpectedCurrent: ArtifactExpectedCurrent): ArtifactPlan =>
   unwrapPlan({
     scope: "project",
     root,
     operations: [],
+    preconditions: [],
     receipt: {
       _tag: "remove",
       target: {
@@ -117,6 +150,7 @@ const createReceiptRemovalPlan = (root: string): ArtifactPlan =>
         kind: { _tag: "receipt" },
         owner: applicationOwner,
       },
+      expectedCurrent: receiptExpectedCurrent,
     },
   });
 
@@ -125,7 +159,9 @@ layer(NodeContext.layer)("applyArtifactPlan", (it) => {
     Effect.gen(function* () {
       const path = yield* Path.Path;
       const foreignRoot = path.isAbsolute("C:/workspace") ? "/workspace" : "C:/workspace";
-      const result = yield* Effect.exit(applyArtifactPlan(createWritePlan(foreignRoot, ["settings.json"])));
+      const result = yield* Effect.exit(
+        applyArtifactPlan(createWritePlan({ root: foreignRoot, expectedByPath: { "settings.json": expectedMissing } })),
+      );
 
       expect(Exit.isFailure(result)).toBe(true);
     }),
@@ -137,7 +173,7 @@ layer(NodeContext.layer)("applyArtifactPlan", (it) => {
         const fileSystem = yield* FileSystem.FileSystem;
         const path = yield* Path.Path;
         const root = yield* fileSystem.makeTempDirectoryScoped({ prefix: "dufflebag-apply-success-" });
-        const plan = createWritePlan(root, ["config/settings.json"]);
+        const plan = createWritePlan({ root, expectedByPath: { "config/settings.json": expectedMissing } });
 
         yield* applyArtifactPlan(plan);
 
@@ -152,6 +188,262 @@ layer(NodeContext.layer)("applyArtifactPlan", (it) => {
     ),
   );
 
+  it.effect("rejects a receipt that appeared after planning before mutating an artifact", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const fileSystem = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const root = yield* fileSystem.makeTempDirectoryScoped({ prefix: "dufflebag-apply-receipt-appeared-" });
+        const artifactPath = path.join(root, "settings.json");
+        const receiptPath = path.join(root, ".dufflebag/receipt.json");
+        const appearedReceiptBytes = new TextEncoder().encode("receipt appeared after planning");
+        const plan = createWritePlan({
+          root,
+          expectedByPath: { "settings.json": expectedMissing },
+          receiptExpectedCurrent: expectedMissing,
+        });
+
+        yield* fileSystem.makeDirectory(path.dirname(receiptPath), { recursive: true });
+        yield* fileSystem.writeFile(receiptPath, appearedReceiptBytes);
+
+        const result = yield* Effect.exit(applyArtifactPlan(plan));
+
+        expect(Exit.isFailure(result)).toBe(true);
+        expect(yield* fileSystem.exists(artifactPath)).toBe(false);
+        expect([...(yield* fileSystem.readFile(receiptPath))]).toEqual([...appearedReceiptBytes]);
+      }),
+    ),
+  );
+
+  it.effect("rejects changed receipt bytes before mutating an artifact", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const fileSystem = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const root = yield* fileSystem.makeTempDirectoryScoped({ prefix: "dufflebag-apply-receipt-changed-" });
+        const artifactPath = path.join(root, "settings.json");
+        const receiptPath = path.join(root, ".dufflebag/receipt.json");
+        const priorReceiptBytes = new TextEncoder().encode("receipt inspected during planning");
+        const changedReceiptBytes = new TextEncoder().encode("receipt changed after planning");
+
+        yield* fileSystem.makeDirectory(path.dirname(receiptPath), { recursive: true });
+        yield* fileSystem.writeFile(receiptPath, priorReceiptBytes);
+
+        const plan = createWritePlan({
+          root,
+          expectedByPath: { "settings.json": expectedMissing },
+          receiptExpectedCurrent: expectedFile(priorReceiptBytes),
+        });
+        yield* fileSystem.writeFile(receiptPath, changedReceiptBytes);
+
+        const result = yield* Effect.exit(applyArtifactPlan(plan));
+
+        expect(Exit.isFailure(result)).toBe(true);
+        expect(yield* fileSystem.exists(artifactPath)).toBe(false);
+        expect([...(yield* fileSystem.readFile(receiptPath))]).toEqual([...changedReceiptBytes]);
+      }),
+    ),
+  );
+
+  it.effect("commits when present receipt bytes still match planning", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const fileSystem = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const root = yield* fileSystem.makeTempDirectoryScoped({ prefix: "dufflebag-apply-receipt-matching-" });
+        const artifactPath = path.join(root, "settings.json");
+        const receiptPath = path.join(root, ".dufflebag/receipt.json");
+        const priorReceiptBytes = new TextEncoder().encode("receipt inspected during planning");
+
+        yield* fileSystem.makeDirectory(path.dirname(receiptPath), { recursive: true });
+        yield* fileSystem.writeFile(receiptPath, priorReceiptBytes);
+
+        const plan = createWritePlan({
+          root,
+          expectedByPath: { "settings.json": expectedMissing },
+          receiptExpectedCurrent: expectedFile(priorReceiptBytes),
+        });
+        yield* applyArtifactPlan(plan);
+
+        expect([...(yield* fileSystem.readFile(artifactPath))]).toEqual([...installedBytes]);
+        expect(yield* decodeArtifactReceiptJson(yield* fileSystem.readFileString(receiptPath))).toEqual(plan.receipt.receipt);
+      }),
+    ),
+  );
+
+  it.effect("rejects a changed receipt from a serialized removal plan", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const fileSystem = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const root = yield* fileSystem.makeTempDirectoryScoped({ prefix: "dufflebag-apply-serialized-removal-" });
+        const receiptPath = path.join(root, ".dufflebag/receipt.json");
+        const priorReceiptBytes = new TextEncoder().encode("receipt inspected during planning");
+        const changedReceiptBytes = new TextEncoder().encode("receipt changed after planning");
+        const serializedPlan = unwrapPlan(JSON.parse(JSON.stringify(createReceiptRemovalPlan(root, expectedFile(priorReceiptBytes)))));
+
+        yield* fileSystem.makeDirectory(path.dirname(receiptPath), { recursive: true });
+        yield* fileSystem.writeFile(receiptPath, changedReceiptBytes);
+
+        const result = yield* Effect.exit(applyArtifactPlan(serializedPlan));
+
+        expect(Exit.isFailure(result)).toBe(true);
+        expect([...(yield* fileSystem.readFile(receiptPath))]).toEqual([...changedReceiptBytes]);
+      }),
+    ),
+  );
+
+  it.effect("rejects a target that appeared after planning without mutating artifacts or the receipt", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const fileSystem = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const root = yield* fileSystem.makeTempDirectoryScoped({ prefix: "dufflebag-apply-appeared-conflict-" });
+        const stableArtifactPath = path.join(root, "stable.txt");
+        const artifactPath = path.join(root, "settings.json");
+        const receiptPath = path.join(root, ".dufflebag/receipt.json");
+        const appearedBytes = new TextEncoder().encode("appeared after planning");
+        const priorReceiptBytes = new TextEncoder().encode("prior receipt");
+        const plan = createWritePlan({
+          root,
+          expectedByPath: { "stable.txt": expectedFile(originalBytes), "settings.json": expectedMissing },
+        });
+
+        yield* fileSystem.makeDirectory(path.dirname(receiptPath), { recursive: true });
+        yield* fileSystem.writeFile(stableArtifactPath, originalBytes);
+        yield* fileSystem.writeFile(artifactPath, appearedBytes);
+        yield* fileSystem.writeFile(receiptPath, priorReceiptBytes);
+
+        const result = yield* Effect.exit(applyArtifactPlan(plan));
+
+        expect(Exit.isFailure(result)).toBe(true);
+        expect([...(yield* fileSystem.readFile(stableArtifactPath))]).toEqual([...originalBytes]);
+        expect([...(yield* fileSystem.readFile(artifactPath))]).toEqual([...appearedBytes]);
+        expect([...(yield* fileSystem.readFile(receiptPath))]).toEqual([...priorReceiptBytes]);
+
+        const rootEntries = yield* fileSystem.readDirectory(root);
+        expect(rootEntries.filter((entry) => entry.startsWith(".dufflebag-transaction-"))).toEqual([]);
+      }),
+    ),
+  );
+
+  it.effect("rejects target bytes changed after planning without mutating artifacts or the receipt", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const fileSystem = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const root = yield* fileSystem.makeTempDirectoryScoped({ prefix: "dufflebag-apply-changed-conflict-" });
+        const artifactPath = path.join(root, "settings.json");
+        const receiptPath = path.join(root, ".dufflebag/receipt.json");
+        const changedBytes = new TextEncoder().encode("changed after planning");
+        const priorReceiptBytes = new TextEncoder().encode("prior receipt");
+
+        yield* fileSystem.makeDirectory(path.dirname(receiptPath), { recursive: true });
+        yield* fileSystem.writeFile(artifactPath, originalBytes);
+        yield* fileSystem.writeFile(receiptPath, priorReceiptBytes);
+
+        const plan = createWritePlan({ root, expectedByPath: { "settings.json": expectedFile(originalBytes) } });
+        yield* fileSystem.writeFile(artifactPath, changedBytes);
+
+        const result = yield* Effect.exit(applyArtifactPlan(plan));
+
+        expect(Exit.isFailure(result)).toBe(true);
+        expect([...(yield* fileSystem.readFile(artifactPath))]).toEqual([...changedBytes]);
+        expect([...(yield* fileSystem.readFile(receiptPath))]).toEqual([...priorReceiptBytes]);
+
+        const rootEntries = yield* fileSystem.readDirectory(root);
+        expect(rootEntries.filter((entry) => entry.startsWith(".dufflebag-transaction-"))).toEqual([]);
+      }),
+    ),
+  );
+
+  it.effect("guards unchanged owned targets before committing another artifact", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const fileSystem = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const root = yield* fileSystem.makeTempDirectoryScoped({ prefix: "dufflebag-apply-unchanged-guard-" });
+        const stablePath = path.join(root, "stable.txt");
+        const changedPath = path.join(root, "changed.txt");
+        const receiptPath = path.join(root, ".dufflebag/receipt.json");
+        const stableArtifact = {
+          path: "stable.txt",
+          kind: { _tag: "managedConfig" },
+          owner: applicationOwner,
+          ownership: {
+            _tag: "wholeFile",
+            installedHash: expectedFile(originalBytes).sha256,
+            previous: missingPrevious,
+          },
+        };
+        const changedArtifact = {
+          path: "changed.txt",
+          kind: { _tag: "managedConfig" },
+          owner: applicationOwner,
+          ownership: { _tag: "wholeFile", installedHash, previous: missingPrevious },
+        };
+        const plan = unwrapPlan({
+          scope: "project",
+          root,
+          operations: [
+            {
+              _tag: "write",
+              artifact: changedArtifact,
+              bytes: installedBytes,
+              expectedCurrent: expectedMissing,
+            },
+          ],
+          preconditions: [{ path: stableArtifact.path, expectedCurrent: expectedFile(originalBytes) }],
+          receipt: {
+            _tag: "receiptPublish",
+            target: {
+              path: ".dufflebag/receipt.json",
+              kind: { _tag: "receipt" },
+              owner: applicationOwner,
+            },
+            receipt: {
+              version: "0.12.0",
+              scope: "project",
+              features: [],
+              artifacts: [stableArtifact, changedArtifact],
+            },
+            expectedCurrent: expectedMissing,
+          },
+        });
+
+        yield* fileSystem.writeFile(stablePath, originalBytes);
+        yield* fileSystem.writeFile(stablePath, externallyChangedBytes);
+
+        const result = yield* Effect.exit(applyArtifactPlan(plan));
+
+        expect(Exit.isFailure(result)).toBe(true);
+        expect([...(yield* fileSystem.readFile(stablePath))]).toEqual([...externallyChangedBytes]);
+        expect(yield* fileSystem.exists(changedPath)).toBe(false);
+        expect(yield* fileSystem.exists(receiptPath)).toBe(false);
+      }),
+    ),
+  );
+
+  it.effect("commits when present target bytes still match planning", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const fileSystem = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const root = yield* fileSystem.makeTempDirectoryScoped({ prefix: "dufflebag-apply-matching-current-" });
+        const artifactPath = path.join(root, "settings.json");
+        const receiptPath = path.join(root, ".dufflebag/receipt.json");
+
+        yield* fileSystem.writeFile(artifactPath, originalBytes);
+
+        const plan = createWritePlan({ root, expectedByPath: { "settings.json": expectedFile(originalBytes) } });
+        yield* applyArtifactPlan(plan);
+
+        expect([...(yield* fileSystem.readFile(artifactPath))]).toEqual([...installedBytes]);
+        expect(yield* decodeArtifactReceiptJson(yield* fileSystem.readFileString(receiptPath))).toEqual(plan.receipt.receipt);
+      }),
+    ),
+  );
+
   it.effect("refuses to start while durable recovery evidence is pending", () =>
     Effect.scoped(
       Effect.gen(function* () {
@@ -160,7 +452,7 @@ layer(NodeContext.layer)("applyArtifactPlan", (it) => {
         const root = yield* fileSystem.makeTempDirectoryScoped({ prefix: "dufflebag-apply-pending-" });
         const recoveryPath = path.join(root, ".dufflebag/recovery.json");
         const artifactPath = path.join(root, "config/settings.json");
-        const plan = createWritePlan(root, ["config/settings.json"]);
+        const plan = createWritePlan({ root, expectedByPath: { "config/settings.json": expectedMissing } });
 
         yield* fileSystem.makeDirectory(path.dirname(recoveryPath), { recursive: true });
         yield* fileSystem.writeFileString(recoveryPath, "pending recovery");
@@ -186,7 +478,7 @@ layer(NodeContext.layer)("applyArtifactPlan", (it) => {
         const outside = yield* fileSystem.makeTempDirectoryScoped({ prefix: "dufflebag-apply-symlink-outside-" });
         const escapedPath = path.join(outside, "escaped.json");
         const receiptPath = path.join(root, ".dufflebag/receipt.json");
-        const plan = createWritePlan(root, ["link/escaped.json"]);
+        const plan = createWritePlan({ root, expectedByPath: { "link/escaped.json": expectedMissing } });
 
         yield* fileSystem.symlink(outside, path.join(root, "link"));
 
@@ -236,10 +528,11 @@ layer(NodeContext.layer)("applyArtifactPlan", (it) => {
         const path = yield* Path.Path;
         const root = yield* fileSystem.makeTempDirectoryScoped({ prefix: "dufflebag-apply-uninstall-" });
         const receiptPath = path.join(root, ".dufflebag/receipt.json");
-        const plan = createReceiptRemovalPlan(root);
+        const previousReceiptBytes = new TextEncoder().encode("previous receipt");
+        const plan = createReceiptRemovalPlan(root, expectedFile(previousReceiptBytes));
 
         yield* fileSystem.makeDirectory(path.dirname(receiptPath), { recursive: true });
-        yield* fileSystem.writeFileString(receiptPath, "previous receipt");
+        yield* fileSystem.writeFile(receiptPath, previousReceiptBytes);
 
         yield* applyArtifactPlan(plan);
 
@@ -296,7 +589,10 @@ layer(transactionOrderLayer)("applyArtifactPlan transaction order", (it) => {
         const fileSystem = yield* FileSystem.FileSystem;
         const path = yield* Path.Path;
         const root = yield* fileSystem.makeTempDirectoryScoped({ prefix: "dufflebag-apply-order-success-" });
-        const plan = createWritePlan(root, ["first.txt", "second.txt"]);
+        const plan = createWritePlan({
+          root,
+          expectedByPath: { "first.txt": expectedMissing, "second.txt": expectedMissing },
+        });
 
         yield* applyArtifactPlan(plan);
 
@@ -312,7 +608,14 @@ layer(transactionOrderLayer)("applyArtifactPlan transaction order", (it) => {
         const fileSystem = yield* FileSystem.FileSystem;
         const path = yield* Path.Path;
         const root = yield* fileSystem.makeTempDirectoryScoped({ prefix: "dufflebag-apply-order-rollback-" });
-        const plan = createWritePlan(root, ["first.txt", "second.txt", "fail.txt"]);
+        const plan = createWritePlan({
+          root,
+          expectedByPath: {
+            "first.txt": expectedFile(originalBytes),
+            "second.txt": expectedFile(secondOriginalBytes),
+            "fail.txt": expectedFile(originalBytes),
+          },
+        });
 
         yield* fileSystem.writeFile(path.join(root, "first.txt"), originalBytes);
         yield* fileSystem.writeFile(path.join(root, "second.txt"), secondOriginalBytes);
@@ -369,7 +672,10 @@ layer(NodeContext.layer)("applyArtifactPlan interruption", (it) => {
           const secondPath = path.join(root, "second.txt");
           const receiptPath = path.join(root, ".dufflebag/receipt.json");
           const recoveryPath = path.join(root, ".dufflebag/recovery.json");
-          const plan = createWritePlan(root, ["first.txt", "second.txt"]);
+          const plan = createWritePlan({
+            root,
+            expectedByPath: { "first.txt": expectedMissing, "second.txt": expectedMissing },
+          });
           const applyFiber = yield* Effect.fork(applyArtifactPlan(plan));
 
           yield* Deferred.await(firstCommitted);
@@ -415,7 +721,7 @@ layer(NodeContext.layer)("applyArtifactPlan interruption", (it) => {
           const artifactPath = path.join(root, "settings.json");
           const receiptPath = path.join(root, ".dufflebag/receipt.json");
           const recoveryPath = path.join(root, ".dufflebag/recovery.json");
-          const plan = createWritePlan(root, ["settings.json"]);
+          const plan = createWritePlan({ root, expectedByPath: { "settings.json": expectedMissing } });
           const applyFiber = yield* Effect.fork(applyArtifactPlan(plan));
 
           yield* Deferred.await(receiptCommitted);
@@ -489,7 +795,10 @@ layer(symlinkSwapLayer)("applyArtifactPlan symlink swap", (it) => {
         const firstPath = path.join(root, "first.txt");
         const escapedPath = path.join(outside, "escaped.json");
         const receiptPath = path.join(root, ".dufflebag/receipt.json");
-        const plan = createWritePlan(root, ["first.txt", "safe/escaped.json"]);
+        const plan = createWritePlan({
+          root,
+          expectedByPath: { "first.txt": expectedMissing, "safe/escaped.json": expectedMissing },
+        });
 
         yield* fileSystem.makeDirectory(path.join(root, "safe"));
         yield* fileSystem.makeDirectory(outside);
@@ -547,7 +856,7 @@ layer(recoveryParentSwapLayer)("applyArtifactPlan recovery parent swap", (it) =>
         const artifactPath = path.join(root, "settings.json");
         const outsideRecoveryPath = path.join(outside, "recovery.json");
         const outsideReceiptPath = path.join(outside, "receipt.json");
-        const plan = createWritePlan(root, ["settings.json"]);
+        const plan = createWritePlan({ root, expectedByPath: { "settings.json": expectedMissing } });
 
         yield* fileSystem.makeDirectory(path.join(root, ".dufflebag"));
         yield* fileSystem.makeDirectory(outside);
@@ -597,7 +906,7 @@ layer(markerFailureLayer)("applyArtifactPlan recovery marker failure", (it) => {
         const artifactPath = path.join(root, "settings.json");
         const receiptPath = path.join(root, ".dufflebag/receipt.json");
         const recoveryPath = path.join(root, ".dufflebag/recovery.json");
-        const plan = createWritePlan(root, ["settings.json"]);
+        const plan = createWritePlan({ root, expectedByPath: { "settings.json": expectedMissing } });
 
         const result = yield* Effect.exit(applyArtifactPlan(plan));
 
@@ -638,7 +947,7 @@ layer(markerDefectLayer)("applyArtifactPlan post-link marker defect", (it) => {
         const artifactPath = path.join(root, "settings.json");
         const receiptPath = path.join(root, ".dufflebag/receipt.json");
         const recoveryPath = path.join(root, ".dufflebag/recovery.json");
-        const plan = createWritePlan(root, ["settings.json"]);
+        const plan = createWritePlan({ root, expectedByPath: { "settings.json": expectedMissing } });
 
         const result = yield* Effect.exit(applyArtifactPlan(plan));
 
@@ -707,7 +1016,7 @@ layer(Layer.empty)("applyArtifactPlan competing writers", (it) => {
           const artifactPath = path.join(root, "settings.json");
           const receiptPath = path.join(root, ".dufflebag/receipt.json");
           const recoveryPath = path.join(root, ".dufflebag/recovery.json");
-          const plan = createWritePlan(root, ["settings.json"]);
+          const plan = createWritePlan({ root, expectedByPath: { "settings.json": expectedFile(originalBytes) } });
 
           yield* fileSystem.makeDirectory(path.dirname(receiptPath));
           yield* fileSystem.writeFile(artifactPath, originalBytes);
@@ -778,7 +1087,10 @@ layer(byteChangeLayer)("applyArtifactPlan target change", (it) => {
         const changedPath = path.join(root, "changed.txt");
         const receiptPath = path.join(root, ".dufflebag/receipt.json");
         const externallyChangedBytes = new TextEncoder().encode("changed after capture");
-        const plan = createWritePlan(root, ["first.txt", "changed.txt"]);
+        const plan = createWritePlan({
+          root,
+          expectedByPath: { "first.txt": expectedMissing, "changed.txt": expectedFile(originalBytes) },
+        });
 
         yield* fileSystem.writeFile(changedPath, originalBytes);
 
@@ -826,7 +1138,14 @@ layer(commitFailureLayer)("applyArtifactPlan commit failure", (it) => {
         const originalPath = path.join(root, "existing.txt");
         const createdDirectory = path.join(root, "created");
         const receiptPath = path.join(root, ".dufflebag/receipt.json");
-        const plan = createWritePlan(root, ["existing.txt", "created/nested/file.txt", "fail.txt"]);
+        const plan = createWritePlan({
+          root,
+          expectedByPath: {
+            "existing.txt": expectedFile(originalBytes),
+            "created/nested/file.txt": expectedMissing,
+            "fail.txt": expectedMissing,
+          },
+        });
 
         yield* fileSystem.writeFile(originalPath, originalBytes);
 
@@ -884,7 +1203,10 @@ layer(rollbackParentContentLayer)("applyArtifactPlan rollback parent content", (
         const externalPath = path.join(root, "created/nested/external.txt");
         const receiptPath = path.join(root, ".dufflebag/receipt.json");
         const recoveryPath = path.join(root, ".dufflebag/recovery.json");
-        const plan = createWritePlan(root, ["created/nested/file.txt", "fail.txt"]);
+        const plan = createWritePlan({
+          root,
+          expectedByPath: { "created/nested/file.txt": expectedMissing, "fail.txt": expectedMissing },
+        });
 
         const result = yield* Effect.exit(applyArtifactPlan(plan));
 
@@ -939,7 +1261,10 @@ layer(rollbackRaceLayer)("applyArtifactPlan rollback target change", (it) => {
         const firstPath = path.join(root, "first.txt");
         const receiptPath = path.join(root, ".dufflebag/receipt.json");
         const recoveryPath = path.join(root, ".dufflebag/recovery.json");
-        const plan = createWritePlan(root, ["first.txt", "fail.txt"]);
+        const plan = createWritePlan({
+          root,
+          expectedByPath: { "first.txt": expectedMissing, "fail.txt": expectedMissing },
+        });
 
         const result = yield* Effect.exit(applyArtifactPlan(plan));
 
@@ -987,7 +1312,7 @@ layer(receiptFailureLayer)("applyArtifactPlan receipt failure", (it) => {
         const artifactPath = path.join(root, "existing.txt");
         const receiptPath = path.join(root, ".dufflebag/receipt.json");
         const priorReceiptBytes = new Uint8Array([255, 0, 1, 128]);
-        const plan = createWritePlan(root, ["existing.txt"]);
+        const plan = createWritePlan({ root, expectedByPath: { "existing.txt": expectedFile(originalBytes) } });
 
         yield* fileSystem.writeFile(artifactPath, originalBytes);
         yield* fileSystem.makeDirectory(path.dirname(receiptPath), { recursive: true });
@@ -1039,7 +1364,13 @@ layer(stageFailureLayer)("applyArtifactPlan stage failure", (it) => {
         const firstPath = path.join(root, "first.txt");
         const secondPath = path.join(root, "second.txt");
         const receiptPath = path.join(root, ".dufflebag/receipt.json");
-        const plan = createWritePlan(root, ["first.txt", "second.txt"]);
+        const plan = createWritePlan({
+          root,
+          expectedByPath: {
+            "first.txt": expectedFile(originalBytes),
+            "second.txt": expectedFile(secondOriginalBytes),
+          },
+        });
 
         yield* fileSystem.writeFile(firstPath, originalBytes);
         yield* fileSystem.writeFile(secondPath, secondOriginalBytes);
@@ -1091,7 +1422,13 @@ layer(snapshotFailureLayer)("applyArtifactPlan snapshot failure", (it) => {
         const firstPath = path.join(root, "first.txt");
         const failedPath = path.join(root, "snapshot-fail.txt");
         const receiptPath = path.join(root, ".dufflebag/receipt.json");
-        const plan = createWritePlan(root, ["first.txt", "snapshot-fail.txt"]);
+        const plan = createWritePlan({
+          root,
+          expectedByPath: {
+            "first.txt": expectedFile(originalBytes),
+            "snapshot-fail.txt": expectedFile(secondOriginalBytes),
+          },
+        });
 
         yield* fileSystem.writeFile(firstPath, originalBytes);
         yield* fileSystem.writeFile(failedPath, secondOriginalBytes);
@@ -1143,7 +1480,7 @@ layer(cleanupFailureLayer)("applyArtifactPlan cleanup failure", (it) => {
         const artifactPath = path.join(root, "settings.json");
         const receiptPath = path.join(root, ".dufflebag/receipt.json");
         const recoveryPath = path.join(root, ".dufflebag/recovery.json");
-        const plan = createWritePlan(root, ["settings.json"]);
+        const plan = createWritePlan({ root, expectedByPath: { "settings.json": expectedMissing } });
 
         const result = yield* Effect.exit(applyArtifactPlan(plan));
 
@@ -1192,7 +1529,7 @@ layer(markerCleanupFailureLayer)("applyArtifactPlan marker cleanup failure", (it
         const artifactPath = path.join(root, "settings.json");
         const receiptPath = path.join(root, ".dufflebag/receipt.json");
         const recoveryPath = path.join(root, ".dufflebag/recovery.json");
-        const plan = createWritePlan(root, ["settings.json"]);
+        const plan = createWritePlan({ root, expectedByPath: { "settings.json": expectedMissing } });
 
         const result = yield* Effect.exit(applyArtifactPlan(plan));
 
@@ -1240,7 +1577,7 @@ layer(markerChangeLayer)("applyArtifactPlan changed recovery marker", (it) => {
         const root = yield* fileSystem.makeTempDirectoryScoped({ prefix: "dufflebag-apply-marker-change-" });
         const receiptPath = path.join(root, ".dufflebag/receipt.json");
         const recoveryPath = path.join(root, ".dufflebag/recovery.json");
-        const plan = createWritePlan(root, ["settings.json"]);
+        const plan = createWritePlan({ root, expectedByPath: { "settings.json": expectedMissing } });
 
         const result = yield* Effect.exit(applyArtifactPlan(plan));
 
@@ -1300,7 +1637,10 @@ layer(rollbackFailureLayer)("applyArtifactPlan rollback failure", (it) => {
         const originalPath = path.join(root, "existing.txt");
         const receiptPath = path.join(root, ".dufflebag/receipt.json");
         const recoveryPath = path.join(root, ".dufflebag/recovery.json");
-        const plan = createWritePlan(root, ["existing.txt", "fail.txt"]);
+        const plan = createWritePlan({
+          root,
+          expectedByPath: { "existing.txt": expectedFile(originalBytes), "fail.txt": expectedMissing },
+        });
 
         yield* fileSystem.writeFile(originalPath, originalBytes);
 
@@ -1344,7 +1684,10 @@ layer(rollbackFailureLayer)("applyArtifactPlan rollback failure", (it) => {
         const root = yield* fileSystem.makeTempDirectoryScoped({ prefix: "dufflebag-apply-private-recovery-" });
         const originalPath = path.join(root, "existing.txt");
         const recoveryPath = path.join(root, ".dufflebag/recovery.json");
-        const plan = createWritePlan(root, ["existing.txt", "fail.txt"]);
+        const plan = createWritePlan({
+          root,
+          expectedByPath: { "existing.txt": expectedFile(originalBytes), "fail.txt": expectedMissing },
+        });
 
         yield* fileSystem.writeFile(originalPath, originalBytes, { mode: 0o600 });
         yield* Effect.exit(applyArtifactPlan(plan));

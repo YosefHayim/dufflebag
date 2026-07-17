@@ -1,6 +1,6 @@
 import { FileSystem } from "@effect/platform";
 import { PlatformError } from "@effect/platform/Error";
-import { Effect, Option, ParseResult, Schema } from "effect";
+import { Effect, Either, Option, ParseResult, Schema } from "effect";
 
 import { bagConfigSchema } from "./bagConfigSchema.js";
 import { findDuplicateJsonProperty } from "./jsonDocument.js";
@@ -10,10 +10,6 @@ const textDecoder = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
 export const managedConfigFileSchema = Schema.typeSchema(bagConfigSchema);
 
 export type ManagedConfigFile = Schema.Schema.Type<typeof managedConfigFileSchema>;
-
-export const configFileReadResultSchema = Schema.OptionFromSelf(managedConfigFileSchema);
-
-export type ConfigFileReadResult = Schema.Schema.Type<typeof configFileReadResultSchema>;
 
 export class ConfigFileParseError extends Schema.TaggedError<ConfigFileParseError>()("ConfigFileParseError", {
   configPath: Schema.NonEmptyString.annotations({
@@ -45,11 +41,11 @@ export const configFileReadErrorSchema = Schema.Union(PlatformError, ConfigFileP
 
 export type ConfigFileReadError = Schema.Schema.Type<typeof configFileReadErrorSchema>;
 
-const decodeJson = Schema.decodeUnknown(Schema.parseJson(), {
+const decodeJson = Schema.decodeUnknownEither(Schema.parseJson(), {
   onExcessProperty: "error",
 });
 
-const decodeManagedConfigFile = Schema.decodeUnknown(managedConfigFileSchema, {
+const decodeManagedConfigFile = Schema.decodeUnknownEither(managedConfigFileSchema, {
   onExcessProperty: "error",
 });
 
@@ -59,15 +55,110 @@ const formatUnknownError = (error: unknown): string => (error instanceof Error ?
 
 const isNotFound = (error: PlatformError): boolean => error._tag === "SystemError" && error.reason === "NotFound";
 
-const decodeUtf8 = (bytes: Uint8Array, configPath: string) =>
-  Effect.try({
-    try: () => textDecoder.decode(bytes),
-    catch: (error) =>
+const decodeConfigFileBytes = (input: {
+  readonly bytes: Uint8Array;
+  readonly configPath: string;
+}): Either.Either<ManagedConfigFile, ConfigFileParseError | ConfigFileSchemaError> => {
+  // Apply the same lossless byte-to-config pipeline at every trust boundary.
+  // 1. Decode bytes without replacement characters or BOM normalization.
+  const decodedText = Either.mapLeft(
+    Either.try({
+      try: () => textDecoder.decode(input.bytes),
+      catch: formatUnknownError,
+    }),
+    (issue) =>
       new ConfigFileParseError({
-        configPath,
-        issue: `file bytes are not valid UTF-8: ${formatUnknownError(error)}`,
+        configPath: input.configPath,
+        issue: `file bytes are not valid UTF-8: ${issue}`,
       }),
+  );
+  if (Either.isLeft(decodedText)) {
+    return Either.left(decodedText.left);
+  }
+
+  const json = decodedText.right;
+  if (json.startsWith("\uFEFF")) {
+    return Either.left(
+      new ConfigFileParseError({
+        configPath: input.configPath,
+        issue: "file must not start with a UTF-8 byte-order mark",
+      }),
+    );
+  }
+
+  // 2. Parse strict JSON before inspecting its object semantics.
+  const parsed = Either.mapLeft(
+    decodeJson(json),
+    (error) =>
+      new ConfigFileParseError({
+        configPath: input.configPath,
+        issue: formatParseError(error),
+      }),
+  );
+  if (Either.isLeft(parsed)) {
+    return Either.left(parsed.left);
+  }
+
+  // 3. Reject duplicate properties that JSON parsing would collapse.
+  const duplicateProperty = findDuplicateJsonProperty(json);
+  if (duplicateProperty !== undefined) {
+    return Either.left(
+      new ConfigFileParseError({
+        configPath: input.configPath,
+        issue: `duplicate JSON property ${JSON.stringify(duplicateProperty)}`,
+      }),
+    );
+  }
+
+  // 4. Decode the complete managed configuration shape and invariants.
+  return Either.mapLeft(
+    decodeManagedConfigFile(parsed.right),
+    (error) =>
+      new ConfigFileSchemaError({
+        configPath: input.configPath,
+        issue: formatParseError(error),
+      }),
+  );
+};
+
+const managedConfigsEqual = Schema.equivalence(managedConfigFileSchema);
+
+const missingConfigFileSnapshotSchema = Schema.TaggedStruct("missing", {}).annotations({
+  description: "Managed configuration file is absent.",
+});
+
+const presentConfigFileSnapshotSchema = Schema.TaggedStruct("present", {
+  bytes: Schema.Uint8ArrayFromSelf.annotations({
+    description: "Exact managed configuration bytes read once from disk.",
+  }),
+  config: managedConfigFileSchema.annotations({
+    description: "Complete strict configuration decoded from the same bytes.",
+  }),
+})
+  .pipe(
+    Schema.filter((snapshot) => {
+      const decodedConfig = decodeConfigFileBytes({
+        bytes: snapshot.bytes,
+        configPath: "managed configuration snapshot",
+      });
+
+      return Either.isRight(decodedConfig) && managedConfigsEqual(decodedConfig.right, snapshot.config)
+        ? undefined
+        : {
+            path: ["config"],
+            message: "Decoded managed configuration must exactly match its source bytes.",
+          };
+    }),
+  )
+  .annotations({
+    description: "Exact managed configuration bytes and their decoded value.",
   });
+
+export const configFileSnapshotSchema = Schema.Union(missingConfigFileSnapshotSchema, presentConfigFileSnapshotSchema).annotations({
+  description: "Missing or present managed configuration captured by one filesystem read.",
+});
+
+export type ConfigFileSnapshot = Schema.Schema.Type<typeof configFileSnapshotSchema>;
 
 export const readConfigFile = (configPath: string) =>
   Effect.gen(function* () {
@@ -78,36 +169,17 @@ export const readConfigFile = (configPath: string) =>
     );
 
     if (Option.isNone(contents)) {
-      return Option.none<ManagedConfigFile>();
+      return missingConfigFileSnapshotSchema.make();
     }
 
-    const json = yield* decodeUtf8(contents.value, configPath);
-    const parsed = yield* decodeJson(json).pipe(
-      Effect.mapError(
-        (error) =>
-          new ConfigFileParseError({
-            configPath,
-            issue: formatParseError(error),
-          }),
-      ),
-    );
-    const duplicateProperty = findDuplicateJsonProperty(json);
-    if (duplicateProperty !== undefined) {
-      return yield* new ConfigFileParseError({
-        configPath,
-        issue: `duplicate JSON property ${JSON.stringify(duplicateProperty)}`,
-      });
+    const decodedConfig = decodeConfigFileBytes({ bytes: contents.value, configPath });
+    if (Either.isLeft(decodedConfig)) {
+      return yield* decodedConfig.left;
     }
 
-    const config = yield* decodeManagedConfigFile(parsed).pipe(
-      Effect.mapError(
-        (error) =>
-          new ConfigFileSchemaError({
-            configPath,
-            issue: formatParseError(error),
-          }),
-      ),
-    );
-
-    return Option.some(config);
+    return presentConfigFileSnapshotSchema.make({
+      _tag: "present",
+      bytes: contents.value,
+      config: decodedConfig.right,
+    });
   });

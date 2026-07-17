@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-import { Either, Option, Schema } from "effect";
+import { Either, Schema } from "effect";
 import { describe, expect, it } from "vitest";
 import { type BagConfig, defaultBagConfig, legacyBagConfigEnvironmentSchema } from "./bagConfigSchema.js";
 import {
@@ -15,6 +15,12 @@ import {
 
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
+const missingConfigSnapshot = { _tag: "missing" };
+const presentConfigSnapshot = (config: BagConfig) => ({
+  _tag: "present",
+  bytes: textEncoder.encode(`${JSON.stringify(config)}\n`),
+  config,
+});
 const settingsJsonSchema = Schema.parseJson(Schema.Record({ key: Schema.String, value: Schema.Unknown }));
 const decodeSettings = Schema.decodeUnknownSync(settingsJsonSchema, {
   onExcessProperty: "error",
@@ -61,14 +67,14 @@ describe("planManagedConfig", () => {
     const copied = unwrap(
       planManagedConfig({
         scope: "project",
-        selection: { _tag: "firstProjectInstall", globalConfig: Option.some(globalConfig) },
+        selection: { _tag: "firstProjectInstall", globalConfig: presentConfigSnapshot(globalConfig) },
         previousConfigFile: missingPrevious,
       }),
     );
     const defaulted = unwrap(
       planManagedConfig({
         scope: "project",
-        selection: { _tag: "firstProjectInstall", globalConfig: Option.none() },
+        selection: { _tag: "firstProjectInstall", globalConfig: missingConfigSnapshot },
         previousConfigFile: missingPrevious,
       }),
     );
@@ -80,10 +86,31 @@ describe("planManagedConfig", () => {
     expectManagedConfigWrite(defaulted);
   });
 
+  it("rejects a global snapshot whose decoded config does not match its source bytes", () => {
+    const sourceConfig = { ...defaultBagConfig, speechVoice: "Ava" };
+    const result = planManagedConfig({
+      scope: "project",
+      selection: {
+        _tag: "firstProjectInstall",
+        globalConfig: {
+          _tag: "present",
+          bytes: textEncoder.encode(`${JSON.stringify(sourceConfig)}\n`),
+          config: { ...sourceConfig, speechVoice: "Daniel" },
+        },
+      },
+      previousConfigFile: missingPrevious,
+    });
+
+    expect(Either.isLeft(result)).toBe(true);
+    if (Either.isLeft(result)) {
+      expect(result.left.message).toContain("source bytes");
+    }
+  });
+
   it("rejects first-project selection in global scope", () => {
     const result = planManagedConfig({
       scope: "global",
-      selection: { _tag: "firstProjectInstall", globalConfig: Option.none() },
+      selection: { _tag: "firstProjectInstall", globalConfig: missingConfigSnapshot },
       previousConfigFile: missingPrevious,
     });
 
@@ -95,7 +122,7 @@ describe("planManagedConfig", () => {
   });
 
   it.each([
-    ["first project", { _tag: "firstProjectInstall", globalConfig: Option.none() }],
+    ["first project", { _tag: "firstProjectInstall", globalConfig: missingConfigSnapshot }],
     ["legacy migration", { _tag: "legacyEnvironment", settingsBytes: settingsBytes({ env: { dufflebagDebugEnabled: "true" } }) }],
   ])("rejects a one-time %s selection when a target config already exists", (_case, selection) => {
     const result = planManagedConfig({
