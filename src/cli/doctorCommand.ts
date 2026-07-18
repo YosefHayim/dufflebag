@@ -39,14 +39,44 @@ export const doctorCommand = Command.make("doctor", {}, () =>
       );
       yield* TerminalUI.info(report.config._tag === "present" ? "config: present" : "config: missing");
       yield* TerminalUI.info(
-        `agents: ${report.agents
-          .filter((agent) => agent.detected || agent.managed)
-          .map((agent) => `${agent.displayName}${agent.managed ? "*" : ""}`)
-          .join(", ") || "none detected"}`,
+        `agents: ${
+          report.agents
+            .filter((agent) => agent.detected || agent.managed)
+            .map((agent) => `${agent.displayName}${agent.managed ? "*" : ""}`)
+            .join(", ") || "none detected"
+        }`,
       );
+
+      if (report.daemons.length === 0) {
+        if (scope === "global") {
+          yield* TerminalUI.info("daemon: none running (config freezes at next SessionStart)");
+        }
+      } else {
+        // Summarize each live daemon's spawn-time config vs managed config.
+        for (const daemon of report.daemons) {
+          const shortSid = daemon.sessionId.length > 12 ? `${daemon.sessionId.slice(0, 8)}…` : daemon.sessionId;
+          if (daemon.snapshot._tag === "missing") {
+            yield* TerminalUI.warn(`daemon ${shortSid}: live, no config snapshot — restart the session`);
+            continue;
+          }
+          yield* TerminalUI.info(
+            `daemon ${shortSid}: frozen warn ${daemon.snapshot.config.contextWarnFraction} · budget ${daemon.snapshot.config.autorunDefaultCycleCount} · cap ${daemon.snapshot.config.autorunMaxCycleCount}`,
+          );
+        }
+      }
 
       // Surface every deterministic discrepancy without authorizing repair.
       for (const discrepancy of report.discrepancies) {
+        if (discrepancy._tag === "daemonConfigMismatch") {
+          yield* TerminalUI.warn(
+            `daemonConfigMismatch ${discrepancy.sessionId}: ${discrepancy.key} managed=${discrepancy.managedValue} daemon=${discrepancy.daemonValue}`,
+          );
+          continue;
+        }
+        if (discrepancy._tag === "daemonConfigSnapshotMissing") {
+          yield* TerminalUI.warn(`daemonConfigSnapshotMissing ${discrepancy.sessionId}`);
+          continue;
+        }
         yield* TerminalUI.warn(discrepancy._tag);
       }
     }
