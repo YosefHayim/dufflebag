@@ -5,7 +5,7 @@
  * Only this file may call NodeRuntime.runMain / Effect.run*.
  */
 
-import { readFileSync } from "node:fs";
+import { readFileSync, realpathSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -95,7 +95,14 @@ export const isBareArgv = (argv: ReadonlyArray<string>): boolean => argv.length 
 
 const thisFile = fileURLToPath(import.meta.url);
 const invoked = process.argv[1] === undefined ? undefined : resolve(process.argv[1]);
-const isDirectRun = invoked === thisFile || invoked === thisFile.replace(/\.ts$/, ".js");
+let isDirectRun = invoked === thisFile || invoked === thisFile.replace(/\.ts$/, ".js");
+if (!isDirectRun && invoked !== undefined) {
+  try {
+    isDirectRun = realpathSync(invoked) === thisFile;
+  } catch {
+    // ignore missing/unreadable argv path
+  }
+}
 
 // Single runtime edge for the main application package — only when invoked as the entrypoint.
 if (isDirectRun) {
