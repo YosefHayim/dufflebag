@@ -196,7 +196,58 @@ layer(NodeContext.layer)("doctor", (it) => {
 
         expect(report.config).toEqual({ _tag: "missing" });
         expect(report.discrepancies).toEqual([{ _tag: "missingManagedConfig" }]);
+        expect(report.daemons).toEqual([]);
         expect(yield* fileSystem.exists(path.join(root, ".claude/dufflebag/config.json"))).toBe(false);
+      }),
+    ),
+  );
+
+  it.effect("surfaces a live daemon frozen config that drifts from managed config", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const fileSystem = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const root = yield* fileSystem.makeTempDirectoryScoped({ prefix: "dufflebag-doctor-daemon-root-" });
+        const stagedRoot = yield* fileSystem.makeTempDirectoryScoped({ prefix: "dufflebag-doctor-daemon-stage-" });
+        const configPath = path.join(root, ".claude/dufflebag/config.json");
+        const receiptPath = path.join(root, ".claude/dufflebag/receipt.json");
+        const loopStateDir = path.join(root, ".claude/.ctx-loop-state");
+        const sessionId = "sess-doctor-daemon";
+        const managed = { ...defaultBagConfig, contextWarnFraction: 0.15 };
+        const frozen = { ...defaultBagConfig, contextWarnFraction: 0.18 };
+
+        yield* fileSystem.makeDirectory(path.dirname(configPath), { recursive: true });
+        yield* fileSystem.makeDirectory(loopStateDir, { recursive: true });
+        yield* fileSystem.writeFileString(configPath, `${JSON.stringify(managed)}\n`);
+        yield* fileSystem.writeFileString(
+          receiptPath,
+          `${JSON.stringify({ version: "1.0.0", scope: "global", features: ["context-guard", "autonomous-loop"], artifacts: [] })}\n`,
+        );
+        // Use this process's pid so the live check passes without spawning a fake daemon.
+        yield* fileSystem.writeFileString(path.join(loopStateDir, `${sessionId}.pid`), `${process.pid}\n`);
+        yield* fileSystem.writeFileString(path.join(loopStateDir, `${sessionId}.config`), `${JSON.stringify(frozen)}\n`);
+
+        const report = yield* doctor({
+          destination: { _tag: "global", root },
+          stagedPackage: { root: stagedRoot, version: "1.0.0" },
+          platform: { operatingSystem: "darwin", ghosttyAvailable: true },
+          agentEvidence: { homePaths: [], absolutePaths: [], commands: [] },
+        });
+
+        expect(report.daemons).toEqual([
+          {
+            sessionId,
+            pid: process.pid,
+            snapshot: { _tag: "present", config: frozen },
+          },
+        ]);
+        expect(report.discrepancies).toContainEqual({
+          _tag: "daemonConfigMismatch",
+          sessionId,
+          key: "contextWarnFraction",
+          managedValue: 0.15,
+          daemonValue: 0.18,
+        });
       }),
     ),
   );
