@@ -1,27 +1,32 @@
 # AGENTS.md
 
-This is the repository entrypoint for coding agents and maintainers. `CLAUDE.md` and `GEMINI.md` are symlinks to this file.
+Entrypoint for coding agents and maintainers. `CLAUDE.md` and `GEMINI.md` are symlinks to this file so Claude, Gemini, Codex, Cursor, Kiro, and other AGENTS-aware tools share one contract.
 
 ## What this is
 
-**dufflebag** installs and reconciles an owned set of agent skills, dependency-free hooks, agent configuration, and reusable CI/publish workflow templates. Its public CLI installs, updates, uninstalls, diagnoses, configures, and scaffolds those artifacts.
-
-Install one feature with:
+**dufflebag** is a TypeScript CLI that installs, updates, uninstalls, diagnoses, configures, and scaffolds an owned set of agent skills, dependency-free hooks, agent configuration, and reusable CI/publish workflow templates.
 
 ```bash
 npx ys-dufflebag install --features png-to-code
 ```
 
-## Read before changing code
+## Source-of-truth map
 
-- [`PROJECT.md`](PROJECT.md) defines product scope and direction.
-- [`CONTEXT.md`](CONTEXT.md) explains runtime and operational boundaries.
-- [`LANGUAGE.md`](LANGUAGE.md) owns domain terms.
-- [`CODE-STYLE.md`](CODE-STYLE.md) is the prescriptive style source of truth.
-- [`code-style.rules.json`](code-style.rules.json) is the machine-readable rule map.
-- `docs/adr/current/` records architectural decisions; do not rewrite historical bodies.
+Read these before changing code. This file is a routing digest — open the linked SSOT for details.
 
-Feature documentation lives with its authored source under `src/skills/<sourceDirectory>/`. Public feature and installed-skill IDs are decoded data and can differ from the authored directory name.
+| Doc | Role |
+| --- | --- |
+| [`PROJECT.md`](PROJECT.md) | Product scope and direction |
+| [`CONTEXT.md`](CONTEXT.md) | Runtime and operational boundaries |
+| [`LANGUAGE.md`](LANGUAGE.md) | Domain terms |
+| [`CODE-STYLE.md`](CODE-STYLE.md) | Prescriptive style SSOT for this repo |
+| [`code-style.rules.json`](code-style.rules.json) | Rule id → enforcement channel |
+| `docs/adr/current/` | Architectural decisions (do not rewrite historical bodies) |
+| `src/skills/<sourceDirectory>/` | Authored feature docs and feature-local runtime |
+
+Public feature and installed-skill IDs are decoded catalog data and can differ from the authored camelCase directory name.
+
+**Style layers:** workspace philosophy at `~/Desktop/Code/code-style.md` (Uncle Bob distillation) → this repo’s [`CODE-STYLE.md`](CODE-STYLE.md) **wins on mechanism**. Philosophy still binds on intent (small functions, honest names, dependency direction, tests as courage). Do not restate style rules here.
 
 ## Repo layout
 
@@ -40,50 +45,23 @@ Feature documentation lives with its authored source under `src/skills/<sourceDi
 | `docs/adr/current/` | Current architectural decisions |
 | `.husky/pre-commit` | README regeneration before commits |
 
-This layout is the approved destination. During the migration, legacy technical-layer directories and hyphenated authored directories may still exist; do not add new behavior there when the owning migration task has a target capability.
+Capability layout is current ([ADR 0016](docs/adr/current/0016-capability-layout-replaces-core.md)). Do not reintroduce `src/core/`, `src/commands/`, or `src/payload/`.
 
 ## Working contract
 
-This is a routing digest. Style is layered:
+Hard rules agents must hold every turn. Full prescription: [`CODE-STYLE.md`](CODE-STYLE.md) and `docs/adr/current/`.
 
-| Layer | File | Role |
-| --- | --- | --- |
-| Workspace philosophy | `~/Desktop/Code/code-style.md` | Uncle Bob distillation (shared across repos) |
-| Project dialect | [`CODE-STYLE.md`](CODE-STYLE.md) | Prescriptive SSOT inside this repo |
-| Machine map | [`code-style.rules.json`](code-style.rules.json) | Rule id → enforcement channel |
-| Verify | `pnpm verify` | biome ci + tsc + tests + build |
-
-When mechanism conflicts with workspace philosophy (e.g. Schema vs interfaces), **this repo’s CODE-STYLE wins**. Philosophy still binds on intent (small functions, honest names, dependency direction, tests as courage). Architectural reasons belong in `docs/adr/current/`.
-
-- **One strict style bar for all TypeScript** — `src/` *and* the png harness (`src/skills/png-to-code/scripts/`). **biome is the linter (`recommended`) *and* formatter** (double quotes), committed as `biome.json` with `biome ci` the one CI gate. One root `tsconfig` governs the project; the png harness's own `tsconfig` is the single sanctioned exception ([ADR 0013](docs/adr/current/0013-style-refresh-colocated-tests-single-command-autorun-templates.md)).
-- **No hand-rolled type-guard parse helpers** — do not export `isX` / `parseX` pairs for literals and numbers. Application code decodes with Effect Schema (`bagConfigSchema`, legacy env map). Hook-island config uses private switch/default readers inside `readConfig` only.
-
-- **Effect application** — capabilities return Effect values. Only `src/cli/main.ts` starts the runtime. Use official platform services directly; do not add pass-through tags, layers, managers, helpers, or utility wrappers.
-- **Schema-owned data** — runtime, persisted, catalog, CLI, environment, and agent-format objects begin as Effect Schema. Derive types with `Schema.Schema.Type`; keep descriptions, defaults, checks, messages, and legacy transformations on their properties.
-- **Tagged errors** — application failures use `Schema.TaggedError`. Installed hooks remain dependency-free plain Node and keep their explicit fail-open behavior where the event contract requires it.
-- **One command path** — interactive and explicit commands invoke the same capability. `TerminalUI` owns presentation. A non-TTY process never prompts and missing input becomes a structured usage error.
-- **Dependency-free hook island** — hook graphs import only `node:*`, shared `src/runtime/**`, and their own feature runtime subtree. Application code never imports installed hook code.
-- **Functions** — named functions are arrow constants declared before use. Prefer one cohesive input, allow two only as a natural pair, and use a named request for three or more. Do not add ceremonial one-property requests or positional boolean behavior flags.
-- **Readable bodies** — one visible job per function, no input mutation, no builder `reduce`, no `Promise.all`, and at most two control-flow nesting levels. Keep one blank line between functions.
-- **Comments with evidence** — explicit loops have a short intent comment; indexed non-null access has a proof comment; real ordered pipelines have one contract plus numbered phase comments.
-- **Names and exports** — authored paths use `camelCase`, UI files use `PascalCase`, and public IDs/flags remain hyphenated data. Optional barrels contain only direct wildcard exports. Avoid vague manager/helper/utils/data/info buckets and names.
-- **No type escape hatches** — no authored interfaces outside declaration augmentation, enums, conditional/infer machinery, assertions, or suppression directives.
-- **Tests co-locate** — keep `foo.test.ts` beside `foo.ts`; root repository-tool tests live under `scripts/`. Use behavior-level fixtures and integration tests for transaction, migration, shipping, and CLI boundaries.
-- **Transactional writes** — inspect, plan, validate, apply, then write the receipt last. Roll back in reverse order. A receipt is the only deletion authority; detection may inform migration but never authorize deletion.
-- **Catalog-closed shipping** — the decoded feature catalog owns exact shipped paths and runtime entrypoints. Build and packed-tarball verification reject missing, duplicate, extra, rewritten, or uncataloged content.
-- **README regeneration** — the pre-commit hook regenerates README content. After committing, inspect the index and commit scope because the hook may stage `README.md`.
-
-> **Migration in progress.** The root style contract describes the approved destination. Keep changed code moving toward it, but do not hide legacy violations behind a broad allowlist or mix unrelated migration work into a focused slice.
-
-### `scripts/dev/` — local-only tooling (gitignored)
-
-Scripts for local debugging, one-off experiments, or personal dev utilities go in `scripts/dev/`. This folder is gitignored. Maintained production, build, CI, and verification tools live directly under root `scripts/`.
-
-When creating a new script, ask: _"Would CI, the build, or the shipped CLI need this?"_ If **no** → `scripts/dev/`.
+- **Verify gate** — `pnpm verify` = `biome ci` + typecheck + test + build. Biome is linter and formatter (double quotes). One root `tsconfig`; the png harness under `src/skills/png-to-code/scripts/` is the single sanctioned exception.
+- **Effect / Schema** — capabilities return Effect; only `src/cli/main.ts` starts the runtime. Runtime, persisted, catalog, CLI, and agent-format data begin as Effect Schema. Application failures use `Schema.TaggedError`. No hand-rolled `isX` / `parseX` pairs for literals and numbers.
+- **Hook island** — installed hooks stay dependency-free plain Node (`node:*`, `src/runtime/**`, own feature runtime only), **fail-open**. Application code never imports installed hook code.
+- **Ownership** — inspect → plan → validate → apply → write receipt last. A receipt is the only deletion authority. Catalog-closed shipping: the feature catalog owns exact shipped paths.
+- **Shape** — capability-owned paths; camelCase authored directories; PascalCase UI files; kebab-case public IDs/flags. One command path; `TerminalUI` owns presentation; non-TTY never prompts.
+- **Local tooling** — gitignored `scripts/dev/` for personal/one-off scripts. Maintained tools live under root `scripts/`.
+- **README** — pre-commit may regenerate and stage `README.md`; inspect the index after committing.
 
 ## Validate changes
 
-Run the narrow suite for the changed capability, then the repository gate from the root:
+Run the narrow suite for the changed capability, then the repository gate:
 
 ```bash
 pnpm test
@@ -97,19 +75,13 @@ For png-to-code script changes:
 pnpm --dir src/skills/png-to-code/scripts typecheck
 ```
 
-## Agent skills
+## Agent engineering config
 
-### Issue tracker
-
-Issues for this repo live in GitHub (`YosefHayim/dufflebag`). See [`docs/agents/issue-tracker.md`](docs/agents/issue-tracker.md).
-
-### Triage labels
-
-Five canonical triage roles mapped to GitHub label strings. See [`docs/agents/triage-labels.md`](docs/agents/triage-labels.md).
-
-### Domain docs
-
-Single-context layout: read [`src/skills/png-to-code/CONTEXT.md`](src/skills/png-to-code/CONTEXT.md) and `src/skills/png-to-code/docs/adr/` when working on png-to-code. See [`docs/agents/domain.md`](docs/agents/domain.md).
+| Topic | Doc |
+| --- | --- |
+| Issue tracker | [`docs/agents/issue-tracker.md`](docs/agents/issue-tracker.md) (GitHub `YosefHayim/dufflebag`) |
+| Triage labels | [`docs/agents/triage-labels.md`](docs/agents/triage-labels.md) |
+| Domain docs | [`docs/agents/domain.md`](docs/agents/domain.md) — e.g. png-to-code: `src/skills/png-to-code/CONTEXT.md` |
 
 <!-- dufflebag:skills start -->
 ## autorun
