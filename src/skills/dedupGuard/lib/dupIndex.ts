@@ -108,8 +108,12 @@ export const DEFAULT_SKIP_DIRS: readonly string[] = [
 
 const CACHE_VERSION = 1;
 /** A `.ts`/`.tsx` source file (not a `.d.ts` ambient declaration). Works on a basename or a full path. */
-export const isSourcePath = (name: string): boolean => /\.tsx?$/.test(name) && !/\.d\.ts$/.test(name);
-const normalizeWhitespace = (text: string): string => text.replace(/\s+/g, " ").trim();
+export const isSourcePath = (name: string): boolean =>
+  // e.g. "foo.ts", "bar.tsx" — not "foo.js" or "foo.d.ts"
+  /\.tsx?$/.test(name) && !/\.d\.ts$/.test(name);
+const normalizeWhitespace = (text: string): string =>
+  // e.g. "a \n\t b" → "a b"
+  text.replace(/\s+/g, " ").trim();
 
 /**
  * Resolve and load the guarded repo's own `typescript`. Returns null (→ caller
@@ -138,6 +142,7 @@ export function resolveRepoRoot(cwd: string = process.cwd()): string {
 export function parseSkipList(raw: string | undefined): string[] {
   if (!raw) return [];
   return raw
+    // e.g. "vendor, generated  tmp" → ["vendor","generated","tmp"]
     .split(/[\s,]+/)
     .map((s) => s.trim())
     .filter(Boolean);
@@ -297,6 +302,7 @@ function functionFingerprint(ts: typeof TS, node: TS.Node): { name: string; fp: 
 
 /** Parse `text` once and pull every type + function entry, with 1-based lines. */
 function extractEntries(ts: typeof TS, text: string, fileName: string): ExtractResult {
+  // e.g. "Button.tsx" → TSX; "util.ts" → TS
   const scriptKind = /\.tsx$/.test(fileName) ? ts.ScriptKind.TSX : ts.ScriptKind.TS;
   const sourceFile = ts.createSourceFile(fileName || "snippet.tsx", text, ts.ScriptTarget.Latest, true, scriptKind);
   const types: TypeEntry[] = [];

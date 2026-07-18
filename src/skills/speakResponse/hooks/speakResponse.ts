@@ -53,15 +53,15 @@ function proseSinceLastPrompt(entries: Entry[]): string {
 /** Strip markdown/code so we speak conversation, not syntax. */
 function stripMarkdown(text: string): string {
   return text
-    .replace(/```[\s\S]*?```/g, "") // fenced code blocks
-    .replace(/`([^`]*)`/g, "$1") // inline code → word
-    .replace(/!\[[^\]]*\]\([^)]*\)/g, "") // images
-    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1") // links → text
-    .replace(/^\s{0,3}#{1,6}\s*/gm, "") // headings
-    .replace(/^\s*[-*+]\s+/gm, " ") // bullets
-    .replace(/^\s*>\s?/gm, "") // blockquotes
-    .replace(/[*_~]/g, "") // bold/italic/strike
-    .replace(/\s+/g, " ")
+    .replace(/```[\s\S]*?```/g, "") // e.g. ```ts\ncode\n``` → removed
+    .replace(/`([^`]*)`/g, "$1") // e.g. `foo` → foo
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, "") // e.g. ![alt](url) → removed
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1") // e.g. [docs](url) → docs
+    .replace(/^\s{0,3}#{1,6}\s*/gm, "") // e.g. "## Title" → "Title"
+    .replace(/^\s*[-*+]\s+/gm, " ") // e.g. "- item" → " item"
+    .replace(/^\s*>\s?/gm, "") // e.g. "> quote" → "quote"
+    .replace(/[*_~]/g, "") // e.g. **bold** / _em_ / ~~x~~ markers stripped
+    .replace(/\s+/g, " ") // collapse runs of whitespace to one space
     .trim();
 }
 

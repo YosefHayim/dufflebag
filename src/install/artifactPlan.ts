@@ -19,8 +19,14 @@ import {
 const receiptFilename = "receipt.json";
 const recoveryFilename = "recovery.json";
 
+// e.g. "/Users/me/.claude" or "C:/Users/me/.claude" — not "rel", "a/../b", or "C:\\x"
+const ABSOLUTE_ROOT_PATTERN =
+  /^(?:\/|[A-Za-z]:\/)(?!.*(?:^|\/)\.{1,2}(?:\/|$))(?!.*\/\/)(?:[^\\/\0]+(?:\/[^\\/\0]+)*)?$/;
+// e.g. "deslop" — legacy kebab skill id in uninstall manifests
+const LEGACY_SKILL_ID_PATTERN = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
+
 export const absoluteRootSchema = Schema.NonEmptyTrimmedString.pipe(
-  Schema.pattern(/^(?:\/|[A-Za-z]:\/)(?!.*(?:^|\/)\.{1,2}(?:\/|$))(?!.*\/\/)(?:[^\\/\0]+(?:\/[^\\/\0]+)*)?$/, {
+  Schema.pattern(ABSOLUTE_ROOT_PATTERN, {
     message: () => "Artifact plan roots must be canonical POSIX or drive-absolute forward-slash paths with no parent traversal.",
   }),
   Schema.annotations({
@@ -648,7 +654,7 @@ const legacyRecordedBySchema = Schema.Union(
   }),
   Schema.TaggedStruct("skill", {
     id: Schema.NonEmptyTrimmedString.pipe(
-      Schema.pattern(/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/, {
+      Schema.pattern(LEGACY_SKILL_ID_PATTERN, {
         message: () => "Legacy artifact skill IDs must use lowercase kebab-case.",
       }),
       Schema.annotations({

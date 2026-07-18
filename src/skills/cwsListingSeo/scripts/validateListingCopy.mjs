@@ -27,6 +27,7 @@ const LIMITS = {
 };
 
 /** Official summary guidance: avoid superlatives like greatest / fastest. */
+// e.g. matches "best", "number one", "#1", "world-class" — not "better" alone
 const SUMMARY_SUPERLATIVES =
   /\b(best|greatest|fastest|number\s*one|#1|top-rated|world.?class)\b/i;
 
@@ -39,18 +40,22 @@ const SUMMARY_SUPERLATIVES =
  * "ChatGPT, Gemini, Claude, Copilot, Perplexity, Midjourney, …"
  */
 const looksLikeKeywordDump = (line) => {
+  // e.g. "- ChatGPT, Gemini, …" or "• brand A, brand B" → strip leading bullet
   const trimmed = line.trim().replace(/^[—\-*•]\s*/, "");
   if (trimmed.length < 24) return false;
 
+  // e.g. "a, b, c, d, e, f" → 5 commas
   const separators = (trimmed.match(/[,|]/g) ?? []).length;
   if (separators < 5) return false;
 
+  // e.g. "ChatGPT, Gemini · Claude" → tokens split on punctuation/space
   const words = trimmed.split(/[\s,|•·/;]+/).filter(Boolean);
   if (words.length < 6) return false;
 
   const avgLen = words.reduce((n, w) => n + w.length, 0) / words.length;
   const density = separators / words.length;
   // Real prose: few commas per word. Dumps: almost every token is comma-separated.
+  // e.g. ends with "?" or "." → treat as prose, not a dump
   return density >= 0.45 && avgLen <= 14 && !/[.?!]/.test(trimmed);
 };
 
@@ -64,6 +69,7 @@ const STOPWORDS = new Set(
 const tokenize = (text) =>
   text
     .toLowerCase()
+    // e.g. "Fast-AI (v2)!" → "fast-ai  v2 "
     .replace(/[^a-z0-9\s'-]/g, " ")
     .split(/\s+/)
     .filter((t) => t.length >= 4 && !STOPWORDS.has(t));

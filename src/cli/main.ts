@@ -95,9 +95,11 @@ export const isBareArgv = (argv: ReadonlyArray<string>): boolean => argv.length 
 
 const thisFile = fileURLToPath(import.meta.url);
 const invoked = process.argv[1] === undefined ? undefined : resolve(process.argv[1]);
+// e.g. ".../main.ts" → ".../main.js" so tsx and compiled entry compare equal
 let isDirectRun = invoked === thisFile || invoked === thisFile.replace(/\.ts$/, ".js");
 if (!isDirectRun && invoked !== undefined) {
   try {
+    // npm bin is a symlink into node_modules; realpath makes argv match import.meta.url
     isDirectRun = realpathSync(invoked) === thisFile;
   } catch {
     // ignore missing/unreadable argv path

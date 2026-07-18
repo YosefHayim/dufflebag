@@ -89,6 +89,7 @@ export function toAss(scenes, w, h) {
   for (const s of scenes) {
     const end = t + s.durationSec;
     if (s.caption) {
+      // e.g. "line1\nline2" → "line1\\Nline2"; strip ASS override braces
       const text = String(s.caption).replace(/\r?\n/g, "\\N").replace(/[{}]/g, "");
       lines.push(`Dialogue: 0,${assTime(t)},${assTime(end)},Default,,0,0,0,,${text}`);
     }
@@ -116,6 +117,7 @@ export function toSrt(scenes) {
   return blocks.join("\n");
 }
 
+// e.g. "C:\path:file" → "C\\:path\\:file" for ffmpeg filter args
 const escapeSub = (p) => p.replace(/[\\:',;[\]]/g, (c) => `\\${c}`);
 
 // --- IO layer ---
@@ -128,11 +130,13 @@ function run(args, cwd) {
 /** True when this ffmpeg was built with libass (so it can burn captions). */
 function hasSubtitlesFilter() {
   const res = spawnSync("ffmpeg", ["-hide_banner", "-filters"], { encoding: "utf8" });
+  // e.g. ffmpeg filter list contains the word "subtitles"
   return typeof res.stdout === "string" && /\bsubtitles\b/.test(res.stdout);
 }
 
 function parseFlags(argv) {
   const out = {};
+  // e.g. "--mode" → "mode"
   for (let i = 0; i < argv.length; i += 2) out[argv[i].replace(/^--/, "")] = argv[i + 1];
   return out;
 }

@@ -1,6 +1,8 @@
 # Dufflebag code style
 
-This file is the prescriptive source of truth for maintained code in this repository. The codebase is migrating to this contract; a rule describes the required destination even when a later refactor task still owns existing violations.
+This file is the **project dialect** (prescriptive SSOT) for maintained code in this repository. Workspace philosophy is the Uncle Bob distillation at `~/Desktop/Code/code-style.md` (same body ships as `templates/mdFiles/CODE-STYLE.md`). When mechanism conflicts with philosophy (e.g. Schema vs interfaces), **this file wins**; philosophy still binds on intent (small functions, honest names, dependency direction, tests as courage).
+
+The codebase is migrating to this contract; a rule describes the required destination even when a later refactor task still owns existing violations.
 
 `code-style.rules.json` mirrors every rule ID and records how each rule is checked. Biome owns formatting and general linting. `scripts/checkCodeStyle.ts` owns only the AST, import-graph, path, and comment rules that Biome cannot express.
 
@@ -182,9 +184,14 @@ Descriptions, defaults, checks, error messages, and legacy transformations live 
 `FeatureDefinition` follows this pattern:
 
 ```ts
+// e.g. "context-guard" — not "ContextGuard"
+const FEATURE_ID_PATTERN = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
+// e.g. "contextGuard" — not "context-guard"
+const SOURCE_DIRECTORY_PATTERN = /^[a-z][a-zA-Z0-9]*$/;
+
 export const featureDefinitionSchema = Schema.Struct({
   id: Schema.NonEmptyTrimmedString.pipe(
-    Schema.pattern(/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/, {
+    Schema.pattern(FEATURE_ID_PATTERN, {
       message: () => "Feature IDs use lowercase kebab-case.",
     }),
     Schema.annotations({
@@ -192,7 +199,7 @@ export const featureDefinitionSchema = Schema.Struct({
     }),
   ),
   sourceDirectory: Schema.NonEmptyTrimmedString.pipe(
-    Schema.pattern(/^[a-z][a-zA-Z0-9]*$/, {
+    Schema.pattern(SOURCE_DIRECTORY_PATTERN, {
       message: () => "Source directories use camelCase.",
     }),
     Schema.annotations({
@@ -213,7 +220,7 @@ export const featureDefinitionSchema = Schema.Struct({
   }),
   dependencies: Schema.Array(
     Schema.NonEmptyTrimmedString.pipe(
-      Schema.pattern(/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/, {
+      Schema.pattern(FEATURE_ID_PATTERN, {
         message: () => "Dependency IDs use lowercase kebab-case.",
       }),
     ),

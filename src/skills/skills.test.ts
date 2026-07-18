@@ -24,6 +24,7 @@ type Frontmatter = {
 
 const parseFrontmatter = (file: string): { frontmatter: Frontmatter | null; body: string } => {
   const text = readFileSync(file, "utf8");
+  // e.g. "---\nname: foo\n---\n# body" → groups: frontmatter block, body
   const match = text.match(/^---\s*\n([\s\S]*?)\n---\s*\n([\s\S]*)$/);
   if (!match) return { frontmatter: null, body: text };
   const lines = match[1].split("\n");
@@ -34,6 +35,7 @@ const parseFrontmatter = (file: string): { frontmatter: Frontmatter | null; body
     const key = line.slice(0, colon).trim();
     const value = line.slice(colon + 1).trim();
     if (key === "arguments") {
+      // e.g. "stop exit" → ["stop","exit"] (JSON array also accepted)
       frontmatter.arguments = value.startsWith("[") ? JSON.parse(value) : value.split(/\s+/).filter(Boolean);
     } else if (key === "name" || key === "description" || key === "type") {
       frontmatter[key] = value;
@@ -69,6 +71,7 @@ const expectValidSkillFrontmatter = (skillMd: string, expectedName: string): voi
   const { frontmatter } = parseFrontmatter(skillMd);
   expect(frontmatter).not.toBeNull();
   expect(frontmatter?.name).toBe(expectedName);
+  // e.g. "png-to-code", "autorun" — not "PngToCode"
   expect(frontmatter?.name).toMatch(/^[a-z0-9-]+$/);
   expect((frontmatter?.name ?? "").length).toBeLessThanOrEqual(64);
   expect(frontmatter?.description).toBeTruthy();
@@ -87,9 +90,11 @@ describe("shipped skills", () => {
 
 describe("local skill sources", () => {
   it.each(sourceSkillDirectories)("%s is camelCase and has valid skill frontmatter", (sourceDirectory) => {
+    // e.g. "pngToCode" — not "png-to-code"
     expect(sourceDirectory).toMatch(/^[a-z][a-zA-Z0-9]*$/);
 
     const feature = featureCatalog.find((candidate) => candidate.sourceDirectory === sourceDirectory);
+    // e.g. "pngToCode" → "png-to-code" when catalog has no installed skill id
     const expectedName =
       feature?.installedSkill._tag === "skill" ? feature.installedSkill.id : sourceDirectory.replace(/([a-z0-9])([A-Z])/g, "$1-$2").toLowerCase();
 

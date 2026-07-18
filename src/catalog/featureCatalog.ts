@@ -1,7 +1,16 @@
 import { Either, Option, Schema } from "effect";
 
+// e.g. "context-guard", "png-to-code" — not "ContextGuard" or "png_to_code"
+const FEATURE_ID_PATTERN = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
+// e.g. "contextGuard", "pngToCode" — not "context-guard" or "Context_Guard"
+const SOURCE_DIRECTORY_PATTERN = /^[a-z][a-zA-Z0-9]*$/;
+// e.g. "SKILL.md", "hooks/ctxWatch.ts" — not "/abs/path" or "a/../b"
+const FEATURE_RELATIVE_PATH_PATTERN = /^(?!\/)(?!.*(?:^|\/)\.\.(?:\/|$))[^\\]+$/;
+// e.g. "hooks/dedupGuard.ts" — feature-relative hook entrypoint only
+const HOOK_SOURCE_ENTRYPOINT_PATTERN = /^(?!\/)(?!.*(?:^|\/)\.\.(?:\/|$))[^\\]+\.ts$/;
+
 export const featureIdSchema = Schema.NonEmptyTrimmedString.pipe(
-  Schema.pattern(/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/, {
+  Schema.pattern(FEATURE_ID_PATTERN, {
     message: () => "Feature IDs must use lowercase kebab-case.",
   }),
   Schema.brand("FeatureId"),
@@ -13,13 +22,13 @@ export const featureIdSchema = Schema.NonEmptyTrimmedString.pipe(
 export type FeatureId = Schema.Schema.Type<typeof featureIdSchema>;
 
 const sourceDirectorySchema = Schema.NonEmptyTrimmedString.pipe(
-  Schema.pattern(/^[a-z][a-zA-Z0-9]*$/, {
+  Schema.pattern(SOURCE_DIRECTORY_PATTERN, {
     message: () => "Source directories must use camelCase.",
   }),
 );
 
 const shippedPathSchema = Schema.NonEmptyTrimmedString.pipe(
-  Schema.pattern(/^(?!\/)(?!.*(?:^|\/)\.\.(?:\/|$))[^\\]+$/, {
+  Schema.pattern(FEATURE_RELATIVE_PATH_PATTERN, {
     message: () => "Shipped paths must stay inside the authored skill directory.",
   }),
 );
@@ -30,7 +39,7 @@ export const featurePlatformSchema = Schema.Literal("any", "macos", "macos+ghost
 
 export const installedSkillSchema = Schema.TaggedStruct("skill", {
   id: Schema.NonEmptyTrimmedString.pipe(
-    Schema.pattern(/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/, {
+    Schema.pattern(FEATURE_ID_PATTERN, {
       message: () => "Installed skill IDs must use lowercase kebab-case.",
     }),
     Schema.annotations({
@@ -71,7 +80,7 @@ export const featureRuntimeSchema = Schema.Union(
   Schema.TaggedStruct("none", {}),
   Schema.TaggedStruct("hook", {
     sourceEntrypoint: Schema.NonEmptyTrimmedString.pipe(
-      Schema.pattern(/^(?!\/)(?!.*(?:^|\/)\.\.(?:\/|$))[^\\]+\.ts$/, {
+      Schema.pattern(HOOK_SOURCE_ENTRYPOINT_PATTERN, {
         message: () => "Hook source entrypoints must end in .ts and stay feature-relative.",
       }),
       Schema.annotations({

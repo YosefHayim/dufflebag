@@ -212,27 +212,47 @@ function count(re, str) {
  */
 function deriveSrc(blob, modernAsset) {
   return {
+    // e.g. "<main>" / "<main class=…>"
     mainTag: count(/<main[\s/>]/g, blob),
     landmarks:
+      // e.g. "<nav>", "<header>", or role="navigation"
       /<(header|nav|footer|section|aside|search)[\s/>]/i.test(blob) ||
       /role=["'](banner|navigation|main|contentinfo|complementary|search)["']/i.test(blob),
+    // e.g. `<div onClick={…}>` — click handler on non-button
     clickableDiv: count(/<div[^>]*\son(?:Click|MouseDown)=/gi, blob),
+    // e.g. "<img src=…>"
     imgTag: count(/<img[\s/>]/gi, blob),
+    // e.g. alt="…"
     altAttr: count(/\balt=/g, blob),
+    // e.g. htmlFor=, aria-label=, or <label>
     labelAssoc: /htmlFor=|aria-label(?:ledby)?=|<label[\s>]/i.test(blob),
+    // e.g. `from "next/image"`
     nextImage: /from\s+["']next\/image["']/.test(blob),
+    // e.g. "hero.webp" or "photo.avif"
     modernAsset: modernAsset || /\.(?:webp|avif)\b/i.test(blob),
+    // e.g. "next/font"
     nextFont: /next\/font/.test(blob),
+    // e.g. "font-display: swap" or display: "swap"
     fontDisplay: /font-display\s*:/i.test(blob) || /display:\s*["']swap["']/.test(blob),
+    // e.g. next/dynamic, React.lazy, import(
     dynamicImport: /next\/dynamic|React\.lazy|\blazy\(|\bimport\(/.test(blob),
+    // e.g. "Content-Security-Policy"
     csp: /Content-Security-Policy/i.test(blob),
+    // e.g. "Strict-Transport-Security"
     hsts: /Strict-Transport-Security/i.test(blob),
+    // e.g. `async headers()` or `headers() {`
     headersFn: /async\s+headers\s*\(|\bheaders\s*\(\s*\)\s*\{/.test(blob),
+    // e.g. MV3 "content_security_policy"
     manifestCsp: /content_security_policy/i.test(blob),
+    // e.g. <html lang="en"> or lang: "en"
     htmlLang: /<html[^>]*\slang=|\blang:\s*["']/.test(blob),
+    // e.g. <title>, title: "…", export const metadata, generateMetadata
     titleMeta: /<title[\s>]|title:\s*["'`]|export\s+const\s+metadata|generateMetadata/.test(blob),
+    // e.g. description: "…" or name="description"
     descMeta: /description:\s*["'`]|name=["']description["']/.test(blob),
+    // e.g. openGraph, property="og:title"
     og: /openGraph|property=["']og:|og:title/.test(blob),
+    // e.g. application/ld+json
     jsonLd: /application\/ld\+json/.test(blob),
   };
 }

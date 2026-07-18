@@ -142,6 +142,7 @@ const validateProtectedPaths = (protectedPaths: ReadonlyArray<ProtectedPathConfi
 
 const validateRuleIds = (repositoryRoot: string, rules: ReadonlyArray<MachineRule>): void => {
   const guide = readFileSync(join(repositoryRoot, "CODE-STYLE.md"), "utf8");
+  // e.g. "[rule:comment.regex-example]" → "comment.regex-example"
   const documentedIds = [...guide.matchAll(/\[rule:([a-z0-9.-]+)\]/gu)].map((match) => match[1] ?? "");
   const machineIds = rules.map((rule) => rule.id);
   const allIds = new Set([...documentedIds, ...machineIds]);
@@ -222,6 +223,7 @@ const hasImmediatelyPrecedingComment = (sourceFile: ts.SourceFile, node: ts.Node
   }
 
   const gap = sourceFile.text.slice(comment.end, node.getStart(sourceFile));
+  // e.g. "\n\n" or "  \n  " — a blank gap with only whitespace
   return /^[ \t]*\r?\n[ \t]*$/u.test(gap);
 };
 
@@ -282,6 +284,7 @@ const hasExportModifier = (node: ts.Node & { modifiers?: ts.NodeArray<ts.Modifie
   Boolean(node.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword));
 
 const isHookRuntimeFile = (file: string): boolean =>
+  // e.g. "src/skills/dedupGuard/hooks/dedupGuard.ts" or ".../runtime/io.ts"
   file.startsWith("src/runtime/") || /^src\/skills\/[^/]+\/(?:hooks|runtime)\//u.test(file);
 
 const isApplicationFile = (file: string): boolean =>
@@ -458,14 +461,17 @@ const resolvedImportPath = (file: string, specifier: string): string | undefined
 
 const sourceCandidates = (target: string): ReadonlyArray<string> => {
   if (target.endsWith(".mjs")) {
+    // e.g. "foo.mjs" → also try "foo.mts"
     return [target, target.replace(/\.mjs$/u, ".mts")];
   }
 
   if (target.endsWith(".cjs")) {
+    // e.g. "foo.cjs" → also try "foo.cts"
     return [target, target.replace(/\.cjs$/u, ".cts")];
   }
 
   if (target.endsWith(".js")) {
+    // e.g. "foo.js" → also try "foo.ts" and "foo.tsx"
     return [target, target.replace(/\.js$/u, ".ts"), target.replace(/\.js$/u, ".tsx")];
   }
 
@@ -486,6 +492,7 @@ const resolvesToPureBarrel = (repositoryRoot: string, file: string, specifier: s
   return sourceFile.statements.length > 0 && sourceFile.statements.every(ts.isExportDeclaration);
 };
 
+// e.g. matches "// @ts-ignore", "biome-ignore lint/...", "eslint-disable-next-line", "c8 ignore"
 const SUPPRESSION_PATTERN =
   /(?:@ts-(?:ignore|expect-error|nocheck)|biome-ignore|prettier-ignore|eslint-disable(?:-next-line|-line)?|(?:c8|istanbul|v8)\s+ignore)\b/u;
 
@@ -512,6 +519,7 @@ const suppressionCommentLines = (sourceFile: ts.SourceFile): ReadonlyArray<numbe
 };
 
 const featureRuntimeRoot = (file: string): string | undefined => {
+  // e.g. "src/skills/dedupGuard/hooks/x.ts" → "src/skills/dedupGuard"
   const match = /^(src\/skills\/[^/]+)\/(?:hooks|runtime)\//u.exec(file);
   return match?.[1];
 };
@@ -568,15 +576,18 @@ const inspectSourceFile = (
   const protectedPath = Boolean(protectedEntry);
   if (!protectedPath) {
     const basename = file.split("/").at(-1) ?? "";
+    // e.g. "utils.ts", "helpers.mts", "common.tsx" — forbidden generic buckets
     if (/^(?:types|helpers|utils|common|misc)\.[cm]?[jt]sx?$/u.test(basename)) {
       addLineViolation("path.no-generic-bucket", 1, "Use a filename that names the domain job.");
     }
 
     const sourceDirectories = file.split("/").slice(1, -1);
+    // e.g. "dedupGuard" ok; "dedup-guard" or "DedupGuard" not
     if (sourceDirectories.some((directory) => !/^[a-z][a-zA-Z0-9]*$/u.test(directory))) {
       addLineViolation("path.source-directory-case", 1, "Authored source directories must use camelCase.");
     }
 
+    // e.g. "src/core/...", "src/commands/...", "src/payload/..." — retired layout
     if (/^src\/(?:core|commands|payload)(?:\/|$)/u.test(file)) {
       addLineViolation("path.capability-layout", 1, "Move this source into the capability that owns it.");
     }
@@ -704,6 +715,7 @@ const inspectSourceFile = (
       });
     }
 
+    // e.g. "foo.d.ts" / "bar.d.mts" may declare interfaces; other files may not
     if (ts.isInterfaceDeclaration(node) && !/\.d\.(?:c|m)?ts$/u.test(file)) {
       addViolation({
         ruleId: "type.no-interface",
@@ -754,6 +766,7 @@ const inspectSourceFile = (
       });
     }
 
+    // e.g. "src/foo/index.ts" — barrel files may only re-export
     if (/\/index\.[cm]?[jt]sx?$/u.test(`/${file}`) && ts.isStatement(node) && node.parent === sourceFile) {
       const exportSpecifier =
         ts.isExportDeclaration(node) &&
@@ -765,6 +778,7 @@ const inspectSourceFile = (
         ts.isExportDeclaration(node) &&
         !node.exportClause &&
         Boolean(exportSpecifier) &&
+        // e.g. "./index.js" or "pkg/index.ts" — barrel chaining forbidden
         !/(?:^|\/)index\.(?:js|mjs|cjs|ts|mts|cts)$/u.test(exportSpecifier ?? "") &&
         !resolvesToPureBarrel(repositoryRoot, file, exportSpecifier ?? "");
       if (!directWildcard) {
@@ -779,6 +793,7 @@ const inspectSourceFile = (
 
     if (
       ts.isIdentifier(node) &&
+      // e.g. "helper", "ArtifactManager", "userData" — vague role/suffix names
       /^(?:manager|helper|utils|data|info|common|misc)$|(?:Manager|Helper|Utils|Data|Info|Common|Misc)$/u.test(
         node.text,
       )
