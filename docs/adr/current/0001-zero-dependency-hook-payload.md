@@ -3,6 +3,9 @@
 - **Status:** Accepted (2026-07-01)
 - **Scope:** `src/hooks/**` → compiled to `dist/hooks` and copied into `~/.claude/skills-bag/hooks`
 
+
+> **Current map (0016):** the zero-dependency hook kernel lives at `src/runtime/` (not `src/payload/`). The rule is unchanged.
+
 ## Context
 
 Hooks fire on the hot path of every tool call (`PreToolUse`, `PostToolUse`,

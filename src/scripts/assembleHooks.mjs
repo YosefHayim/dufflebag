@@ -4,7 +4,7 @@
  * flat, self-contained `dist/hooks/` payload the installer copies wholesale.
  *
  * Sources are vertical (`src/skills/<feature>/hooks/*`, `src/skills/<feature>/lib/*`) and
- * the shared zero-dep kernel lives in `src/payload/*`; the *output* is flat
+ * the shared zero-dep kernel lives in `src/runtime/*`; the *output* is flat
  * (ADR 0008: source structure ≠ output structure). Entry hooks land at
  * `dist/hooks/*.js`, their kernel + feature libs at `dist/hooks/lib/*.js`, and
  * each entry hook's cross-dir import specifiers are rewritten to the flat
@@ -22,17 +22,19 @@ import { fileURLToPath } from "node:url";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const DIST_SKILLS = path.join(ROOT, "dist", "src", "skills");
-const PAYLOAD_DIR = path.join(ROOT, "dist", "src", "payload");
+const PAYLOAD_DIR = path.join(ROOT, "dist", "src", "runtime");
 const OUT_HOOKS = path.join(ROOT, "dist", "hooks");
 const OUT_LIB = path.join(OUT_HOOKS, "lib");
 
 /**
  * Cross-dir import specifiers tsc emits (verbatim under NodeNext) and the flat
  * sibling they map to in the assembled payload:
- *   ../../../payload/config.js      →  ./lib/config.js   (shared kernel)
+ *   ../../../runtime/config.js      →  ./lib/config.js   (shared kernel)
+ *   ../../../payload/config.js      →  ./lib/config.js   (legacy path during transition)
  *   ../lib/state.js                 →  ./lib/state.js    (feature-local lib)
  */
 const IMPORT_REWRITES = [
+  ["../../../runtime/", "./lib/"],
   ["../../../payload/", "./lib/"],
   ["../lib/", "./lib/"],
 ];

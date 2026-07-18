@@ -1,5 +1,8 @@
 # ADR 0015 — Pre-commit README regeneration
 
+
+> **Current map (0016):** feature catalog SSOT is `src/catalog/featureCatalog.ts` (not `src/core/catalog/features.ts`).
+
 ## Status
 
 Accepted.

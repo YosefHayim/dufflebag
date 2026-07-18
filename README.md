@@ -74,9 +74,9 @@ dufflebag config --warn 0.15 --block 0.22 --budget 5
 | Feature | What it does | Runs on |
 | --- | --- | --- |
 | **context-guard** | Nudge a /handoff at ~18% of the model window and hard-deny new code edits at ~20%, so long sessions wind down gracefully instead of ballooning past usable context. | 🟢 any OS |
-| **dedup-guard** | Block a Write/Edit that pastes a function body or interface/type shape already defined elsewhere in the repo — DRY enforced at the moment of the write. Uses the repo's own TypeScript; deny by default (tune with dufflebagDedupEnforcement). Also wires Cursor (warn) + an AGENTS.md rule for Codex. | 🟢 any OS |
 | **autonomous-loop** | A SessionStart daemon that auto-/compacts and resumes work hands-free once context nears the guardrail and a fresh handoff exists. macOS + Ghostty only (it types into your terminal window). | 🔴 macOS + Ghostty |
 | **speak-response** | A Stop hook that speaks Claude's prose (code blocks stripped) via the macOS `say` command. macOS only. | 🟡 macOS |
+| **dedup-guard** | Block a Write/Edit that pastes a function body or interface/type shape already defined elsewhere in the repo — DRY enforced at the moment of the write. Uses the repo's own TypeScript; deny by default (tune with dufflebagDedupEnforcement). Also wires Cursor (warn) + an AGENTS.md rule for Codex. | 🟢 any OS |
 | **png-to-code** | A skill that turns a PNG design (illustration, logo, UI mockup) into SVG/HTML/CSS that measurably converges to a 1:1 match — a decompose → reuse-or-build → render → screenshot-diff → refine loop, plus a rig-first doctrine for animation. Pure skill (no hooks); its diff harness needs Node + Playwright. | 🟢 any OS |
 | **github-repo-metadata** | A skill that writes and audits GitHub repository About metadata: concise descriptions, homepage/demo links, and topics/tags grounded in official GitHub guidance. Pure skill (no hooks). | 🟢 any OS |
 | **write-a-post** | A skill that writes a portfolio blog post in the owner's exact voice, scaffolds it into the blog data file via a one-command dev script, and generates a matching cover image by driving a real ChatGPT browser conversation through ai-browser-bridge (attaching the likeness photo + an existing cover so the character and flat-2D style stay consistent). Pure skill (no hooks). | 🟢 any OS |
@@ -84,11 +84,15 @@ dufflebag config --warn 0.15 --block 0.22 --budget 5
 | **refresh-agent-docs** | A skill that refetches current official guidance for AGENTS.md, CLAUDE.md, GEMINI.md, Cursor rules, Kiro steering, Roo rules, and Codex instructions before rewriting repo agent docs. Pure skill (no hooks). | 🟢 any OS |
 | **deslop-v2** | The over-engineering companion to deslop: reviews code and repo structure for excess — pass-through wrappers, `??` fallback chains, nested ternaries, grab-bag returns, and over-nested folders/packages — then removes it so the code does exactly what it needs and no more. Use when the user says code is over-engineered, over-abstracted, or too complicated, or asks to simplify, flatten, or cut needless indirection and layers. Pure skill (no hooks). | 🟢 any OS |
 | **grill-me-code-style** | A greenfield code-style grilling skill. Interviews the user about how a new project is built, then renders an interactive HTML plan and writes CODE-STYLE.md, formatter config, and AGENTS.md digest on approval. | 🟢 any OS |
+| **grill-me-code-style-coach** | Coach real style and structure decisions while code is being built or fixed. | 🟢 any OS |
+| **grill-me-code-style-review** | Review a large changeset against its code-style contract and explain only real deviations. | 🟢 any OS |
 | **grill-me-code-style-with-docs** | An existing-codebase code-style grilling skill. Uses real code as evidence, fans out sub-agents for repeated patterns, then writes/updates CODE-STYLE.md and the AGENTS.md digest on approval. | 🟢 any OS |
+| **grill-me-stack** | Teach and challenge a project's technology choices until their tradeoffs are explainable. | 🟢 any OS |
 | **planpage** | A skill for rendering agent plans, review gates, and reports as beautiful interactive HTML pages using the open-source planpage package. | 🟢 any OS |
 | **web-perf-ci** | A skill that wires automated performance gates into a website's CI/CD: a Lighthouse CI budget check on every PR (lab), a Chrome UX Report (CrUX) real-user field check after deploy, and an optional web-vitals RUM snippet — all enforcing Core Web Vitals budgets (LCP, INP, CLS). It interviews the repo to detect the stack and run mode, then writes lighthouserc, the GitHub Actions workflows, and zero-dep CrUX + PSI checkers. Pure skill (no hooks); the checks need Node 18+ and a free Google API key (Chrome UX Report + PageSpeed Insights APIs). | 🟢 any OS |
 | **cws-listing-seo** | A skill that optimizes Chrome Web Store listing copy (name, summary, Overview) and marketing-site GEO using official Chrome/Google guidance. Ships a zero-dep validator for limits + Keyword Spam heuristics; CWS keyword volume stays manual/browser research (no official free API). Pure skill (no hooks). | 🟢 any OS |
 | **make-a-trailer** | A skill that directs a cinematic, viral-ready vertical trailer for any project: it reads the repo's own docs to derive the story, consults ChatGPT (GPT-5.5 Thinking) over ai-browser-bridge to write the transcript + storyboard, batch-generates the keyframes as ChatGPT images, animates them with Higgsfield or Flow/Veo, produces voiceover + music (ElevenLabs → Higgsfield → local synth), and assembles a 9:16 master + 16:9/1:1/4:5 cuts with ffmpeg — behind two planpage approval gates and a resumable generation manifest. macOS + Chrome (ai-browser-bridge), the Higgsfield MCP, and ffmpeg required. Pure skill (no hooks). | 🟡 macOS |
+| **web-best-practices** | Audit and fix semantics, accessibility, assets, security, SEO, and machine readability. | 🟢 any OS |
 <!-- AUTO:FEATURES:END -->
 
 ## Recommended community skills
@@ -142,7 +146,7 @@ pnpm build
 pnpm verify
 ```
 
-`pnpm generate-readme` rewrites only the marked feature and skill sections above from `src/core/catalog/features.ts` and `src/skills/*/SKILL.md`. The pre-commit hook runs it automatically and stages the updated README.
+`pnpm generate-readme` rewrites only the marked feature and skill sections above from `src/catalog/featureCatalog.ts` and `src/skills/*/SKILL.md`. The pre-commit hook runs it automatically and stages the updated README.
 
 ## License
 

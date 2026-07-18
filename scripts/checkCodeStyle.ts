@@ -32,9 +32,9 @@ type CodeStyleConfiguration = {
 };
 
 const APPROVED_PROTECTED_PATHS = [
-  "src/skills/make-a-trailer/SKILL.md",
-  "src/skills/make-a-trailer/reference/pipeline.md",
-  "src/skills/make-a-trailer/scripts/assembleCut.mjs",
+  "src/skills/makeATrailer/SKILL.md",
+  "src/skills/makeATrailer/reference/pipeline.md",
+  "src/skills/makeATrailer/scripts/assembleCut.mjs",
 ];
 
 const APPROVED_ASSEMBLE_CUT_EXEMPTIONS = [
@@ -287,7 +287,7 @@ const isHookRuntimeFile = (file: string): boolean =>
 const isApplicationFile = (file: string): boolean =>
   file.startsWith("src/") &&
   !isHookRuntimeFile(file) &&
-  !file.startsWith("src/skills/png-to-code/scripts/");
+  !file.startsWith("src/skills/pngToCode/scripts/");
 
 const assignedRootIdentifier = (expression: ts.Expression): ts.Identifier | undefined => {
   if (ts.isIdentifier(expression)) {

@@ -44,9 +44,20 @@ This layout is the approved destination. During the migration, legacy technical-
 
 ## Working contract
 
-This is a routing digest. [`CODE-STYLE.md`](CODE-STYLE.md) is authoritative and every enforceable rule maps to [`code-style.rules.json`](code-style.rules.json). Architectural reasons belong in `docs/adr/current/`.
+This is a routing digest. Style is layered:
+
+| Layer | File | Role |
+| --- | --- | --- |
+| Workspace philosophy | `~/Desktop/Code/code-style.md` | Uncle Bob distillation (shared across repos) |
+| Project dialect | [`CODE-STYLE.md`](CODE-STYLE.md) | Prescriptive SSOT inside this repo |
+| Machine map | [`code-style.rules.json`](code-style.rules.json) | Rule id → enforcement channel |
+| Verify | `pnpm verify` | biome ci + tsc + tests + build |
+
+When mechanism conflicts with workspace philosophy (e.g. Schema vs interfaces), **this repo’s CODE-STYLE wins**. Philosophy still binds on intent (small functions, honest names, dependency direction, tests as courage). Architectural reasons belong in `docs/adr/current/`.
 
 - **One strict style bar for all TypeScript** — `src/` *and* the png harness (`src/skills/png-to-code/scripts/`). **biome is the linter (`recommended`) *and* formatter** (double quotes), committed as `biome.json` with `biome ci` the one CI gate. One root `tsconfig` governs the project; the png harness's own `tsconfig` is the single sanctioned exception ([ADR 0013](docs/adr/current/0013-style-refresh-colocated-tests-single-command-autorun-templates.md)).
+- **No hand-rolled type-guard parse helpers** — do not export `isX` / `parseX` pairs for literals and numbers. Application code decodes with Effect Schema (`bagConfigSchema`, legacy env map). Hook-island config uses private switch/default readers inside `readConfig` only.
+
 - **Effect application** — capabilities return Effect values. Only `src/cli/main.ts` starts the runtime. Use official platform services directly; do not add pass-through tags, layers, managers, helpers, or utility wrappers.
 - **Schema-owned data** — runtime, persisted, catalog, CLI, environment, and agent-format objects begin as Effect Schema. Derive types with `Schema.Schema.Type`; keep descriptions, defaults, checks, messages, and legacy transformations on their properties.
 - **Tagged errors** — application failures use `Schema.TaggedError`. Installed hooks remain dependency-free plain Node and keep their explicit fail-open behavior where the event contract requires it.

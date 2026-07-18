@@ -1,10 +1,10 @@
 {
   "name": "ys-dufflebag",
-  "version": "0.11.0",
+  "version": "0.12.0",
   "description": "One-command installer for a personal bag of AI coding agent skills, hooks, and reusable CI/publish workflow templates for Claude Code, Kimi, and Kiro: a context guardrail that forces a graceful /handoff before the window fills, a DRY dedup-guard, a hands-free autonomous-compact loop (autorun), a macOS text-to-speech hook, and a png-to-code skill that converts PNG designs into pixel-perfect animated SVG via a measured screenshot-diff loop. Pure TypeScript, Node-only, no Python.",
   "type": "module",
   "bin": {
-    "dufflebag": "dist/src/cli.js"
+    "dufflebag": "dist/src/cli/main.js"
   },
   "files": [
     "dist",
@@ -16,7 +16,7 @@
   ],
   "scripts": {
     "dev": "pnpm cli",
-    "cli": "tsx src/cli.ts",
+    "cli": "tsx src/cli/main.ts",
     "prepare": "husky",
     "prebuild": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
     "build": "tsc && node src/scripts/assembleHooks.mjs",
@@ -62,14 +62,11 @@
   },
   "packageManager": "pnpm@10.33.2",
   "dependencies": {
-    "@clack/prompts": "^0.10.1",
     "@effect/cli": "0.76.0",
     "@effect/platform": "0.97.0",
     "@effect/platform-node": "0.108.0",
-    "commander": "^13.1.0",
     "effect": "3.22.0",
     "jsonc-parser": "3.3.1",
-    "picocolors": "^1.1.1",
     "yaml": "2.9.0"
   },
   "devDependencies": {

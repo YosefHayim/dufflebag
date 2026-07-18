@@ -5,6 +5,9 @@
 - **Related:** [0008](0008-vertical-per-feature-layout.md), [0009](0009-reusable-workflows-and-cli-scaffolding.md), [0013](0013-style-refresh-colocated-tests-single-command-autorun-templates.md)
 - **Supersedes:** the *directory-path* portions of [0008](0008-vertical-per-feature-layout.md) (`skills/` → `src/skills/`) and [0013](0013-style-refresh-colocated-tests-single-command-autorun-templates.md) (`mdFiles/` → `templates/mdFiles/`). The reasoning in both is unchanged — only the base paths move.
 
+
+> **Current map (0016):** capability layout replaces the kernel three-up under `src/core`/`src/payload`. Scripts remain under `src/scripts/`.
+
 ## Context
 
 After the dufflebag pivot (0008) and the style refresh (0013), the repo root held six meaningful

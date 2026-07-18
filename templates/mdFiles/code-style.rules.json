@@ -50,7 +50,7 @@
       "good": "import { allow, emit } from \"../../../payload/io.js\";",
       "bad": "import { program } from \"commander\";",
       "source": "Never / ADR 0001",
-      "exemplar": "src/skills/dedup-guard/hooks/dedupGuard.ts"
+      "exemplar": "src/skills/dedupGuard/hooks/dedupGuard.ts"
     },
     {
       "id": "no-focused-tests",

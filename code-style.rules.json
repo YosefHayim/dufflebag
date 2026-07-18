@@ -71,6 +71,11 @@
       "enforcement": "manual"
     },
     {
+      "id": "type.no-handrolled-parser",
+      "summary": "Do not export type-guard/parse helpers for schema-owned literals and numbers; decode with Schema or private switch inside hook readConfig only.",
+      "enforcement": "manual"
+    },
+    {
       "id": "type.schema-owned-runtime",
       "summary": "Runtime object types derive from executable Effect Schema definitions.",
       "enforcement": "ast"
@@ -153,15 +158,15 @@
   ],
   "protectedPaths": [
     {
-      "path": "src/skills/make-a-trailer/SKILL.md",
+      "path": "src/skills/makeATrailer/SKILL.md",
       "codeRuleExemptions": []
     },
     {
-      "path": "src/skills/make-a-trailer/reference/pipeline.md",
+      "path": "src/skills/makeATrailer/reference/pipeline.md",
       "codeRuleExemptions": []
     },
     {
-      "path": "src/skills/make-a-trailer/scripts/assembleCut.mjs",
+      "path": "src/skills/makeATrailer/scripts/assembleCut.mjs",
       "codeRuleExemptions": [
         "function.arrow-only",
         "function.input-shape",

@@ -4,6 +4,9 @@
 - **Scope:** `src/**` (incl. `src/skills/**`), the build, and the install copy step
 - **Related:** [0001 — Zero-dependency hook payload](0001-zero-dependency-hook-payload.md), [0003 — Config SSOT inside payload](0003-config-ssot-inside-payload.md), [0014 — Consolidate under src/ and templates/](0014-consolidate-under-src-and-templates.md)
 
+
+> **Current map (0016):** features still live under `src/skills/<sourceDirectory>/` (camelCase). The former `src/core`/`src/commands`/`src/payload` split is gone.
+
 ## Context
 
 The engine was layered: `src/core/`, `src/hooks/`, `src/commands/`. The owner
