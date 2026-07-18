@@ -85,11 +85,11 @@ jobs:
       - name: Type check
         run: pnpm run typecheck
 
-      - name: Run tests
-        run: pnpm test
-
       - name: Build
         run: pnpm run build
+
+      - name: Run tests
+        run: pnpm test
 
       - name: Publish to npm (trusted publishing)
         run: pnpm publish --no-git-checks --access public --provenance

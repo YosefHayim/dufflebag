@@ -36,5 +36,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # stagePackage + install fixtures need compiled skills under dist/src/skills.
+      - name: Build
+        run: pnpm run build
+
       - name: Run tests
         run: pnpm test
