@@ -51,6 +51,7 @@ function parseArgs(argv) {
 }
 
 function timestampSlug(date) {
+  // e.g. "2026-07-18T18:38:24.663Z" → "2026-07-18T18-38-24-663Z"
   return date.toISOString().replace(/[:.]/g, "-");
 }
 

@@ -153,6 +153,7 @@ function osa(script: string, timeoutMs = 5000): string | null {
   }
 }
 
+// e.g. `say "hi\there"` → `say \"hi\\there\"` for AppleScript string literals
 const esc = (s: string): string => s.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 
 /** Focus guard: true only if Ghostty is the frontmost app. Fail-closed. */
@@ -236,6 +237,7 @@ async function acquireKeysLock(timeoutMs = 20_000): Promise<boolean> {
       return true;
     } catch (err) {
       if ((err as NodeJS.ErrnoException).code !== "EEXIST") return false;
+      // e.g. "12345 1710000000" → ["12345","1710000000"]
       const parts = readText(KEYS_LOCK).split(/\s+/);
       const heldAt = parts.length > 1 ? Number(parts[1]) * 1000 : 0;
       if (now() - heldAt > KEYLOCK_STALE_MS) {

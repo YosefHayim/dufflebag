@@ -58,6 +58,7 @@ function parseFlags(argv) {
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (!a.startsWith("--")) continue;
+    // e.g. "--ratio" → "ratio"
     const key = a.replace(/^--/, "");
     const next = argv[i + 1];
     if (!next || next.startsWith("--")) out[key] = true;

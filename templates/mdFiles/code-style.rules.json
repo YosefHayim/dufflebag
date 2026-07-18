@@ -1,137 +1,66 @@
 {
-  "$schema-note": "The machine mirror of CODE-STYLE.md — a structured ruleset ('biome config, as a skill'). Each rule declares HOW it is enforced (its channel) and the concrete artifact that enforces it. CODE-STYLE.md stays the human prose; this file is what the grill-me review/coach skills read to enforce every rule deterministically, not just the 'Never' list. SSOT for the machine view; keep the two in step.",
-  "version": 1,
-  "repo": "dufflebag",
+  "$schema-note": "Machine mirror of templates/mdFiles/CODE-STYLE.md (Uncle Bob workspace philosophy). Judgment-enforced unless a project adds Biome/AST channels. Keep in step with the prose guide.",
+  "version": 2,
+  "repo": "scaffolded",
   "generatedFrom": "templates/mdFiles/CODE-STYLE.md",
-  "gate": "verify (biome ci . && tsc --noEmit && vitest run && build)",
+  "gate": "project-defined (prefer: biome ci && tsc --noEmit && tests && build)",
   "channels": {
-    "biome-builtin": "A Biome recommended rule already catches it — runs in `biome ci`, zero extra config.",
-    "biome-builtin-scoped": "A Biome rule enabled for a path subset via biome.json `overrides`.",
-    "biome-restricted-import": "Enforced by `noRestrictedImports` (path/dep boundaries), scoped via `overrides`.",
-    "biome-grit-plugin": "A custom GritQL rule in biome-rules/*.grit (call/expression shaped). Autofix via `=>` when marked safe.",
-    "judgment": "No deterministic detector — GritQL can't express it (e.g. declarations) or it is taste/architecture. Enforced by the review sub-agents + `deslop`/`deslop-v2` per-diff."
+    "judgment": "Review / deslop / coach skills and human review. No deterministic detector by default."
   },
   "rules": [
     {
-      "id": "no-explicit-any",
-      "statement": "unknown, never any in hand-written code.",
-      "channel": "biome-builtin",
-      "artifact": "linter.rules.recommended (suspicious/noExplicitAny)",
-      "good": "const errors = (body as { errors?: unknown }).errors;",
-      "bad": "let b: any = 1; const a = (x as any).y;",
-      "source": "Types & contracts",
-      "exemplar": "src/core/settings/settings.ts"
-    },
-    {
-      "id": "node-import-protocol",
-      "statement": "Node builtins use the node: prefix.",
-      "channel": "biome-builtin",
-      "artifact": "linter.rules.recommended (style/useNodejsImportProtocol, FIXABLE)",
-      "good": "import { readFileSync } from \"node:fs\";",
-      "bad": "import { readFileSync } from \"fs\";",
-      "source": "Imports: node: prefix, barrels per directory",
-      "exemplar": "src/payload/io.ts"
-    },
-    {
-      "id": "no-console-in-cli",
-      "statement": "Never console.* in the CLI — go through core/ui.ts. Harness scripts may use console.* as their output contract.",
-      "channel": "biome-builtin-scoped",
-      "artifact": "biome.json overrides[src/core/**, src/commands/**].suspicious/noConsole = error (harness intentionally excluded)",
-      "good": "ui.info(\"done\");",
-      "bad": "console.log(\"done\");",
-      "source": "Never",
-      "exemplar": "src/core/ui.ts"
-    },
-    {
-      "id": "zero-dep-hook-payload",
-      "statement": "A runtime dependency must never be reachable from the hook payload — hooks import only node:*, src/payload/*, and the feature's own lib/.",
-      "channel": "biome-restricted-import",
-      "artifact": "biome.json overrides[src/skills/*/hooks/**].style/noRestrictedImports (paths: commander, @clack/prompts, picocolors)",
-      "good": "import { allow, emit } from \"../../../payload/io.js\";",
-      "bad": "import { program } from \"commander\";",
-      "source": "Never / ADR 0001",
-      "exemplar": "src/skills/dedupGuard/hooks/dedupGuard.ts"
-    },
-    {
-      "id": "no-focused-tests",
-      "statement": "Never commit a focused test — `.only(` silently skips the rest of the suite.",
-      "channel": "biome-grit-plugin",
-      "artifact": "biome-rules/no-focused-tests.grit",
-      "good": "describe(\"suite\", () => { it(\"case\", () => {}); });",
-      "bad": "describe.only(\"suite\", () => {});",
-      "source": "Tests co-locate — no test/ dir",
-      "exemplar": "src/core/catalog/features.test.ts"
-    },
-    {
-      "id": "filenames-camelcase",
-      "statement": "Source files are camelCase (agentWiring.ts, contextGuard.ts).",
-      "channel": "biome-builtin",
-      "artifact": "linter.rules.style/useFilenamingConvention { filenameCases: [camelCase] } — DOCUMENTED, not yet enabled (audit index.ts / *.test.ts naming before turning on).",
-      "status": "pending-rollout",
-      "good": "agentWiring.ts",
-      "bad": "agent-wiring.ts",
-      "source": "Naming",
-      "exemplar": "src/core/wiring/agentWiring.ts"
-    },
-    {
-      "id": "no-enum-prefer-union",
-      "statement": "Prefer string-literal unions over enums.",
+      "id": "workspace.reuse-before-invent",
+      "statement": "Reuse and extend before creating; promote to shared only on a real second consumer.",
       "channel": "judgment",
-      "artifact": "GritQL 2.5 cannot match `enum` declarations and `recommended` does not flag them — caught by the review sub-agents + deslop. Revisit as a grit rule when Biome adds declaration matching.",
-      "good": "export type FeatureId = \"context-guard\" | \"dedup-guard\";",
-      "bad": "export enum FeatureId { ContextGuard, DedupGuard }",
-      "source": "Types & contracts",
-      "exemplar": "src/core/catalog/features.ts"
+      "source": "§0 Workspace stance"
     },
     {
-      "id": "tsdoc-exported-surface",
-      "statement": "Every exported function/type carries TSDoc: summary + @param each + @returns + one line per property. Internal one-liners stay bare.",
+      "id": "workspace.ssot-kiss-yagni-dry",
+      "statement": "SSOT / KISS / YAGNI / DRY: one source of truth; simplest thing that works; no premature features; no copy-paste logic.",
       "channel": "judgment",
-      "artifact": "deslop / jsdoc-editor per-diff — not mechanically checkable end-to-end.",
-      "good": "/**\\n * Fill the publish template's placeholders.\\n * @param template - raw publish.yml.\\n * @returns the filled YAML.\\n */\\nexport function fillPublishTemplate(...) {}",
-      "bad": "export function fillPublishTemplate(template, inputs) {}",
-      "source": "TSDoc on the exported surface / ADR 0012",
-      "exemplar": "src/commands/scaffoldCi.ts"
+      "source": "§0 Workspace stance"
     },
     {
-      "id": "pure-io-divider",
-      "statement": "A module that touches disk/env/process splits pure transformers (top) from effects (bottom) with a `// --- IO layer ---` divider; tests hit the pure half.",
+      "id": "function.small-one-thing",
+      "statement": "Functions are small, do one thing, stay at one abstraction level; few args; no flag/output args.",
       "channel": "judgment",
-      "artifact": "Architectural — review sub-agents check the divider + that tests exercise the pure half.",
-      "good": "mergeManagedHooks(...) // pure\\n// --- IO layer ---\\nreadSettings(file) // disk",
-      "bad": "function readAndMerge(file) { const s = readFileSync(file); return merge(s); }",
-      "source": "Pure core, imperative shell / ADR 0010",
-      "exemplar": "src/core/settings/settings.ts"
+      "source": "§3 Functions"
     },
     {
-      "id": "clone-in-clone-out",
-      "statement": "Pure mutators take a value and return a new one via structuredClone — never mutate an argument.",
+      "id": "function.cqs",
+      "statement": "Command–Query Separation: commands change state and return void; queries return values without mutating.",
       "channel": "judgment",
-      "artifact": "Semantic — review sub-agents (noParameterAssign catches only direct reassignment, not deep mutation).",
-      "good": "const settings = clone(input); ...; return settings;",
-      "bad": "input.hooks.push(hook); return input;",
-      "source": "Pure mutators clone in, clone out",
-      "exemplar": "src/core/settings/settings.ts"
+      "source": "§4 Side effects and CQS"
     },
     {
-      "id": "shared-contract-reexport",
-      "statement": "Declare a shared contract once, re-export it — never re-declare (config SSOT lives in src/payload/config.ts).",
+      "id": "comment.last-resort",
+      "statement": "Comments are last resort; delete noise/journals/commented-out code; keep consequence warnings and clarifying intent when the language truly can’t.",
       "channel": "judgment",
-      "artifact": "Cross-module — review sub-agents; a divergent re-declared key is invisible to a single-file linter.",
-      "good": "export { ENV_KEYS } from \"../payload/config.js\";",
-      "bad": "export const ENV_KEYS = { /* re-declared copy */ } as const;",
-      "source": "Declare a shared contract once / ADR 0003",
-      "exemplar": "src/payload/config.ts"
+      "source": "§6 Comments"
     },
     {
-      "id": "catalog-ships-allowlist",
-      "statement": "The installer copies only the catalog-declared `ships` paths — build-only .ts never leaks into a user's install.",
+      "id": "name.reveal-intent",
+      "statement": "Names reveal intent; no noise words (data/info/manager); distinguish meaningfully.",
       "channel": "judgment",
-      "artifact": "Architectural invariant — review sub-agents + the install/uninstall integration test.",
-      "good": "for (const rel of feature.ships) copyDir(...);",
-      "bad": "copyDir(featureRoot, dest); // copies engine .ts too",
-      "source": "Ship boundary / ADR 0008",
-      "exemplar": "src/core/catalog/features.ts"
+      "source": "§7 Names"
+    },
+    {
+      "id": "test.tdd-courage",
+      "statement": "Prefer red→green→refactor; tests are living documentation; do not ship untested behavior.",
+      "channel": "judgment",
+      "source": "§9 TDD"
+    },
+    {
+      "id": "architecture.dependency-rule",
+      "statement": "Dependencies point inward; frameworks/DB/web are details/plugins; protect structure over urgent hacks.",
+      "channel": "judgment",
+      "source": "§10 Architecture"
+    },
+    {
+      "id": "ocp.prefer-types",
+      "statement": "Prefer adding a type/class over hunting every switch/if for a new case.",
+      "channel": "judgment",
+      "source": "§12 Open/Closed"
     }
   ]
 }

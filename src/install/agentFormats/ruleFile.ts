@@ -15,7 +15,9 @@ import {
 
 const textEncoder = new TextEncoder();
 const templateToken = "@@CTL@@";
+// e.g. "---\n" or "---\r\n" at the start of a skill markdown body
 const leadingFrontmatterOpeningPattern = /^---(?:\r\n|\n)/;
+// e.g. "---\nname: x\n---\n# body" → whole leading YAML frontmatter block
 const leadingFrontmatterBlockPattern = /^---(?:\r\n|\n)(?:[\s\S]*?(?:\r\n|\n))?---(?:(?:\r\n|\n)|$)/;
 const agentDefinitionsEqual = Schema.equivalence(agentDefinitionSchema);
 const catalogSkillDefinitionSchema = installedSkillDefinitionSchema.members[1];

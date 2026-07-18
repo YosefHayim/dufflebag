@@ -1,9 +1,12 @@
 import { type Option, Schema, SchemaAST } from "effect";
 
+// e.g. "0.18", "+1e-3", ".5" — not "1." alone without digits after optional form handled, "NaN", or "0x10"
+const LEGACY_NUMBER_STRING_PATTERN = /^[+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?$/;
+
 const legacyNumberStringSchema = Schema.Trim.pipe(
   Schema.compose(
     Schema.String.pipe(
-      Schema.pattern(/^[+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?$/, {
+      Schema.pattern(LEGACY_NUMBER_STRING_PATTERN, {
         message: () => "Expected a complete base-10 number.",
       }),
     ),

@@ -102,6 +102,7 @@ function save(dir, m) {
 
 function parseFlags(argv) {
   const out = {};
+  // e.g. "--manifest" → "manifest"
   for (let i = 0; i < argv.length; i += 2) out[argv[i].replace(/^--/, "")] = argv[i + 1];
   return out;
 }

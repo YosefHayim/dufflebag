@@ -60,6 +60,7 @@ const featuresSource = readFileSync(featuresPath, "utf8");
  */
 function parseFeatures() {
   const starts = [];
+  // e.g. `id: "context-guard",\n  sourceDirectory:` → capture "context-guard"
   const startRegex = /id:\s*"([a-z][a-z0-9-]*)",\s*\n\s*sourceDirectory:/g;
   let match;
 
@@ -71,12 +72,16 @@ function parseFeatures() {
     const end = starts[index + 1]?.index ?? featuresSource.length;
     const block = featuresSource.slice(start.index, end);
 
+    // e.g. `title: "Context guard"` → "Context guard"
     const title = block.match(/title:\s*"((?:\\.|[^"\\])*)"/)?.[1] ?? start.id;
     const summary =
       block
+        // e.g. `summary: "One-line…"` or multiline string concat
         .match(/summary:\s*\n?\s*"((?:\\.|[^"\\])*)"/s)?.[1]
-        ?.replace(/\\n/g, " ")
-        ?.replace(/"\s*\+\s*"/g, "") ?? "";
+        ?.replace(/\\n/g, " ") // e.g. "line1\\nline2" → "line1 line2"
+        ?.replace(/"\s*\+\s*"/g, "") ?? // e.g. `"a" + "b"` fragments → "ab"
+        "";
+    // e.g. `platform: "macos"` → "macos"
     const platform = block.match(/platform:\s*"([^"]+)"/)?.[1] ?? "any";
 
     const platformEmoji =
@@ -99,6 +104,7 @@ function parseFeatures() {
  * Only handles single-line scalar values; that is all this generator needs.
  */
 function parseFrontmatter(content) {
+  // e.g. "---\nname: foo\n---\n# body" → capture "name: foo"
   const fmMatch = content.match(/^---\n([\s\S]*?)\n---/);
   if (!fmMatch) return {};
 
@@ -108,6 +114,7 @@ function parseFrontmatter(content) {
     if (colonIdx === -1) continue;
     const key = line.slice(0, colonIdx).trim();
     let value = line.slice(colonIdx + 1).trim();
+    // e.g. `"quoted"` or `'quoted'` → quoted
     value = value.replace(/^["']|["']$/g, "");
     if (key && value) map[key] = value;
   }
@@ -120,10 +127,12 @@ function parseFrontmatter(content) {
  * non-empty prose line (truncated if it runs long).
  */
 function fallbackDescription(content) {
+  // e.g. strip YAML frontmatter then the first "# Title" heading line
   const body = content.replace(/^---\n[\s\S]*?\n---/, "").replace(/^#\s+.*$/m, "");
   for (const line of body.split("\n")) {
     const trimmed = line.trim();
     if (!trimmed || trimmed.startsWith("#") || trimmed.startsWith("```")) continue;
+    // e.g. "**Bold** [link](url)" → "Bold link"
     const plain = trimmed.replace(/\*\*/g, "").replace(/\[([^\]]+)\]\([^)]+\)/g, "$1");
     if (plain.length > 240) return `${plain.slice(0, 237)}…`;
     return plain;

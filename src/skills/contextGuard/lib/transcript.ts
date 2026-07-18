@@ -67,6 +67,7 @@ export function windowFor(model: string | undefined): number {
 export function resolveTranscript(data: HookInput): string | null {
   if (data.transcript_path && existsSync(data.transcript_path)) return data.transcript_path;
   if (!data.cwd || !data.session_id) return null;
+  // e.g. "/Users/me/My App" → "-Users-me-My-App" (Claude Code project slug)
   const slug = data.cwd.replace(/[^A-Za-z0-9]/g, "-");
   const candidate = path.join(PROJECTS_DIR, slug, `${data.session_id}.jsonl`);
   return existsSync(candidate) ? candidate : null;

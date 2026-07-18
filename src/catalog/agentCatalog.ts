@@ -1,7 +1,18 @@
 import { Option, Schema } from "effect";
 
+// e.g. "claude-code", "cursor" — not "ClaudeCode" or "claude_code"
+const AGENT_ID_PATTERN = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
+// e.g. ".claude/settings.json" — not "/abs" or "a/../b"
+const HOME_RELATIVE_PATH_PATTERN = /^(?!\/)(?!.*(?:^|\/)\.\.(?:\/|$))[^\\]+$/;
+// e.g. "/usr/local/bin/code" — absolute, no ".." segments
+const ABSOLUTE_PATH_PATTERN = /^\/(?!.*(?:^|\/)\.\.(?:\/|$))[^\\]+$/;
+// e.g. "claude", "code" — bare executable name, no path or spaces
+const COMMAND_NAME_PATTERN = /^[^/\\\s]+$/;
+// e.g. ".md", ".mdc" — leading-dot lowercase extension
+const RULE_EXTENSION_PATTERN = /^\.[a-z0-9]+$/;
+
 export const agentIdSchema = Schema.NonEmptyTrimmedString.pipe(
-  Schema.pattern(/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/, {
+  Schema.pattern(AGENT_ID_PATTERN, {
     message: () => "Agent IDs must use lowercase kebab-case.",
   }),
   Schema.brand("AgentId"),
@@ -13,7 +24,7 @@ export const agentIdSchema = Schema.NonEmptyTrimmedString.pipe(
 export type AgentId = Schema.Schema.Type<typeof agentIdSchema>;
 
 const homePathSchema = Schema.NonEmptyTrimmedString.pipe(
-  Schema.pattern(/^(?!\/)(?!.*(?:^|\/)\.\.(?:\/|$))[^\\]+$/, {
+  Schema.pattern(HOME_RELATIVE_PATH_PATTERN, {
     message: () => "Home paths must be relative and stay inside the home directory.",
   }),
   Schema.annotations({
@@ -22,7 +33,7 @@ const homePathSchema = Schema.NonEmptyTrimmedString.pipe(
 );
 
 const absolutePathSchema = Schema.NonEmptyTrimmedString.pipe(
-  Schema.pattern(/^\/(?!.*(?:^|\/)\.\.(?:\/|$))[^\\]+$/, {
+  Schema.pattern(ABSOLUTE_PATH_PATTERN, {
     message: () => "Absolute detection paths must start at the filesystem root and contain no parent traversal.",
   }),
   Schema.annotations({
@@ -31,7 +42,7 @@ const absolutePathSchema = Schema.NonEmptyTrimmedString.pipe(
 );
 
 const commandSchema = Schema.NonEmptyTrimmedString.pipe(
-  Schema.pattern(/^[^/\\\s]+$/, {
+  Schema.pattern(COMMAND_NAME_PATTERN, {
     message: () => "Detection commands must be executable names without paths or whitespace.",
   }),
   Schema.annotations({
@@ -73,7 +84,7 @@ export const agentDetectionSchema = Schema.Struct({
 export type AgentDetection = Schema.Schema.Type<typeof agentDetectionSchema>;
 
 const targetPathSchema = Schema.NonEmptyTrimmedString.pipe(
-  Schema.pattern(/^(?!\/)(?!.*(?:^|\/)\.\.(?:\/|$))[^\\]+$/, {
+  Schema.pattern(HOME_RELATIVE_PATH_PATTERN, {
     message: () => "Agent target paths must be relative and stay inside the destination root.",
   }),
   Schema.annotations({
@@ -82,7 +93,7 @@ const targetPathSchema = Schema.NonEmptyTrimmedString.pipe(
 );
 
 const ruleExtensionSchema = Schema.NonEmptyTrimmedString.pipe(
-  Schema.pattern(/^\.[a-z0-9]+$/, {
+  Schema.pattern(RULE_EXTENSION_PATTERN, {
     message: () => "Rule-file extensions must start with a dot and use lowercase letters or digits.",
   }),
   Schema.annotations({

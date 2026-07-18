@@ -12,8 +12,23 @@ export const scopeSchema = Schema.Literal("global", "project").annotations({
 
 export type Scope = Schema.Schema.Type<typeof scopeSchema>;
 
+// e.g. "skills/deslop/SKILL.md" — not "/abs", "C:\x", "a/../b", or "a//b"
+const RELATIVE_ARTIFACT_PATH_PATTERN =
+  /^(?!\/)(?![A-Za-z]:)(?!.*(?:^|\/)\.{1,2}(?:\/|$))(?!.*\/\/)[^\\/\0]+(?:\/[^\\/\0]+)*$/;
+// e.g. 64-char lowercase hex: "a1b2…f9"
+const SHA256_HEX_PATTERN = /^[a-f0-9]{64}$/;
+// e.g. "/hooks/0/command", "/a~1b" (~0/~1 escapes) — not "hooks" (relative) or "/a~2"
+const JSON_POINTER_PATTERN = /^(?:\/(?:[^~/]|~[01])*)+$/;
+// e.g. ", " or ",\n  " — one comma with optional JSON whitespace only
+const JSON_PROPERTY_SEPARATOR_PATTERN = /^[ \t\r\n]*,[ \t\r\n]*$/u;
+// e.g. "0.12.1", "1.0.0-rc.1", "1.0.0+build.3"
+const SEMVER_PATTERN =
+  /^(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/;
+// e.g. "context-guard" — legacy kebab skill id
+const LEGACY_SKILL_ID_PATTERN = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
+
 export const relativeArtifactPathSchema = Schema.NonEmptyTrimmedString.pipe(
-  Schema.pattern(/^(?!\/)(?![A-Za-z]:)(?!.*(?:^|\/)\.{1,2}(?:\/|$))(?!.*\/\/)[^\\/\0]+(?:\/[^\\/\0]+)*$/, {
+  Schema.pattern(RELATIVE_ARTIFACT_PATH_PATTERN, {
     message: () => "Artifact paths must be relative, normalized, and stay inside the scope root.",
   }),
   Schema.annotations({
@@ -22,7 +37,7 @@ export const relativeArtifactPathSchema = Schema.NonEmptyTrimmedString.pipe(
 );
 
 export const sha256Schema = Schema.String.pipe(
-  Schema.pattern(/^[a-f0-9]{64}$/, {
+  Schema.pattern(SHA256_HEX_PATTERN, {
     message: () => "Hashes must be lowercase SHA-256 hex strings.",
   }),
   Schema.annotations({
@@ -31,7 +46,7 @@ export const sha256Schema = Schema.String.pipe(
 );
 
 export const jsonPointerSchema = Schema.String.pipe(
-  Schema.pattern(/^(?:\/(?:[^~/]|~[01])*)+$/, {
+  Schema.pattern(JSON_POINTER_PATTERN, {
     message: () => "JSON pointers must be absolute RFC 6901 paths with valid escape sequences.",
   }),
   Schema.annotations({
@@ -158,7 +173,7 @@ export const previousFileValueSchema = Schema.Union(
 export type PreviousFileValue = Schema.Schema.Type<typeof previousFileValueSchema>;
 
 const jsonPropertySeparatorSchema = Schema.String.pipe(
-  Schema.pattern(/^[ \t\r\n]*,[ \t\r\n]*$/u, {
+  Schema.pattern(JSON_PROPERTY_SEPARATOR_PATTERN, {
     message: () => "A JSON property separator must contain one comma and only JSON whitespace.",
   }),
 );
@@ -604,12 +619,9 @@ const receiptFeatureIssues = (features: ReadonlyArray<string>) => {
 const featureListSchema = Schema.Array(featureIdSchema).pipe(Schema.filter(receiptFeatureIssues));
 
 export const versionSchema = Schema.NonEmptyTrimmedString.pipe(
-  Schema.pattern(
-    /^(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/,
-    {
-      message: () => "Receipt versions must use semantic version syntax.",
-    },
-  ),
+  Schema.pattern(SEMVER_PATTERN, {
+    message: () => "Receipt versions must use semantic version syntax.",
+  }),
 );
 
 export const artifactReceiptSchema = Schema.Struct({
@@ -726,7 +738,7 @@ export const readArtifactReceiptSnapshot = (receiptPath: string) =>
   });
 
 const legacySkillIdSchema = Schema.NonEmptyTrimmedString.pipe(
-  Schema.pattern(/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/, {
+  Schema.pattern(LEGACY_SKILL_ID_PATTERN, {
     message: () => "Legacy installed skill IDs must use lowercase kebab-case.",
   }),
 );

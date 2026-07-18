@@ -1,577 +1,618 @@
-# CODE-STYLE.md
+# Code Style
 
-How code is written in **dufflebag**. Prescriptive (how to write), not
-descriptive (what exists — that's `../../AGENTS.md`). This file lives at
-`templates/mdFiles/CODE-STYLE.md` and is the **SSOT for style**; the rules digest is
-mirrored into `../../AGENTS.md` — **edit here, not there.** Between runs, the
-`deslop` skill reads this file to enforce style per-diff.
+Scaffolded copy of the workspace Uncle Bob distillation (`code-style.md` at the Code workspace root). This is the **default philosophy** for a repository; a project may add a short dialect section below, but must not contradict these rules.
 
-> **Style refresh landed 2026-07-02** ([ADR 0012](../../docs/adr/current/0012-tsdoc-on-the-exported-surface.md),
-> [ADR 0013](../../docs/adr/current/0013-style-refresh-colocated-tests-single-command-autorun-templates.md)).
-> Two reversals from the earlier doctrine: **the exported surface now requires TSDoc**
-> (was "minimal comments, strip JSDoc"), and **biome is the linter as well as the
-> formatter** (the linter was off). Tests co-locate (no `test/` dir), the autonomous
-> loop is one `autorun` command with verbs, and `workflow-templates/` is now
-> `templates/workflows/`. A follow-on consolidation ([ADR 0014](../../docs/adr/current/0014-consolidate-under-src-and-templates.md))
-> then moved **all source under `src/`** (`src/skills/`, `src/scripts/`) and **all copyable
-> templates under `templates/`** (this guide now lives at `templates/mdFiles/`). Where a diff
-> drifts from a rule below, **the rule wins** and
-> `deslop` flags it; the architectural *why* lives in `../../docs/adr/current/`.
+| Source | What it is |
+|---|---|
+| `CLAUDE.md` | Workspace rules for agents across independent projects |
+| `clean-code-uncle-bob-lesson-1-…md` | Functions, politeness, side effects, DRY |
+| `clean-code-uncle-bob-lesson-2-…md` | Comments, names, file size |
+| `clean-code-uncle-bob-lesson-3-…md` | Craft expectations, tests as courage, honesty |
+| `clean-code-uncle-bob-lesson-4-…md` | TDD three laws, “say no”, double-entry coding |
+| `clean-code-uncle-bob-lesson-5-…md` | Clean architecture, use cases, dependency rule |
+| `clean-code-uncle-bob-lesson-6-…md` | Agile as data, iterations, estimates |
 
-## Scope
-
-One strict style bar for **all TypeScript** — the CLI engine (`src/`), every
-feature's engine (`src/skills/<feature>/{hooks,lib,command}`) *and* the dev-only png
-harness (`src/skills/png-to-code/scripts/`). Nothing is exempt from the *style* bar
-([ADR 0004](../../docs/adr/current/0004-unified-style-and-error-model-by-role.md)).
-The one structural exception is the harness's **own `tsconfig`** (see "Single
-tsconfig root" below) — a separate build, not a separate style.
-
-## Stack & framework practices
-
-There is no framework here to defer to — this is Node + TypeScript. Point each
-concern at the skill that owns it; do not restate them:
-
-- **Authoring skill content** (`src/skills/**/SKILL.md`, `png-to-code` docs) → `write-a-skill`.
-- **Comment / readability enforcement per diff** → `deslop` (reads this file).
-- **CLI/TUI UX review** (flows, prompts, states) → `interactive-cli-reviewer` (advisory).
-- **TSDoc authoring / cleanup** → `jsdoc-editor`.
-
-`commander`, `@clack/prompts`, `picocolors`, `playwright`, `pixelmatch`, `pngjs`,
-`svgo`, `biome`, and `vitest` have **no official skill** — their usage rules live
-in this file. Dependency choices are governed by
-[ADR 0006](../../docs/adr/current/0006-lean-dependency-stance.md).
+This file is a **working style guide**, not a book summary. Every rule ends with a small code example.
 
 ---
 
-## Rules
+## 0. Workspace stance (from `CLAUDE.md`)
 
-Load-bearing, project-specific rules only. Each is a one-line rule plus a real
-before/after.
+These apply **before** any Clean Code rule:
 
-### TSDoc on the exported surface — mandatory
-
-Every **exported** function and type carries TSDoc: a one-line summary, `@param`
-for **each** parameter, `@returns` for every non-`void` return, and one doc line
-per `interface`/`type` **property**. Non-exported one-liner helpers are **exempt**
-(a summary only when the name isn't self-evident). This is a **reversal** of the
-old minimal-comments stance ([ADR 0012](../../docs/adr/current/0012-tsdoc-on-the-exported-surface.md)):
-the boundary is documented; the anti-noise spirit survives only *inside* a module.
+1. **One project at a time.** `Code/` is not a monorepo. `cd` into the project; read *that* project’s `AGENTS.md` / `CONTEXT.md`.
+2. **Reuse before inventing.** Search for an existing place to edit. Promote to shared only on a real second consumer.
+3. **SSOT / KISS / YAGNI / DRY.** One source of truth; simplest thing that works; don’t build what you don’t need yet; don’t copy-paste logic.
+4. **Plan first** when a change ripples through shared interfaces (`src/core/types.ts`, package APIs, etc.).
+5. **Right package manager** (`pnpm` vs `npm` vs `uv`) — wrong one corrupts the lockfile.
 
 ```ts
-// before — src/commands/scaffoldCi.ts (prose header, no tags)
-/** Fill the publish copy-template's {{OWNER}}/{{REPO}}/{{PACKAGE}} placeholders. */
-export function fillPublishTemplate(template: string, inputs: ScaffoldInputs): string { … }
+// BAD — invent a new util because you didn't look
+// packages/foo/src/formatDate.ts  (already exists in @repo/utils)
 
-// after — summary + @param each + @returns
-/**
- * Fill the publish copy-template's `{{OWNER}}`/`{{REPO}}`/`{{PACKAGE}}` placeholders.
- * @param template - raw `publish.yml` text containing the placeholders.
- * @param inputs - repo identity (owner, repo, package name) to substitute in.
- * @returns the filled YAML, ready to write to `.github/workflows/`.
- */
-export function fillPublishTemplate(template: string, inputs: ScaffoldInputs): string { … }
+// GOOD — extend the existing shared helper on the second real consumer
+import { formatDate } from "@repo/utils";
 ```
 
-```ts
-// before — an exported interface with a single header
-/** Repo identity the publish copy-template needs filled in. */
-export interface ScaffoldInputs { owner: string; repo: string; packageName: string; }
+---
 
-// after — one doc line per property
-export interface ScaffoldInputs {
-  /** GitHub org/user that owns the target repo. */
-  owner: string;
-  /** Target repository name. */
-  repo: string;
-  /** npm package name to publish as. */
-  packageName: string;
+## 1. The only way to go fast is to go well
+
+**Conclusion:** Messes feel fast for a week and then destroy the team. Working code is only half the job — clean it once it works. Nobody writes clean code first; humans think in messes, then refactor.
+
+```ts
+// Step 1 — make it work (messy is fine)
+function handle(order: any) {
+  const t = order.total - (order.coupon ? order.total * 0.1 : 0);
+  db.query("UPDATE orders SET total=" + t + " WHERE id=" + order.id);
+  mailer.send(order.email, "Thanks", "You paid " + t);
+  return t;
+}
+
+// Step 2 — once green, clean it
+function handle(order: Order): Money {
+  const total = applyCoupon(order);
+  orders.saveTotal(order.id, total);
+  receipts.email(order.customer, total);
+  return total;
 }
 ```
 
-_Why:_ this is a library-shaped CLI — an agent or human reading a single signature
-should get the contract without opening the body. Internal one-liners stay bare so
-the noise `deslop` used to strip never returns *inside* a module.
+---
 
-### Readable over clever — the boring version wins
+## 2. Clean code = no WTFs per minute
 
-Prefer explicit, skimmable code to a dense one-liner. Behavior lives in **data
-tables and guard clauses**, not metaprogramming. If a reader has to decode it, it's
-wrong even when it's shorter.
+**Conclusion (from Booch, Feathers, Cunningham, Stroustrup):** Clean code is simple, direct, prose-like, looks like someone cares, and every next line is roughly what you expected.
 
 ```ts
-// before — "clever": a comma-operator reduce, write-once/read-never
-export const skillsFor = (ids: FeatureId[]): string[] =>
-  [...ids.reduce((s, id) => (FEATURES[id].skills.forEach((k) => s.add(k)), s), new Set<string>())];
+// BAD — every line is a small surprise
+function p(x: any) {
+  return x.a.filter((y: any) => y.s === 1).map((y: any) => y.n).join(",");
+}
 
-// after — src/core/catalog/features.ts (the real code)
-export function skillsFor(ids: FeatureId[]): string[] {
-  return [...new Set(ids.flatMap((id) => FEATURES[id].skills))];
+// GOOD — names remove surprise
+function activeUserNames(users: User[]): string {
+  return users
+    .filter((user) => user.status === Status.Active)
+    .map((user) => user.name)
+    .join(", ");
 }
 ```
 
-_Why:_ the whole `FEATURES` catalog is this principle — behavior is **data**, not
-branches. `classifyAgents` returns an explicit array rather than a clever map;
-hooks early-exit with named guard clauses rather than nested ternaries.
+---
 
-### Single tsconfig root — one config per deployable unit
+## 3. Functions: small, one thing, one level of abstraction
 
-There is **one `tsconfig.json` at the repo root** (`rootDir: "."`) governing the
-whole main project — `src/` and every shipped skill's `hooks`/`lib`/`command`. Do
-not scatter configs within a unit. The **only** sanctioned second tsconfig is
-`src/skills/png-to-code/scripts/tsconfig.json`, because the harness is a physically
-separate sub-package (its own `package.json`, its own deps, its own install/build
-lifecycle) — [ADR 0013](../../docs/adr/current/0013-style-refresh-colocated-tests-single-command-autorun-templates.md).
+**Conclusions (Lesson 1):**
 
-```jsonc
-// tsconfig.json (root) — the one config; tests are excluded from emit
-{
-  "compilerOptions": { "rootDir": ".", "outDir": "dist", "strict": true, /* … */ },
-  "include": ["src/**/*.ts"],                 // src/** now covers the kernel, every skill, and the build script
-  "exclude": ["node_modules", "dist", "src/skills/png-to-code", "**/*.test.ts"]
+| Rule | Meaning |
+|---|---|
+| **Small** | Prefer a few lines. Extract until you can’t extract more without losing meaning. |
+| **One thing** | If you can still extract a meaningful step, it’s more than one thing. |
+| **Same abstraction** | Every line is one level *below* the function name. No mixing “get page” with “append `</div>`”. |
+| **Polite (newspaper)** | Title → summary → detail. Reader can exit early. |
+| **Few args** | Ideal 0–2. Max ~3. More → pack into an object. |
+| **No flag args** | `doThis(true)` is rude. Split into two named functions. |
+| **No output args** | Don’t pass an object only to fill it; return a value. |
+| **Prefer exceptions** to error codes that force nested `if` ladders. |
+| **Avoid switch-on-type** — use polymorphism (Open/Closed). |
+
+```ts
+// BAD — long, multi-level, flag arg, output arg, switch magnet
+function process(page: Page, isTest: boolean, out: string[]) {
+  let html = page.raw;
+  if (isTest) {
+    html = setup + html + teardown;
+  }
+  switch (page.kind) {
+    case "wiki":
+      out.push(toWikiHtml(html));
+      break;
+    case "blog":
+      out.push(toBlogHtml(html));
+      break;
+  }
+}
+
+// GOOD — small, one level, return values, polymorphism
+function renderPageWithSetupsAndTeardowns(page: Page): string {
+  const body = page.isTestPage()
+    ? includeSetupsAndTeardowns(page)
+    : page.content();
+  return page.toHtml(body);
+}
+
+interface Page {
+  isTestPage(): boolean;
+  content(): string;
+  toHtml(body: string): string;
 }
 ```
 
-_Why:_ a scattered tsconfig is how the harness drifted into its own quote style once
-([ADR 0004](../../docs/adr/current/0004-unified-style-and-error-model-by-role.md)); one
-config per unit keeps the bar single.
+```ts
+// BAD — boolean flag
+sendEmail(user, true);
 
-### biome is the linter AND the formatter — `recommended` on
-
-`biome.json` runs the **linter** (`recommended`) *and* the formatter *and*
-organize-imports over `src/**` (which now holds the kernel, every skill, and the harness). `biome check --write` is the local
-fixer; `biome ci` is the one gate (lint + format + imports in a single pass — no
-separate `lint.yml`/`format.yml`; that split is only for ESLint + Prettier). A rule
-that fights an intentional pattern is disabled in `biome.json` — currently only
-`style/noNonNullAssertion` (non-null assertions are deliberate at controlled sites:
-regex match groups, `ts!` after a resolve guard, in the zero-dep hooks + png harness).
-Keep `biome.json` **strict JSON — no comments**: a stray `//` silently invalidates the
-config and biome falls back to scanning `dist/` + everything else, so document
-suppression reasons *here*, not inline.
-
-```json
-// before — linter off, half the skill TS not even covered
-{ "files": { "includes": ["src/**/*.ts", "test/**/*.ts", "src/skills/png-to-code/scripts/**/*.ts"] },
-  "linter": { "enabled": false } }
-
-// after — one bar over all TS (src/** = kernel + skills + harness), correctness rules on
-{ "files": { "includes": ["src/**/*.ts"] },
-  "linter": { "enabled": true, "rules": { "recommended": true, "style": { "noNonNullAssertion": "off" } } } }
+// GOOD — named intent
+sendWelcomeEmail(user);
+sendPasswordResetEmail(user);
 ```
-
-_Why:_ "biome as the eslinter and prettier" means both jobs. Formatting-only let
-real bugs through; the linter is the correctness half.
-
-### Tests co-locate — no `test/` dir
-
-A unit test sits **beside its source** as `foo.test.ts` next to `foo.ts`.
-Cross-cutting tests that don't map to a single source file (the install/uninstall
-round-trip; the workflow drift check) live in `src/commands/` as
-`*.integration.test.ts`. `vitest` discovers `src/**/*.test.ts` (skills included, since they live under `src/`);
-the root tsconfig excludes `**/*.test.ts` from emit and the npm tarball excludes
-them too ([ADR 0013](../../docs/adr/current/0013-style-refresh-colocated-tests-single-command-autorun-templates.md)).
-
-```
-// before (a separate tree)         // after (beside the source)
-test/features.test.ts               src/core/catalog/features.test.ts
-test/dupIndex.test.ts               src/skills/dedup-guard/lib/dupIndex.test.ts
-test/settings.test.ts               src/core/settings/settings.test.ts
-test/commands.integration.test.ts   src/commands/commands.integration.test.ts   (cross-cutting → commands/)
-test/workflowTemplates.test.ts      src/commands/workflowTemplates.integration.test.ts
-```
-
-_Why:_ a test next to its source is found, run, and updated together with it;
-the two orphans that span many files get an explicit `*.integration.test.ts` home.
-
-### Pure core, imperative shell — split with a divider
-
-Any module that touches disk / env / process separates **pure transformers**
-(top) from **effects** (bottom) with a literal `// --- IO layer ---` divider.
-Tests hit the pure half; this is what makes the risky settings surgery unit-
-testable without disk. **Hard rule.** Folders group **by purpose** — `src/core/`
-by domain (`catalog`/`settings`/`wiring`/`host`), each feature vertical under
-`src/skills/<feature>/` — and the pure/effects split stays *within* each module
-([ADR 0010](../../docs/adr/current/0010-core-grouped-by-domain.md)).
 
 ```ts
-// core/settings/settings.ts
-export function mergeManagedHooks(input: ClaudeSettings, hooks: RenderedHook[]): ClaudeSettings { … } // pure: clone in → clone out
-export function mergeEnv(input: ClaudeSettings, envMap: Record<string, string>): ClaudeSettings { … }  // pure
-// --- IO layer ---------------------------------------------------------------
-export function readSettings(file: string): ClaudeSettings { … }   // disk
-export function writeSettings(file: string, s: ClaudeSettings): void { … } // disk
-```
+// BAD — output argument
+function fillTotals(order: Order, result: number[]) {
+  result.push(order.subtotal);
+  result.push(order.tax);
+}
 
-_Why:_ `src/core/settings/settings.test.ts` exercises the merge logic with plain
-objects and never touches a file.
-
-### Error handling is chosen by role, not by locale
-
-Three modes, picked by what a module **is**
-([ADR 0004](../../docs/adr/current/0004-unified-style-and-error-model-by-role.md)):
-
-```ts
-// HOOK — fail-open. A guard bug must NEVER block the user's edit.  (src/skills/dedup-guard/hooks/dedupGuard.ts)
-try { main(); } catch (e) { if (readConfig().debugEnabled) writeSync(2, `…${e}`); process.exit(0); }
-
-// CLI — throw an actionable Error, caught once at the top.  (cli.ts + core/config.ts)
-throw new Error(`contextWarnFraction (${w}) must be below contextBlockFraction (${b})`);
-program.parseAsync(process.argv).catch((err) => { fail(String(err)); process.exitCode = 1; });
-
-// GATE / HARNESS — fail-closed, exit code IS the product.  (src/skills/dedup-guard/command/dedupCheck.ts, png harness bin/*)
-process.exitCode = 1;   // duplicates found
-process.exit(2);        // usage / IO error
-```
-
-_Why:_ a hook that throws would brick editing; a CI gate that swallows its exit
-code is useless.
-
-### Hooks are fail-open and go through `allow()` / `emit()`
-
-Every hook is a `main()` wrapped in a top-level `try/catch → process.exit(0)`,
-with guard-clause early-exits via `src/payload/io.ts`. `stderr` only when
-`debugEnabled`. Never bundle a runtime dep into the payload
-([ADR 0001](../../docs/adr/current/0001-zero-dependency-hook-payload.md)).
-
-```ts
-// src/skills/dedup-guard/hooks/dedupGuard.ts
-if (mode === "off") allow();                 // early-exit, not `return`
-if (!isSourcePath(filePath)) allow();
-if (hits.length === 0) allow();
-emit({ hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "deny", … } });
-```
-
-_Why:_ `allow`/`emit` are typed `never` and flush synchronously — a hook must
-write its decision before exit or a pipe drops it.
-
-### Declare a shared contract once, re-export it — never re-declare
-
-Anything the CLI and the payload must agree on lives in **one** module; the other
-side imports and re-exports
-([ADR 0003](../../docs/adr/current/0003-config-ssot-inside-payload.md)).
-
-```ts
-// SSOT — src/payload/config.ts (inside the zero-dep payload kernel)
-export const ENV_KEYS = { contextWarnFraction: "dufflebagContextWarnFraction", … } as const;
-// CLI re-exports, never re-declares — core/config.ts
-export { DEFAULTS, ENV_KEYS, ENV_PREFIX, … } from "../payload/config.js";
-```
-
-_Why:_ a divergent key name would silently disable the guardrail.
-
-### Pure mutators clone in, clone out — never mutate an argument
-
-Settings/JSON transformers take a value and return a new one via `structuredClone`.
-
-```ts
-// core/settings/settings.ts
-const clone = <T>(value: T): T => structuredClone(value);
-export function removeManagedHooks(input: ClaudeSettings): ClaudeSettings {
-  const settings = clone(input);   // never touch `input`
-  …
-  return settings;
+// GOOD — return a value
+function totals(order: Order): { subtotal: Money; tax: Money } {
+  return { subtotal: order.subtotal, tax: order.tax };
 }
 ```
 
-_Why:_ callers chain these (`removeManagedEnv(removeManagedHooks(…))`); in-place
-mutation would make ordering load-bearing and tests brittle.
+---
 
-### Bag-owned entries are identified only by their marker
+## 4. Side effects and Command–Query Separation
 
-Everything the installer owns is recognized by the `/dufflebag/` path marker (in
-hook commands) or the `dufflebag` env prefix — never by position or count. This is
-what makes uninstall surgical.
+**Conclusions (Lesson 1):**
 
-```ts
-// core/settings/paths.ts
-export const isBagCommand = (command: string): boolean => command.includes(PATH_MARKER);
-```
-
-_Why:_ the user hand-maintains `settings.json`; we must take back **exactly** what
-we added and nothing else.
-
-### Layout: vertical per feature; the shared kernel stays in `src/`
-
-Each feature owns **one folder** — `src/skills/<feature>/` holds its engine (hook
-sources, feature-local libs, its command) *and* its shipped content. The
-irreducible shared kernel stays in `src/`, split by dependency reach: `src/core/`
-(CLI kernel — may use `commander`/clack) and `src/payload/` (zero-dep hook
-kernel: the `config` SSOT + `io`). Sources are vertical; the build gathers hooks
-into a **flat** `dist/hooks/` payload ([ADR 0008](../../docs/adr/current/0008-vertical-per-feature-layout.md)).
-
-```
-// before (layered)              // after (vertical per feature)
-src/hooks/dedupGuard.ts          src/skills/dedup-guard/hooks/dedupGuard.ts
-src/hooks/lib/dupIndex.ts        src/skills/dedup-guard/lib/dupIndex.ts        (feature-local — moves down)
-src/commands/dedup.ts            src/skills/dedup-guard/command/dedupCheck.ts
-src/hooks/lib/config.ts (SSOT)   src/payload/config.ts                     (shared kernel — stays up)
-```
-
-_Why:_ features share a zero-dep config SSOT — a kernel can't live inside one
-feature. Only the truly shared stays up; anything one feature owns moves into its
-folder.
-
-### One command per tool surface — the autonomous loop is `autorun`
-
-A tool with several verbs is **one skill/command**, not one-per-verb, when a single
-engine backs them. The autonomous loop ships **one** `autorun` skill:
-`/autorun <n>` arms, `/autorun stop` pauses, `/autorun exit` shuts the daemon down —
-all routed to the single `ctxLoopCtl.js` control plane (`arm|stop|exit`)
-([ADR 0013](../../docs/adr/current/0013-style-refresh-colocated-tests-single-command-autorun-templates.md)).
+- A **side effect** is a change to system state (open file, write DB, mutate global).
+- Side-effect functions come in **pairs** (`open`/`close`, `new`/`delete`) — and humans are bad at pairs. Prefer APIs that own the whole pair (pass a lambda / callback so open+close stay together).
+- **Command–Query Separation (CQS):**
+  - **Command** → changes state, returns `void`.
+  - **Query** → returns a value, does **not** change state.
 
 ```ts
-// before — three sibling skills, one engine
-FEATURES["autonomous-loop"].skills = ["autorun", "autostop", "autoexit"];
-// after — one skill, verbs routed by the skill's argument
-FEATURES["autonomous-loop"].skills = ["autorun"];   // /autorun · /autorun stop · /autorun exit
+// BAD — query that also mutates (surprise side effect)
+function getNextId(): number {
+  currentId += 1; // mutation hidden behind "get"
+  return currentId;
+}
+
+// GOOD — command and query separated
+function advanceId(): void {
+  currentId += 1;
+}
+function currentIdValue(): number {
+  return currentId;
+}
+
+// GOOD — side-effect pair owned by one function
+function withOpenFile(path: string, process: (f: File) => void): void {
+  const file = open(path);
+  try {
+    process(file);
+  } finally {
+    file.close();
+  }
+}
 ```
-
-_Why:_ the three skills were thin shells over the same `ctl` subcommands; one
-command matches the engine and the user's mental model. The `--features
-autonomous-loop` id is an external CLI contract and is unchanged.
-
-### Ship boundary: the catalog declares what ships
-
-`src/skills/<feature>/` mixes engine `.ts` with shipped content, so the installer must
-never copy build-only source into a user's `~/.claude`. The `FEATURES` catalog's
-**`ships`** list is the allowlist; the installer copies **only** those paths (and
-the npm tarball excludes co-located `*.test.ts`).
 
 ```ts
-// install.ts — copy only the catalog-declared paths (unlisted ships nothing)
-for (const rel of feature.ships) copyDir(path.join(src, rel), path.join(dest, rel));
+// Prefer exceptions over error codes
+// BAD
+function parse(json: string): { ok: boolean; value?: User; error?: string } {
+  try {
+    return { ok: true, value: JSON.parse(json) };
+  } catch {
+    return { ok: false, error: "bad json" };
+  }
+}
+
+// GOOD
+function parseUser(json: string): User {
+  try {
+    return User.fromJson(JSON.parse(json));
+  } catch (cause) {
+    throw new InvalidUserJsonError({ cause });
+  }
+}
 ```
-
-_Why:_ fail-safe — a build-only `dedupGuard.ts` never leaks because it isn't
-listed; a forgotten path ships *nothing*, not everything
-([ADR 0008](../../docs/adr/current/0008-vertical-per-feature-layout.md)).
-
-### Workflows: single-purpose legs under `templates/workflows/`, copied per repo
-
-CI is a set of single-purpose `workflow_call` legs (`biome` / `typecheck` / `test`
-/ `build` / `report-failure` / opt-in `e2e`) composed by a `ci.yml` gate through
-`./` local refs. `dufflebag scaffold-ci` **copies** the whole set from
-**`templates/workflows/`** into a target repo, so each repo **owns** its CI
-(`--force` resyncs). Only `publish.yml` is templated — OIDC binds per repo +
-filename, so its `{{OWNER}}/{{REPO}}/{{PACKAGE}}` are filled in. The scaffolder
-writes YAML as text — no YAML dep
-([ADR 0006](../../docs/adr/current/0006-lean-dependency-stance.md), [ADR 0009](../../docs/adr/current/0009-reusable-workflows-and-cli-scaffolding.md)).
-
-```yaml
-# a scaffolded ci.yml composes local legs — copied, not referenced:
-jobs:
-  biome:
-    uses: ./.github/workflows/biome.yml
-```
-
-_Why:_ a personal toolbelt shouldn't couple every repo to dufflebag as a live
-workflow host; self-contained copies (resynced on demand) win. **Every project
-should adopt this set** via `dufflebag scaffold-ci`. **A private repo simply omits
-`publish.yml`** (nothing to publish) — the rest of the set stands alone. The shared
-legs ship in both `.github/workflows/` and `templates/workflows/`, kept
-byte-identical by a test. `biome ci` is one gate (lint + format); matrix only on
-`test` + `build`.
-
-### Naming
-
-| Category | Case | Example |
-|---|---|---|
-| Files | `camelCase` | `agentWiring.ts`, `contextGuard.ts`, `pixelDiff.ts` |
-| Functions / variables | `camelCase` | `resolveFeatures`, `repoRoot` |
-| Constants (hardcoded values) | `SCREAMING_SNAKE` | `INSTALL_DIR_NAME`, `ENV_KEYS`, `OUT_HOOKS` |
-| Types / interfaces | `PascalCase` | `Feature`, `BagConfig`, `DedupMode` |
-| Feature IDs · skill dirs · CLI flags | `kebab-case` | `png-to-code`, `--dedup-mode` |
-
-_Why:_ the last row is an **external contract** — `npx ys-dufflebag install --features
-png-to-code` and existing installs depend on it; never casing-convert product IDs.
-
-### Types & contracts
-
-`interface` for object shapes, `type` for unions/aliases. **Explicit return types**
-on every exported function. Prefer string-literal unions over enums.
-
-```ts
-export type FeatureId = "context-guard" | "autonomous-loop" | "speak-response" | "dedup-guard" | "png-to-code";
-export interface Feature { id: FeatureId; requires: FeatureId[]; hooks: ManagedHook[]; … }
-export function resolveFeatures(requested: FeatureId[]): FeatureId[] { … }
-```
-
-### Imports: `node:` prefix, barrels per directory
-
-Node builtins use the `node:` prefix. The CLI-kernel directories — `core/`,
-`commands/`, and the harness `lib/` — expose an `index.ts` barrel, and
-cross-directory consumers import from it, not the file. The **zero-dep payload**
-(`src/payload/`) and **feature libs** (`src/skills/<feature>/lib/`) expose **no**
-barrel: their few consumers import the specific file (`../../../payload/config.js`,
-`../lib/state.js`), so the flat-payload assembler can rewrite those exact
-specifiers to `./lib/` deterministically.
-
-```ts
-// before — install.ts
-import { resolveLayout } from "../core/paths.js";
-import { readSettings } from "../core/settings.js";  // …and ~8 more
-// after
-import { resolveLayout, readSettings, /* … */ } from "../core/index.js";
-```
-
-_Barrels use NodeNext `.js` re-exports and must not introduce an import cycle._
 
 ---
 
-## Scripts — the shared `package.json` contract
+## 5. DRY — Don’t Repeat Yourself
 
-Every repo in this workspace (this one included) exposes the **same script _names_**
-so muscle memory and CI carry across projects. **Names are the contract; bodies bend
-to the stack only where they must** (`dev`/`build`/`start`). The toolchain is fixed:
-**biome** (lint + format), **vitest** (test), **`tsc --noEmit`** (typecheck), **tsx**
-(run TS), **husky** (`prepare`). Distilled from the 15-repo reality (`typecheck` in 14 ·
-`test`/`dev`/`build` in 13 · `lint`/`format` in 12 · `prepare` in 11 · `lint:fix` in 9).
+**Conclusion:** Duplication is the root of fragile change. Extract shared loops *and* shared decisions. Lambdas/callbacks kill “same loop, different body” duplication.
 
-### The canonical surface
+```ts
+// BAD — same loop twice
+for (const row of rows) {
+  if (row.active) emails.push(row.email);
+}
+for (const row of rows) {
+  if (row.active) ids.push(row.id);
+}
 
-| Script | Canonical body | Notes |
-|---|---|---|
-| `dev` | stack — `tsx --watch` · `next dev` · `astro dev` · `turbo run dev` · `vite` · (CLI product → `<pm> cli`) | the dev loop |
-| `build` | stack — `tsc` · `tsup` · `next build` · `astro build` · `vite build` · `turbo run build` | shippable output |
-| `start` | stack — `node dist/…` · `next start` | run the built artifact (when runnable) |
-| `cli` | `tsx <entry>` | interactive front door — bare = menu, `-- <sub>` = direct |
-| `test` | `vitest run` | jest only where that's already the runner (Oly-App) |
-| `test:watch` | `vitest` | watch mode |
-| `test:coverage` | `vitest run --coverage` | when coverage is tracked |
-| `typecheck` | `tsc --noEmit` | multiple tsconfigs → chain with `&&` |
-| `lint` | `biome check .` | read-only: lint + format-check + imports |
-| `lint:fix` | `biome check --write .` | autofix |
-| `format` | `biome format --write .` | format-only convenience |
-| `check:ci` | `biome ci .` | machine gate — no writes, CI-optimized |
-| `prepare` | `husky` | installs git hooks |
-| `verify` | `biome ci . && tsc --noEmit && vitest run && <build>` | the ONE aggregate gate; `verify:push` husky alias where a pre-push runs it |
-
-### Conventions
-
-- **`ns:action` colon sub-namespacing** — variants nest under `:` (never a dash, never
-  run-together): `test:watch`, `test:coverage`, `test:e2e`, `lint:fix`, `check:ci`,
-  `dev:web`, `verify:push`.
-- **Chain the atomics into one `verify` gate** — `verify` runs `check:ci → typecheck →
-  test → build` (+ any repo-specific validator). It replaces the four old names for the
-  same gate: `qa` · `quality` · `validate` · `qa:all`. A human never memorizes the sequence.
-- **`cli` is the universal front door** — bare `cli` opens the interactive menu;
-  `cli -- <sub> [flags]` runs a subcommand directly; both routes call the **same**
-  functions and a non-TTY invocation falls back safely (never hangs) — the ADR 0011
-  pattern. A CLI-first product aliases `dev` → `cli`; a product-name shortcut (`alg`,
-  `launch`) may alias it too.
-- **Names are the contract; bodies bend to the stack.** Only `dev`/`build`/`start`
-  change shape per framework — the rest stay byte-identical everywhere the tool is present.
-- **Add only where the tool is already present** — never add `test` without vitest/jest,
-  `typecheck` without tsc, or `cli` without an entrypoint. Each name is a promise the
-  toolchain must keep.
-
-### Recipe: how to script a repo
-
-1. Add the canonical names that fit the stack (minimum: `dev`, `build`, `test`,
-   `test:watch`, `typecheck`, `lint`, `lint:fix`, `format`, `verify`).
-2. Keep the `test`/`typecheck`/`lint`/`lint:fix`/`format`/`check:ci` bodies **verbatim**;
-   only `dev`/`build`/`start` bend to the framework.
-3. Wire `verify` = `check:ci && typecheck && test && build`; point the pre-push hook
-   (`verify:push`) at it.
-4. Nest every variant under `:` (`test:watch`, not `test-watch` or `testWatch`).
-5. `dufflebag scaffold-ci` so the CI legs run the same names.
+// GOOD — one traversal policy, different bodies
+function forEachActive(rows: Row[], visit: (row: Row) => void): void {
+  for (const row of rows) {
+    if (row.active) visit(row);
+  }
+}
+forEachActive(rows, (r) => emails.push(r.email));
+forEachActive(rows, (r) => ids.push(r.id));
+```
 
 ---
 
-## Recipes
+## 6. Comments: last resort, not a virtue
 
-### How to add a feature
+**Conclusions (Lesson 2):**
 
-1. Create `src/skills/<feature-id>/` — the feature's one folder (engine + content).
-2. Add the id to the `FeatureId` union and `ALL_FEATURES` in `core/catalog/features.ts`,
-   and its entry to the `FEATURES` catalog: `title`, `summary`, `requires`,
-   `platform`, `skills`, `hooks` (via the `HOOK` map), and **`ships`** — the exact
-   paths copied into a user's install (`[]` for a pure-hook feature).
-3. Hooks → `src/skills/<feature-id>/hooks/<name>.ts` (see next recipe); register in
-   the `HOOK` map. Feature-local helpers → `src/skills/<feature-id>/lib/`.
-4. A feature command → `src/skills/<feature-id>/command/`, wired in `cli.ts`.
-5. Shipped content (`SKILL.md`, `references/`) → the same folder; list it in `ships`.
-6. **TSDoc every exported function/type** you add (summary + `@param`/`@returns` +
-   per-prop). Tests co-locate: put `foo.test.ts` next to `foo.ts`; a cross-cutting
-   test goes in `src/commands/*.integration.test.ts`.
+- Every comment is a **failure to express yourself in code** (you will still fail sometimes — that’s life).
+- **Comments lie** because code changes and comments don’t.
+- Don’t use comments to makeup for bad names or bad structure — **clean the code**.
+- Delete noise, journals, position markers, commented-out code, HTML-in-comments.
+- Acceptable comments: legal headers, public API docs, **warning of consequences**, TODOs with context, clarifying intent when the language truly can’t.
 
-### How to add a hook
+```ts
+// BAD — noise / lies / makeup for bad names
+// Increment i
+i++;
+// Check if employee is eligible for full benefits
+if (employee.flags & HOURLY && employee.age > 65) { ... }
 
-1. `src/skills/<feature>/hooks/<name>.ts` — a `main()` wrapped in `try { main() } catch { process.exit(0) }`.
-2. Read stdin with `JSON.parse(readFileSync(0, "utf8"))` inside a `try` that
-   falls to `allow()`. Emit decisions with `allow()` / `emit()` from `src/payload/io.ts`.
-3. Import **only** `node:*`, `src/payload/*`, and the feature's own files
-   ([ADR 0001](../../docs/adr/current/0001-zero-dependency-hook-payload.md)). Cross into `core` only via `import type`.
-4. Register it in the `HOOK` map; the build gathers it into the flat `dist/hooks/` payload.
+// GOOD — explain yourself in code
+const eligibleForFullBenefits =
+  employee.isHourly() && employee.isSenior();
+if (eligibleForFullBenefits) { ... }
 
-### How to add a harness script
+// GOOD — rare justified comment (non-obvious consequence)
+// Must run before process.env is frozen by the runtime; do not move.
+loadDotEnv();
+```
 
-1. `src/skills/png-to-code/scripts/src/bin/<name>.ts` — a runnable entrypoint.
-2. Parse args with `lib/argv.ts`; fail with `fail(msg): never` (`console.error` +
-   `process.exit(2)`). Emit results as JSON on stdout; **exit code is the
-   contract** (0 pass / 1 fail / 2 usage-IO).
-3. Shared logic goes in `lib/` / `png/` / `verify/`, not in the entrypoint.
+```ts
+// BAD — journal / attribution / commented-out
+// 2024-01-12 JS: fixed tax
+// 2024-03-01 AM: rewrote tax
+// return oldTax(order);
+return tax(order);
 
-### How to wire a repo's CI/publish
-
-1. CI is **copied**: `dufflebag scaffold-ci` copies the whole workflow set from
-   `templates/workflows/` into a repo's `.github/workflows/` (`--force` to resync).
-   To change a leg, edit BOTH `.github/workflows/<leg>.yml` and
-   `templates/workflows/<leg>.yml` — a drift test keeps the shared legs
-   byte-identical. Keep `biome` + `typecheck` single-leg; `test` + `build` on the
-   os × Node matrix. Add a purpose = one new `templates/workflows/*.yml` (+ a leg
-   in the `ci.yml` gate).
-2. Publish is **templated**: `scaffold-ci` fills `publish.yml`'s
-   `{{OWNER}}/{{REPO}}/{{PACKAGE}}` from the target's git remote + `package.json`.
-   Never turn it into a `workflow_call` reference — OIDC binds to the repo + filename
-   ([ADR 0009](../../docs/adr/current/0009-reusable-workflows-and-cli-scaffolding.md)).
-3. **Private repo?** Omit or delete `publish.yml` — there's nothing to publish; the
-   rest of the CI set stands alone.
+// GOOD — git owns history; dead code is deleted
+return tax(order);
+```
 
 ---
 
-## Exemplars
+## 7. Names reveal intent
 
-Write new code like these files:
+**Conclusions (Lesson 2):**
 
-- `src/core/settings/settings.ts` — pure/IO split, clone-in-clone-out, surgical + idempotent mutation.
-- `src/payload/config.ts` — the config SSOT; a self-contained, dependency-free payload module.
-- `src/commands/scaffoldCi.ts` — pure/IO split + fully-TSDoc'd exported surface (the target for TSDoc).
-- `src/skills/dedup-guard/hooks/dedupGuard.ts` — the fail-open hook shape (`main()` + top-level catch + `allow`/`emit` guard clauses).
-- `src/core/catalog/features.ts` — catalog-driven design: behavior is **data** (the `FEATURES` table), not branches.
-- `src/skills/dedup-guard/lib/dupIndex.ts` — the AST engine; fail-soft at every entry point.
+- Names are everywhere — spend time on them.
+- **Reveal intent.** Disambiguate. Avoid noise words (`data`, `info`, `manager`, `a1`, `a2`).
+- No convenient misspellings. No number series (`account1`, `account2`).
+- Distinguish names *meaningfully* (`source` vs `destination`, not `a` vs `b`).
 
----
+```ts
+// BAD
+const d = 15; // days?
+function getThem() {
+  const list1 = [];
+  for (const x of theList) if (x[0] === 4) list1.push(x);
+  return list1;
+}
 
-## Never
-
-- **Never** leave an **exported** function or type without TSDoc (`@param` each + `@returns` + per-prop) ([ADR 0012](../../docs/adr/current/0012-tsdoc-on-the-exported-surface.md)).
-- **Never** add a name-restating comment to **internal** (non-exported) code — the exemption for the exported surface stops at the boundary.
-- **Never** let a hook throw past its top-level catch — fail-open is inviolable.
-- **Never** `console.*` in the CLI — go through `core/ui.ts` (the clack wrapper). Harness scripts may use `console.*` as their output contract.
-- **Never** make a runtime dependency reachable from the hook payload (`node:*` + `src/payload/*` + the feature's own `lib/` only).
-- **Never** re-declare a shared contract — re-export the SSOT ([ADR 0003](../../docs/adr/current/0003-config-ssot-inside-payload.md)).
-- **Never** mutate a settings/JSON argument in place — clone in, clone out.
-- **Never** write an empty/noise env key — skip empty strings.
-- **Never** entangle pure logic with IO in one function — split with the `// --- IO layer ---` divider.
-- **Never** casing-convert a product ID (feature id, skill dir, CLI flag) — they are external contracts.
-- **Never** scatter a second `tsconfig.json` within the main project — one config per deployable unit; the png harness is the single exception.
-- **Never** ship a `test/` dir — tests co-locate beside their source (cross-cutting → `src/commands/*.integration.test.ts`).
-- **Never** turn biome's linter back off — biome is the linter *and* formatter; suppress a specific rule in `biome.json` (reason recorded here) instead.
-- **Never** put a comment in `biome.json` — it must be strict JSON; a stray `//` silently makes biome scan `dist/` and everything else.
-- **Never** identify bag-owned entries by anything but the `/dufflebag/` path marker or `dufflebag` env prefix.
-- **Never** add a dependency without a justification note ([ADR 0006](../../docs/adr/current/0006-lean-dependency-stance.md)).
-- **Never** ship build-only `.ts` into a user's install — the catalog `ships` allowlist is the boundary ([ADR 0008](../../docs/adr/current/0008-vertical-per-feature-layout.md)).
-- **Never** make `publish.yml` a referenced `workflow_call` — OIDC binds per repo + filename; it is copied + templated, never referenced ([ADR 0009](../../docs/adr/current/0009-reusable-workflows-and-cli-scaffolding.md)).
-- **Never** edit a shared workflow leg in only one of `.github/workflows/` or `templates/workflows/` — they must stay byte-identical (the drift test enforces it).
-- **Never** name a script variant with a dash or run-together — sub-namespace under `:` (`test:watch`, never `test-watch`/`testwatch`); and **never** split the aggregate gate back into `qa`/`quality`/`validate`/`qa:all` — there is one `verify`.
-- **Never** rename `dev`/`build`/`start`/`test`/`typecheck`/`lint`/`lint:fix`/`format`/`cli`/`verify` to a repo-local synonym — the names are the cross-repo contract (only their bodies bend, and only `dev`/`build`/`start` bend).
+// GOOD
+const daysUntilDeadline = 15;
+function flaggedCells(gameBoard: Cell[]): Cell[] {
+  return gameBoard.filter((cell) => cell.isFlagged());
+}
+```
 
 ---
 
-## Refresh log
+## 8. Professional expectations (Lesson 3)
 
-- **2026-07-02**: added the **Scripts — the shared `package.json` contract** section — one canonical name→body table (biome `lint`/`lint:fix`/`format` · vitest `test`/`test:watch` · `tsc --noEmit` `typecheck` · `tsx` `cli` · `husky` `prepare`), `ns:action` colon nesting, a single `verify` gate (`check:ci && typecheck && test && build`, replacing `qa`/`quality`/`validate`/`qa:all`), and `cli` as the universal interactive front door. Every owned repo in the workspace was normalized to this surface in the same pass (zaatar-tech-main-repo excluded — not ours). This SSOT ships to other repos via `templates/mdFiles/`; each repo's own `CODE-STYLE.md` cross-references it.
-- **2026-07-02** ([ADR 0014](../../docs/adr/current/0014-consolidate-under-src-and-templates.md)): source consolidation into two top-level buckets — `skills/` → `src/skills/`, `scripts/` → `src/scripts/` (all source under `src/`), and `mdFiles/` → `templates/mdFiles/` (all copyable templates under `templates/`, joining `templates/workflows/`). `rootDir: "."` keeps the `dist/src/**` layout; skill→kernel imports drop the now-redundant segment (`../../../src/payload/` → `../../../payload/`). Personal-skill symlinks re-pointed; the catalog ship-path + `bundledSkillsDir()` follow to `src/skills`.
-- **2026-07-02** ([ADR 0012](../../docs/adr/current/0012-tsdoc-on-the-exported-surface.md), [ADR 0013](../../docs/adr/current/0013-style-refresh-colocated-tests-single-command-autorun-templates.md)): TSDoc mandatory on the exported surface (reverses the old minimal-comments rule); biome linter on (`recommended`); tests co-located, `test/` removed; the autonomous loop collapsed to one `autorun` command with `stop`/`exit` verbs; `workflow-templates/` → `templates/workflows/`; this guide moved to `mdFiles/CODE-STYLE.md`.
-- **2026-07-01** ([ADR 0007](../../docs/adr/current/0007-rename-to-dufflebag-broadened-remit.md)–[0010](../../docs/adr/current/0010-core-grouped-by-domain.md)): the dufflebag pivot — rename across four contracts (clean break, no back-compat), vertical per-feature layout, catalog ship-allowlist, reusable workflows, core grouped by domain.
+Treat these as **team contracts**, not slogans:
+
+| Expectation | In practice |
+|---|---|
+| **We will not ship shit** | Definition of done includes clean + tested. |
+| **Always ready** | Main branch is releasable every iteration. |
+| **Stable productivity** | Speed doesn’t collapse as the codebase grows. |
+| **Inexpensive adaptability** | Software is *soft* — change should be cheap. |
+| **Continuous improvement** | Code gets better over time, not worse. |
+| **Fearless competence** | Tests remove fear of change. |
+| **QA finds nothing** | Don’t dump quality onto QA. |
+| **Honest estimates** | Three numbers: best / likely / worst — not a single lie. |
+| **Cover for each other** | Team > hero. |
+
+```ts
+// BAD — single false-precision estimate
+// "It'll take 3 days"
+
+// GOOD — honest range
+// best: 1d | likely: 3d | worst: 8d (unknown: payment provider sandbox)
+```
+
+```ts
+// BAD — "we'll clean it later" permanently
+if (legacy) {
+  // TODO: fix this mess before launch (written 2 years ago)
+  doTheMess();
+}
+
+// GOOD — leave the campground cleaner
+if (legacy) {
+  return migrateAndHandle(legacy); // improved path, covered by tests
+}
+```
+
+---
+
+## 9. TDD — three laws + double-entry bookkeeping
+
+**Conclusions (Lesson 4):**
+
+1. **You may not write production code** until a failing test forces you to.
+2. **You may not write more of a test** than is sufficient to fail (incl. compile fail).
+3. **You may not write more production code** than is sufficient to pass the one failing test.
+
+TDD is **double-entry bookkeeping**: every behavior is entered twice (test + production) so they check each other. Tests are the **examples / living documentation** of the system.
+
+Also: **say no** when the answer is no. The most valuable word a programmer has under deadline pressure is *no* (then work hard to find a yes that still protects quality).
+
+```ts
+// Cycle: red → green → refactor (stack example, abbreviated)
+
+// 1) RED — test fails (class doesn't exist yet)
+test("new stack is empty", () => {
+  const stack = new MyStack<number>();
+  expect(stack.isEmpty()).toBe(true);
+});
+
+// 2) GREEN — minimum production code
+class MyStack<T> {
+  isEmpty(): boolean {
+    return true;
+  }
+}
+
+// 3) RED — next behavior
+test("after push, stack is not empty", () => {
+  const stack = new MyStack<number>();
+  stack.push(1);
+  expect(stack.isEmpty()).toBe(false);
+});
+
+// 4) GREEN — only enough to pass
+class MyStack<T> {
+  private size = 0;
+  isEmpty(): boolean {
+    return this.size === 0;
+  }
+  push(_value: T): void {
+    this.size += 1;
+  }
+}
+
+// 5) REFACTOR — only with green bar
+```
+
+**Coverage tip (Lesson 3):** The only target that makes sense is *as close to 100% as the team can honestly hold*. Don’t let coverage become a manager vanity metric (teams will gut asserts to protect the number). Coverage is a **team introspection** tool.
+
+```ts
+// BAD — high coverage, no meaning
+test("create user", () => {
+  createUser({ name: "Ada" }); // no assert
+});
+
+// GOOD — assert the behavior you care about
+test("create user persists and returns id", async () => {
+  const user = await createUser({ name: "Ada" });
+  expect(user.id).toBeTruthy();
+  expect(await users.find(user.id)).toEqual(user);
+});
+```
+
+---
+
+## 10. Architecture: structure over frameworks
+
+**Conclusions (Lesson 5):**
+
+### Two values of software
+1. **Behavior** — it does what stakeholders asked (urgent).
+2. **Structure** — it can still change (important).  
+   Eisenhower: don’t let urgent behavior kill important structure. **Fight for the architecture.**
+
+### Goal of architecture
+Minimize the human resources required to build and maintain the system.  
+**Messes aren’t faster** even in the short term.
+
+### Rules that don’t depend on framework/language/DB
+- **Use-case driven.** Core is **Interactors** (use cases) + **Entities** (business rules).
+- **Web is a delivery mechanism** (an I/O device), not the app.
+- **Database is a detail.** ORM stays behind a gateway; entities don’t import it.
+- **Dependency rule:** source code dependencies point **inward**. Outer rings (UI, DB, frameworks) depend on inner rings (use cases, entities) — never the reverse.
+- **Plugin model:** frameworks are plugins to *your* app, not the other way around.
+- **Good architecture defers critical decisions** (DB, framework, web) as long as possible.
+
+```ts
+// BAD — "Rails/Next/Nest shape" leaks into the core
+// app/api/orders/route.ts
+export async function POST(req: Request) {
+  const body = await req.json();
+  const order = await prisma.order.create({ data: body }); // DB in the center
+  await stripe.charges.create({ amount: order.total });    // provider in the center
+  return Response.json(order);
+}
+
+// GOOD — dependency rule: use case in the center
+// domain/entities/Order.ts
+export class Order {
+  constructor(
+    readonly id: OrderId,
+    readonly lines: Line[],
+  ) {}
+  total(): Money {
+    return Money.sum(this.lines.map((l) => l.subtotal()));
+  }
+}
+
+// application/PlaceOrder.ts  (Interactor / use case)
+export class PlaceOrder {
+  constructor(
+    private readonly orders: OrderRepository, // interface, not Prisma
+    private readonly payments: PaymentGateway, // interface, not Stripe
+  ) {}
+
+  async execute(request: PlaceOrderRequest): Promise<PlaceOrderResponse> {
+    const order = Order.fromRequest(request);
+    await this.payments.charge(order.total());
+    await this.orders.save(order);
+    return PlaceOrderResponse.from(order);
+  }
+}
+
+// infrastructure/http/placeOrderController.ts  (delivery mechanism)
+export async function placeOrderController(req: Request): Promise<Response> {
+  const result = await placeOrder.execute(PlaceOrderRequest.fromHttp(req));
+  return Response.json(result.toJson());
+}
+
+// infrastructure/prisma/PrismaOrderRepository.ts  (DB is a detail)
+export class PrismaOrderRepository implements OrderRepository {
+  async save(order: Order): Promise<void> {
+    await prisma.order.upsert(/* map entity → rows */);
+  }
+}
+```
+
+```text
+        [ UI / HTTP / CLI ]     delivery mechanisms
+                 |
+                 v
+        [ Controllers / Presenters ]
+                 |
+                 v
+        [ Interactors / Use Cases ]   <── application rules
+                 |
+                 v
+        [ Entities ]                  <── business rules
+                 ^
+                 |  (interfaces owned inward)
+        [ Gateways: DB, Mail, Pay ]
+```
+
+---
+
+## 11. Agile is data, not a speed spell
+
+**Conclusions (Lesson 6):**
+
+- **Purpose of agile:** put **truth on the wall** (velocity + burndown) so hope dies early and management can manage.
+- Agile does **not** make you go faster by itself — it produces data about how messed up the plan is.
+- **Waterfall** fails because testing discovers design is wrong too late → death march.
+- **Short iterations** (days/weeks): plan a little, build a little, measure, replan.
+- Estimates are **guesses that improve** as variables shrink; never treat early estimates as contracts.
+- **Control knobs** of project management: scope, resources, date, quality — quality is not a real knob (cutting it bankrupts the future).
+
+```ts
+// BAD — fake agile
+// "We're agile" + no charts + fixed scope + fixed date + "just work weekends"
+
+// GOOD — agile as feedback loop
+type Iteration = {
+  number: number;
+  plannedPoints: number;
+  donePoints: number; // measured, not hoped
+};
+
+function velocity(history: Iteration[]): number {
+  const recent = history.slice(-3);
+  return average(recent.map((i) => i.donePoints));
+}
+
+// Forecast: remainingPoints / velocity → iterations left
+// If charts say you won't make the date: cut scope or move date — don't cut quality.
+```
+
+---
+
+## 12. Open/Closed without the textbook fog
+
+**Conclusion (Lesson 1 → OCP):** Prefer adding a new type/class over hunting every `switch`/`if` when a new case appears.
+
+```ts
+// BAD — every new shape edits every switch
+function area(shape: { type: string; w?: number; r?: number }): number {
+  switch (shape.type) {
+    case "rect":
+      return (shape.w ?? 0) ** 2;
+    case "circle":
+      return Math.PI * (shape.r ?? 0) ** 2;
+    // add "triangle"? edit here + draw() + serialize() + ...
+  }
+  return 0;
+}
+
+// GOOD — open for extension, closed for modification
+interface Shape {
+  area(): number;
+}
+class Rect implements Shape {
+  constructor(private w: number) {}
+  area() {
+    return this.w * this.w;
+  }
+}
+class Circle implements Shape {
+  constructor(private r: number) {}
+  area() {
+    return Math.PI * this.r * this.r;
+  }
+}
+// New Rhombus? Add a class. Call sites stay untouched.
+```
+
+---
+
+## 13. One-page checklist (print this)
+
+Before you merge:
+
+- [ ] **Works**, then **cleaned** (not “clean later”).
+- [ ] Functions **small**, **one thing**, **one abstraction level**.
+- [ ] Names **reveal intent**; no flag/output args.
+- [ ] **CQS** respected; side-effect pairs owned.
+- [ ] **No duplication** you can still see.
+- [ ] **Comments** only where code truly can’t speak.
+- [ ] **Test** exists for the behavior (preferably first).
+- [ ] New dependency points **inward** (use case/entity free of UI/DB/framework).
+- [ ] You didn’t trade **structure** for a false sense of speed.
+- [ ] Estimate / scope talk was **honest**.
+
+---
+
+## 14. How this maps to *this* workspace
+
+Uncle Bob’s rules are **language-agnostic**. In `~/Desktop/Code` they show up as:
+
+| Uncle Bob | How it already shows up here |
+|---|---|
+| SSOT / DRY | “Reuse before create”; `CONTEXT.md` ubiquitous language |
+| Dependency rule | Shared packages (`@zaatar/*`, `@repo/*`) with clear boundaries |
+| DB/web are details | Workers/Pages/Nest as delivery; domain kept separate where projects mature |
+| Small functions / prose | Project `AGENTS.md` “terse, clear” norms (e.g. Oly-App casing) |
+| Plan before ripple | “Plan first before shared interface changes” in `CLAUDE.md` |
+| Say no / honest estimates | Craft over cargo-cult agile consultants (Lesson 1 intro) |
+
+When a **specific project** has its own `CODE-STYLE.md` or `code-style.rules.json`, **that file wins inside that project**. This root file is the cross-cutting distillation from the root lessons + workspace index.
+
+---
+
+## Sources (root only)
+
+```text
+CLAUDE.md
+clean-code-uncle-bob-lesson-1-7EmboKQH8lM.md   # functions, ethics, DRY, CQS
+clean-code-uncle-bob-lesson-2-2a_ytyt9sf8.md   # comments, names
+clean-code-uncle-bob-lesson-3-Qjywrq2gM8o.md   # craft expectations, tests as courage
+clean-code-uncle-bob-lesson-4-58jGpV2Cg50.md   # TDD three laws, say no
+clean-code-uncle-bob-lesson-5-sn0aFEMVTpA.md   # architecture, interactors, dependency rule
+clean-code-uncle-bob-lesson-6-l-gF0vDhJVI.md   # agile as data, iterations
+```

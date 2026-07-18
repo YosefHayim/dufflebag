@@ -131,7 +131,9 @@ const detectGitRemote = (root: string) =>
     Command.workingDirectory(root),
     Command.string,
     Effect.map((url) => {
+      // e.g. "git@github.com:Acme/app.git" or "https://github.com/Acme/app" → owner=Acme, repo=app
       const match = url.trim().match(/github\.com[:/]([^/]+)\/(.+?)(?:\.git)?$/);
+      // Guard proves capture groups exist when match is non-null.
       return match === null ? undefined : { owner: match[1]!, repo: match[2]! };
     }),
     Effect.catchAll(() => Effect.succeed(undefined)),
