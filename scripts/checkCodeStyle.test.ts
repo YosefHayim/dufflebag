@@ -16,9 +16,9 @@ type ProtectedPath = {
 };
 
 const PROTECTED_PATHS = [
-  "src/skills/make-a-trailer/SKILL.md",
-  "src/skills/make-a-trailer/reference/pipeline.md",
-  "src/skills/make-a-trailer/scripts/assembleCut.mjs",
+  "src/skills/makeATrailer/SKILL.md",
+  "src/skills/makeATrailer/reference/pipeline.md",
+  "src/skills/makeATrailer/scripts/assembleCut.mjs",
 ];
 
 const ASSEMBLE_CUT_EXEMPTIONS = [
@@ -264,7 +264,7 @@ describe("code-style contract configuration", () => {
       name: "a wildcard path",
       mutate: (protectedPaths: ReadonlyArray<ProtectedPath>): ReadonlyArray<ProtectedPath> => [
         ...protectedPaths.slice(0, 2),
-        { path: "src/skills/make-a-trailer/**", codeRuleExemptions: ASSEMBLE_CUT_EXEMPTIONS },
+        { path: "src/skills/makeATrailer/**", codeRuleExemptions: ASSEMBLE_CUT_EXEMPTIONS },
       ],
     },
     {
@@ -1175,7 +1175,7 @@ describe("scan boundaries and protected baseline", () => {
 
   it("applies exactly the three approved code exemptions to assembleCut.mjs", () => {
     const report = checkSource(
-      "src/skills/make-a-trailer/scripts/assembleCut.mjs",
+      "src/skills/makeATrailer/scripts/assembleCut.mjs",
       "export function assemble(first, second, third) {\n  for (const cut of cuts) { render(cut); }\n}\n",
     );
 

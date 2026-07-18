@@ -4,6 +4,9 @@
 - **Scope:** `src/payload/config.ts` (SSOT) ← re-exported by `src/core/config.ts`
 - **Related:** [0001 — Zero-dependency hook payload](0001-zero-dependency-hook-payload.md)
 
+
+> **Current map (0016):** app config SSOT is `src/config/bagConfigSchema.ts`; installed hooks read `src/runtime/config.ts`. The no-drift rule is unchanged.
+
 ## Context
 
 The tunables (`dufflebagContextWarnFraction`, block fraction, autorun budget,

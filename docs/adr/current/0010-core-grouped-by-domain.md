@@ -1,8 +1,8 @@
 # 0010 — `src/core/` grouped by domain; the pure/IO split stays within each module
 
-- **Status:** Accepted (2026-07-01)
-- **Scope:** `src/core/**`, the `core/index.ts` barrel
-- **Related:** [0004 — Unified style + error model by role](0004-unified-style-and-error-model-by-role.md), [0008 — Vertical per-feature layout](0008-vertical-per-feature-layout.md)
+- **Status:** Superseded (2026-07-18) by [0016 — Capability layout replaces core](0016-capability-layout-replaces-core.md)
+- **Scope:** `src/core/**`, the `core/index.ts` barrel (historical — those paths no longer exist)
+- **Related:** [0004 — Unified style + error model by role](0004-unified-style-and-error-model-by-role.md), [0008 — Vertical per-feature layout](0008-vertical-per-feature-layout.md), [0016 — Capability layout](0016-capability-layout-replaces-core.md)
 
 ## Context
 

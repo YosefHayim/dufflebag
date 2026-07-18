@@ -4,6 +4,9 @@
 - **Scope:** `src/cli.ts` (dispatch), `src/commands/menu.ts`, the `select`/`text` wrappers in `src/core/ui.ts`
 - **Related:** [0004 — Unified style + error model by role](0004-unified-style-and-error-model-by-role.md), [0010 — Core grouped by domain](0010-core-grouped-by-domain.md)
 
+
+> **Current map (0016):** menu lives at `src/cli/menuCommand.ts` with `TerminalUI`; there is no `src/cli.ts` / `src/core/ui.ts`.
+
 ## Context
 
 The CLI was subcommand + flag only. Bare `dufflebag` printed commander's help

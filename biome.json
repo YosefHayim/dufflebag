@@ -29,11 +29,7 @@
   "plugins": ["./biome-rules/no-focused-tests.grit"],
   "overrides": [
     {
-      "includes": ["src/core/**", "src/commands/**"],
-      "linter": { "rules": { "suspicious": { "noConsole": "error" } } }
-    },
-    {
-      "includes": ["src/skills/*/hooks/**"],
+      "includes": ["src/skills/*/hooks/**", "src/skills/*/command/**", "src/runtime/**"],
       "linter": {
         "rules": {
           "style": {
@@ -41,9 +37,13 @@
               "level": "error",
               "options": {
                 "paths": {
-                  "commander": "Zero-dep hook payload: import only node:*, src/payload/*, and the feature's own lib/ (CODE-STYLE.md -> Never; ADR 0001).",
-                  "@clack/prompts": "Zero-dep hook payload: import only node:*, src/payload/*, and the feature's own lib/ (CODE-STYLE.md -> Never; ADR 0001).",
-                  "picocolors": "Zero-dep hook payload: import only node:*, src/payload/*, and the feature's own lib/ (CODE-STYLE.md -> Never; ADR 0001)."
+                  "commander": "Zero-dep hook/gate runtime: import only node:*, src/runtime/*, and the feature's own lib/ (CODE-STYLE.md -> Never; ADR 0001).",
+                  "@clack/prompts": "Zero-dep hook/gate runtime: import only node:*, src/runtime/*, and the feature's own lib/ (CODE-STYLE.md -> Never; ADR 0001).",
+                  "picocolors": "Zero-dep hook/gate runtime: import only node:*, src/runtime/*, and the feature's own lib/ (CODE-STYLE.md -> Never; ADR 0001).",
+                  "effect": "Zero-dep hook/gate runtime: import only node:*, src/runtime/*, and the feature's own lib/ (CODE-STYLE.md -> Never; ADR 0001).",
+                  "@effect/cli": "Zero-dep hook/gate runtime: import only node:*, src/runtime/*, and the feature's own lib/ (CODE-STYLE.md -> Never; ADR 0001).",
+                  "@effect/platform": "Zero-dep hook/gate runtime: import only node:*, src/runtime/*, and the feature's own lib/ (CODE-STYLE.md -> Never; ADR 0001).",
+                  "@effect/platform-node": "Zero-dep hook/gate runtime: import only node:*, src/runtime/*, and the feature's own lib/ (CODE-STYLE.md -> Never; ADR 0001)."
                 }
               }
             }

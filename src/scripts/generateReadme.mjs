@@ -47,25 +47,36 @@ const COMMUNITY_SKILLS = {
   "grill-with-docs": { author: "Matt Pocock", url: "https://github.com/mattpocock/skills" },
 };
 
-// ─── Extract features from features.ts ──────────────────────────────────────
+// ─── Extract features from featureCatalog.ts ────────────────────────────────
 
-const featuresPath = path.join(ROOT, "src/core/catalog/features.ts");
+const featuresPath = path.join(ROOT, "src/catalog/featureCatalog.ts");
 const featuresSource = readFileSync(featuresPath, "utf8");
 
-/** Parse the FEATURES record from TypeScript source (regex, no eval). */
+/**
+ * Parse the decoded feature catalog from TypeScript source (regex, no eval).
+ * Entries are array objects that open with `id: "…"` immediately followed by
+ * `sourceDirectory:` — that pairing uniquely identifies top-level features
+ * (installed-skill nested ids never carry a sourceDirectory).
+ */
 function parseFeatures() {
-  const features = [];
-  // Match each feature block: `"feature-id": { ... }` or `feature-id: { ... }`
-  // (biome unquotes single-word keys, so accept both quoted and bare keys).
-  const featureRegex = /"?([a-z][a-z0-9-]*)"?:\s*\{([^}]+(?:\{[^}]*\}[^}]*)*)\}/g;
+  const starts = [];
+  const startRegex = /id:\s*"([a-z][a-z0-9-]*)",\s*\n\s*sourceDirectory:/g;
   let match;
 
-  while ((match = featureRegex.exec(featuresSource)) !== null) {
-    const id = match[1];
-    const block = match[2];
+  while ((match = startRegex.exec(featuresSource)) !== null) {
+    starts.push({ id: match[1], index: match.index });
+  }
 
-    const title = block.match(/title:\s*"([^"]+)"/)?.[1] ?? id;
-    const summary = block.match(/summary:\s*\n?\s*"([^"]+(?:"\s*\+\s*"[^"]+)*)"/s)?.[1]?.replace(/"\s*\+\s*"/g, "") ?? "";
+  return starts.map((start, index) => {
+    const end = starts[index + 1]?.index ?? featuresSource.length;
+    const block = featuresSource.slice(start.index, end);
+
+    const title = block.match(/title:\s*"((?:\\.|[^"\\])*)"/)?.[1] ?? start.id;
+    const summary =
+      block
+        .match(/summary:\s*\n?\s*"((?:\\.|[^"\\])*)"/s)?.[1]
+        ?.replace(/\\n/g, " ")
+        ?.replace(/"\s*\+\s*"/g, "") ?? "";
     const platform = block.match(/platform:\s*"([^"]+)"/)?.[1] ?? "any";
 
     const platformEmoji =
@@ -77,9 +88,8 @@ function parseFeatures() {
             ? "🔴 macOS + Ghostty"
             : platform;
 
-    features.push({ id, title, summary, platform: platformEmoji });
-  }
-  return features;
+    return { id: start.id, title, summary, platform: platformEmoji };
+  });
 }
 
 // ─── Extract skills from SKILL.md frontmatter ───────────────────────────────

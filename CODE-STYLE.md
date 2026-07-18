@@ -143,6 +143,36 @@ export const applyArtifactPlan = (request: ApplyArtifactPlanRequest) =>
 
 ## Schemas and types
 
+### No hand-rolled parse helpers [rule:type.no-handrolled-parser]
+
+Do not export type-guard/`parseX` pairs for schema-owned literals, numbers, or booleans (`isDedupMode` + `parseDedupMode`, `parseNumber`, and the like).
+
+- **Application code** decodes with Effect Schema (`bagConfigSchema`, legacy environment maps, CLI request schemas). Failures surface as parse errors, not ad-hoc guards.
+- **Dependency-free hook island** may keep private switch/default readers inside a single `readConfig` (or equivalent transport reader). Do not export those helpers for the rest of the package to reimplement validation.
+
+```ts
+// BAD — parallel validation surface next to Schema
+export const isDedupMode = (value: string): value is DedupMode =>
+  DEDUP_MODES.some((mode) => mode === value);
+export const parseDedupMode = (raw?: string): DedupMode =>
+  isDedupMode((raw ?? "").trim().toLowerCase()) ? /* … */ : "deny";
+
+// GOOD — application: Schema owns the mode
+export const dedupModeSchema = Schema.Literal("deny", "warn", "off");
+
+// GOOD — hook island: private switch inside the only reader
+const dedupModeFromEnv = (raw: string | undefined): DedupMode => {
+  switch ((raw ?? "").trim().toLowerCase()) {
+    case "warn":
+      return "warn";
+    case "off":
+      return "off";
+    default:
+      return "deny";
+  }
+};
+```
+
 ### Schema owns runtime objects [rule:type.schema-owned-runtime]
 
 When data crosses a runtime, persistence, CLI, environment, catalog, or agent-format boundary, define executable Effect Schema first and derive TypeScript types from it. Do not maintain a handwritten object type beside a validator.
