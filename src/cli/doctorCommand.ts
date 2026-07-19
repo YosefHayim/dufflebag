@@ -39,10 +39,12 @@ export const doctorCommand = Command.make("doctor", {}, () =>
       );
       yield* TerminalUI.info(report.config._tag === "present" ? "config: present" : "config: missing");
       yield* TerminalUI.info(
-        `agents: ${report.agents
-          .filter((agent) => agent.detected || agent.managed)
-          .map((agent) => `${agent.displayName}${agent.managed ? "*" : ""}`)
-          .join(", ") || "none detected"}`,
+        `agents: ${
+          report.agents
+            .filter((agent) => agent.detected || agent.managed)
+            .map((agent) => `${agent.displayName}${agent.managed ? "*" : ""}`)
+            .join(", ") || "none detected"
+        }`,
       );
 
       // Surface every deterministic discrepancy without authorizing repair.

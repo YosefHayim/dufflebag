@@ -60,7 +60,7 @@ immediately — a toolbelt, not a platform.
   vertical-per-feature layout, catalog ship-allowlist, and reusable workflows all landed —
   as did the **2026-07-02 style refresh** (TSDoc on the exported surface, biome linter on,
   co-located tests, single-command `autorun`) and the **source consolidation**: all source
-  under `src/` (`src/skills/`, `src/scripts/`), all copyable templates under `templates/`
+  under `src/` (capabilities + `src/skills/`), maintainer tooling under root `scripts/`, all copyable templates under `templates/`
   (`templates/workflows/`, `templates/mdFiles/`) — [ADR 0012](../../docs/adr/current/0012-tsdoc-on-the-exported-surface.md)–[0014](../../docs/adr/current/0014-consolidate-under-src-and-templates.md).
 - **Next:** Cursor/Codex adapters ([#5](https://github.com/YosefHayim/dufflebag/issues/5)).
 - **Maybe:** more template kinds under `templates/` — a project should be able to scaffold

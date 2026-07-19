@@ -13,8 +13,7 @@ export const scopeSchema = Schema.Literal("global", "project").annotations({
 export type Scope = Schema.Schema.Type<typeof scopeSchema>;
 
 // e.g. "skills/deslop/SKILL.md" — not "/abs", "C:\x", "a/../b", or "a//b"
-const RELATIVE_ARTIFACT_PATH_PATTERN =
-  /^(?!\/)(?![A-Za-z]:)(?!.*(?:^|\/)\.{1,2}(?:\/|$))(?!.*\/\/)[^\\/\0]+(?:\/[^\\/\0]+)*$/;
+const RELATIVE_ARTIFACT_PATH_PATTERN = /^(?!\/)(?![A-Za-z]:)(?!.*(?:^|\/)\.{1,2}(?:\/|$))(?!.*\/\/)[^\\/\0]+(?:\/[^\\/\0]+)*$/;
 // e.g. 64-char lowercase hex: "a1b2…f9"
 const SHA256_HEX_PATTERN = /^[a-f0-9]{64}$/;
 // e.g. "/hooks/0/command", "/a~1b" (~0/~1 escapes) — not "hooks" (relative) or "/a~2"

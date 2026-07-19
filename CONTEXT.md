@@ -22,11 +22,13 @@ Application code is grouped by capability, not by technical layer:
 - `src/runtime/` — dependency-free hook kernel (`config` + `io`)
 - `src/skills/<sourceDirectory>/` — authored skills (camelCase directories) and feature-local hooks
 - `src/doctor.ts` / `src/scaffoldWorkflows.ts` — doctor and workflow scaffolding capabilities
+- `scripts/` — package build and repository verification tooling (not product runtime)
+- `scripts/` — outer-ring maintainer tooling (build, README generation, style contract); never imported by product code
 - `templates/` — copyable workflows and markdown guides
 - `dist/hooks/` — flat, compiled, zero-dep hook payload assembled at build time
 - `dist/staged/` — catalog-closed staged package for install/update/doctor
 
-`src/core/`, `src/commands/`, and `src/payload/` are **not** part of the current tree (see ADR 0016).
+`src/core/`, `src/commands/`, `src/payload/`, and `src/scripts/` are **not** part of the current tree (see ADR 0016; tooling lives under root `scripts/`).
 
 ## Key constraints
 

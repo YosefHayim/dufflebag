@@ -130,9 +130,7 @@ const runDoctor = Effect.gen(function* () {
       platform: host.platform,
       agentEvidence: host.agentEvidence,
     });
-    yield* TerminalUI.step(
-      `${scope}: ${report.installation._tag === "present" ? `v${report.installation.version}` : "missing"}`,
-    );
+    yield* TerminalUI.step(`${scope}: ${report.installation._tag === "present" ? `v${report.installation.version}` : "missing"}`);
   }
 });
 

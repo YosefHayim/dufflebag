@@ -10,6 +10,20 @@ import { install, installRequestSchema, reconcileInstallation } from "./install.
 
 const textEncoder = new TextEncoder();
 
+const stageContextGuardRuntime = (stagedRoot: string) =>
+  Effect.gen(function* () {
+    const fileSystem = yield* FileSystem.FileSystem;
+    const path = yield* Path.Path;
+    const hooks = ["contextGuard.js", "ctxWatchSpawn.js", "ctxLoopCtl.js"] as const;
+
+    // Stage every registration entrypoint used by context-guard.
+    for (const name of hooks) {
+      const destination = path.join(stagedRoot, "runtime/contextGuard/hooks", name);
+      yield* fileSystem.makeDirectory(path.dirname(destination), { recursive: true });
+      yield* fileSystem.writeFile(destination, textEncoder.encode("export {};\n"));
+    }
+  });
+
 const installRequest = (input: { root: string; stagedRoot: string }) => ({
   destination: { _tag: "project", root: input.root },
   host: { homeRoot: input.root },
@@ -28,11 +42,9 @@ layer(NodeContext.layer)("install", (it) => {
         const path = yield* Path.Path;
         const root = yield* fileSystem.makeTempDirectoryScoped({ prefix: "dufflebag-install-root-" });
         const stagedRoot = yield* fileSystem.makeTempDirectoryScoped({ prefix: "dufflebag-install-stage-" });
-        const stagedEntrypoint = path.join(stagedRoot, "runtime/contextGuard/hooks/contextGuard.js");
         const settingsPath = path.join(root, ".claude/settings.json");
 
-        yield* fileSystem.makeDirectory(path.dirname(stagedEntrypoint), { recursive: true });
-        yield* fileSystem.writeFile(stagedEntrypoint, textEncoder.encode("export {};\n"));
+        yield* stageContextGuardRuntime(stagedRoot);
         yield* fileSystem.makeDirectory(path.dirname(settingsPath), { recursive: true });
         yield* fileSystem.writeFileString(
           settingsPath,
@@ -62,6 +74,8 @@ layer(NodeContext.layer)("install", (it) => {
         expect(receipt.features).toEqual(["context-guard"]);
         expect(receipt.artifacts.map((artifact: { path: string }) => artifact.path)).toEqual([
           ".claude/dufflebag/runtime/contextGuard/hooks/contextGuard.js",
+          ".claude/dufflebag/runtime/contextGuard/hooks/ctxLoopCtl.js",
+          ".claude/dufflebag/runtime/contextGuard/hooks/ctxWatchSpawn.js",
           ".claude/dufflebag/config.json",
           ".claude/settings.json",
         ]);
@@ -76,11 +90,9 @@ layer(NodeContext.layer)("install", (it) => {
         const path = yield* Path.Path;
         const root = yield* fileSystem.makeTempDirectoryScoped({ prefix: "dufflebag-install-repeat-root-" });
         const stagedRoot = yield* fileSystem.makeTempDirectoryScoped({ prefix: "dufflebag-install-repeat-stage-" });
-        const stagedEntrypoint = path.join(stagedRoot, "runtime/contextGuard/hooks/contextGuard.js");
         const request = installRequest({ root, stagedRoot });
 
-        yield* fileSystem.makeDirectory(path.dirname(stagedEntrypoint), { recursive: true });
-        yield* fileSystem.writeFile(stagedEntrypoint, textEncoder.encode("export {};\n"));
+        yield* stageContextGuardRuntime(stagedRoot);
 
         yield* install(request);
         const before = yield* fileSystem.readFile(path.join(root, ".claude/dufflebag/receipt.json"));
@@ -100,12 +112,10 @@ layer(NodeContext.layer)("install", (it) => {
         const path = yield* Path.Path;
         const root = yield* fileSystem.makeTempDirectoryScoped({ prefix: "dufflebag-install-receipt-correlation-root-" });
         const stagedRoot = yield* fileSystem.makeTempDirectoryScoped({ prefix: "dufflebag-install-receipt-correlation-stage-" });
-        const stagedEntrypoint = path.join(stagedRoot, "runtime/contextGuard/hooks/contextGuard.js");
         const victimPath = path.join(root, "victim.txt");
         const victimBytes = textEncoder.encode("user-owned\n");
 
-        yield* fileSystem.makeDirectory(path.dirname(stagedEntrypoint), { recursive: true });
-        yield* fileSystem.writeFileString(stagedEntrypoint, "export {};\n");
+        yield* stageContextGuardRuntime(stagedRoot);
         yield* fileSystem.writeFile(victimPath, victimBytes);
 
         const harmlessReceipt = {
@@ -157,7 +167,8 @@ layer(NodeContext.layer)("install", (it) => {
         const stagedRoot = yield* fileSystem.makeTempDirectoryScoped({ prefix: "dufflebag-install-formats-stage-" });
         const stagedFiles = [
           ["runtime/contextGuard/hooks/contextGuard.js", "export {};\n"],
-          ["runtime/autorun/hooks/autorun.js", "export {};\n"],
+          ["runtime/contextGuard/hooks/ctxWatchSpawn.js", "export {};\n"],
+          ["runtime/contextGuard/hooks/ctxLoopCtl.js", "export {};\n"],
           ["skills/autorun/SKILL.md", "---\nname: autorun\n---\nRun @@CTL@@ when the loop is armed.\n"],
         ];
 
@@ -178,7 +189,7 @@ layer(NodeContext.layer)("install", (it) => {
 
         expect(yield* fileSystem.readFileString(path.join(root, ".claude/skills/autorun/SKILL.md"))).toContain("Run");
         expect(yield* fileSystem.readFileString(path.join(root, ".cursor/rules/autorun.mdc"))).toContain(
-          ".claude/dufflebag/runtime/autorun/hooks/autorun.js",
+          ".claude/dufflebag/runtime/contextGuard/hooks/ctxLoopCtl.js",
         );
 
         const instructions = yield* fileSystem.readFileString(path.join(root, "AGENTS.md"));
@@ -207,7 +218,8 @@ layer(NodeContext.layer)("install", (it) => {
         const stagedRoot = yield* fileSystem.makeTempDirectoryScoped({ prefix: "dufflebag-install-non-claude-stage-" });
         const stagedFiles = [
           ["runtime/contextGuard/hooks/contextGuard.js", "export {};\n"],
-          ["runtime/autorun/hooks/autorun.js", "export {};\n"],
+          ["runtime/contextGuard/hooks/ctxWatchSpawn.js", "export {};\n"],
+          ["runtime/contextGuard/hooks/ctxLoopCtl.js", "export {};\n"],
           ["skills/autorun/SKILL.md", "---\nname: autorun\n---\nRun @@CTL@@ when the loop is armed.\n"],
         ];
 
@@ -226,11 +238,11 @@ layer(NodeContext.layer)("install", (it) => {
           agents: { _tag: "selected", ids: ["cursor"] },
         });
 
-        expect(yield* fileSystem.readFileString(path.join(root, ".claude/dufflebag/runtime/autorun/hooks/autorun.js"))).toBe(
+        expect(yield* fileSystem.readFileString(path.join(root, ".claude/dufflebag/runtime/contextGuard/hooks/ctxLoopCtl.js"))).toBe(
           "export {};\n",
         );
         expect(yield* fileSystem.readFileString(path.join(root, ".cursor/rules/autorun.mdc"))).toContain(
-          ".claude/dufflebag/runtime/autorun/hooks/autorun.js",
+          ".claude/dufflebag/runtime/contextGuard/hooks/ctxLoopCtl.js",
         );
       }),
     ),
@@ -245,7 +257,8 @@ layer(NodeContext.layer)("install", (it) => {
         const stagedRoot = yield* fileSystem.makeTempDirectoryScoped({ prefix: "dufflebag-install-allowlist-stage-" });
         const stagedFiles = [
           ["runtime/contextGuard/hooks/contextGuard.js", "export {};\n"],
-          ["runtime/autorun/hooks/autorun.js", "export {};\n"],
+          ["runtime/contextGuard/hooks/ctxWatchSpawn.js", "export {};\n"],
+          ["runtime/contextGuard/hooks/ctxLoopCtl.js", "export {};\n"],
           ["skills/autorun/SKILL.md", "---\nname: autorun\n---\nRun @@CTL@@ when armed.\n"],
           ["skills/autorun/EXTRA.md", "not catalog-shipped\n"],
         ];
@@ -280,11 +293,9 @@ layer(NodeContext.layer)("install", (it) => {
         const path = yield* Path.Path;
         const root = yield* fileSystem.makeTempDirectoryScoped({ prefix: "dufflebag-install-legacy-root-" });
         const stagedRoot = yield* fileSystem.makeTempDirectoryScoped({ prefix: "dufflebag-install-legacy-stage-" });
-        const stagedEntrypoint = path.join(stagedRoot, "runtime/contextGuard/hooks/contextGuard.js");
         const settingsPath = path.join(root, ".claude/settings.json");
 
-        yield* fileSystem.makeDirectory(path.dirname(stagedEntrypoint), { recursive: true });
-        yield* fileSystem.writeFileString(stagedEntrypoint, "export {};\n");
+        yield* stageContextGuardRuntime(stagedRoot);
         yield* fileSystem.makeDirectory(path.dirname(settingsPath), { recursive: true });
         yield* fileSystem.writeFileString(
           settingsPath,
@@ -322,12 +333,10 @@ layer(NodeContext.layer)("install", (it) => {
         const homeRoot = yield* fileSystem.makeTempDirectoryScoped({ prefix: "dufflebag-install-home-" });
         const projectRoot = yield* fileSystem.makeTempDirectoryScoped({ prefix: "dufflebag-install-project-" });
         const stagedRoot = yield* fileSystem.makeTempDirectoryScoped({ prefix: "dufflebag-install-global-stage-" });
-        const stagedEntrypoint = path.join(stagedRoot, "runtime/contextGuard/hooks/contextGuard.js");
         const globalConfigPath = path.join(homeRoot, ".claude/dufflebag/config.json");
         const globalConfig = { ...defaultBagConfig, speechVoice: "Daniel" };
 
-        yield* fileSystem.makeDirectory(path.dirname(stagedEntrypoint), { recursive: true });
-        yield* fileSystem.writeFileString(stagedEntrypoint, "export {};\n");
+        yield* stageContextGuardRuntime(stagedRoot);
         yield* fileSystem.makeDirectory(path.dirname(globalConfigPath), { recursive: true });
         yield* fileSystem.writeFileString(globalConfigPath, `${JSON.stringify(globalConfig, null, 2)}\n`);
 
@@ -352,11 +361,9 @@ layer(NodeContext.layer)("install", (it) => {
         const path = yield* Path.Path;
         const root = yield* fileSystem.makeTempDirectoryScoped({ prefix: "dufflebag-install-cleanup-only-root-" });
         const stagedRoot = yield* fileSystem.makeTempDirectoryScoped({ prefix: "dufflebag-install-cleanup-only-stage-" });
-        const stagedEntrypoint = path.join(stagedRoot, "runtime/contextGuard/hooks/contextGuard.js");
         const settingsPath = path.join(root, ".claude/settings.json");
 
-        yield* fileSystem.makeDirectory(path.dirname(stagedEntrypoint), { recursive: true });
-        yield* fileSystem.writeFileString(stagedEntrypoint, "export {};\n");
+        yield* stageContextGuardRuntime(stagedRoot);
         yield* fileSystem.makeDirectory(path.dirname(settingsPath), { recursive: true });
         yield* fileSystem.writeFileString(settingsPath, '{\n  "env": { "keep": "yes", "dufflebagDebugEnabled": "true" }\n}\n');
 
@@ -383,12 +390,10 @@ layer(NodeContext.layer)("install", (it) => {
         const path = yield* Path.Path;
         const root = yield* fileSystem.makeTempDirectoryScoped({ prefix: "dufflebag-install-invalid-legacy-root-" });
         const stagedRoot = yield* fileSystem.makeTempDirectoryScoped({ prefix: "dufflebag-install-invalid-legacy-stage-" });
-        const stagedEntrypoint = path.join(stagedRoot, "runtime/contextGuard/hooks/contextGuard.js");
         const settingsPath = path.join(root, ".claude/settings.json");
         const originalSettings = '{\n  "env": { "dufflebagDebugEnabled": "yes" }\n}\n';
 
-        yield* fileSystem.makeDirectory(path.dirname(stagedEntrypoint), { recursive: true });
-        yield* fileSystem.writeFileString(stagedEntrypoint, "export {};\n");
+        yield* stageContextGuardRuntime(stagedRoot);
         yield* fileSystem.makeDirectory(path.dirname(settingsPath), { recursive: true });
         yield* fileSystem.writeFileString(settingsPath, originalSettings);
 
@@ -416,12 +421,10 @@ layer(NodeContext.layer)("install", (it) => {
         const realRoot = path.join(container, "realRoot");
         const linkedRoot = path.join(container, "linkedRoot");
         const stagedRoot = yield* fileSystem.makeTempDirectoryScoped({ prefix: "dufflebag-install-symlink-stage-" });
-        const stagedEntrypoint = path.join(stagedRoot, "runtime/contextGuard/hooks/contextGuard.js");
 
         yield* fileSystem.makeDirectory(realRoot);
         yield* fileSystem.symlink(realRoot, linkedRoot);
-        yield* fileSystem.makeDirectory(path.dirname(stagedEntrypoint), { recursive: true });
-        yield* fileSystem.writeFileString(stagedEntrypoint, "export {};\n");
+        yield* stageContextGuardRuntime(stagedRoot);
 
         yield* install(installRequest({ root: linkedRoot, stagedRoot }));
 

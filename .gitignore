@@ -7,17 +7,19 @@ coverage/
 .worktrees/
 
 # png-to-code local/demo artifacts (never commit binaries)
-skills/png-to-code/demo/*
-!skills/png-to-code/demo/README.md
-skills/png-to-code/**/out/
-skills/png-to-code/**/*.png
-skills/png-to-code/**/*.svg
-skills/png-to-code/**/*.html
-skills/png-to-code/**/diff*.png
-skills/png-to-code/scripts/node_modules/
+src/skills/pngToCode/demo/*
+!src/skills/pngToCode/demo/README.md
+src/skills/pngToCode/**/out/
+src/skills/pngToCode/**/*.png
+src/skills/pngToCode/**/*.svg
+src/skills/pngToCode/**/*.html
+src/skills/pngToCode/**/diff*.png
+src/skills/pngToCode/scripts/node_modules/
+src/skills/pngToCode/scripts/.playwright/
 
-# Playwright browser cache (when installed from scripts/)
-skills/png-to-code/scripts/.playwright/
+# Local agent install mirrors (not product source)
+.agents/
+.devin/
 
 # Kiro CLI agent config (local)
 .kiro

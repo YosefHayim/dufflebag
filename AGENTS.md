@@ -40,7 +40,7 @@ Public feature and installed-skill IDs are decoded catalog data and can differ f
 | `src/skills/<sourceDirectory>/` | Authored skill content and feature-local dependency-free runtime |
 | `src/doctor.ts` | Structured installation diagnostics |
 | `src/scaffoldWorkflows.ts` | Workflow-template scaffolding capability |
-| `scripts/` | Repository build, generation, contract, shipping, and smoke tooling |
+| `scripts/` | Outer-ring tooling only: package build (`assembleHooks`, `generateReadme`), style contract (`checkCodeStyle`), never imported by `src/` |
 | `templates/` | Files intentionally copied into another repository |
 | `docs/adr/current/` | Current architectural decisions |
 | `.husky/pre-commit` | README regeneration before commits |
@@ -51,12 +51,12 @@ Capability layout is current ([ADR 0016](docs/adr/current/0016-capability-layout
 
 Hard rules agents must hold every turn. Full prescription: [`CODE-STYLE.md`](CODE-STYLE.md) and `docs/adr/current/`.
 
-- **Verify gate** — `pnpm verify` = `biome ci` + typecheck + test + build. Biome is linter and formatter (double quotes). One root `tsconfig`; the png harness under `src/skills/png-to-code/scripts/` is the single sanctioned exception.
+- **Verify gate** — `pnpm verify` = `biome ci` + typecheck + test + build. Biome is linter and formatter (double quotes). One root `tsconfig`; the png harness under `src/skills/pngToCode/scripts/` is the single sanctioned exception.
 - **Effect / Schema** — capabilities return Effect; only `src/cli/main.ts` starts the runtime. Runtime, persisted, catalog, CLI, and agent-format data begin as Effect Schema. Application failures use `Schema.TaggedError`. No hand-rolled `isX` / `parseX` pairs for literals and numbers.
 - **Hook island** — installed hooks stay dependency-free plain Node (`node:*`, `src/runtime/**`, own feature runtime only), **fail-open**. Application code never imports installed hook code.
 - **Ownership** — inspect → plan → validate → apply → write receipt last. A receipt is the only deletion authority. Catalog-closed shipping: the feature catalog owns exact shipped paths.
 - **Shape** — capability-owned paths; camelCase authored directories; PascalCase UI files; kebab-case public IDs/flags. One command path; `TerminalUI` owns presentation; non-TTY never prompts.
-- **Local tooling** — gitignored `scripts/dev/` for personal/one-off scripts. Maintained tools live under root `scripts/`.
+- **Local tooling** — gitignored `scripts/dev/` for personal/one-off scripts. All maintained build/verify tools live under root `scripts/` (not under `src/`).
 - **README** — pre-commit may regenerate and stage `README.md`; inspect the index after committing.
 
 ## Validate changes
@@ -72,7 +72,7 @@ pnpm verify
 For png-to-code script changes:
 
 ```bash
-pnpm --dir src/skills/png-to-code/scripts typecheck
+pnpm --dir src/skills/pngToCode/scripts typecheck
 ```
 
 ## Agent engineering config

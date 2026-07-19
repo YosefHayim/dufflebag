@@ -6,7 +6,7 @@
 - **Supersedes:** the *directory-path* portions of [0008](0008-vertical-per-feature-layout.md) (`skills/` → `src/skills/`) and [0013](0013-style-refresh-colocated-tests-single-command-autorun-templates.md) (`mdFiles/` → `templates/mdFiles/`). The reasoning in both is unchanged — only the base paths move.
 
 
-> **Current map (0016):** capability layout replaces the kernel three-up under `src/core`/`src/payload`. Scripts remain under `src/scripts/`.
+> **Current map (0016 + tooling):** capability layout replaces the kernel three-up under `src/core`/`src/payload`. Maintainer and package-build tooling lives under root `scripts/` (outer ring); `src/` is product source only.
 
 ## Context
 

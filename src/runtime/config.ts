@@ -100,10 +100,7 @@ export const readConfig = (env: NodeJS.Dict<string> = process.env): BagConfig =>
   autorunDefaultCycleCount: numberFromEnv(env[ENV_KEYS.autorunDefaultCycleCount], DEFAULTS.autorunDefaultCycleCount),
   autorunMaxCycleCount: numberFromEnv(env[ENV_KEYS.autorunMaxCycleCount], DEFAULTS.autorunMaxCycleCount),
   autorunPollIntervalSeconds: numberFromEnv(env[ENV_KEYS.autorunPollIntervalSeconds], DEFAULTS.autorunPollIntervalSeconds),
-  autorunIdleThresholdSeconds: numberFromEnv(
-    env[ENV_KEYS.autorunIdleThresholdSeconds],
-    DEFAULTS.autorunIdleThresholdSeconds,
-  ),
+  autorunIdleThresholdSeconds: numberFromEnv(env[ENV_KEYS.autorunIdleThresholdSeconds], DEFAULTS.autorunIdleThresholdSeconds),
   speechVoice: env[ENV_KEYS.speechVoice] ?? DEFAULTS.speechVoice,
   speechWordsPerMinute: numberFromEnv(env[ENV_KEYS.speechWordsPerMinute], DEFAULTS.speechWordsPerMinute),
   dedupEnforcement: dedupModeFromEnv(env[ENV_KEYS.dedupEnforcement]),

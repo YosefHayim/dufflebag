@@ -20,8 +20,7 @@ const receiptFilename = "receipt.json";
 const recoveryFilename = "recovery.json";
 
 // e.g. "/Users/me/.claude" or "C:/Users/me/.claude" — not "rel", "a/../b", or "C:\\x"
-const ABSOLUTE_ROOT_PATTERN =
-  /^(?:\/|[A-Za-z]:\/)(?!.*(?:^|\/)\.{1,2}(?:\/|$))(?!.*\/\/)(?:[^\\/\0]+(?:\/[^\\/\0]+)*)?$/;
+const ABSOLUTE_ROOT_PATTERN = /^(?:\/|[A-Za-z]:\/)(?!.*(?:^|\/)\.{1,2}(?:\/|$))(?!.*\/\/)(?:[^\\/\0]+(?:\/[^\\/\0]+)*)?$/;
 // e.g. "deslop" — legacy kebab skill id in uninstall manifests
 const LEGACY_SKILL_ID_PATTERN = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
 

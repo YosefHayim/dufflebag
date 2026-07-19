@@ -99,6 +99,7 @@ const validFixture = [
         {
           event: "Stop",
           matcher: { _tag: "none" },
+          entrypoint: { _tag: "featureDefault" },
         },
       ],
     },
@@ -133,7 +134,22 @@ describe("featureCatalog", () => {
     expect(installedSkillsFor(["context-guard", "speak-response", "dedup-guard"])).toEqual([]);
     expect(installedSkillsFor(featureCatalog.map((feature) => feature.id)).map((skill) => [skill.id, skill.shippedPaths])).toEqual([
       ["autorun", ["SKILL.md"]],
-      ["png-to-code", ["SKILL.md", "README.md", "CONTEXT.md", "TECH-GLOSSARY.md", "reference", "demo", "scripts"]],
+      [
+        "png-to-code",
+        [
+          "SKILL.md",
+          "README.md",
+          "CONTEXT.md",
+          "TECH-GLOSSARY.md",
+          "reference",
+          "demo",
+          "scripts/package.json",
+          "scripts/svgo.config.mjs",
+          "scripts/robot.svgo.config.mjs",
+          "scripts/tsconfig.json",
+          "scripts/src",
+        ],
+      ],
       ["github-repo-metadata", ["SKILL.md"]],
       ["write-a-post", ["SKILL.md"]],
       ["readme-editor", ["SKILL.md", "references"]],
@@ -170,7 +186,7 @@ describe("featureCatalog", () => {
     );
     const runtimeEntrypoints = runtimeFeatures.map((feature) => feature.sourceEntrypoint);
 
-    expect(runtimeEntrypoints).toEqual(["hooks/contextGuard.ts", "hooks/autorun.ts", "hooks/speakResponse.ts", "hooks/dedupGuard.ts"]);
+    expect(runtimeEntrypoints).toEqual(["hooks/contextGuard.ts", "hooks/speakResponse.ts", "hooks/dedupGuard.ts"]);
     expect(runtimeFeatures).toEqual([
       {
         id: "context-guard",
@@ -180,25 +196,22 @@ describe("featureCatalog", () => {
           {
             event: "PreToolUse",
             matcher: { _tag: "pattern", value: "Write|Edit|MultiEdit|NotebookEdit" },
+            entrypoint: { _tag: "featureDefault" },
           },
           {
             event: "PostToolUse",
             matcher: { _tag: "pattern", value: "Write|Edit|MultiEdit|NotebookEdit" },
+            entrypoint: { _tag: "featureDefault" },
           },
           {
             event: "UserPromptSubmit",
             matcher: { _tag: "none" },
+            entrypoint: { _tag: "featureDefault" },
           },
-        ],
-      },
-      {
-        id: "autonomous-loop",
-        platform: "macos+ghostty",
-        sourceEntrypoint: "hooks/autorun.ts",
-        registrations: [
           {
             event: "SessionStart",
             matcher: { _tag: "none" },
+            entrypoint: { _tag: "path", value: "hooks/ctxWatchSpawn.ts" },
           },
         ],
       },
@@ -210,6 +223,7 @@ describe("featureCatalog", () => {
           {
             event: "Stop",
             matcher: { _tag: "none" },
+            entrypoint: { _tag: "featureDefault" },
           },
         ],
       },
@@ -221,6 +235,7 @@ describe("featureCatalog", () => {
           {
             event: "PreToolUse",
             matcher: { _tag: "pattern", value: "Write|Edit|MultiEdit" },
+            entrypoint: { _tag: "featureDefault" },
           },
         ],
       },

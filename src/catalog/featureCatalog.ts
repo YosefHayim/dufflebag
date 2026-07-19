@@ -69,11 +69,30 @@ const hookMatcherSchema = Schema.Union(
   description: "Optional tool matcher represented without an optional property.",
 });
 
+const registrationEntrypointSchema = Schema.Union(
+  Schema.TaggedStruct("featureDefault", {}).annotations({
+    description: "Use the feature-level hook sourceEntrypoint.",
+  }),
+  Schema.TaggedStruct("path", {
+    value: Schema.NonEmptyTrimmedString.pipe(
+      Schema.pattern(HOOK_SOURCE_ENTRYPOINT_PATTERN, {
+        message: () => "Registration entrypoints must end in .ts and stay feature-relative.",
+      }),
+      Schema.annotations({
+        description: "Feature-relative TypeScript entrypoint for this registration only.",
+      }),
+    ),
+  }),
+).annotations({
+  description: "Per-registration entrypoint without an optional property.",
+});
+
 const hookRegistrationSchema = Schema.Struct({
   event: Schema.Literal("PreToolUse", "PostToolUse", "UserPromptSubmit", "SessionStart", "Stop").annotations({
     description: "Agent lifecycle event that invokes this entrypoint.",
   }),
   matcher: hookMatcherSchema,
+  entrypoint: registrationEntrypointSchema,
 });
 
 export const featureRuntimeSchema = Schema.Union(
@@ -222,14 +241,22 @@ export const featureCatalog = Schema.decodeUnknownSync(featureCatalogSchema, {
         {
           event: "PreToolUse",
           matcher: { _tag: "pattern", value: "Write|Edit|MultiEdit|NotebookEdit" },
+          entrypoint: { _tag: "featureDefault" },
         },
         {
           event: "PostToolUse",
           matcher: { _tag: "pattern", value: "Write|Edit|MultiEdit|NotebookEdit" },
+          entrypoint: { _tag: "featureDefault" },
         },
         {
           event: "UserPromptSubmit",
           matcher: { _tag: "none" },
+          entrypoint: { _tag: "featureDefault" },
+        },
+        {
+          event: "SessionStart",
+          matcher: { _tag: "none" },
+          entrypoint: { _tag: "path", value: "hooks/ctxWatchSpawn.ts" },
         },
       ],
     },
@@ -244,20 +271,11 @@ export const featureCatalog = Schema.decodeUnknownSync(featureCatalogSchema, {
     },
     title: "Autonomous loop (autorun)",
     summary:
-      "A SessionStart daemon that auto-/compacts and resumes work hands-free once context nears the guardrail and a fresh handoff exists. macOS + Ghostty only (it types into your terminal window).",
+      "A skill that arms the context-guard SessionStart daemon to auto-/compact and resume hands-free once context nears the guardrail and a fresh handoff exists. macOS + Ghostty only (it types into your terminal window). Hook runtime lives under context-guard.",
     selectedByDefault: false,
     dependencies: ["context-guard"],
     platform: "macos+ghostty",
-    runtime: {
-      _tag: "hook",
-      sourceEntrypoint: "hooks/autorun.ts",
-      registrations: [
-        {
-          event: "SessionStart",
-          matcher: { _tag: "none" },
-        },
-      ],
-    },
+    runtime: { _tag: "none" },
   },
   {
     id: "speak-response",
@@ -275,6 +293,7 @@ export const featureCatalog = Schema.decodeUnknownSync(featureCatalogSchema, {
         {
           event: "Stop",
           matcher: { _tag: "none" },
+          entrypoint: { _tag: "featureDefault" },
         },
       ],
     },
@@ -296,6 +315,7 @@ export const featureCatalog = Schema.decodeUnknownSync(featureCatalogSchema, {
         {
           event: "PreToolUse",
           matcher: { _tag: "pattern", value: "Write|Edit|MultiEdit" },
+          entrypoint: { _tag: "featureDefault" },
         },
       ],
     },
@@ -306,7 +326,19 @@ export const featureCatalog = Schema.decodeUnknownSync(featureCatalogSchema, {
     installedSkill: {
       _tag: "skill",
       id: "png-to-code",
-      shippedPaths: ["SKILL.md", "README.md", "CONTEXT.md", "TECH-GLOSSARY.md", "reference", "demo", "scripts"],
+      shippedPaths: [
+        "SKILL.md",
+        "README.md",
+        "CONTEXT.md",
+        "TECH-GLOSSARY.md",
+        "reference",
+        "demo",
+        "scripts/package.json",
+        "scripts/svgo.config.mjs",
+        "scripts/robot.svgo.config.mjs",
+        "scripts/tsconfig.json",
+        "scripts/src",
+      ],
     },
     title: "PNG → pixel-perfect code",
     summary:

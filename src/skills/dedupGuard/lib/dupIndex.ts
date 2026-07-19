@@ -141,11 +141,13 @@ export function resolveRepoRoot(cwd: string = process.cwd()): string {
 /** Parse the `dufflebagDedupSkipDirectories` value (comma/space list) into extra skip-dir names. */
 export function parseSkipList(raw: string | undefined): string[] {
   if (!raw) return [];
-  return raw
-    // e.g. "vendor, generated  tmp" → ["vendor","generated","tmp"]
-    .split(/[\s,]+/)
-    .map((s) => s.trim())
-    .filter(Boolean);
+  return (
+    raw
+      // e.g. "vendor, generated  tmp" → ["vendor","generated","tmp"]
+      .split(/[\s,]+/)
+      .map((s) => s.trim())
+      .filter(Boolean)
+  );
 }
 
 /** Absolute path → repo-relative POSIX path (stable cache + display key). */

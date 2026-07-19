@@ -19,7 +19,7 @@
     "cli": "tsx src/cli/main.ts",
     "prepare": "husky",
     "prebuild": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
-    "build": "tsc && node src/scripts/assembleHooks.mjs",
+    "build": "tsc && node scripts/assembleHooks.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
@@ -29,7 +29,7 @@
     "check:ci": "biome ci .",
     "verify": "biome ci . && tsc --noEmit && vitest run && pnpm build",
     "prepublishOnly": "npm run build",
-    "generate-readme": "node src/scripts/generateReadme.mjs"
+    "generate-readme": "node scripts/generateReadme.mjs"
   },
   "keywords": [
     "claude-code",

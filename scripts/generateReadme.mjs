@@ -18,7 +18,7 @@
  *   <!-- AUTO:FEATURES:START --> … <!-- AUTO:FEATURES:END -->  (owned catalog)
  *   <!-- AUTO:SKILLS:START -->  … <!-- AUTO:SKILLS:END -->     (community skills)
  *
- * Run: `node src/scripts/generateReadme.mjs`
+ * Run: `node scripts/generateReadme.mjs`
  */
 
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -26,7 +26,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const ROOT = path.resolve(__dirname, "../..");
+const ROOT = path.resolve(__dirname, "..");
 
 const SKILL_ROOTS = [
   { root: path.join(ROOT, "src/skills"), label: "dufflebag source" },

@@ -20,7 +20,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const DIST_SKILLS = path.join(ROOT, "dist", "src", "skills");
 const PAYLOAD_DIR = path.join(ROOT, "dist", "src", "runtime");
 const OUT_HOOKS = path.join(ROOT, "dist", "hooks");
