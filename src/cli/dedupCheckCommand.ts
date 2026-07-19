@@ -45,11 +45,7 @@ const checkCommand = Command.make(
         since: Option.getOrUndefined(args.since),
       });
     }).pipe(Effect.catchAll((error) => TerminalUI.presentError(error))),
-).pipe(
-  Command.withDescription(
-    "Scan a repo for duplicate function bodies / type shapes (exits non-zero on findings)",
-  ),
-);
+).pipe(Command.withDescription("Scan a repo for duplicate function bodies / type shapes (exits non-zero on findings)"));
 
 export const dedupCommand = Command.make("dedup").pipe(
   Command.withDescription("Dedup-guard tools (scan / CI gate)"),

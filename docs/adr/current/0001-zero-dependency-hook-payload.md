@@ -3,6 +3,8 @@
 - **Status:** Accepted (2026-07-01)
 - **Scope:** `src/hooks/**` → compiled to `dist/hooks` and copied into `~/.claude/skills-bag/hooks`
 
+> **Live tree:** prefer [0016](0016-capability-layout-replaces-core.md) + root `CONTEXT.md`. Historical path names (`src/core`, `src/payload`, `src/commands`) in this body are not the current layout.
+
 
 > **Current map (0016):** the zero-dependency hook kernel lives at `src/runtime/` (not `src/payload/`). The rule is unchanged.
 

@@ -4,6 +4,8 @@
 - **Scope:** `src/core/**`, the `core/index.ts` barrel (historical — those paths no longer exist)
 - **Related:** [0004 — Unified style + error model by role](0004-unified-style-and-error-model-by-role.md), [0008 — Vertical per-feature layout](0008-vertical-per-feature-layout.md), [0016 — Capability layout](0016-capability-layout-replaces-core.md)
 
+> **Live tree:** prefer [0016](0016-capability-layout-replaces-core.md) + root `CONTEXT.md`. Historical path names (`src/core`, `src/payload`, `src/commands`) in this body are not the current layout.
+
 ## Context
 
 `src/core/` had grown to eleven flat modules — `agents`, `agentWiring`,

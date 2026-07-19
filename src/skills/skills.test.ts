@@ -47,9 +47,7 @@ const parseFrontmatter = (file: string): { frontmatter: Frontmatter | null; body
 const skillRoot = path.dirname(fileURLToPath(import.meta.url));
 
 const installedSkills = installedSkillsFor(featureCatalog.map((feature) => feature.id)).map((skill) => {
-  const feature = featureCatalog.find(
-    (candidate) => candidate.installedSkill._tag === "skill" && candidate.installedSkill.id === skill.id,
-  );
+  const feature = featureCatalog.find((candidate) => candidate.installedSkill._tag === "skill" && candidate.installedSkill.id === skill.id);
   if (feature === undefined) {
     throw new Error(`Installed skill ${skill.id} is missing a catalog feature.`);
   }
@@ -96,7 +94,9 @@ describe("local skill sources", () => {
     const feature = featureCatalog.find((candidate) => candidate.sourceDirectory === sourceDirectory);
     // e.g. "pngToCode" → "png-to-code" when catalog has no installed skill id
     const expectedName =
-      feature?.installedSkill._tag === "skill" ? feature.installedSkill.id : sourceDirectory.replace(/([a-z0-9])([A-Z])/g, "$1-$2").toLowerCase();
+      feature?.installedSkill._tag === "skill"
+        ? feature.installedSkill.id
+        : sourceDirectory.replace(/([a-z0-9])([A-Z])/g, "$1-$2").toLowerCase();
 
     expectValidSkillFrontmatter(path.join(skillRoot, sourceDirectory, "SKILL.md"), expectedName);
   });

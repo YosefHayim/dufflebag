@@ -4,6 +4,8 @@
 - **Scope:** `src/payload/config.ts` (SSOT) ← re-exported by `src/core/config.ts`
 - **Related:** [0001 — Zero-dependency hook payload](0001-zero-dependency-hook-payload.md)
 
+> **Live tree:** prefer [0016](0016-capability-layout-replaces-core.md) + root `CONTEXT.md`. Historical path names (`src/core`, `src/payload`, `src/commands`) in this body are not the current layout.
+
 
 > **Current map (0016):** app config SSOT is `src/config/bagConfigSchema.ts`; installed hooks read `src/runtime/config.ts`. The no-drift rule is unchanged.
 

@@ -14,7 +14,7 @@ import { Effect, Schema } from "effect";
 
 import { featureCatalog } from "../catalog/featureCatalog.js";
 import { versionSchema } from "../install/artifactReceipt.js";
-import { type stagedPackageSchema } from "../install/install.js";
+import type { stagedPackageSchema } from "../install/install.js";
 
 export class StagePackageError extends Schema.TaggedError<StagePackageError>()("StagePackageError", {
   issue: Schema.NonEmptyString.annotations({
@@ -100,6 +100,9 @@ const copyFile = (input: { source: string; destination: string }) =>
     yield* fileSystem.writeFile(input.destination, bytes);
   });
 
+// Never stage install junk even when a catalog path is a directory allowlist.
+const STAGED_TREE_SKIP_NAMES = new Set(["node_modules", ".playwright", "out", ".git", ".DS_Store"]);
+
 const copyTree = (input: {
   source: string;
   destination: string;
@@ -125,8 +128,12 @@ const copyTree = (input: {
     yield* fileSystem.makeDirectory(input.destination, { recursive: true });
     const entries = yield* fileSystem.readDirectory(input.source);
 
-    // Mirror every child path into the staged destination tree.
+    // Mirror child paths, skipping local dependency and output trees.
     for (const entry of entries) {
+      if (STAGED_TREE_SKIP_NAMES.has(entry)) {
+        continue;
+      }
+
       yield* copyTree({
         source: path.join(input.source, entry),
         destination: path.join(input.destination, entry),
@@ -134,11 +141,7 @@ const copyTree = (input: {
     }
   });
 
-const stageRuntimeFeature = (input: {
-  packageRoot: string;
-  stagedRoot: string;
-  sourceDirectory: string;
-}) =>
+const stageRuntimeFeature = (input: { packageRoot: string; stagedRoot: string; sourceDirectory: string }) =>
   Effect.gen(function* () {
     const fileSystem = yield* FileSystem.FileSystem;
     const path = yield* Path.Path;

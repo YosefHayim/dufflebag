@@ -24,7 +24,7 @@ src/
 └── scaffoldWorkflows.ts
 ```
 
-`src/core`, `src/commands`, `src/payload`, technical-layer buckets, and mirrored wrapper hierarchies are not part of the target structure.
+`src/core`, `src/commands`, `src/payload`, technical-layer buckets, and mirrored wrapper hierarchies are not part of the target structure. Maintainer tooling lives under root `scripts/` (outer ring); application code never imports it.
 
 ### Capability-owned paths [rule:path.capability-layout]
 

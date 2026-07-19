@@ -157,7 +157,13 @@ const detectInputs = (root: string) =>
         catch: (error) => error,
       }).pipe(Effect.catchAll(() => Effect.succeed(undefined)));
 
-      if (typeof parsed === "object" && parsed !== null && "name" in parsed && typeof parsed.name === "string" && parsed.name.trim() !== "") {
+      if (
+        typeof parsed === "object" &&
+        parsed !== null &&
+        "name" in parsed &&
+        typeof parsed.name === "string" &&
+        parsed.name.trim() !== ""
+      ) {
         return parsed.name;
       }
 

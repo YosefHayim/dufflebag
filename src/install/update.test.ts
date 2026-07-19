@@ -13,7 +13,8 @@ const stagePackage = (root: string) =>
     const path = yield* Path.Path;
     const files = [
       ["runtime/contextGuard/hooks/contextGuard.js", "export {};\n"],
-      ["runtime/autorun/hooks/autorun.js", "export {};\n"],
+      ["runtime/contextGuard/hooks/ctxWatchSpawn.js", "export {};\n"],
+      ["runtime/contextGuard/hooks/ctxLoopCtl.js", "export {};\n"],
       ["skills/autorun/SKILL.md", "---\nname: autorun\n---\nRun @@CTL@@ when armed.\n"],
     ];
 
@@ -66,7 +67,7 @@ layer(NodeContext.layer)("update", (it) => {
         expect(yield* fileSystem.exists(path.join(root, ".continue/config.json"))).toBe(false);
         expect(yield* fileSystem.readFileString(instructionsPath)).toBe("User instructions.\n");
         expect(yield* fileSystem.readFileString(settingsPath)).toContain('"theme": "dark"');
-        expect(yield* fileSystem.readFileString(settingsPath)).not.toContain("SessionStart");
+        expect(yield* fileSystem.readFileString(settingsPath)).toContain("SessionStart");
 
         const receipt = JSON.parse(yield* fileSystem.readFileString(path.join(root, ".claude/dufflebag/receipt.json")));
         expect(receipt.features).toEqual(["context-guard"]);

@@ -5,18 +5,17 @@ import type { PlatformError } from "@effect/platform/Error";
 import { Effect, Either, Option, ParseResult, Predicate, Schema } from "effect";
 import { findNodeAtLocation, type Node, parseTree } from "jsonc-parser";
 
-import { type AgentDefinition, agentCatalog, agentEvidenceSchema, agentIdSchema, classifyAgents } from "../catalog/agentCatalog.js";
+import { type AgentDefinition, agentCatalog, classifyAgents } from "../catalog/agentCatalog.js";
 import {
   featureCatalog,
-  featureIdSchema,
-  featurePlatformSchema,
+  type featureIdSchema,
   installedSkillSchema,
   installedSkillsFor,
   resolveFeatureSelection,
   selectedFeatureIds,
 } from "../catalog/featureCatalog.js";
 import { defaultBagConfig } from "../config/bagConfigSchema.js";
-import { type ConfigFileSnapshot, managedConfigFileSchema, readConfigFile } from "../config/configFile.js";
+import { type ConfigFileSnapshot, readConfigFile } from "../config/configFile.js";
 import {
   type ConfigureRequest,
   hasLegacySettingsCandidate,
@@ -53,11 +52,35 @@ import {
   type ReceiptEntry,
   readArtifactReceiptSnapshot,
   receiptEntrySchema,
-  versionSchema,
 } from "./artifactReceipt.js";
+import {
+  InstallError,
+  type InstallRequest,
+  type InstallResult,
+  installRequestSchema,
+  installResultSchema,
+  receiptPath,
+  runtimePath,
+} from "./installSchemas.js";
 
-export const receiptPath = ".claude/dufflebag/receipt.json";
-export const runtimePath = ".claude/dufflebag/runtime";
+export {
+  agentChoiceSchema,
+  configurationChoiceSchema,
+  InstallError,
+  type InstallRequest,
+  type InstallResult,
+  installationDestinationSchema,
+  installationHostSchema,
+  installationLocationSchema,
+  installRequestSchema,
+  installResultSchema,
+  interactionSchema,
+  platformRequirementSchema,
+  receiptPath,
+  runtimePath,
+  selectedFeatureChoiceSchema,
+  stagedPackageSchema,
+} from "./installSchemas.js";
 
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
@@ -65,185 +88,6 @@ const jsonValueSchema = Schema.parseJson();
 const receiptEqual = (left: ArtifactReceipt, right: ArtifactReceipt): boolean =>
   Schema.encodeSync(artifactReceiptJsonSchema)(left) === Schema.encodeSync(artifactReceiptJsonSchema)(right);
 const applicationOwner: ArtifactOwner = { _tag: "application" };
-
-const hasUnsafeInstallationPathCharacter = (root: string): boolean =>
-  Array.from(root).some((character) => {
-    const codePoint = character.codePointAt(0);
-
-    return (
-      character === '"' ||
-      character === "`" ||
-      character === "$" ||
-      character === "\\" ||
-      codePoint === undefined ||
-      codePoint < 32 ||
-      codePoint === 127
-    );
-  });
-
-const installationRootSchema = absoluteRootSchema.pipe(
-  Schema.filter((root) => !hasUnsafeInstallationPathCharacter(root), {
-    message: () => "Installation roots must not contain shell-expanding or control characters.",
-  }),
-);
-
-export const installationDestinationSchema = Schema.Union(
-  Schema.TaggedStruct("global", {
-    root: installationRootSchema.annotations({
-      description: "Absolute home root that receives one global installation.",
-    }),
-  }),
-  Schema.TaggedStruct("project", {
-    root: installationRootSchema.annotations({
-      description: "Absolute project root that receives one project installation.",
-    }),
-  }),
-).annotations({
-  description: "Exactly one installation scope and its corresponding filesystem root.",
-});
-
-export const installationHostSchema = Schema.Struct({
-  homeRoot: installationRootSchema.annotations({
-    description: "Canonicalizable home root used only for the global installation/config scope.",
-  }),
-}).annotations({
-  description: "Host path evidence captured by the CLI edge before capability reconciliation.",
-});
-
-export const installationLocationSchema = Schema.Struct({
-  destination: installationDestinationSchema,
-  host: installationHostSchema,
-}).pipe(
-  Schema.filter((location) =>
-    location.destination._tag === "global" && location.destination.root !== location.host.homeRoot
-      ? {
-          path: ["host", "homeRoot"],
-          message: "A global installation destination must equal the captured home root.",
-        }
-      : undefined,
-  ),
-);
-
-export const selectedFeatureChoiceSchema = Schema.TaggedStruct("selected", {
-  ids: Schema.Array(featureIdSchema).annotations({
-    description: "Explicit public feature IDs expanded through catalog dependencies.",
-  }),
-});
-
-const featureChoiceSchema = Schema.Union(
-  Schema.TaggedStruct("defaults", {}).annotations({
-    description: "Catalog features selected by default.",
-  }),
-  selectedFeatureChoiceSchema,
-).annotations({
-  description: "Default or explicit feature selection without behavior flags.",
-});
-
-const selectedAgentChoiceSchema = Schema.TaggedStruct("selected", {
-  ids: Schema.Array(agentIdSchema).annotations({
-    description: "Explicit public agent IDs receiving native artifacts.",
-  }),
-});
-
-export const agentChoiceSchema = Schema.Union(
-  selectedAgentChoiceSchema,
-  Schema.TaggedStruct("detected", {
-    evidence: agentEvidenceSchema.annotations({
-      description: "Observed evidence classified against the decoded agent catalog.",
-    }),
-  }),
-).annotations({
-  description: "Explicit or evidence-derived agent selection.",
-});
-
-export const interactionSchema = Schema.Union(Schema.TaggedStruct("interactive", {}), Schema.TaggedStruct("scripted", {})).annotations({
-  description: "Caller interaction mode retained for presentation at the CLI edge.",
-});
-
-export const configurationChoiceSchema = Schema.Union(
-  Schema.TaggedStruct("automatic", {}).annotations({
-    description: "Reuse this scope's config, inherit once for a project, or use schema defaults.",
-  }),
-  Schema.TaggedStruct("selected", {
-    config: managedConfigFileSchema.annotations({
-      description: "Complete validated configuration explicitly selected by the caller.",
-    }),
-  }),
-).annotations({
-  description: "Automatic or explicit complete configuration selection.",
-});
-
-export const stagedPackageSchema = Schema.Struct({
-  root: absoluteRootSchema.annotations({
-    description: "Absolute staged dist root containing only verified skills and runtime files.",
-  }),
-  version: versionSchema.annotations({
-    description: "Semantic package version published in the ownership receipt.",
-  }),
-}).annotations({
-  description: "Verified staged package consumed by installation.",
-});
-
-export const installRequestSchema = Schema.extend(
-  installationLocationSchema,
-  Schema.Struct({
-    stagedPackage: stagedPackageSchema,
-    features: featureChoiceSchema,
-    agents: agentChoiceSchema,
-    interaction: interactionSchema,
-    configuration: configurationChoiceSchema,
-  }),
-).pipe(
-  Schema.annotations({
-    description: "Complete install capability request decoded before filesystem inspection.",
-  }),
-);
-
-export type InstallRequest = Schema.Schema.Type<typeof installRequestSchema>;
-
-export const platformRequirementSchema = Schema.Struct({
-  featureId: featureIdSchema.annotations({
-    description: "Selected feature that declared this host requirement.",
-  }),
-  platform: featurePlatformSchema,
-}).annotations({
-  description: "Catalog-correlated host requirement surfaced without hidden environment probing.",
-});
-
-const installResultFieldsSchema = {
-  scope: Schema.Literal("global", "project").annotations({
-    description: "Scope reconciled by this capability call.",
-  }),
-  features: Schema.Array(featureIdSchema).annotations({
-    description: "Dependency-resolved features in catalog order.",
-  }),
-  agents: Schema.Array(agentIdSchema).annotations({
-    description: "Selected agents in catalog order.",
-  }),
-  platformRequirements: Schema.Array(platformRequirementSchema).annotations({
-    description: "Platform requirement for every dependency-resolved selected feature.",
-  }),
-  interaction: interactionSchema,
-};
-
-export const installResultSchema = Schema.Union(
-  Schema.TaggedStruct("installed", installResultFieldsSchema),
-  Schema.TaggedStruct("unchanged", installResultFieldsSchema),
-).annotations({
-  description: "Applied or already-current installation result.",
-});
-
-export type InstallResult = Schema.Schema.Type<typeof installResultSchema>;
-
-export class InstallError extends Schema.TaggedError<InstallError>()("InstallError", {
-  issue: Schema.NonEmptyString.annotations({
-    description: "Actionable decode, inspection, planning, or application failure.",
-  }),
-}) {
-  get message(): string {
-    return `Cannot install dufflebag: ${this.issue}`;
-  }
-}
 
 const fileSnapshotSchema = Schema.Union(
   Schema.TaggedStruct("missing", {}),
@@ -625,6 +469,19 @@ const installedRuntimeFile = (sourceDirectory: string, filePath: string): string
 const runtimeCommand = (root: string, sourceDirectory: string, sourceEntrypoint: string, path: Path.Path): string =>
   `node "${path.join(root, installedRuntimeFile(sourceDirectory, stagedRuntimeEntrypoint(sourceEntrypoint)))}"`;
 
+const registrationSourceEntrypoint = (
+  feature: (typeof featureCatalog)[number],
+  registration: {
+    entrypoint: { _tag: "featureDefault" } | { _tag: "path"; value: string };
+  },
+): string => {
+  if (feature.runtime._tag !== "hook") {
+    return "";
+  }
+
+  return registration.entrypoint._tag === "path" ? registration.entrypoint.value : feature.runtime.sourceEntrypoint;
+};
+
 const desiredHookGroups = (input: {
   root: string;
   featureIds: ReadonlyArray<string>;
@@ -643,8 +500,9 @@ const desiredHookGroups = (input: {
       return;
     }
 
-    const command = runtimeCommand(input.root, feature.sourceDirectory, feature.runtime.sourceEntrypoint, input.path);
     feature.runtime.registrations.forEach((registration) => {
+      const entrypoint = registrationSourceEntrypoint(feature, registration);
+      const command = runtimeCommand(input.root, feature.sourceDirectory, entrypoint, input.path);
       const group = managedHookGroupSchema.make({
         ...(registration.matcher._tag === "pattern" ? { matcher: registration.matcher.value } : {}),
         hooks: [{ type: "command", command }],
@@ -1185,9 +1043,14 @@ const createRuntimeWrites = (input: {
 
         const directory = path.join(input.request.stagedPackage.root, "runtime", feature.sourceDirectory);
         const files = yield* readStagedFiles(directory);
-        const entrypoint = stagedRuntimeEntrypoint(feature.runtime.sourceEntrypoint);
-        if (!files.some((file) => file.path === entrypoint)) {
-          return yield* new InstallError({ issue: `Staged runtime entrypoint is missing: ${feature.sourceDirectory}/${entrypoint}` });
+        const entrypoints = feature.runtime.registrations.map((registration) =>
+          stagedRuntimeEntrypoint(registrationSourceEntrypoint(feature, registration)),
+        );
+        // Prove every registration entrypoint is present in the staged feature tree.
+        for (const entrypoint of entrypoints) {
+          if (!files.some((file) => file.path === entrypoint)) {
+            return yield* new InstallError({ issue: `Staged runtime entrypoint is missing: ${feature.sourceDirectory}/${entrypoint}` });
+          }
         }
 
         return yield* Effect.forEach(files, (file) =>
@@ -1335,14 +1198,13 @@ const mapFormatError = <Value>(result: Either.Either<Value, unknown>): Either.Ei
   Either.mapLeft(result, toInstallError);
 
 const controlPath = (root: string, path: Path.Path): Either.Either<string, InstallError> => {
-  const feature = featureCatalog.find((candidate) => candidate.id === "autonomous-loop");
+  // Loop control lives under context-guard (ctxLoopCtl), not the skill-only autorun feature.
+  const feature = featureCatalog.find((candidate) => candidate.id === "context-guard");
   if (feature?.runtime._tag !== "hook") {
-    return Either.left(new InstallError({ issue: "The autonomous-loop catalog feature must declare one runtime entrypoint." }));
+    return Either.left(new InstallError({ issue: "The context-guard catalog feature must declare one runtime entrypoint." }));
   }
 
-  return Either.right(
-    path.join(root, installedRuntimeFile(feature.sourceDirectory, stagedRuntimeEntrypoint(feature.runtime.sourceEntrypoint))),
-  );
+  return Either.right(path.join(root, installedRuntimeFile(feature.sourceDirectory, "hooks/ctxLoopCtl.js")));
 };
 
 const createSkillDirectoryWrites = (input: {

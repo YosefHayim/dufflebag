@@ -14,7 +14,8 @@ const stagePackage = (root: string) =>
     const path = yield* Path.Path;
     const files = [
       ["runtime/contextGuard/hooks/contextGuard.js", "export {};\n"],
-      ["runtime/autorun/hooks/autorun.js", "export {};\n"],
+      ["runtime/contextGuard/hooks/ctxWatchSpawn.js", "export {};\n"],
+      ["runtime/contextGuard/hooks/ctxLoopCtl.js", "export {};\n"],
       ["skills/autorun/SKILL.md", "---\nname: autorun\n---\nRun @@CTL@@ when armed.\n"],
     ];
 
@@ -80,7 +81,7 @@ layer(NodeContext.layer)("uninstall", (it) => {
           }),
         );
         expect(yield* fileSystem.exists(path.join(root, ".claude/dufflebag/receipt.json"))).toBe(false);
-        expect(yield* fileSystem.exists(path.join(root, ".claude/dufflebag/runtime/autorun/hooks/autorun.js"))).toBe(false);
+        expect(yield* fileSystem.exists(path.join(root, ".claude/dufflebag/runtime/contextGuard/hooks/ctxWatchSpawn.js"))).toBe(false);
         expect(yield* fileSystem.exists(path.join(root, ".claude/skills/autorun/SKILL.md"))).toBe(false);
         expect(yield* fileSystem.exists(path.join(root, ".cursor/rules/autorun.mdc"))).toBe(false);
       }),
@@ -138,7 +139,7 @@ layer(NodeContext.layer)("uninstall", (it) => {
         const path = yield* Path.Path;
         const root = yield* fileSystem.makeTempDirectoryScoped({ prefix: "dufflebag-uninstall-conflict-root-" });
         const stagedRoot = yield* fileSystem.makeTempDirectoryScoped({ prefix: "dufflebag-uninstall-conflict-stage-" });
-        const runtimePath = path.join(root, ".claude/dufflebag/runtime/autorun/hooks/autorun.js");
+        const runtimePath = path.join(root, ".claude/dufflebag/runtime/contextGuard/hooks/ctxWatchSpawn.js");
         const receiptPath = path.join(root, ".claude/dufflebag/receipt.json");
 
         yield* stagePackage(stagedRoot);

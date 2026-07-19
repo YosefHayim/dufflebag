@@ -96,7 +96,7 @@ layer(NodeContext.layer)("doctor", (it) => {
             title: "Autonomous loop (autorun)",
             platform: "macos+ghostty",
             platformAvailable: false,
-            stagedRuntime: { _tag: "missing", path: "runtime/autorun/hooks/autorun.js" },
+            stagedRuntime: { _tag: "notRequired" },
           },
           {
             id: "deslop",
@@ -122,11 +122,6 @@ layer(NodeContext.layer)("doctor", (it) => {
           { _tag: "receiptScopeMismatch", requestedScope: "project", receiptScope: "global" },
           { _tag: "packageVersionMismatch", installedVersion: "0.9.0", stagedVersion: "1.0.0" },
           { _tag: "unsupportedFeaturePlatform", featureId: "autonomous-loop", platform: "macos+ghostty" },
-          {
-            _tag: "missingStagedRuntime",
-            featureId: "autonomous-loop",
-            path: "runtime/autorun/hooks/autorun.js",
-          },
           { _tag: "detectedAgentNotManaged", agentId: "cursor" },
           { _tag: "managedAgentNotDetected", agentId: "codex" },
         ]);

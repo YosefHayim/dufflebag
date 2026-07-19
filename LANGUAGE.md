@@ -16,7 +16,7 @@ Names-only glossary: human↔agent bridge for the domain vocabulary used in code
 | **surgical install / uninstall** | Receipt-authorized edits that restore prior bytes on uninstall. | "merge", "patch" |
 | **context-guard** | Nudge `/handoff` at the warn fraction and hard-deny new code edits near the cap. | "context manager" |
 | **dedup-guard** | DRY guard that blocks duplicate function/type bodies at write time. | "duplicate checker" |
-| **autonomous-loop / `autorun`** | macOS + Ghostty hands-free compact/resume loop; one skill with `stop`/`exit` verbs. | "auto-compact", "daemon" (alone) |
+| **autonomous-loop / `autorun`** | Skill that arms the context-guard SessionStart daemon for hands-free compact/resume (`stop`/`exit` verbs). Hook runtime is owned by **context-guard**. | "auto-compact", "daemon" (alone) |
 | **speak-response** | Stop hook that speaks Claude prose via macOS `say`. | "TTS", "voice" |
 | **png-to-code** | PNG → measured pixel-perfect code skill (SVG/HTML/CSS) with screenshot-diff harness. | "image-to-code" |
 | **scaffold-workflows** | CLI command that copies the reusable workflow set into another repo. | "scaffold-ci" (legacy name), "ci-setup" |

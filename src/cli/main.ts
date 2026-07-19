@@ -89,7 +89,7 @@ const program = Effect.gen(function* () {
 }).pipe(Effect.provide(NodeContext.layer));
 
 // Exported for tests that exercise request assembly without starting the runtime.
-export { dufflebag, cli, VERSION };
+export { cli, dufflebag, VERSION };
 
 export const isBareArgv = (argv: ReadonlyArray<string>): boolean => argv.length <= 2;
 
