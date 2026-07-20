@@ -23,6 +23,7 @@ import { closeSync, existsSync, openSync, readdirSync, readFileSync, statSync, w
 import path from "node:path";
 
 import { readConfig } from "../../../runtime/config.js";
+import { decideCycleGate } from "../lib/cycleGate.js";
 import { KILL_SWITCH, LOOP_STATE_DIR, loopFile, readInt, remove, writeText } from "../lib/state.js";
 import { readOccupancy, resolveTranscriptForSid, tailLines, windowFor } from "../lib/transcript.js";
 
@@ -32,6 +33,12 @@ const POLL_MS = cfg.autorunPollIntervalSeconds * 1000;
 const IDLE_MS = cfg.autorunIdleThresholdSeconds * 1000;
 const HARD_CAP = cfg.autorunMaxCycleCount;
 const DEFAULT_BUDGET = cfg.autorunDefaultCycleCount;
+
+/** When truthy (`1`/`true`/`yes`), log keystrokes instead of sending them. */
+const isDaemonDryRun = (): boolean => {
+  const raw = (process.env.dufflebagDaemonDryrun ?? "").trim().toLowerCase();
+  return raw === "1" || raw === "true" || raw === "yes";
+};
 
 const STALE_REAP_MS = 600_000; // no transcript growth this long → session gone
 const KEYLOCK_STALE_MS = 30_000; // reclaim a keystroke lock held by a dead daemon
@@ -217,6 +224,11 @@ end tell`;
 
 /** Type literal text (and optionally Return) into the focused window. */
 function typeText(text: string, submit: boolean): boolean {
+  if (isDaemonDryRun()) {
+    // Safe manual verification: locate/raise still run; keystrokes are logged only.
+    console.error(`[dufflebag dry-run] would keystroke ${JSON.stringify(text)}${submit ? " + Return" : ""}`);
+    return true;
+  }
   const lines = [`tell application "System Events" to keystroke "${esc(text)}"`];
   if (submit) {
     lines.push("delay 0.2");
@@ -351,45 +363,43 @@ async function run(sid: string): Promise<void> {
       if (shouldExit(sid, transcript)) break;
       const file = transcript!; // shouldExit guaranteed non-null transcript
 
-      // Disarmed → pure observer.
-      if (!existsSync(loopFile(sid, "armed"))) {
-        warnEnteredAt = null;
-        continue;
-      }
-
-      maybeResyncTitle(sid, file);
+      const armed = existsSync(loopFile(sid, "armed"));
+      if (armed) maybeResyncTitle(sid, file);
 
       const { occupancy, model } = readOccupancy(file);
-      if (!occupancy) continue;
-      const pct = occupancy / windowFor(model);
-
-      if (pct < WARN_PCT) {
-        warnEnteredAt = null;
-        continue;
-      }
-      if (warnEnteredAt === null) warnEnteredAt = now();
-
+      const windowTokens = windowFor(model);
       const cycles = readInt(loopFile(sid, "cycles"), 0);
       const budget = readInt(loopFile(sid, "budget"), DEFAULT_BUDGET);
-      if (cycles >= HARD_CAP) {
-        writeText(loopFile(sid, "halted"), "hard-cap");
-        disarm(sid);
-        warnEnteredAt = null;
-        continue;
-      }
-      if (cycles >= budget) {
-        writeText(loopFile(sid, "halted"), "budget-reached");
-        disarm(sid);
-        warnEnteredAt = null;
-        continue;
-      }
+      const atOrAboveWarn = occupancy !== null && occupancy / windowTokens >= WARN_PCT;
 
-      if (!freshHandoffExists(warnEnteredAt)) continue;
-      if (!turnIsIdle(file)) continue;
-      if (!ghosttyIsFrontmost()) continue;
+      // Fresh-handoff is relative to warn-band entry, not absolute clock time.
+      if (!armed || (occupancy !== null && !atOrAboveWarn)) warnEnteredAt = null;
+      else if (atOrAboveWarn && warnEnteredAt === null) warnEnteredAt = now();
 
-      if (existsSync(loopFile(sid, "done"))) {
-        writeText(loopFile(sid, "halted"), "done");
+      // Skip AppleScript / FS probes when pure counters already refuse or halt.
+      const probeLiveGates = armed && occupancy !== null && atOrAboveWarn && cycles < HARD_CAP && cycles < budget;
+
+      const decision = decideCycleGate({
+        armed,
+        occupancy,
+        windowTokens,
+        warnFraction: WARN_PCT,
+        cycles,
+        budget,
+        hardCap: HARD_CAP,
+        freshHandoff: probeLiveGates && warnEnteredAt !== null && freshHandoffExists(warnEnteredAt),
+        turnIdle: probeLiveGates && turnIsIdle(file),
+        ghosttyFrontmost: probeLiveGates && ghosttyIsFrontmost(),
+        // Window location is re-checked under the keystroke lock inside inject
+        // so we only AXRaise once. Pre-flight assumes located; inject refuses.
+        windowLocated: true,
+        done: probeLiveGates && existsSync(loopFile(sid, "done")),
+      });
+
+      if (decision.kind === "observe" || decision.kind === "wait") continue;
+
+      if (decision.kind === "halt") {
+        writeText(loopFile(sid, "halted"), decision.reason);
         disarm(sid);
         warnEnteredAt = null;
         continue;
