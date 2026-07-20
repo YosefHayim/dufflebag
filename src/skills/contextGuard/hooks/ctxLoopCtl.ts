@@ -21,7 +21,7 @@ import { homedir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { readConfig } from "../../../runtime/config.js";
+import { planDaemonSpawn, readConfig } from "../../../runtime/config.js";
 import { loopFile, readInt, remove, writeText } from "../lib/state.js";
 import { resolveSessionId, sumTokens } from "../lib/transcript.js";
 
@@ -54,7 +54,10 @@ function daemonAlive(sid: string): boolean {
 /** Launch the daemon detached if it isn't already holding the lock. */
 function spawnDaemon(sid: string): void {
   if (daemonAlive(sid)) return;
-  const child = spawn("node", [daemonPath(), sid], { detached: true, stdio: "ignore" });
+  // Same explicit-env contract as SessionStart so re-arm freezes settings, not defaults.
+  const plan = planDaemonSpawn({ sessionId: sid, daemonPath: daemonPath() });
+  writeText(loopFile(sid, "config"), JSON.stringify(plan.configSnapshot));
+  const child = spawn(plan.command, [...plan.args], plan.options);
   child.unref();
 }
 
