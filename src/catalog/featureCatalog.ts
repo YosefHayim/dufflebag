@@ -88,7 +88,16 @@ const registrationEntrypointSchema = Schema.Union(
 });
 
 const hookRegistrationSchema = Schema.Struct({
-  event: Schema.Literal("PreToolUse", "PostToolUse", "UserPromptSubmit", "SessionStart", "Stop").annotations({
+  event: Schema.Literal(
+    "PreToolUse",
+    "PostToolUse",
+    "UserPromptSubmit",
+    "SessionStart",
+    "Stop",
+    "PreCompact",
+    "PostCompact",
+    "SessionEnd",
+  ).annotations({
     description: "Agent lifecycle event that invokes this entrypoint.",
   }),
   matcher: hookMatcherSchema,
@@ -257,6 +266,36 @@ export const featureCatalog = Schema.decodeUnknownSync(featureCatalogSchema, {
           event: "SessionStart",
           matcher: { _tag: "none" },
           entrypoint: { _tag: "path", value: "hooks/ctxWatchSpawn.ts" },
+        },
+        {
+          event: "SessionStart",
+          matcher: { _tag: "none" },
+          entrypoint: { _tag: "path", value: "hooks/idleCompactHook.ts" },
+        },
+        {
+          event: "UserPromptSubmit",
+          matcher: { _tag: "none" },
+          entrypoint: { _tag: "path", value: "hooks/idleCompactHook.ts" },
+        },
+        {
+          event: "Stop",
+          matcher: { _tag: "none" },
+          entrypoint: { _tag: "path", value: "hooks/idleCompactHook.ts" },
+        },
+        {
+          event: "PreCompact",
+          matcher: { _tag: "none" },
+          entrypoint: { _tag: "path", value: "hooks/idleCompactHook.ts" },
+        },
+        {
+          event: "PostCompact",
+          matcher: { _tag: "none" },
+          entrypoint: { _tag: "path", value: "hooks/idleCompactHook.ts" },
+        },
+        {
+          event: "SessionEnd",
+          matcher: { _tag: "none" },
+          entrypoint: { _tag: "path", value: "hooks/idleCompactHook.ts" },
         },
       ],
     },
