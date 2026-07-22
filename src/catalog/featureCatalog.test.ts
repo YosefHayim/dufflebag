@@ -35,6 +35,19 @@ const expectedFeatureIds = [
   "cws-listing-seo",
   "make-a-trailer",
   "web-best-practices",
+  "organized-commits",
+  "finish-and-ship",
+  "preview-and-prove",
+  "reuse-first-audit",
+  "agent-session-auditor",
+  "sync-agent-skills",
+  "env-config-contract",
+  "mcp-oauth-onboarding",
+  "rtl-ui-audit",
+  "deploy-and-prove",
+  "coordinate-worktrees",
+  "capture-workflow",
+  "finish-agent-sessions",
 ];
 
 const expectedSourceDirectories = [
@@ -61,6 +74,19 @@ const expectedSourceDirectories = [
   "cwsListingSeo",
   "makeATrailer",
   "webBestPractices",
+  "organizedCommits",
+  "finishAndShip",
+  "previewAndProve",
+  "reuseFirstAudit",
+  "agentSessionAuditor",
+  "syncAgentSkills",
+  "envConfigContract",
+  "mcpOauthOnboarding",
+  "rtlUiAudit",
+  "deployAndProve",
+  "coordinateWorktrees",
+  "captureWorkflow",
+  "finishAgentSessions",
 ];
 
 const validFixture = [
@@ -168,6 +194,19 @@ describe("featureCatalog", () => {
       ["cws-listing-seo", ["SKILL.md", "REFERENCE.md", "scripts", "templates"]],
       ["make-a-trailer", ["SKILL.md", "reference", "scripts"]],
       ["web-best-practices", ["SKILL.md", "reference", "scripts", "templates"]],
+      ["organized-commits", ["SKILL.md", "REFERENCE.md"]],
+      ["finish-and-ship", ["SKILL.md"]],
+      ["preview-and-prove", ["SKILL.md"]],
+      ["reuse-first-audit", ["SKILL.md"]],
+      ["agent-session-auditor", ["SKILL.md"]],
+      ["sync-agent-skills", ["SKILL.md"]],
+      ["env-config-contract", ["SKILL.md"]],
+      ["mcp-oauth-onboarding", ["SKILL.md"]],
+      ["rtl-ui-audit", ["SKILL.md"]],
+      ["deploy-and-prove", ["SKILL.md"]],
+      ["coordinate-worktrees", ["SKILL.md"]],
+      ["capture-workflow", ["SKILL.md"]],
+      ["finish-agent-sessions", ["SKILL.md"]],
     ]);
   });
 
@@ -262,6 +301,9 @@ describe("featureCatalog", () => {
       ["grill-me-code-style-with-docs", ["grill-me-code-style"]],
       ["grill-with-docs", ["grill-me-code-style"]],
       ["make-a-trailer", ["planpage"]],
+      ["finish-and-ship", ["organized-commits"]],
+      ["coordinate-worktrees", ["organized-commits"]],
+      ["finish-agent-sessions", ["finish-and-ship", "agent-session-auditor"]],
     ]);
     expect(Either.getOrThrowWith(resolveFeatureSelection(["make-a-trailer", "autonomous-loop", "context-guard"]), String)).toEqual([
       "context-guard",
