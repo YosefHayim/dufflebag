@@ -41,6 +41,24 @@ layer(NodeContext.layer)("configFile", (it) => {
     ),
   );
 
+  it.effect("migrates the exact pre-0.13 config shape with idle compaction off", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const fileSystem = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const root = yield* fileSystem.makeTempDirectoryScoped({ prefix: "dufflebag-config-file-012-" });
+        const configPath = path.join(root, "config.json");
+        const { idleAutoCompact: _removed, ...oldConfig } = defaultBagConfig;
+
+        yield* fileSystem.writeFileString(configPath, JSON.stringify(oldConfig));
+
+        const snapshot = yield* readConfigFile(configPath);
+        expect(snapshot._tag).toBe("present");
+        if (snapshot._tag === "present") expect(snapshot.config).toEqual(defaultBagConfig);
+      }),
+    ),
+  );
+
   it.effect("reports the file and missing property for an incomplete config", () =>
     Effect.scoped(
       Effect.gen(function* () {
