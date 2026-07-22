@@ -14,7 +14,7 @@ const stageContextGuardRuntime = (stagedRoot: string) =>
   Effect.gen(function* () {
     const fileSystem = yield* FileSystem.FileSystem;
     const path = yield* Path.Path;
-    const hooks = ["contextGuard.js", "ctxWatchSpawn.js", "ctxLoopCtl.js"] as const;
+    const hooks = ["contextGuard.js", "ctxWatchSpawn.js", "ctxLoopCtl.js", "idleCompactHook.js", "idleCompactWatch.js"] as const;
 
     // Stage every registration entrypoint used by context-guard.
     for (const name of hooks) {
@@ -76,9 +76,49 @@ layer(NodeContext.layer)("install", (it) => {
           ".claude/dufflebag/runtime/contextGuard/hooks/contextGuard.js",
           ".claude/dufflebag/runtime/contextGuard/hooks/ctxLoopCtl.js",
           ".claude/dufflebag/runtime/contextGuard/hooks/ctxWatchSpawn.js",
+          ".claude/dufflebag/runtime/contextGuard/hooks/idleCompactHook.js",
+          ".claude/dufflebag/runtime/contextGuard/hooks/idleCompactWatch.js",
           ".claude/dufflebag/config.json",
           ".claude/settings.json",
         ]);
+      }),
+    ),
+  );
+
+  it.effect("installs native hooks for detected Codex and Grok without replacing user hooks", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const fileSystem = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const root = yield* fileSystem.makeTempDirectoryScoped({ prefix: "dufflebag-native-hooks-root-" });
+        const stagedRoot = yield* fileSystem.makeTempDirectoryScoped({ prefix: "dufflebag-native-hooks-stage-" });
+        const codexPath = path.join(root, ".codex/hooks.json");
+
+        yield* stageContextGuardRuntime(stagedRoot);
+        yield* fileSystem.makeDirectory(path.dirname(codexPath), { recursive: true });
+        yield* fileSystem.writeFileString(
+          codexPath,
+          '{\n  "keep": true,\n  "hooks": { "Stop": [{ "hooks": [{ "type": "command", "command": "user-stop" }] }] }\n}\n',
+        );
+
+        yield* install({
+          ...installRequest({ root, stagedRoot }),
+          agents: { _tag: "selected", ids: ["codex", "grok"] },
+          configuration: { _tag: "selected", config: { ...defaultBagConfig, idleAutoCompact: "1m" } },
+        });
+
+        const codex = yield* fileSystem.readFileString(codexPath);
+        expect(codex).toContain('"keep": true');
+        expect(codex).toContain("user-stop");
+        expect(codex).toContain("DUFFLEBAG_AGENT_ID=codex");
+        expect(codex).toContain("dufflebagIdleAutoCompact=1m");
+
+        const grok = yield* fileSystem.readFileString(path.join(root, ".grok/hooks/dufflebag.json"));
+        expect(grok).toContain("DUFFLEBAG_AGENT_ID=grok");
+        expect(grok).toContain("idleCompactHook.js");
+
+        const claudeExists = yield* fileSystem.exists(path.join(root, ".claude/settings.json"));
+        expect(claudeExists).toBe(false);
       }),
     ),
   );
@@ -169,6 +209,7 @@ layer(NodeContext.layer)("install", (it) => {
           ["runtime/contextGuard/hooks/contextGuard.js", "export {};\n"],
           ["runtime/contextGuard/hooks/ctxWatchSpawn.js", "export {};\n"],
           ["runtime/contextGuard/hooks/ctxLoopCtl.js", "export {};\n"],
+          ["runtime/contextGuard/hooks/idleCompactHook.js", "export {};\n"],
           ["skills/autorun/SKILL.md", "---\nname: autorun\n---\nRun @@CTL@@ when the loop is armed.\n"],
         ];
 
@@ -220,6 +261,7 @@ layer(NodeContext.layer)("install", (it) => {
           ["runtime/contextGuard/hooks/contextGuard.js", "export {};\n"],
           ["runtime/contextGuard/hooks/ctxWatchSpawn.js", "export {};\n"],
           ["runtime/contextGuard/hooks/ctxLoopCtl.js", "export {};\n"],
+          ["runtime/contextGuard/hooks/idleCompactHook.js", "export {};\n"],
           ["skills/autorun/SKILL.md", "---\nname: autorun\n---\nRun @@CTL@@ when the loop is armed.\n"],
         ];
 
