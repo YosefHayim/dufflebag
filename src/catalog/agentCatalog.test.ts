@@ -17,54 +17,70 @@ const expectedAgents = [
     displayName: "Claude Code",
     detection: { homePaths: [".claude"], absolutePaths: [], commands: ["claude"] },
     target: { _tag: "skillDirectory", path: ".claude/skills" },
+    nativeHooks: { _tag: "claudeJson", configPath: ".claude/settings.json", compactCommand: "/compact" },
   },
   {
     id: "kiro",
     displayName: "Kiro",
     detection: { homePaths: [".kiro"], absolutePaths: [], commands: ["kiro"] },
     target: { _tag: "skillDirectory", path: ".kiro/skills" },
+    nativeHooks: { _tag: "unsupported" },
   },
   {
     id: "kimi-code",
     displayName: "Kimi Code CLI",
     detection: { homePaths: [".kimi-code"], absolutePaths: [], commands: ["kimi"] },
     target: { _tag: "skillDirectory", path: ".kimi-code/skills" },
+    nativeHooks: { _tag: "unsupported" },
   },
   {
     id: "devin",
     displayName: "Devin CLI",
     detection: { homePaths: [".devin", ".config/devin"], absolutePaths: [], commands: ["devin"] },
     target: { _tag: "skillDirectory", path: ".devin/skills" },
+    nativeHooks: { _tag: "unsupported" },
   },
   {
     id: "cursor",
     displayName: "Cursor",
     detection: { homePaths: [".cursor"], absolutePaths: ["/Applications/Cursor.app"], commands: ["cursor"] },
     target: { _tag: "ruleFile", directory: ".cursor/rules", extension: ".mdc" },
+    nativeHooks: { _tag: "unsupported" },
   },
   {
     id: "windsurf",
     displayName: "Windsurf",
     detection: { homePaths: [".windsurf"], absolutePaths: ["/Applications/Windsurf.app"], commands: ["windsurf"] },
     target: { _tag: "instructionFile", path: ".windsurfrules" },
+    nativeHooks: { _tag: "unsupported" },
   },
   {
     id: "cline",
     displayName: "Cline",
     detection: { homePaths: [".cline"], absolutePaths: [], commands: ["cline"] },
     target: { _tag: "instructionFile", path: ".clinerules" },
+    nativeHooks: { _tag: "unsupported" },
   },
   {
     id: "codex",
     displayName: "Codex",
     detection: { homePaths: [".codex"], absolutePaths: [], commands: ["codex"] },
     target: { _tag: "instructionFile", path: "AGENTS.md" },
+    nativeHooks: { _tag: "codexJson", configPath: ".codex/hooks.json", compactCommand: "/compact" },
+  },
+  {
+    id: "grok",
+    displayName: "Grok",
+    detection: { homePaths: [".grok"], absolutePaths: [], commands: ["grok"] },
+    target: { _tag: "skillDirectory", path: ".grok/skills" },
+    nativeHooks: { _tag: "grokJson", configPath: ".grok/hooks/dufflebag.json", compactCommand: "/compact" },
   },
   {
     id: "gemini",
     displayName: "Gemini CLI",
     detection: { homePaths: [], absolutePaths: [], commands: ["gemini"] },
     target: { _tag: "instructionFile", path: "GEMINI.md" },
+    nativeHooks: { _tag: "unsupported" },
   },
   {
     id: "aider",
@@ -76,6 +92,7 @@ const expectedAgents = [
       configPath: ".aider.conf.yml",
       referenceFormat: "yamlReadArray",
     },
+    nativeHooks: { _tag: "unsupported" },
   },
   {
     id: "continue",
@@ -87,18 +104,21 @@ const expectedAgents = [
       configPath: ".continue/config.json",
       referenceFormat: "jsonRulesArray",
     },
+    nativeHooks: { _tag: "unsupported" },
   },
   {
     id: "cody",
     displayName: "Cody",
     detection: { homePaths: [".cody"], absolutePaths: [], commands: [] },
     target: { _tag: "instructionFile", path: ".cody/instructions.md" },
+    nativeHooks: { _tag: "unsupported" },
   },
   {
     id: "junie",
     displayName: "Junie",
     detection: { homePaths: [".junie"], absolutePaths: [], commands: [] },
     target: { _tag: "instructionFile", path: ".junie/guidelines.md" },
+    nativeHooks: { _tag: "unsupported" },
   },
 ];
 
@@ -107,6 +127,7 @@ const validAgentFixture = {
   displayName: "Example Agent",
   detection: { homePaths: [".example"], absolutePaths: ["/Applications/Example.app"], commands: ["example"] },
   target: { _tag: "instructionFile", path: "EXAMPLE.md" },
+  nativeHooks: { _tag: "unsupported" },
 };
 
 const decodeCatalog = (input: unknown) =>
@@ -132,7 +153,7 @@ const decodeEvidence = (input: unknown) =>
 describe("agentCatalog", () => {
   it("decodes the exact approved agents in stable display order", () => {
     expect(agentCatalog).toEqual(expectedAgents);
-    expect(agentCatalog).toHaveLength(13);
+    expect(agentCatalog).toHaveLength(14);
   });
 
   it("uses every target format and keeps IDs unique", () => {
@@ -142,7 +163,7 @@ describe("agentCatalog", () => {
       ruleFile: agentCatalog.filter((agent) => agent.target._tag === "ruleFile").length,
       instructionFile: agentCatalog.filter((agent) => agent.target._tag === "instructionFile").length,
       configReference: agentCatalog.filter((agent) => agent.target._tag === "configReference").length,
-    }).toEqual({ skillDirectory: 4, ruleFile: 1, instructionFile: 6, configReference: 2 });
+    }).toEqual({ skillDirectory: 5, ruleFile: 1, instructionFile: 6, configReference: 2 });
   });
 
   it("keeps human-facing display names in the catalog", () => {
@@ -155,6 +176,7 @@ describe("agentCatalog", () => {
       "Windsurf",
       "Cline",
       "Codex",
+      "Grok",
       "Gemini CLI",
       "Aider",
       "Continue",
@@ -166,6 +188,19 @@ describe("agentCatalog", () => {
   it("finds agents with Option and represents absence", () => {
     expect(Option.map(findAgent("kimi-code"), (agent) => agent.displayName)).toEqual(Option.some("Kimi Code CLI"));
     expect(findAgent("missing-agent")).toEqual(Option.none());
+  });
+
+  it("declares verified native hook adapters without inferring support from detection", () => {
+    expect(Option.map(findAgent("claude-code"), (agent) => agent.nativeHooks)).toEqual(
+      Option.some({ _tag: "claudeJson", configPath: ".claude/settings.json", compactCommand: "/compact" }),
+    );
+    expect(Option.map(findAgent("codex"), (agent) => agent.nativeHooks)).toEqual(
+      Option.some({ _tag: "codexJson", configPath: ".codex/hooks.json", compactCommand: "/compact" }),
+    );
+    expect(Option.map(findAgent("grok"), (agent) => agent.nativeHooks)).toEqual(
+      Option.some({ _tag: "grokJson", configPath: ".grok/hooks/dufflebag.json", compactCommand: "/compact" }),
+    );
+    expect(Option.map(findAgent("kimi-code"), (agent) => agent.nativeHooks)).toEqual(Option.some({ _tag: "unsupported" }));
   });
 
   it("stores Aider and Continue behavior in referenceFormat data", () => {
@@ -254,13 +289,14 @@ describe("classifyAgents", () => {
     const classified = classifyAgents({
       homePaths: [".continue", ".claude"],
       absolutePaths: ["/Applications/Windsurf.app"],
-      commands: ["gemini", "cursor"],
+      commands: ["gemini", "cursor", "grok"],
     });
 
     expect(classified.filter((agent) => agent.installed).map((agent) => agent.id)).toEqual([
       "claude-code",
       "cursor",
       "windsurf",
+      "grok",
       "gemini",
       "continue",
     ]);
@@ -270,7 +306,7 @@ describe("classifyAgents", () => {
   it("returns every agent as not installed for empty evidence", () => {
     const classified = classifyAgents({ homePaths: [], absolutePaths: [], commands: [] });
 
-    expect(classified).toHaveLength(13);
+    expect(classified).toHaveLength(14);
     expect(classified.every((agent) => !agent.installed)).toBe(true);
   });
 

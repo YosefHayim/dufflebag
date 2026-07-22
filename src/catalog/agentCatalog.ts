@@ -137,6 +137,26 @@ export const agentTargetSchema = Schema.Union(
 
 export type AgentTarget = Schema.Schema.Type<typeof agentTargetSchema>;
 
+export const nativeHookAdapterSchema = Schema.Union(
+  Schema.TaggedStruct("unsupported", {}),
+  Schema.TaggedStruct("claudeJson", {
+    configPath: targetPathSchema,
+    compactCommand: Schema.Literal("/compact"),
+  }),
+  Schema.TaggedStruct("codexJson", {
+    configPath: targetPathSchema,
+    compactCommand: Schema.Literal("/compact"),
+  }),
+  Schema.TaggedStruct("grokJson", {
+    configPath: targetPathSchema,
+    compactCommand: Schema.Literal("/compact"),
+  }),
+).annotations({
+  description: "Verified native lifecycle-hook format or an explicit unsupported result.",
+});
+
+export type NativeHookAdapter = Schema.Schema.Type<typeof nativeHookAdapterSchema>;
+
 export const agentDefinitionSchema = Schema.Struct({
   id: agentIdSchema.annotations({
     description: "Stable public agent ID.",
@@ -150,6 +170,7 @@ export const agentDefinitionSchema = Schema.Struct({
   target: agentTargetSchema.annotations({
     description: "Single native output target selected by its format tag.",
   }),
+  nativeHooks: nativeHookAdapterSchema,
 });
 
 export type AgentDefinition = Schema.Schema.Type<typeof agentDefinitionSchema>;
@@ -173,54 +194,70 @@ export const agentCatalog = Schema.decodeUnknownSync(agentCatalogSchema, {
     displayName: "Claude Code",
     detection: { homePaths: [".claude"], absolutePaths: [], commands: ["claude"] },
     target: { _tag: "skillDirectory", path: ".claude/skills" },
+    nativeHooks: { _tag: "claudeJson", configPath: ".claude/settings.json", compactCommand: "/compact" },
   },
   {
     id: "kiro",
     displayName: "Kiro",
     detection: { homePaths: [".kiro"], absolutePaths: [], commands: ["kiro"] },
     target: { _tag: "skillDirectory", path: ".kiro/skills" },
+    nativeHooks: { _tag: "unsupported" },
   },
   {
     id: "kimi-code",
     displayName: "Kimi Code CLI",
     detection: { homePaths: [".kimi-code"], absolutePaths: [], commands: ["kimi"] },
     target: { _tag: "skillDirectory", path: ".kimi-code/skills" },
+    nativeHooks: { _tag: "unsupported" },
   },
   {
     id: "devin",
     displayName: "Devin CLI",
     detection: { homePaths: [".devin", ".config/devin"], absolutePaths: [], commands: ["devin"] },
     target: { _tag: "skillDirectory", path: ".devin/skills" },
+    nativeHooks: { _tag: "unsupported" },
   },
   {
     id: "cursor",
     displayName: "Cursor",
     detection: { homePaths: [".cursor"], absolutePaths: ["/Applications/Cursor.app"], commands: ["cursor"] },
     target: { _tag: "ruleFile", directory: ".cursor/rules", extension: ".mdc" },
+    nativeHooks: { _tag: "unsupported" },
   },
   {
     id: "windsurf",
     displayName: "Windsurf",
     detection: { homePaths: [".windsurf"], absolutePaths: ["/Applications/Windsurf.app"], commands: ["windsurf"] },
     target: { _tag: "instructionFile", path: ".windsurfrules" },
+    nativeHooks: { _tag: "unsupported" },
   },
   {
     id: "cline",
     displayName: "Cline",
     detection: { homePaths: [".cline"], absolutePaths: [], commands: ["cline"] },
     target: { _tag: "instructionFile", path: ".clinerules" },
+    nativeHooks: { _tag: "unsupported" },
   },
   {
     id: "codex",
     displayName: "Codex",
     detection: { homePaths: [".codex"], absolutePaths: [], commands: ["codex"] },
     target: { _tag: "instructionFile", path: "AGENTS.md" },
+    nativeHooks: { _tag: "codexJson", configPath: ".codex/hooks.json", compactCommand: "/compact" },
+  },
+  {
+    id: "grok",
+    displayName: "Grok",
+    detection: { homePaths: [".grok"], absolutePaths: [], commands: ["grok"] },
+    target: { _tag: "skillDirectory", path: ".grok/skills" },
+    nativeHooks: { _tag: "grokJson", configPath: ".grok/hooks/dufflebag.json", compactCommand: "/compact" },
   },
   {
     id: "gemini",
     displayName: "Gemini CLI",
     detection: { homePaths: [], absolutePaths: [], commands: ["gemini"] },
     target: { _tag: "instructionFile", path: "GEMINI.md" },
+    nativeHooks: { _tag: "unsupported" },
   },
   {
     id: "aider",
@@ -232,6 +269,7 @@ export const agentCatalog = Schema.decodeUnknownSync(agentCatalogSchema, {
       configPath: ".aider.conf.yml",
       referenceFormat: "yamlReadArray",
     },
+    nativeHooks: { _tag: "unsupported" },
   },
   {
     id: "continue",
@@ -243,18 +281,21 @@ export const agentCatalog = Schema.decodeUnknownSync(agentCatalogSchema, {
       configPath: ".continue/config.json",
       referenceFormat: "jsonRulesArray",
     },
+    nativeHooks: { _tag: "unsupported" },
   },
   {
     id: "cody",
     displayName: "Cody",
     detection: { homePaths: [".cody"], absolutePaths: [], commands: [] },
     target: { _tag: "instructionFile", path: ".cody/instructions.md" },
+    nativeHooks: { _tag: "unsupported" },
   },
   {
     id: "junie",
     displayName: "Junie",
     detection: { homePaths: [".junie"], absolutePaths: [], commands: [] },
     target: { _tag: "instructionFile", path: ".junie/guidelines.md" },
+    nativeHooks: { _tag: "unsupported" },
   },
 ]);
 
