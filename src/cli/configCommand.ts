@@ -111,6 +111,7 @@ const CONFIG_LABELS: Record<keyof typeof defaultBagConfig, string> = {
   autorunMaxCycleCount: "autorun max cycles",
   autorunPollIntervalSeconds: "autorun poll interval (s)",
   autorunIdleThresholdSeconds: "autorun idle threshold (s)",
+  idleAutoCompact: "idle auto-compact (off|duration)",
   speechVoice: "speech voice",
   speechWordsPerMinute: "speech rate (wpm)",
   dedupEnforcement: "dedup enforcement (deny|warn|off)",
