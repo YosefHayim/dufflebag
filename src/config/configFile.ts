@@ -1,6 +1,6 @@
 import { FileSystem } from "@effect/platform";
 import { PlatformError } from "@effect/platform/Error";
-import { Effect, Either, Option, ParseResult, Schema } from "effect";
+import { Effect, Either, Option, ParseResult, Predicate, Schema } from "effect";
 
 import { bagConfigSchema } from "./bagConfigSchema.js";
 import { findDuplicateJsonProperty } from "./jsonDocument.js";
@@ -48,6 +48,12 @@ const decodeJson = Schema.decodeUnknownEither(Schema.parseJson(), {
 const decodeManagedConfigFile = Schema.decodeUnknownEither(managedConfigFileSchema, {
   onExcessProperty: "error",
 });
+
+const decodeManagedConfigValue = (value: unknown) => {
+  const current = decodeManagedConfigFile(value);
+  if (Either.isRight(current) || !Predicate.isRecord(value) || Object.hasOwn(value, "idleAutoCompact")) return current;
+  return decodeManagedConfigFile({ ...value, idleAutoCompact: "off" });
+};
 
 const formatParseError = (error: ParseResult.ParseError): string => ParseResult.TreeFormatter.formatErrorSync(error);
 
@@ -112,7 +118,7 @@ const decodeConfigFileBytes = (input: {
 
   // 4. Decode the complete managed configuration shape and invariants.
   return Either.mapLeft(
-    decodeManagedConfigFile(parsed.right),
+    decodeManagedConfigValue(parsed.right),
     (error) =>
       new ConfigFileSchemaError({
         configPath: input.configPath,

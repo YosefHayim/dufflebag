@@ -1,6 +1,6 @@
 {
   "name": "ys-dufflebag",
-  "version": "0.13.0",
+  "version": "0.13.1",
   "description": "TypeScript CLI that installs and surgically updates coding-agent skills, native hooks, managed configuration, and reusable workflows for Claude Code, Codex, Grok, Kimi, Kiro, and more.",
   "type": "module",
   "bin": {
