@@ -42,7 +42,7 @@ export const doctorCommand = Command.make("doctor", {}, () =>
         `agents: ${
           report.agents
             .filter((agent) => agent.detected || agent.managed)
-            .map((agent) => `${agent.displayName}${agent.managed ? "*" : ""}`)
+            .map((agent) => `${agent.displayName}${agent.managed ? "*" : ""} [idle hooks: ${agent.nativeHookSupport}]`)
             .join(", ") || "none detected"
         }`,
       );

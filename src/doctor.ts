@@ -134,6 +134,9 @@ const doctorAgentSchema = Schema.Struct({
   managed: Schema.Boolean.annotations({
     description: "Whether the strict receipt owns an artifact for this agent.",
   }),
+  nativeHookSupport: Schema.Literal("verified", "unsupported").annotations({
+    description: "Whether this agent has a verified native lifecycle-hook adapter.",
+  }),
 }).annotations({
   description: "Receipt ownership compared with non-authoritative detection evidence.",
 });
@@ -321,6 +324,7 @@ const createAgentDiagnostics = (evidence: AgentEvidence, receipt: ArtifactReceip
     displayName: agent.displayName,
     detected: detectedAgents.get(agent.id) === true,
     managed: managedIds.has(agent.id),
+    nativeHookSupport: agent.nativeHooks._tag === "unsupported" ? "unsupported" : "verified",
   }));
 };
 

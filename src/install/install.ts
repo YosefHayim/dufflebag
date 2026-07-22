@@ -390,51 +390,52 @@ const validateCurrentSettingsOwnership = (
     : Either.left(new InstallError({ issue: `Receipted settings value ${conflict.pointer} changed after installation.` }));
 };
 
-const settingsOperationSchema = artifactOperationSchema.pipe(
-  Schema.filter((operation) => {
-    const identityIssues = [
-      ...(operation.artifact.path === settingsPath
-        ? []
-        : [{ path: ["artifact", "path"], message: `Settings operations must target ${settingsPath}.` }]),
-      ...(operation.artifact.kind._tag === "settings"
-        ? []
-        : [{ path: ["artifact", "kind"], message: "Settings operations must use the settings artifact kind." }]),
-      ...(operation.artifact.owner._tag === "application"
-        ? []
-        : [{ path: ["artifact", "owner"], message: "Settings operations must use the application owner." }]),
-    ];
-    if (identityIssues.length > 0 || operation._tag === "remove") {
-      return identityIssues;
-    }
-
-    const decoded = decodeSettings({ _tag: "file", bytes: operation.bytes });
-    if (Either.isLeft(decoded)) {
-      return [...identityIssues, { path: ["bytes"], message: decoded.left.issue }];
-    }
-
-    if (operation._tag !== "write" || operation.artifact.ownership._tag !== "jsonValues") {
-      return identityIssues;
-    }
-
-    return [
-      ...identityIssues,
-      ...operation.artifact.ownership.values.flatMap((value, index) =>
-        installedJsonValueMatches(value, settingsValueAtPointer(decoded.right.document, value.pointer))
+const settingsOperationSchema = (artifactPath: string) =>
+  artifactOperationSchema.pipe(
+    Schema.filter((operation) => {
+      const identityIssues = [
+        ...(operation.artifact.path === artifactPath
           ? []
-          : [
-              {
-                path: ["artifact", "ownership", "values", index],
-                message: `Settings operation bytes do not match owned pointer ${value.pointer}.`,
-              },
-            ],
-      ),
-    ];
-  }),
-);
+          : [{ path: ["artifact", "path"], message: `Settings operations must target ${artifactPath}.` }]),
+        ...(operation.artifact.kind._tag === "settings"
+          ? []
+          : [{ path: ["artifact", "kind"], message: "Settings operations must use the settings artifact kind." }]),
+        ...(operation.artifact.owner._tag === "application"
+          ? []
+          : [{ path: ["artifact", "owner"], message: "Settings operations must use the application owner." }]),
+      ];
+      if (identityIssues.length > 0 || operation._tag === "remove") {
+        return identityIssues;
+      }
 
-const validateSettingsOperation = (input: unknown): Either.Either<ArtifactOperation, InstallError> =>
+      const decoded = decodeSettings({ _tag: "file", bytes: operation.bytes });
+      if (Either.isLeft(decoded)) {
+        return [...identityIssues, { path: ["bytes"], message: decoded.left.issue }];
+      }
+
+      if (operation._tag !== "write" || operation.artifact.ownership._tag !== "jsonValues") {
+        return identityIssues;
+      }
+
+      return [
+        ...identityIssues,
+        ...operation.artifact.ownership.values.flatMap((value, index) =>
+          installedJsonValueMatches(value, settingsValueAtPointer(decoded.right.document, value.pointer))
+            ? []
+            : [
+                {
+                  path: ["artifact", "ownership", "values", index],
+                  message: `Settings operation bytes do not match owned pointer ${value.pointer}.`,
+                },
+              ],
+        ),
+      ];
+    }),
+  );
+
+const validateSettingsOperation = (input: unknown, artifactPath = settingsPath): Either.Either<ArtifactOperation, InstallError> =>
   Either.mapLeft(
-    Schema.validateEither(settingsOperationSchema, {
+    Schema.validateEither(settingsOperationSchema(artifactPath), {
       onExcessProperty: "error",
     })(input),
     (error) => new InstallError({ issue: `Generated settings operation is invalid: ${formatParseError(error)}` }),
@@ -486,11 +487,14 @@ const desiredHookGroups = (input: {
   root: string;
   featureIds: ReadonlyArray<string>;
   selectedAgents: ReadonlyArray<AgentDefinition>;
+  agent: AgentDefinition;
+  idleAutoCompact: string;
   path: Path.Path;
 }) => {
-  if (!input.selectedAgents.some((agent) => agent.id === "claude-code")) {
+  if (!input.selectedAgents.some((agent) => agent.id === input.agent.id) || input.agent.nativeHooks._tag === "unsupported") {
     return new Map<string, ReadonlyArray<ManagedHookGroup>>();
   }
+  const nativeHooks = input.agent.nativeHooks;
 
   const selectedIds = new Set(input.featureIds);
   const groups = new Map<string, ReadonlyArray<ManagedHookGroup>>();
@@ -502,7 +506,12 @@ const desiredHookGroups = (input: {
 
     feature.runtime.registrations.forEach((registration) => {
       const entrypoint = registrationSourceEntrypoint(feature, registration);
-      const command = runtimeCommand(input.root, feature.sourceDirectory, entrypoint, input.path);
+      const executable = input.agent.detection.commands[0] ?? input.agent.id;
+      const runtime = runtimeCommand(input.root, feature.sourceDirectory, entrypoint, input.path);
+      const command =
+        `DUFFLEBAG_AGENT_ID=${input.agent.id} DUFFLEBAG_AGENT_COMMAND=${executable} ` +
+        `DUFFLEBAG_COMPACT_COMMAND=${nativeHooks.compactCommand} ` +
+        `dufflebagIdleAutoCompact=${input.idleAutoCompact} ${runtime}`;
       const group = managedHookGroupSchema.make({
         ...(registration.matcher._tag === "pattern" ? { matcher: registration.matcher.value } : {}),
         hooks: [{ type: "command", command }],
@@ -814,16 +823,18 @@ const retainedDeletedSettingsValues = (
 };
 
 const planSettings = (input: {
+  artifactPath?: string;
   snapshot: FileSnapshot;
   decoded: DecodedSettings;
   previousArtifact: ReceiptEntry | undefined;
   desiredGroups: ReadonlyMap<string, ReadonlyArray<ManagedHookGroup>>;
   legacySettings: LegacySettingsPlan;
 }): Either.Either<ArtifactOperation | undefined, InstallError> => {
+  const artifactPath = input.artifactPath ?? settingsPath;
   const previousOwnership = input.previousArtifact?.ownership._tag === "jsonValues" ? input.previousArtifact.ownership : undefined;
   if (
     input.previousArtifact !== undefined &&
-    (input.previousArtifact.path !== settingsPath ||
+    (input.previousArtifact.path !== artifactPath ||
       input.previousArtifact.kind._tag !== "settings" ||
       input.previousArtifact.owner._tag !== "application" ||
       previousOwnership === undefined)
@@ -962,7 +973,7 @@ const planSettings = (input: {
           expectedCurrent: expectedCurrent(input.snapshot),
         };
 
-    return validateSettingsOperation(operation);
+    return validateSettingsOperation(operation, artifactPath);
   }
 
   const containerCandidates = [...(previousOwnership?.createdContainers ?? []), ...(createdHooksContainer ? ["/hooks"] : [])];
@@ -981,7 +992,7 @@ const planSettings = (input: {
     _tag: "write",
     artifact: {
       owner: applicationOwner,
-      path: settingsPath,
+      path: artifactPath,
       kind: { _tag: "settings" },
       ownership,
     },
@@ -999,7 +1010,7 @@ const planSettings = (input: {
     return Either.left(new InstallError({ issue: `Generated settings ownership drifted at ${mismatchedValue.pointer}.` }));
   }
 
-  return validateSettingsOperation(operation);
+  return validateSettingsOperation(operation, artifactPath);
 };
 
 const readStagedFiles = (directory: string) =>
@@ -1644,7 +1655,7 @@ const createStaleRestorations = (input: {
   root: string;
   previousReceipt: ArtifactReceipt | undefined;
   desiredWrites: ReadonlyArray<ArtifactOperation>;
-  settingsPlan: ArtifactOperation | undefined;
+  settingsPlans: ReadonlyArray<ArtifactOperation>;
 }) =>
   Effect.gen(function* () {
     if (input.previousReceipt === undefined) {
@@ -1652,15 +1663,14 @@ const createStaleRestorations = (input: {
     }
 
     const desiredPaths = new Set(input.desiredWrites.map((write) => write.artifact.path));
-    const plannedSettingsRestoration =
-      input.settingsPlan !== undefined && input.settingsPlan._tag !== "write" ? input.settingsPlan : undefined;
-    const preplannedPaths = new Set(plannedSettingsRestoration === undefined ? [] : [plannedSettingsRestoration.artifact.path]);
+    const plannedSettingsRestorations = input.settingsPlans.filter((operation) => operation._tag !== "write");
+    const preplannedPaths = new Set(plannedSettingsRestorations.map((operation) => operation.artifact.path));
     const staleArtifacts = input.previousReceipt.artifacts.filter(
       (artifact) => !desiredPaths.has(artifact.path) && !preplannedPaths.has(artifact.path),
     );
     const restorations = yield* materializeArtifactRestorations({ root: input.root, artifacts: staleArtifacts });
 
-    return [...(plannedSettingsRestoration === undefined ? [] : [plannedSettingsRestoration]), ...restorations];
+    return [...plannedSettingsRestorations, ...restorations];
   });
 
 const receiptTarget = (): ReceiptTarget => ({
@@ -1821,23 +1831,47 @@ export const reconcileInstallation = (input: unknown) =>
         expectedCurrent: expectedCurrent(configSnapshotFile(configSnapshot)),
       }),
     );
-    const hookGroups = desiredHookGroups({ root: request.destination.root, featureIds, selectedAgents, path });
-    const settingsPlan = yield* effectFromEither(
-      planSettings({
-        snapshot: settingsSnapshot,
-        decoded: settings,
-        previousArtifact: previousReceiptArtifact(previousReceipt, settingsPath),
-        desiredGroups: hookGroups,
-        legacySettings: managedConfigPlan.legacySettings,
+    const claude = agentCatalog.find((agent) => agent.id === "claude-code");
+    if (claude === undefined) {
+      return yield* new InstallError({ issue: "Claude Code catalog entry is missing." });
+    }
+    const selectedNativeAgents = selectedAgents.filter((agent) => agent.nativeHooks._tag !== "unsupported");
+    const hookConfigAgents = [claude, ...selectedNativeAgents.filter((agent) => agent.id !== claude.id)];
+    const settingsPlans = yield* Effect.forEach(hookConfigAgents, (agent) =>
+      Effect.gen(function* () {
+        if (agent.nativeHooks._tag === "unsupported") return undefined;
+        const artifactPath = agent.nativeHooks.configPath;
+        const snapshot =
+          artifactPath === settingsPath ? settingsSnapshot : yield* readFileSnapshot(path.join(request.destination.root, artifactPath));
+        const decoded = artifactPath === settingsPath ? settings : yield* effectFromEither(decodeSettings(snapshot));
+        const desiredGroups = desiredHookGroups({
+          root: request.destination.root,
+          featureIds,
+          selectedAgents,
+          agent,
+          idleAutoCompact: managedConfigPlan.config.idleAutoCompact,
+          path,
+        });
+        return yield* effectFromEither(
+          planSettings({
+            artifactPath,
+            snapshot,
+            decoded,
+            previousArtifact: previousReceiptArtifact(previousReceipt, artifactPath),
+            desiredGroups,
+            legacySettings: artifactPath === settingsPath ? managedConfigPlan.legacySettings : { _tag: "none" },
+          }),
+        );
       }),
     );
-    const settingsWrite = settingsPlan?._tag === "write" ? settingsPlan : undefined;
-    const writes = [...runtimeWrites, ...agentWrites, managedConfigWrite, ...(settingsWrite === undefined ? [] : [settingsWrite])];
+    const concreteSettingsPlans = settingsPlans.filter((plan): plan is ArtifactOperation => plan !== undefined);
+    const settingsWrites = concreteSettingsPlans.filter((plan) => plan._tag === "write");
+    const writes = [...runtimeWrites, ...agentWrites, managedConfigWrite, ...settingsWrites];
     const restorations = yield* createStaleRestorations({
       root: request.destination.root,
       previousReceipt,
       desiredWrites: writes,
-      settingsPlan,
+      settingsPlans: concreteSettingsPlans,
     });
     const receipt: ArtifactReceipt = {
       version: request.stagedPackage.version,

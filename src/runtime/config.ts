@@ -15,6 +15,7 @@ export type BagConfig = {
   readonly autorunMaxCycleCount: number;
   readonly autorunPollIntervalSeconds: number;
   readonly autorunIdleThresholdSeconds: number;
+  readonly idleAutoCompact: string;
   readonly speechVoice: string;
   readonly speechWordsPerMinute: number;
   readonly dedupEnforcement: DedupMode;
@@ -33,6 +34,7 @@ export const ENV_KEYS = {
   autorunMaxCycleCount: "dufflebagAutorunMaxCycleCount",
   autorunPollIntervalSeconds: "dufflebagAutorunPollIntervalSeconds",
   autorunIdleThresholdSeconds: "dufflebagAutorunIdleThresholdSeconds",
+  idleAutoCompact: "dufflebagIdleAutoCompact",
   speechVoice: "dufflebagSpeechVoice",
   speechWordsPerMinute: "dufflebagSpeechWordsPerMinute",
   dedupEnforcement: "dufflebagDedupEnforcement",
@@ -54,6 +56,7 @@ export const DEFAULTS: BagConfig = {
   autorunMaxCycleCount: 50,
   autorunPollIntervalSeconds: 5,
   autorunIdleThresholdSeconds: 8,
+  idleAutoCompact: "off",
   speechVoice: "Samantha",
   speechWordsPerMinute: 230,
   dedupEnforcement: "deny",
@@ -101,6 +104,7 @@ export const readConfig = (env: NodeJS.Dict<string> = process.env): BagConfig =>
   autorunMaxCycleCount: numberFromEnv(env[ENV_KEYS.autorunMaxCycleCount], DEFAULTS.autorunMaxCycleCount),
   autorunPollIntervalSeconds: numberFromEnv(env[ENV_KEYS.autorunPollIntervalSeconds], DEFAULTS.autorunPollIntervalSeconds),
   autorunIdleThresholdSeconds: numberFromEnv(env[ENV_KEYS.autorunIdleThresholdSeconds], DEFAULTS.autorunIdleThresholdSeconds),
+  idleAutoCompact: env[ENV_KEYS.idleAutoCompact] ?? DEFAULTS.idleAutoCompact,
   speechVoice: env[ENV_KEYS.speechVoice] ?? DEFAULTS.speechVoice,
   speechWordsPerMinute: numberFromEnv(env[ENV_KEYS.speechWordsPerMinute], DEFAULTS.speechWordsPerMinute),
   dedupEnforcement: dedupModeFromEnv(env[ENV_KEYS.dedupEnforcement]),
@@ -119,12 +123,44 @@ export const configToEnvMap = (config: BagConfig): Record<string, string> => ({
   [ENV_KEYS.autorunMaxCycleCount]: String(config.autorunMaxCycleCount),
   [ENV_KEYS.autorunPollIntervalSeconds]: String(config.autorunPollIntervalSeconds),
   [ENV_KEYS.autorunIdleThresholdSeconds]: String(config.autorunIdleThresholdSeconds),
+  [ENV_KEYS.idleAutoCompact]: config.idleAutoCompact,
   [ENV_KEYS.speechVoice]: config.speechVoice,
   [ENV_KEYS.speechWordsPerMinute]: String(config.speechWordsPerMinute),
   [ENV_KEYS.dedupEnforcement]: config.dedupEnforcement,
   [ENV_KEYS.dedupSkipDirectories]: config.dedupSkipDirectories,
   [ENV_KEYS.debugEnabled]: config.debugEnabled ? "true" : "false",
 });
+
+const autoCompactSeconds = (raw: string): number | null => {
+  if (raw === "off") return null;
+  if (!/^[0-9]+[smhd]$/.test(raw)) return null;
+  const amount = Number(raw.slice(0, -1));
+  let seconds = amount;
+  switch (raw.slice(-1)) {
+    case "m":
+      seconds = amount * 60;
+      break;
+    case "h":
+      seconds = amount * 3_600;
+      break;
+    case "d":
+      seconds = amount * 86_400;
+      break;
+  }
+  return seconds >= 10 && seconds <= 86_400 ? seconds : null;
+};
+
+export const agentAutoCompactEnvironmentKey = (agentId: string): string =>
+  `DUFFLEBAG_${agentId.replaceAll("-", "_").toUpperCase()}_AUTO_COMPACT`;
+
+export const resolveAutoCompactSeconds = (
+  agentId: string,
+  env: NodeJS.Dict<string> = process.env,
+  persistentValue = DEFAULTS.idleAutoCompact,
+): number | null => {
+  const override = env[agentAutoCompactEnvironmentKey(agentId)];
+  return autoCompactSeconds(override === undefined ? persistentValue : override);
+};
 
 /**
  * Spawn env for the detached ctx-watch daemon. Starts from the parent environment

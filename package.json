@@ -1,7 +1,7 @@
 {
   "name": "ys-dufflebag",
-  "version": "0.12.2",
-  "description": "One-command installer for a personal bag of AI coding agent skills, hooks, and reusable CI/publish workflow templates for Claude Code, Kimi, and Kiro: a context guardrail that forces a graceful /handoff before the window fills, a DRY dedup-guard, a hands-free autonomous-compact loop (autorun), a macOS text-to-speech hook, and a png-to-code skill that converts PNG designs into pixel-perfect animated SVG via a measured screenshot-diff loop. Pure TypeScript, Node-only, no Python.",
+  "version": "0.13.0",
+  "description": "TypeScript CLI that installs and surgically updates coding-agent skills, native hooks, managed configuration, and reusable workflows for Claude Code, Codex, Grok, Kimi, Kiro, and more.",
   "type": "module",
   "bin": {
     "dufflebag": "dist/src/cli/main.js"
@@ -34,6 +34,8 @@
   "keywords": [
     "claude-code",
     "claude",
+    "codex",
+    "grok",
     "skills",
     "hooks",
     "cli",

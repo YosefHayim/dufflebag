@@ -15,7 +15,7 @@
 - Accept only `off` or a positive integer followed by `s`, `m`, `h`, or `d`; bound enabled durations to 10 seconds through 24 hours.
 - Provider environment overrides are named `DUFFLEBAG_<NORMALIZED_AGENT_ID>_AUTO_COMPACT` and win over persistent configuration.
 - Initially support only verified Claude Code, Codex, and Grok native hook contracts; detected agents without an adapter remain unchanged and are reported unsupported.
-- Target a proven stable Ghostty terminal ID; never fall back to the focused terminal.
+- Target a stable Ghostty terminal ID claimed from the event-bound focused surface; never retarget from later focus.
 - Installed hooks remain dependency-free, fail open, and preserve receipt-authorized byte restoration.
 - Never read, log, or persist draft contents.
 - After an empty-input compaction, park until a new human prompt event.
@@ -192,7 +192,7 @@ Expected: FAIL because the controller is missing.
 
 - [ ] **Step 3: Implement safe terminal claiming and direct input**
 
-Write a temporary OSC title marker to `/dev/tty`, query Ghostty terminals for exactly one matching name, record its stable ID, then restore the title. Require Ghostty `>=1.3.0`. Escape AppleScript text and terminal IDs. Return refusal on zero or multiple matches, missing terminal, disabled AppleScript, or unsupported version.
+At `SessionStart` or human `UserPromptSubmit`, require Ghostty to be frontmost and claim `front window → selected tab → focused terminal`, then retain its stable ID. Keep a temporary OSC-title proof as a fallback for controlling TTYs that allow it. Require Ghostty `>=1.3.0`. Escape AppleScript text and terminal IDs. Return refusal on ambiguity, missing terminal, disabled AppleScript, or unsupported version.
 
 - [ ] **Step 4: Run Ghostty controller tests**
 

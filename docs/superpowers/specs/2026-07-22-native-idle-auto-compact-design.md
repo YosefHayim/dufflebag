@@ -69,9 +69,9 @@ The session-start hook creates one state record containing:
 - last normalized lifecycle event and timestamp;
 - automation phase.
 
-The hook identifies its controlling Ghostty surface by placing a temporary unique title marker on its controlling terminal, resolving that marker through Ghostty's AppleScript terminal collection, recording the returned stable terminal ID, and restoring the prior title. If exactly one terminal cannot be proven, automation stays disabled for that session.
+At a causally bound `SessionStart` or human `UserPromptSubmit`, while Ghostty is frontmost, the hook asks Ghostty for `front window → selected tab → focused terminal` and records that terminal's stable ID. This is the only focus-sensitive moment: it is coupled to the user's launch/submit action, not guessed later by a timer. A temporary title-marker fallback may prove a terminal when a controlling TTY permits it. If exactly one terminal cannot be proven, automation stays disabled for that session.
 
-Ghostty 1.3 or newer is required because its native AppleScript dictionary can address tabs, splits, and terminals individually and send text or key events directly to a terminal. The daemon does not require Ghostty to be frontmost and never falls back to the focused terminal.
+Ghostty 1.3 or newer is required because its native AppleScript dictionary can address tabs, splits, and terminals individually and send text or key events directly to a terminal. After the initial event-bound claim, the daemon does not require Ghostty to be frontmost and never retargets from focus.
 
 Before every injected key or command, the daemon confirms that the agent process is alive, the session is not ended, the terminal ID still exists, and the session record still claims that terminal. Failure of any check parks and reaps the daemon without sending input.
 
