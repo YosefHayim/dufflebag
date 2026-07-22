@@ -1,4 +1,5 @@
-import { existsSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -32,6 +33,19 @@ describe("stagePackage", () => {
         const staged = yield* stagePackage;
         expect(staged.root.endsWith("/dist/staged") || staged.root.endsWith("\\dist\\staged")).toBe(true);
         expect(staged.version).toMatch(/^\d+\.\d+\.\d+/);
+
+        const contextGuardRoot = path.join(staged.root, "runtime/contextGuard");
+        const contextGuard = path.join(contextGuardRoot, "hooks/contextGuard.js");
+        expect(readFileSync(contextGuard, "utf8")).toContain("../lib/config.js");
+        expect(existsSync(path.join(contextGuardRoot, "lib/config.js"))).toBe(true);
+        expect(existsSync(path.join(contextGuardRoot, "lib/io.js"))).toBe(true);
+
+        const execution = spawnSync(process.execPath, [contextGuard], {
+          input: '{"hook_event_name":"UserPromptSubmit","session_id":"stage-package-test"}',
+          encoding: "utf8",
+        });
+        expect(execution.stderr).toBe("");
+        expect(execution.status).toBe(0);
       }).pipe(Effect.provide(NodeContext.layer)),
     { timeout: 30_000 },
   );

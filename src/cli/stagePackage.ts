@@ -141,11 +141,29 @@ const copyTree = (input: {
     }
   });
 
+const rewriteStagedHookRuntimeImports = (input: { hooksRoot: string }) =>
+  Effect.gen(function* () {
+    const fileSystem = yield* FileSystem.FileSystem;
+    const path = yield* Path.Path;
+    if (!(yield* fileSystem.exists(input.hooksRoot))) {
+      return;
+    }
+
+    const hookFiles = (yield* fileSystem.readDirectory(input.hooksRoot)).filter((name) => name.endsWith(".js"));
+    yield* Effect.forEach(hookFiles, (name) => {
+      const hookPath = path.join(input.hooksRoot, name);
+      return fileSystem
+        .readFileString(hookPath)
+        .pipe(Effect.flatMap((source) => fileSystem.writeFileString(hookPath, source.replaceAll("../../../runtime/", "../lib/"))));
+    });
+  });
+
 const stageRuntimeFeature = (input: { packageRoot: string; stagedRoot: string; sourceDirectory: string }) =>
   Effect.gen(function* () {
     const fileSystem = yield* FileSystem.FileSystem;
     const path = yield* Path.Path;
     const compiledFeatureRoot = path.join(input.packageRoot, "dist", "src", "skills", input.sourceDirectory);
+    const compiledSharedRuntimeRoot = path.join(input.packageRoot, "dist", "src", "runtime");
     const stagedFeatureRoot = path.join(input.stagedRoot, "runtime", input.sourceDirectory);
     const compiledExists = yield* fileSystem.exists(compiledFeatureRoot);
     if (!compiledExists) {
@@ -164,6 +182,12 @@ const stageRuntimeFeature = (input: { packageRoot: string; stagedRoot: string; s
         });
       }
     }
+
+    yield* copyTree({
+      source: compiledSharedRuntimeRoot,
+      destination: path.join(stagedFeatureRoot, "lib"),
+    });
+    yield* rewriteStagedHookRuntimeImports({ hooksRoot: path.join(stagedFeatureRoot, "hooks") });
   });
 
 const stageSkillFeature = (input: {
