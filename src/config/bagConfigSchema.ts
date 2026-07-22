@@ -1,5 +1,7 @@
 import { type Option, Schema, SchemaAST } from "effect";
 
+import { autoCompactDurationSchema } from "./autoCompactDuration.js";
+
 // e.g. "0.18", "+1e-3", ".5" — not "1." alone without digits after optional form handled, "NaN", or "0x10"
 const LEGACY_NUMBER_STRING_PATTERN = /^[+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?$/;
 
@@ -83,6 +85,10 @@ export const bagConfigSchema = Schema.Struct({
     ),
     { default: () => 8, exact: true },
   ),
+  idleAutoCompact: Schema.optionalWith(autoCompactDurationSchema, {
+    default: () => "off",
+    exact: true,
+  }),
   speechVoice: Schema.optionalWith(
     Schema.Trim.pipe(
       Schema.compose(
@@ -182,6 +188,10 @@ export const legacyBagConfigEnvironmentSchema = Schema.Struct({
     legacyNumberStringSchema.pipe(Schema.compose(bagConfigSchema.from.fields.autorunIdleThresholdSeconds.from)),
     { default: () => defaultBagConfig.autorunIdleThresholdSeconds, exact: true },
   ).pipe(Schema.fromKey("dufflebagAutorunIdleThresholdSeconds")),
+  idleAutoCompact: Schema.optionalWith(bagConfigSchema.from.fields.idleAutoCompact.from, {
+    default: () => defaultBagConfig.idleAutoCompact,
+    exact: true,
+  }).pipe(Schema.fromKey("dufflebagIdleAutoCompact")),
   speechVoice: Schema.optionalWith(bagConfigSchema.from.fields.speechVoice.from, {
     default: () => defaultBagConfig.speechVoice,
     exact: true,
