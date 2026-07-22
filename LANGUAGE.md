@@ -15,6 +15,9 @@ Names-only glossary: human↔agent bridge for the domain vocabulary used in code
 | **ships / shippedPaths** | Per-feature allowlist of paths copied into a user's install. Fail-safe: unlisted paths ship nothing. | "includes", "files" |
 | **surgical install / uninstall** | Receipt-authorized edits that restore prior bytes on uninstall. | "merge", "patch" |
 | **context-guard** | Nudge `/handoff` at the warn fraction and hard-deny new code edits near the cap. | "context manager" |
+| **idle auto-compact** | Optional native-hook loop that submits one idle draft, waits for any resulting turn, compacts once, then parks. | "autorun" (different context-budget loop), "timer wrapper" |
+| **native hook adapter** | Catalog evidence that an agent's lifecycle events, config path, and compact command were verified. | "supported" without evidence |
+| **terminal claim** | Session-start proof binding automation to one stable Ghostty terminal ID, including tabs and splits. | "focused pane", "front window" |
 | **dedup-guard** | DRY guard that blocks duplicate function/type bodies at write time. | "duplicate checker" |
 | **autonomous-loop / `autorun`** | Skill that arms the context-guard SessionStart daemon for hands-free compact/resume (`stop`/`exit` verbs). Hook runtime is owned by **context-guard**. | "auto-compact", "daemon" (alone) |
 | **speak-response** | Stop hook that speaks Claude prose via macOS `say`. | "TTS", "voice" |

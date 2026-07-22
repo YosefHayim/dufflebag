@@ -64,7 +64,13 @@ Tune guard and loop behavior through the same `dufflebag*` settings keys the hoo
 ```bash
 dufflebag config
 dufflebag config --warn 0.15 --block 0.22 --budget 5
+dufflebag config --auto-compact-idle 1m
 ```
+
+Idle auto-compact is off by default. On macOS with Ghostty 1.3+, verified native
+hooks for Claude Code, Codex, and Grok bind each session to its exact terminal.
+Override one launched agent without changing persistent config, for example
+`DUFFLEBAG_CODEX_AUTO_COMPACT=30s codex` or `DUFFLEBAG_GROK_AUTO_COMPACT=off grok`.
 
 ## What it installs
 
@@ -73,7 +79,7 @@ dufflebag config --warn 0.15 --block 0.22 --budget 5
 <!-- AUTO:FEATURES:START -->
 | Feature | What it does | Runs on |
 | --- | --- | --- |
-| **context-guard** | Nudge a /handoff at ~18% of the model window and hard-deny new code edits at ~20%, so long sessions wind down gracefully instead of ballooning past usable context. | 🟢 any OS |
+| **context-guard** | Guard long sessions near their context cap and optionally compact idle Claude Code, Codex, or Grok sessions in their exact Ghostty terminal. | 🟢 any OS |
 | **autonomous-loop** | A skill that arms the context-guard SessionStart daemon to auto-/compact and resume hands-free once context nears the guardrail and a fresh handoff exists. macOS + Ghostty only (it types into your terminal window). Hook runtime lives under context-guard. | 🔴 macOS + Ghostty |
 | **speak-response** | A Stop hook that speaks Claude's prose (code blocks stripped) via the macOS `say` command. macOS only. | 🟡 macOS |
 | **dedup-guard** | Block a Write/Edit that pastes a function body or interface/type shape already defined elsewhere in the repo — DRY enforced at the moment of the write. Uses the repo's own TypeScript; deny by default (tune with dufflebagDedupEnforcement). Also wires Cursor (warn) + an AGENTS.md rule for Codex. | 🟢 any OS |
