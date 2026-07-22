@@ -2,13 +2,13 @@
 
 ## What this is
 
-`dufflebag` is a personal toolbelt, not a platform: a Node-only TypeScript CLI that installs, updates, and surgically uninstalls a curated bag of Claude Code guardrails, agent skills, and copyable CI/publish workflow templates.
+`dufflebag` is a personal toolbelt, not a platform: a Node-only TypeScript CLI that installs, updates, and surgically uninstalls a curated bag of coding-agent guardrails, skills, and copyable CI/publish workflow templates.
 
 ## Actors
 
 - **The owner / user** — runs `npx ys-dufflebag install` to wire guardrails into `~/.claude` (global) or `./.claude` (project).
-- **Claude Code** — the primary install target; installed hooks run inside Claude's hook lifecycle.
-- **Other agents** (Cursor, Codex, and more) — detected and wired through catalog-driven agent formats.
+- **Claude Code, Codex, and Grok** — verified native lifecycle-hook targets.
+- **Other agents** — detected and wired only through verified catalog-driven formats; unsupported hook adapters are reported, not guessed.
 - **CI / `scaffold-workflows` consumers** — repos that copy the reusable workflow set from `templates/workflows/`.
 
 ## Shape (capability layout)
@@ -35,5 +35,7 @@ Application code is grouped by capability, not by technical layer:
 - Hooks must be **fail-open** — any internal error allows the tool through.
 - Ownership is receipt-based: install/update/uninstall apply only receipt-authorized artifacts.
 - Managed config lives at `.claude/dufflebag/config.json` and is schema-owned.
+- Idle compaction is off by default, requires macOS + Ghostty 1.3+, and targets a stable terminal ID claimed by the session itself.
+- A provider-specific `DUFFLEBAG_<AGENT_ID>_AUTO_COMPACT` process override wins over persistent `idleAutoCompact` config.
 - Authored skill directories use **camelCase**; public feature IDs and installed skill IDs remain **kebab-case** data.
 - One strict style bar across maintained TypeScript, enforced by Biome + `scripts/checkCodeStyle.ts` and documented in root `CODE-STYLE.md`.

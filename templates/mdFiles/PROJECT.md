@@ -6,19 +6,19 @@ version is `../../README.md`; the domain glossary and layout live in
 
 ## The problem
 
-Three papercuts, one owner: long Claude Code sessions balloon past usable context
+Three papercuts, one owner: long coding-agent sessions balloon past usable context
 before winding down; agents re-paste the same function or type under a new name;
 and standing up a personal set of Claude Code hooks/skills + CI is copy-paste
 across ~18 repos. dufflebag packages the owner's personal **bag** of guardrails,
-skills, and CI templates behind one installer that wires them into `~/.claude` (or
-a project's `.claude/`) **surgically**, and takes them back just as cleanly.
+skills, and CI templates behind one installer that wires them into supported agents
+**surgically**, and takes them back just as cleanly.
 
 ## Who it's for
 
-The **owner first**, and any Claude Code user who wants these specific guardrails.
+The **owner first**, and coding-agent users who want these specific guardrails.
 Explicitly **not**: a general-purpose plugin marketplace, a team product with SLAs,
-or a multi-agent tool — **Claude Code is the only install target today** (a detected
-Cursor/Codex is surfaced but untouched; adapters tracked in [#5](https://github.com/YosefHayim/dufflebag/issues/5)).
+or an agent orchestration platform. Native lifecycle-hook adapters are verified for
+Claude Code, Codex, and Grok; other detected agents receive only their supported artifacts.
 
 ## The core insight
 
@@ -35,6 +35,8 @@ immediately — a toolbelt, not a platform.
   **byte-restores** `settings.json` (surgical, path-identified).
 - A long session **winds down gracefully** — `/handoff` nudged at the warn fraction,
   new code edits denied near the cap — instead of overflowing.
+- An optionally configured idle session submits any waiting draft once, finishes that
+  turn when one starts, compacts once, and parks until the next human prompt.
 - A **duplicate** function/type is blocked at write time on Claude (warned on Cursor,
   gated in CI by `dedup check`).
 - A PNG **converges to pixel-perfect code** via a measured screenshot-diff loop, not
@@ -62,7 +64,7 @@ immediately — a toolbelt, not a platform.
   co-located tests, single-command `autorun`) and the **source consolidation**: all source
   under `src/` (capabilities + `src/skills/`), maintainer tooling under root `scripts/`, all copyable templates under `templates/`
   (`templates/workflows/`, `templates/mdFiles/`) — [ADR 0012](../../docs/adr/current/0012-tsdoc-on-the-exported-surface.md)–[0014](../../docs/adr/current/0014-consolidate-under-src-and-templates.md).
-- **Next:** Cursor/Codex adapters ([#5](https://github.com/YosefHayim/dufflebag/issues/5)).
+- **Next:** verify native lifecycle adapters for more detected coding agents.
 - **Maybe:** more template kinds under `templates/` — a project should be able to scaffold
   `CODE-STYLE.md`/`PROJECT.md` alongside the CI set; additional agents as install targets.
 
