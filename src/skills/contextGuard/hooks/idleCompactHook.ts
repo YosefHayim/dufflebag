@@ -6,7 +6,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { readConfig, resolveAutoCompactSeconds } from "../../../runtime/config.js";
-import { claimGhosttyTerminal } from "../lib/ghosttyTerminal.js";
+import { claimFocusedGhosttyTerminal, claimGhosttyTerminal } from "../lib/ghosttyTerminal.js";
 import {
   applyIdleCompactEvent,
   decodeIdleCompactSessionState,
@@ -44,6 +44,19 @@ const findAgentPid = (executable: string): number | null => {
   return null;
 };
 
+const terminalDeviceForPid = (pid: number): string | null => {
+  try {
+    const tty = execFileSync("ps", ["-p", String(pid), "-o", "tty="], {
+      encoding: "utf8",
+      timeout: 2_000,
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
+    return tty === "" || tty === "??" ? null : `/dev/${tty}`;
+  } catch {
+    return null;
+  }
+};
+
 const providerMatches = (event: IdleCompactEvent): boolean => {
   if (process.env.GROK_SESSION_ID && event.agentId !== "grok") return false;
   return true;
@@ -55,7 +68,10 @@ const startSession = (event: IdleCompactEvent): void => {
   const executable = process.env.DUFFLEBAG_AGENT_COMMAND ?? commandForAgent(event.agentId);
   const agentPid = findAgentPid(executable);
   if (agentPid === null) return;
-  const terminal = claimGhosttyTerminal(event.sessionId);
+  const terminalDevice = terminalDeviceForPid(agentPid);
+  if (terminalDevice === null) return;
+  const focusedTerminal = claimFocusedGhosttyTerminal();
+  const terminal = focusedTerminal._tag === "claimed" ? focusedTerminal : claimGhosttyTerminal(event.sessionId, terminalDevice);
   if (terminal._tag !== "claimed") return;
 
   const stateFile = idleCompactFile(event.agentId, event.sessionId);
@@ -92,7 +108,10 @@ const main = (): void => {
   }
   const stateFile = idleCompactFile(event.agentId, event.sessionId);
   const state = decodeIdleCompactSessionState(readJson(stateFile));
-  if (!state) return;
+  if (!state) {
+    if (event.event === "prompt-started") startSession(event);
+    return;
+  }
   writeJsonAtomic(stateFile, applyIdleCompactEvent(state, event));
 };
 
