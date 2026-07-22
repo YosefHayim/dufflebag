@@ -8,7 +8,7 @@
  * consistent. Dependency-free; ships in the hook payload.
  */
 
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import path from "node:path";
 
@@ -22,6 +22,8 @@ export const GUARD_STATE_DIR = path.join(CLAUDE_DIR, ".ctx-guard-state");
 export const loopFile = (sid: string, suffix: string): string => path.join(LOOP_STATE_DIR, `${sid}.${suffix}`);
 /** Path to the guard's per-session nudge flag. */
 export const guardFlag = (sid: string): string => path.join(GUARD_STATE_DIR, `${sid}.nudged`);
+export const idleCompactFile = (agentId: string, sid: string): string =>
+  path.join(LOOP_STATE_DIR, `idle-${encodeURIComponent(agentId)}-${encodeURIComponent(sid)}.json`);
 
 export const exists = (file: string): boolean => existsSync(file);
 
@@ -37,6 +39,21 @@ export function readInt(file: string, fallback = 0): number {
 export function writeText(file: string, text: string | number): void {
   mkdirSync(path.dirname(file), { recursive: true });
   writeFileSync(file, String(text), "utf8");
+}
+
+export function writeJsonAtomic(file: string, value: unknown): void {
+  mkdirSync(path.dirname(file), { recursive: true });
+  const temporary = `${file}.${process.pid}.tmp`;
+  writeFileSync(temporary, JSON.stringify(value), { encoding: "utf8", mode: 0o600 });
+  renameSync(temporary, file);
+}
+
+export function readJson(file: string): unknown {
+  try {
+    return JSON.parse(readFileSync(file, "utf8"));
+  } catch {
+    return null;
+  }
 }
 
 export function remove(file: string): void {
