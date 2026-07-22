@@ -252,6 +252,36 @@ describe("featureCatalog", () => {
             matcher: { _tag: "none" },
             entrypoint: { _tag: "path", value: "hooks/ctxWatchSpawn.ts" },
           },
+          {
+            event: "SessionStart",
+            matcher: { _tag: "none" },
+            entrypoint: { _tag: "path", value: "hooks/idleCompactHook.ts" },
+          },
+          {
+            event: "UserPromptSubmit",
+            matcher: { _tag: "none" },
+            entrypoint: { _tag: "path", value: "hooks/idleCompactHook.ts" },
+          },
+          {
+            event: "Stop",
+            matcher: { _tag: "none" },
+            entrypoint: { _tag: "path", value: "hooks/idleCompactHook.ts" },
+          },
+          {
+            event: "PreCompact",
+            matcher: { _tag: "none" },
+            entrypoint: { _tag: "path", value: "hooks/idleCompactHook.ts" },
+          },
+          {
+            event: "PostCompact",
+            matcher: { _tag: "none" },
+            entrypoint: { _tag: "path", value: "hooks/idleCompactHook.ts" },
+          },
+          {
+            event: "SessionEnd",
+            matcher: { _tag: "none" },
+            entrypoint: { _tag: "path", value: "hooks/idleCompactHook.ts" },
+          },
         ],
       },
       {
@@ -286,6 +316,18 @@ describe("featureCatalog", () => {
     ]);
     expect(runtimeEntrypoints.every((entrypoint) => entrypoint.endsWith(".ts"))).toBe(true);
     expect(runtimeEntrypoints.some((entrypoint) => entrypoint.endsWith(".js"))).toBe(false);
+  });
+
+  it("registers the normalized idle hook for complete session lifecycle evidence", () => {
+    const contextGuard = Option.getOrThrow(findFeature("context-guard"));
+    expect(contextGuard.runtime._tag).toBe("hook");
+    if (contextGuard.runtime._tag !== "hook") return;
+
+    const idleEvents = contextGuard.runtime.registrations
+      .filter((registration) => registration.entrypoint._tag === "path" && registration.entrypoint.value === "hooks/idleCompactHook.ts")
+      .map((registration) => registration.event);
+
+    expect(idleEvents).toEqual(["SessionStart", "UserPromptSubmit", "Stop", "PreCompact", "PostCompact", "SessionEnd"]);
   });
 
   it("finds features with Option", () => {

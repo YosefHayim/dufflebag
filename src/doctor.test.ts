@@ -111,12 +111,14 @@ layer(NodeContext.layer)("doctor", (it) => {
           displayName: "Codex",
           detected: false,
           managed: true,
+          nativeHookSupport: "verified",
         });
         expect(report.agents.find((agent) => agent.id === "cursor")).toEqual({
           id: "cursor",
           displayName: "Cursor",
           detected: true,
           managed: false,
+          nativeHookSupport: "unsupported",
         });
         expect(report.discrepancies).toEqual([
           { _tag: "receiptScopeMismatch", requestedScope: "project", receiptScope: "global" },
@@ -159,6 +161,7 @@ layer(NodeContext.layer)("doctor", (it) => {
           displayName: "Cursor",
           detected: true,
           managed: false,
+          nativeHookSupport: "unsupported",
         });
         expect(report.discrepancies).toEqual([{ _tag: "detectedAgentNotManaged", agentId: "cursor" }]);
         expect(yield* fileSystem.readFileString(detectedMarker)).toBe("keep me\n");

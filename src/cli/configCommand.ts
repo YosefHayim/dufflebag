@@ -50,6 +50,11 @@ const idleOption = Options.integer("idle").pipe(
   Options.withDescription("Seconds without activity before autorun treats a turn as idle"),
 );
 
+const autoCompactIdleOption = Options.text("auto-compact-idle").pipe(
+  Options.optional,
+  Options.withDescription("Idle duration before draft submission and compaction (10s-1d, or off)"),
+);
+
 const ttsVoiceOption = Options.text("tts-voice").pipe(
   Options.optional,
   Options.withDescription("macOS speech voice name; empty selects the system default"),
@@ -85,6 +90,7 @@ const buildConfigPatch = (args: {
   hardCap: Option.Option<number>;
   poll: Option.Option<number>;
   idle: Option.Option<number>;
+  autoCompactIdle: Option.Option<string>;
   ttsVoice: Option.Option<string>;
   ttsRate: Option.Option<number>;
   dedupMode: Option.Option<"deny" | "warn" | "off">;
@@ -97,6 +103,7 @@ const buildConfigPatch = (args: {
   assignOptional(patch, "autorunMaxCycleCount", args.hardCap);
   assignOptional(patch, "autorunPollIntervalSeconds", args.poll);
   assignOptional(patch, "autorunIdleThresholdSeconds", args.idle);
+  assignOptional(patch, "idleAutoCompact", args.autoCompactIdle);
   assignOptional(patch, "speechVoice", args.ttsVoice);
   assignOptional(patch, "speechWordsPerMinute", args.ttsRate);
   assignOptional(patch, "dedupEnforcement", args.dedupMode);
@@ -111,6 +118,7 @@ const CONFIG_LABELS: Record<keyof typeof defaultBagConfig, string> = {
   autorunMaxCycleCount: "autorun max cycles",
   autorunPollIntervalSeconds: "autorun poll interval (s)",
   autorunIdleThresholdSeconds: "autorun idle threshold (s)",
+  idleAutoCompact: "idle auto-compact (off|duration)",
   speechVoice: "speech voice",
   speechWordsPerMinute: "speech rate (wpm)",
   dedupEnforcement: "dedup enforcement (deny|warn|off)",
@@ -131,6 +139,7 @@ export const configCommand = Command.make(
     hardCap: hardCapOption,
     poll: pollOption,
     idle: idleOption,
+    autoCompactIdle: autoCompactIdleOption,
     ttsVoice: ttsVoiceOption,
     ttsRate: ttsRateOption,
     dedupMode: dedupModeOption,
@@ -160,6 +169,7 @@ export const configCommand = Command.make(
         "autorunMaxCycleCount",
         "autorunPollIntervalSeconds",
         "autorunIdleThresholdSeconds",
+        "idleAutoCompact",
         "speechVoice",
         "speechWordsPerMinute",
         "dedupEnforcement",
@@ -170,7 +180,7 @@ export const configCommand = Command.make(
       if (Object.keys(patch).length === 0) {
         const rows = configKeys.map((key) => `${CONFIG_LABELS[key].padEnd(34)} ${String(current[key])}`);
         yield* TerminalUI.note(rows.join("\n"), "managed config");
-        yield* TerminalUI.outro("Change with e.g. `dufflebag config --warn 0.15 --budget 5`");
+        yield* TerminalUI.outro("Change with e.g. `dufflebag config --auto-compact-idle 1m`");
         return;
       }
 
@@ -230,4 +240,4 @@ export const configCommand = Command.make(
       }
       yield* TerminalUI.outro(receiptSnapshot._tag === "present" ? "Saved and receipt re-synced." : "Saved.");
     }).pipe(Effect.catchAll((error) => TerminalUI.presentError(error))),
-).pipe(Command.withDescription("Show or change tunables (warn %, budget, TTS, …)"));
+).pipe(Command.withDescription("Show or change tunables (context guard, idle compaction, TTS, …)"));

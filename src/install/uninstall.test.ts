@@ -16,6 +16,7 @@ const stagePackage = (root: string) =>
       ["runtime/contextGuard/hooks/contextGuard.js", "export {};\n"],
       ["runtime/contextGuard/hooks/ctxWatchSpawn.js", "export {};\n"],
       ["runtime/contextGuard/hooks/ctxLoopCtl.js", "export {};\n"],
+      ["runtime/contextGuard/hooks/idleCompactHook.js", "export {};\n"],
       ["skills/autorun/SKILL.md", "---\nname: autorun\n---\nRun @@CTL@@ when armed.\n"],
     ];
 

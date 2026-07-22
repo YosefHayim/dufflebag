@@ -15,6 +15,7 @@ import {
   ENV_KEYS,
   planDaemonSpawn,
   readConfig,
+  resolveAutoCompactSeconds,
 } from "./config.js";
 
 describe("daemon spawn env", () => {
@@ -23,7 +24,18 @@ describe("daemon spawn env", () => {
     expect(env[ENV_KEYS.contextWarnFraction]).toBe("0.18");
     expect(env[ENV_KEYS.autorunMaxCycleCount]).toBe("50");
     expect(env[ENV_KEYS.debugEnabled]).toBe("false");
+    expect(env[ENV_KEYS.idleAutoCompact]).toBe("off");
     expect(Object.keys(env).sort()).toEqual(Object.values(ENV_KEYS).sort());
+  });
+
+  it("uses a provider override before persistent idle auto-compact", () => {
+    expect(resolveAutoCompactSeconds("codex", { DUFFLEBAG_CODEX_AUTO_COMPACT: "45s" }, "2m")).toBe(45);
+    expect(resolveAutoCompactSeconds("codex", { DUFFLEBAG_CODEX_AUTO_COMPACT: "off" }, "2m")).toBeNull();
+    expect(resolveAutoCompactSeconds("codex", {}, "2m")).toBe(120);
+  });
+
+  it("fails closed for an invalid provider override", () => {
+    expect(resolveAutoCompactSeconds("claude-code", { DUFFLEBAG_CLAUDE_CODE_AUTO_COMPACT: "soon" }, "2m")).toBeNull();
   });
 
   it("configToEnvMap round-trips through readConfig", () => {

@@ -33,6 +33,7 @@ describe("bagConfigSchema", () => {
       autorunMaxCycleCount: 50,
       autorunPollIntervalSeconds: 5,
       autorunIdleThresholdSeconds: 8,
+      idleAutoCompact: "off",
       speechVoice: "Samantha",
       speechWordsPerMinute: 230,
       dedupEnforcement: "deny",
@@ -49,6 +50,7 @@ describe("bagConfigSchema", () => {
     expectDescription(bagConfigSchema.from.fields.autorunMaxCycleCount);
     expectDescription(bagConfigSchema.from.fields.autorunPollIntervalSeconds);
     expectDescription(bagConfigSchema.from.fields.autorunIdleThresholdSeconds);
+    expectDescription(bagConfigSchema.from.fields.idleAutoCompact);
     expectDescription(bagConfigSchema.from.fields.speechVoice);
     expectDescription(bagConfigSchema.from.fields.speechWordsPerMinute);
     expectDescription(bagConfigSchema.from.fields.dedupEnforcement);
@@ -71,6 +73,7 @@ describe("bagConfigSchema", () => {
     "autorunMaxCycleCount",
     "autorunPollIntervalSeconds",
     "autorunIdleThresholdSeconds",
+    "idleAutoCompact",
     "speechVoice",
     "speechWordsPerMinute",
     "dedupEnforcement",
@@ -280,6 +283,6 @@ describe("bagConfigJsonSchema", () => {
     const json = Schema.encodeSync(bagConfigJsonSchema)(defaultBagConfig);
 
     expect(JSON.parse(json)).toEqual(defaultBagConfig);
-    expect(Object.keys(JSON.parse(json))).toHaveLength(11);
+    expect(Object.keys(JSON.parse(json))).toHaveLength(12);
   });
 });
