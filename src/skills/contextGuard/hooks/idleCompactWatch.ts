@@ -26,7 +26,7 @@ const processAlive = (pid: number): boolean => {
 const acquireInputLock = (): boolean => {
   try {
     const descriptor = openSync(KEY_LOCK, "wx");
-    writeSync(descriptor, `${process.pid} ${Date.now()}`);
+    writeSync(descriptor, `${process.pid} ${Math.floor(Date.now() / 1_000)}`);
     closeSync(descriptor);
     return true;
   } catch {

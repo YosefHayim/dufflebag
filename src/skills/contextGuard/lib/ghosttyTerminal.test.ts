@@ -1,8 +1,21 @@
 import { describe, expect, it } from "vitest";
 
-import { claimTerminalScript, decodeClaimResult, terminalInputScript, versionSupportsTerminalInput } from "./ghosttyTerminal.js";
+import {
+  claimFocusedTerminalScript,
+  claimTerminalScript,
+  decodeClaimResult,
+  terminalInputScript,
+  versionSupportsTerminalInput,
+} from "./ghosttyTerminal.js";
 
 describe("Ghostty terminal control", () => {
+  it("claims the causally focused terminal and records only its stable ID", () => {
+    const script = claimFocusedTerminalScript();
+
+    expect(script).toContain("focused terminal of selected tab of front window");
+    expect(script).toContain('if not frontmost then return "NOT_FRONTMOST"');
+  });
+
   it("claims exactly one temporary terminal title and returns its stable ID", () => {
     const script = claimTerminalScript("dufflebag-session-1");
 
