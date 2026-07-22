@@ -63,6 +63,22 @@ const sourceSkillDirectories = readdirSync(skillRoot, { withFileTypes: true })
   .map((entry) => entry.name)
   .sort();
 
+const repeatedWorkflowSkills = [
+  { skillId: "organized-commits", sourceDirectory: "organizedCommits" },
+  { skillId: "finish-and-ship", sourceDirectory: "finishAndShip" },
+  { skillId: "preview-and-prove", sourceDirectory: "previewAndProve" },
+  { skillId: "reuse-first-audit", sourceDirectory: "reuseFirstAudit" },
+  { skillId: "agent-session-auditor", sourceDirectory: "agentSessionAuditor" },
+  { skillId: "sync-agent-skills", sourceDirectory: "syncAgentSkills" },
+  { skillId: "env-config-contract", sourceDirectory: "envConfigContract" },
+  { skillId: "mcp-oauth-onboarding", sourceDirectory: "mcpOauthOnboarding" },
+  { skillId: "rtl-ui-audit", sourceDirectory: "rtlUiAudit" },
+  { skillId: "deploy-and-prove", sourceDirectory: "deployAndProve" },
+  { skillId: "coordinate-worktrees", sourceDirectory: "coordinateWorktrees" },
+  { skillId: "capture-workflow", sourceDirectory: "captureWorkflow" },
+  { skillId: "finish-agent-sessions", sourceDirectory: "finishAgentSessions" },
+];
+
 const expectValidSkillFrontmatter = (skillMd: string, expectedName: string): void => {
   expect(existsSync(skillMd)).toBe(true);
 
@@ -99,5 +115,20 @@ describe("local skill sources", () => {
         : sourceDirectory.replace(/([a-z0-9])([A-Z])/g, "$1-$2").toLowerCase();
 
     expectValidSkillFrontmatter(path.join(skillRoot, sourceDirectory, "SKILL.md"), expectedName);
+  });
+});
+
+describe("repeated workflow skills", () => {
+  it.each(repeatedWorkflowSkills)("$skillId declares searchable triggers and operational gates", ({ skillId, sourceDirectory }) => {
+    const skillMd = path.join(skillRoot, sourceDirectory, "SKILL.md");
+    expect(existsSync(skillMd)).toBe(true);
+
+    const { frontmatter, body } = parseFrontmatter(skillMd);
+    expect(frontmatter?.name).toBe(skillId);
+    expect(frontmatter?.description).toMatch(/^Use when /);
+    expect(body).toContain("## Safety");
+    expect(body).toContain("## Workflow");
+    expect(body).toContain("## Verification");
+    expect(body.split("\n").length).toBeLessThanOrEqual(500);
   });
 });
