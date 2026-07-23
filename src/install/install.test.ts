@@ -229,6 +229,7 @@ layer(NodeContext.layer)("install", (it) => {
         });
 
         expect(yield* fileSystem.readFileString(path.join(root, ".claude/skills/autorun/SKILL.md"))).toContain("Run");
+        expect(yield* fileSystem.readFileString(path.join(root, ".codex/skills/autorun/SKILL.md"))).toContain("Run");
         expect(yield* fileSystem.readFileString(path.join(root, ".cursor/rules/autorun.mdc"))).toContain(
           ".claude/dufflebag/runtime/contextGuard/hooks/ctxLoopCtl.js",
         );
@@ -245,7 +246,7 @@ layer(NodeContext.layer)("install", (it) => {
         );
 
         expect(instructionArtifacts).toHaveLength(1);
-        expect(instructionArtifacts[0].owner.agentIds).toEqual(["codex", "aider", "continue"]);
+        expect(instructionArtifacts[0].owner.agentIds).toEqual(["aider", "continue"]);
       }),
     ),
   );

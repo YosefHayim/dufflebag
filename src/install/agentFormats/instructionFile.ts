@@ -338,6 +338,9 @@ const instructionPathForAgent = (agentId: string): string | undefined => {
 const agentIdsMatchPath = (agentIds: ReadonlyArray<string>, path: string): boolean =>
   agentIds.every((agentId) => instructionPathForAgent(agentId) === path);
 
+const previousAgentIdsMatchPath = (agentIds: ReadonlyArray<string>, path: string): boolean =>
+  agentIds.every((agentId) => instructionPathForAgent(agentId) === path || (agentId === "codex" && path === "AGENTS.md"));
+
 const requestIssues = (request: InstructionFileRequestFields) => {
   const previousArtifact = request.previousArtifact._tag === "owned" ? request.previousArtifact.artifact : undefined;
 
@@ -362,7 +365,7 @@ const requestIssues = (request: InstructionFileRequestFields) => {
           path: ["previousArtifact", "artifact", "ownership"],
           message: "Prior instruction ownership must use the canonical managed-block markers.",
         },
-    previousArtifact === undefined || agentIdsMatchPath(previousArtifact.owner.agentIds, request.path)
+    previousArtifact === undefined || previousAgentIdsMatchPath(previousArtifact.owner.agentIds, request.path)
       ? undefined
       : {
           path: ["previousArtifact", "artifact", "owner"],
@@ -384,7 +387,7 @@ export type InstructionFileRequest = Schema.Schema.Type<typeof instructionFileRe
 const instructionOperationIssues = (operation: InstructionOperationFields) => {
   const ownership = operation.artifact.ownership;
   const issues: Array<{ path: ReadonlyArray<string>; message: string } | undefined> = [
-    agentIdsMatchPath(operation.artifact.owner.agentIds, operation.artifact.path)
+    (operation._tag === "write" ? agentIdsMatchPath : previousAgentIdsMatchPath)(operation.artifact.owner.agentIds, operation.artifact.path)
       ? undefined
       : {
           path: ["artifact", "owner"],
