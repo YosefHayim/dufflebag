@@ -242,7 +242,7 @@ export const agentCatalog = Schema.decodeUnknownSync(agentCatalogSchema, {
     id: "codex",
     displayName: "Codex",
     detection: { homePaths: [".codex"], absolutePaths: [], commands: ["codex"] },
-    target: { _tag: "instructionFile", path: "AGENTS.md" },
+    target: { _tag: "skillDirectory", path: ".codex/skills" },
     nativeHooks: { _tag: "codexJson", configPath: ".codex/hooks.json", compactCommand: "/compact" },
   },
   {

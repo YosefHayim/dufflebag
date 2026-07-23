@@ -40,7 +40,7 @@ const request = (input?: {
       ? { _tag: "absent" }
       : {
           _tag: "present",
-          agentIds: input?.agentIds ?? ["codex"],
+          agentIds: input?.agentIds ?? ["aider"],
           skills: input?.skills ?? [desiredSkill()],
           ctl: input?.ctl ?? "dufflebag",
         },
@@ -90,7 +90,7 @@ describe("planInstructionFile", () => {
     expectTypeOf(plan.artifact.ownership._tag).toEqualTypeOf<"managedBlock">();
     expect(decode(plan.bytes)).toBe(`${startMarker}${expectedBody}${endMarker}\n`);
     expect(plan.artifact).toEqual({
-      owner: { _tag: "agent", agentIds: ["codex"] },
+      owner: { _tag: "agent", agentIds: ["aider"] },
       path: "AGENTS.md",
       kind: { _tag: "instruction" },
       ownership: {
@@ -113,20 +113,20 @@ describe("planInstructionFile", () => {
     expect(plan.bytes.slice(0, existing.byteLength)).toEqual(existing);
   });
 
-  it("evolves shared AGENTS owners across Codex, Aider, and Continue in catalog order", () => {
-    const codex = expectWrite(unwrap(planInstructionFile(request())));
+  it("evolves shared AGENTS owners across Aider and Continue in catalog order", () => {
+    const aider = expectWrite(unwrap(planInstructionFile(request())));
     const allOwners = expectWrite(
       unwrap(
         planInstructionFile(
           request({
-            agentIds: ["codex", "aider", "continue"],
-            currentBytes: codex.bytes,
-            previousArtifact: codex.artifact,
+            agentIds: ["aider", "continue"],
+            currentBytes: aider.bytes,
+            previousArtifact: aider.artifact,
           }),
         ),
       ),
     );
-    const codexAgain = expectWrite(
+    const aiderAgain = expectWrite(
       unwrap(
         planInstructionFile(
           request({
@@ -137,11 +137,34 @@ describe("planInstructionFile", () => {
       ),
     );
 
-    expect(codex.artifact.owner).toEqual({ _tag: "agent", agentIds: ["codex"] });
-    expect(allOwners.artifact.owner).toEqual({ _tag: "agent", agentIds: ["codex", "aider", "continue"] });
-    expect(codexAgain.artifact.owner).toEqual({ _tag: "agent", agentIds: ["codex"] });
-    expect(allOwners.bytes).toEqual(codex.bytes);
-    expect(codexAgain.bytes).toEqual(codex.bytes);
+    expect(aider.artifact.owner).toEqual({ _tag: "agent", agentIds: ["aider"] });
+    expect(allOwners.artifact.owner).toEqual({ _tag: "agent", agentIds: ["aider", "continue"] });
+    expect(aiderAgain.artifact.owner).toEqual({ _tag: "agent", agentIds: ["aider"] });
+    expect(allOwners.bytes).toEqual(aider.bytes);
+    expect(aiderAgain.bytes).toEqual(aider.bytes);
+  });
+
+  it("restores user AGENTS.md bytes from the legacy Codex instruction target", () => {
+    const original = encode("User instructions.\n");
+    const installed = expectWrite(unwrap(planInstructionFile(request({ currentBytes: original }))));
+    const legacyCodexArtifact = {
+      ...installed.artifact,
+      owner: { _tag: "agent" as const, agentIds: ["codex"] as const },
+    };
+
+    const restored = expectRestore(
+      unwrap(
+        planInstructionFile(
+          request({
+            desired: "absent",
+            currentBytes: installed.bytes,
+            previousArtifact: legacyCodexArtifact,
+          }),
+        ),
+      ),
+    );
+
+    expect(restored.bytes).toEqual(original);
   });
 
   it("restores exact surrounding bytes when the final shared owner leaves", () => {

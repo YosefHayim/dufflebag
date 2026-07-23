@@ -65,7 +65,7 @@ const expectedAgents = [
     id: "codex",
     displayName: "Codex",
     detection: { homePaths: [".codex"], absolutePaths: [], commands: ["codex"] },
-    target: { _tag: "instructionFile", path: "AGENTS.md" },
+    target: { _tag: "skillDirectory", path: ".codex/skills" },
     nativeHooks: { _tag: "codexJson", configPath: ".codex/hooks.json", compactCommand: "/compact" },
   },
   {
@@ -163,7 +163,7 @@ describe("agentCatalog", () => {
       ruleFile: agentCatalog.filter((agent) => agent.target._tag === "ruleFile").length,
       instructionFile: agentCatalog.filter((agent) => agent.target._tag === "instructionFile").length,
       configReference: agentCatalog.filter((agent) => agent.target._tag === "configReference").length,
-    }).toEqual({ skillDirectory: 5, ruleFile: 1, instructionFile: 6, configReference: 2 });
+    }).toEqual({ skillDirectory: 6, ruleFile: 1, instructionFile: 5, configReference: 2 });
   });
 
   it("keeps human-facing display names in the catalog", () => {
