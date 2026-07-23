@@ -229,7 +229,8 @@ layer(NodeContext.layer)("install", (it) => {
         });
 
         expect(yield* fileSystem.readFileString(path.join(root, ".claude/skills/autorun/SKILL.md"))).toContain("Run");
-        expect(yield* fileSystem.readFileString(path.join(root, ".codex/skills/autorun/SKILL.md"))).toContain("Run");
+        expect(yield* fileSystem.readFileString(path.join(root, ".agents/skills/autorun/SKILL.md"))).toContain("Run");
+        expect(yield* fileSystem.exists(path.join(root, ".codex/skills/autorun/SKILL.md"))).toBe(false);
         expect(yield* fileSystem.readFileString(path.join(root, ".cursor/rules/autorun.mdc"))).toContain(
           ".claude/dufflebag/runtime/contextGuard/hooks/ctxLoopCtl.js",
         );

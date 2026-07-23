@@ -65,7 +65,7 @@ const expectedAgents = [
     id: "codex",
     displayName: "Codex",
     detection: { homePaths: [".codex"], absolutePaths: [], commands: ["codex"] },
-    target: { _tag: "skillDirectory", path: ".codex/skills" },
+    target: { _tag: "skillDirectory", path: ".agents/skills" },
     nativeHooks: { _tag: "codexJson", configPath: ".codex/hooks.json", compactCommand: "/compact" },
   },
   {
