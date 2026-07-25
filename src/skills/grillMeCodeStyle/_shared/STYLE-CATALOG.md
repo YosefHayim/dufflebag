@@ -420,7 +420,7 @@ When a dimension is language-specific, a note like `[TS/JS only]` appears in the
 
 - **Async jobs** — queue / worker idioms; retry & idempotency shape.
 
-- **Logging & observability** — structured logging; what gets logged where.
+- **Logging & observability** — structured logging; what gets logged where. Prefer one logging API (e.g. Effect.log\*, pino) + **one env mute** (`LOG_LEVEL` / equivalent) over scattered `console.*`. Browser/widget surfaces: fail quiet when customer consoles must stay clean. Existing repos: keep/kill real `console.log/error` offenders from the ceremony scan.
 
 ---
 
@@ -503,13 +503,25 @@ When a dimension is language-specific, a note like `[TS/JS only]` appears in the
   - Does a new module need its own README, or is colocated doc-comments sufficient?
   - Who owns the update — the PR author, or a periodic sweep?
 
+- **Scripts & tool-first lifecycle** — [always grill; use ceremony scan on existing repos]
+  - **Tool first:** if wrangler / next / biome / drizzle-kit / vitest / the framework CLI already does it, `package.json` calls that tool — **no** house script that only shells it.
+  - **Custom script only** for product glue the tool cannot express (seed, lean env→deploy, product asset no tool ships).
+  - **Folders:** only `scripts/dev/` and `scripts/production/` (product lifecycle). Not `src/scripts/`, not app-local dump folders, not `scripts/ci|tools|utils`.
+  - **Generated artifacts die with the custom script** that produced them; prefer official typegen (`wrangler types`) + schema infer for rows.
+  - Greenfield: recommend tool-first + two-nest scripts as default; grill only if the project has a real reason to diverge.
+  - Existing: keep/kill each ceremony-scan hit with path + “replace with {tool}”.
+
 ---
 
 ## Round 7 — Over-engineering (the "too much" fingerprint)
 
-Round 1's slop fingerprint catches *unreadable* code; this round catches *excess* code — abstraction, indirection, and structure that costs more than it buys. It is the grill-time twin of the **`deslop-v2`** skill: every family below has a concrete before/after in [`deslop-v2/references/line-smells.md`](../../deslop-v2/references/line-smells.md) (line-level) and [`deslop-v2/references/structure-smells.md`](../../deslop-v2/references/structure-smells.md) (structural) — pull the matching example as the `✗ not this` when you grill it.
+Round 1's slop fingerprint catches *unreadable* code; this round catches *excess* code — abstraction, indirection, structure, and **tool-ceremony** that costs more than it buys. It is the grill-time twin of the **`deslop-v2`** skill: line/structure before/after in [`deslop-v2/references/line-smells.md`](../../deslop-v2/references/line-smells.md) and [`structure-smells.md`](../../deslop-v2/references/structure-smells.md); ceremony in [`ceremony-smells.md`](../../deslop-v2/references/ceremony-smells.md) — pull the matching example as the `✗ not this` when you grill it.
 
-**The one test — state it, then grill each family against it:** *an abstraction (wrapper, layer, helper, folder, package) earns its place only if it has a second real caller or names a genuine domain concept; otherwise inline or flatten it.* For an existing repo, each family is a **keep/kill** against real offenders (cite `file:symbol`); greenfield, each is a **will-we-allow-this** with an illustrative snippet. Killed families become concrete `## Never` entries with an enforced-vs-taste tag.
+**The one test — state it, then grill each family against it:** *an abstraction (wrapper, layer, helper, folder, package) earns its place only if it has a second real caller or names a genuine domain concept; otherwise inline or flatten it.*
+
+**The tool-first test — state it for ceremony families:** *if the framework/service CLI already does the job, call it; custom code only for product glue; generated orphans die with dead scripts.*
+
+For an existing repo, each family is a **keep/kill** against real offenders (cite `file:symbol` / path); greenfield, each is a **will-we-allow-this** with an illustrative snippet. Killed families become concrete `## Never` entries with an enforced-vs-taste tag. On existing repos, **surface the ceremony kill list from the scan even if the user wants a short grill** — do not skip C1–C8 when the scan found hits.
 
 The five line-level families (each collapses to one TUI question):
 
@@ -525,4 +537,14 @@ The structural families (grill these against the repo tree — `ls`/tree first):
 - **Too little structure** — the mirror twin: a god-file crossing several domains that should split along domain seams.
 - **Calibration** — the target is the middle: one folder per real sub-domain, one file per cohesive unit, one package per real consumer boundary. Count concepts, not lines. This lands as the `## Structure` guidance in `CODE-STYLE.md` and a tight `AGENTS.md` digest line.
 
-Fold the kills into the existing `## Never` list (Round 1's fingerprint) rather than a separate list, and wire the machine-catchable ones (`no-nested-ternary`, banned guard shapes, complexity/length caps) into the **Lint tells** in Round 6 so CI prevents them, not just documents them. Point the repo's ongoing enforcement at `deslop-v2` (per-diff, over-engineering) alongside `deslop` (per-diff, readability).
+The ceremony families (existing: grill the **scan kill list** as keep/kill batches; greenfield: will-we-allow — recommend kill/disallow as default):
+
+- **Tool-wrapper scripts** — files that only shell wrangler/biome/drizzle/tsc/…. → package.json / CI calls the tool. `[taste]`
+- **House typegen / drift theater** — reimplemented `wrangler types` / kit snapshot diffs + test suites. → official CLI only. `[taste]`
+- **Wrong tool for types** — wrangler for row shapes; hand vendor schemas when SDK/extension types exist. → bindings from wrangler, rows from schema infer, vendor from SDK. `[taste]`
+- **Scripts outside product lifecycle** — `src/scripts`, flat dumps, extra nests. → only `scripts/dev` + `scripts/production`, product glue only. `[taste]`
+- **Orphan generated artifacts** — `*.generated.*` for dead generators. → delete with the script. `[taste]`
+- **Parallel type/schema systems** — second interface layer for the same payload. → one SSOT. `[taste]`
+- **`console.*` scatter** — no single mute. → structured logger + one env (`LOG_LEVEL` or project pick). `[lint: no-console]` when the project agrees
+
+Fold the kills into the existing `## Never` list (Round 1's fingerprint) rather than a separate list, and wire the machine-catchable ones (`no-nested-ternary`, `no-console` when agreed, banned guard shapes, complexity/length caps) into the **Lint tells** in Round 6 so CI prevents them, not just documents them. Put the **ceremony kill list** (paths to delete/replace) in the Step 7 plan as an explicit cleanup section. Point ongoing enforcement at `deslop-v2` (per-diff + mass ceremony kill) alongside `deslop` (per-diff, readability).
