@@ -477,7 +477,7 @@ export const featureCatalog = Schema.decodeUnknownSync(featureCatalogSchema, {
     },
     title: "Deslop v2 — kill over-engineering",
     summary:
-      "The over-engineering companion to deslop: reviews code and repo structure for excess — pass-through wrappers, `??` fallback chains, nested ternaries, grab-bag returns, and over-nested folders/packages — then removes it so the code does exactly what it needs and no more. Use when the user says code is over-engineered, over-abstracted, or too complicated, or asks to simplify, flatten, or cut needless indirection and layers. Pure skill (no hooks).",
+      "The over-engineering companion to deslop: reviews code, repo structure, and tool-ceremony for excess — pass-through wrappers, `??` fallback chains, nested ternaries, grab-bag returns, over-nested folders/packages, house typegen, and scripts that only shell wrangler/biome/drizzle — then removes it so the code does exactly what it needs and no more. Use when the user says code is over-engineered, over-abstracted, or too complicated, or asks to kill ceremony, simplify, flatten, or cut needless indirection and layers. Pure skill (no hooks).",
     selectedByDefault: false,
     dependencies: [],
     platform: "any",

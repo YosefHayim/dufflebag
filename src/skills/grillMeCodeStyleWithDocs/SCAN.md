@@ -14,6 +14,15 @@ Spawn a small set of read-only sub-agents in parallel (prefer the `Explore` agen
 - **Naming** — conventions for files, functions, variables; what names encode.
 - **Tests** — presence, location, style, what's actually covered.
 - **AI-slop fingerprint** — hunt the recognizable AI tells, since slop is high-frequency and easily mistaken for a convention: giveaway micro-helpers (`isRecord`, `isObject`, `isNonEmptyString`, `isDefined`, `ensureArray`, `noop`, `assertNever`), defensive over-guards (redundant null/type checks the types already prove), nested or duplicated ternaries, one-use wrapper functions, copy-pasted boilerplate (identical `try/catch` or `if (!x) return null` shapes), and generic names (`handleData`, `processItem`, `result`, `temp`, `manager`). Report each tell with a **count** + 1-2 `file:symbol` offenders — the count is what separates a real convention from repeated slop.
+- **Ceremony & tool-slop fingerprint (mandatory)** — always run; this is how the grill auto-detects over-built noise so Round 7 can keep/kill with real paths. Use the catalog in [`deslop-v2/references/ceremony-smells.md`](../deslop-v2/references/ceremony-smells.md) (C1–C8; ships with the `deslop-v2` skill). Hunt at least:
+  - **Tool wrappers** — scripts/package targets that only `spawn`/`exec` an official CLI (`wrangler`, `biome`, `drizzle-kit`, `tsc`, `vitest`, `next`, …) with no product glue.
+  - **House typegen / drift theater** — custom type generation, snapshot re-diff, header canonicalize, UUID workspaces around a tool that already exists.
+  - **Wrong tool for the type job** — e.g. wrangler used as if it produced SQL row types; parallel hand schemas for vendor SDKs.
+  - **Scripts layout** — anything under `src/scripts/`, app-local `scripts/`, flat root script dumps, or nests other than product `scripts/dev` + `scripts/production`.
+  - **Orphan generated** — `*.generated.*` / committed outputs only justified by a dead or unjustified custom generator.
+  - **`console.log/error/warn`** density vs a single structured logger + env mute.
+  - **Micro-files** (~5–15 lines / one helper / one caller) and **generic locals** after async/Effect/SQL (`result`, `data`, `row`, `outcome`).
+  For each hit report: **family (C#)** · **path** · **official tool that replaces it** (or “product glue — keep lean”) · **orphan artifacts to delete with it** · **count** if repeated. Sort a draft **kill list** (easy pure wrappers first). No soft-pedaling high counts — repeated ceremony is still ceremony.
 
 ## Each agent reports
 
@@ -25,4 +34,4 @@ Spawn a small set of read-only sub-agents in parallel (prefer the `Explore` agen
 
 ## Bring back
 
-Merge into one compact "current reality" brief: for each dimension, the dominant pattern + a real *before* candidate. Feed that into the grill — "the code does X here; keep it, or is this the slop to kill?" Do not treat the dominant pattern as correct by default; it's just the starting evidence. Include the **directory tree + import edges** (for §⑤), the **de-facto extension path** (the ordered seams recent units touched, for the Step 6 golden path), the **AI-slop fingerprint tally** (each tell + count + a real offender, to drive the `Never`-list grill), and each dimension's **verbatim incumbent snippet** (variant A of its pick-the-code choice — see [STYLE-CATALOG.md](../grill-me-code-style/_shared/STYLE-CATALOG.md)).
+Merge into one compact "current reality" brief: for each dimension, the dominant pattern + a real *before* candidate. Feed that into the grill — "the code does X here; keep it, or is this the slop to kill?" Do not treat the dominant pattern as correct by default; it's just the starting evidence. Include the **directory tree + import edges** (for §⑤), the **de-facto extension path** (the ordered seams recent units touched, for the Step 6 golden path), the **AI-slop fingerprint tally** (each tell + count + a real offender, to drive the `Never`-list grill), the **ceremony kill list** (C1–C8 hits with replace-with tool + orphans — drives Round 7 keep/kill and the plan's cleanup section), and each dimension's **verbatim incumbent snippet** (variant A of its pick-the-code choice — see [STYLE-CATALOG.md](../grill-me-code-style/_shared/STYLE-CATALOG.md)).
