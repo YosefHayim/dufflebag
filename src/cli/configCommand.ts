@@ -57,12 +57,17 @@ const autoCompactIdleOption = Options.text("auto-compact-idle").pipe(
 
 const ttsVoiceOption = Options.text("tts-voice").pipe(
   Options.optional,
-  Options.withDescription("macOS speech voice name; empty selects the system default"),
+  Options.withDescription("Supertonic voice ID: F1-F5 or M1-M5 (default F4)"),
 );
 
 const ttsRateOption = Options.integer("tts-rate").pipe(
   Options.optional,
   Options.withDescription("Speech response rate in words per minute"),
+);
+
+const dictationWordsOption = Options.text("dictation-words").pipe(
+  Options.optional,
+  Options.withDescription("Speech replacements, for example Joseph=Yosef;type script=TypeScript"),
 );
 
 const dedupModes: ReadonlyArray<"deny" | "warn" | "off"> = ["deny", "warn", "off"];
@@ -93,6 +98,7 @@ const buildConfigPatch = (args: {
   autoCompactIdle: Option.Option<string>;
   ttsVoice: Option.Option<string>;
   ttsRate: Option.Option<number>;
+  dictationWords: Option.Option<string>;
   dedupMode: Option.Option<"deny" | "warn" | "off">;
   dedupSkip: Option.Option<string>;
 }): Record<string, unknown> => {
@@ -106,6 +112,7 @@ const buildConfigPatch = (args: {
   assignOptional(patch, "idleAutoCompact", args.autoCompactIdle);
   assignOptional(patch, "speechVoice", args.ttsVoice);
   assignOptional(patch, "speechWordsPerMinute", args.ttsRate);
+  assignOptional(patch, "dictationReplacements", args.dictationWords);
   assignOptional(patch, "dedupEnforcement", args.dedupMode);
   assignOptional(patch, "dedupSkipDirectories", args.dedupSkip);
   return patch;
@@ -121,6 +128,7 @@ const CONFIG_LABELS: Record<keyof typeof defaultBagConfig, string> = {
   idleAutoCompact: "idle auto-compact (off|duration)",
   speechVoice: "speech voice",
   speechWordsPerMinute: "speech rate (wpm)",
+  dictationReplacements: "dictation replacements",
   dedupEnforcement: "dedup enforcement (deny|warn|off)",
   dedupSkipDirectories: "dedup skip directories",
   debugEnabled: "debug logging",
@@ -142,6 +150,7 @@ export const configCommand = Command.make(
     autoCompactIdle: autoCompactIdleOption,
     ttsVoice: ttsVoiceOption,
     ttsRate: ttsRateOption,
+    dictationWords: dictationWordsOption,
     dedupMode: dedupModeOption,
     dedupSkip: dedupSkipOption,
   },
@@ -172,6 +181,7 @@ export const configCommand = Command.make(
         "idleAutoCompact",
         "speechVoice",
         "speechWordsPerMinute",
+        "dictationReplacements",
         "dedupEnforcement",
         "dedupSkipDirectories",
         "debugEnabled",

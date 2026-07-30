@@ -25,6 +25,8 @@ describe("daemon spawn env", () => {
     expect(env[ENV_KEYS.autorunMaxCycleCount]).toBe("50");
     expect(env[ENV_KEYS.debugEnabled]).toBe("false");
     expect(env[ENV_KEYS.idleAutoCompact]).toBe("off");
+    expect(env[ENV_KEYS.speechVoice]).toBe("F4");
+    expect(env[ENV_KEYS.dictationReplacements]).toBe("");
     expect(Object.keys(env).sort()).toEqual(Object.values(ENV_KEYS).sort());
   });
 
@@ -43,9 +45,11 @@ describe("daemon spawn env", () => {
       [ENV_KEYS.contextWarnFraction]: "0.12",
       [ENV_KEYS.autorunDefaultCycleCount]: "7",
       [ENV_KEYS.speechVoice]: "Ava",
+      [ENV_KEYS.dictationReplacements]: "Joseph=Yosef",
       [ENV_KEYS.debugEnabled]: "true",
     });
     expect(readConfig(configToEnvMap(original))).toEqual(original);
+    expect(original.dictationReplacements).toBe("Joseph=Yosef");
   });
 
   it("daemonSpawnEnv freezes effective config over the parent env and keeps unrelated keys", () => {

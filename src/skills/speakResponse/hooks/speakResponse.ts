@@ -1,105 +1,162 @@
 #!/usr/bin/env node
-/**
- * speak-response — minimal TTS for Claude Code (macOS). A `Stop` hook: when a
- * turn finishes, it reads the transcript and speaks only the assistant's prose
- * (code blocks and tool calls stripped) via the built-in `say` command. TS port
- * of the original bash hook; voice and rate come from `dufflebag*` env.
- *
- * Fail-open and non-blocking: any error exits 0, and speech is detached so the
- * hook returns instantly. macOS-only — no-ops on other platforms.
- */
+/** Queue one complete final response for Dufflebag's local voice worker. */
 
 import { spawn } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { randomUUID } from "node:crypto";
+import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
-import { readConfig } from "../../../runtime/config.js";
+type JsonRecord = Record<string, unknown>;
 
-interface Block {
-  type?: string;
-  text?: string;
-}
-interface Entry {
-  type?: string;
-  message?: { content?: string | Block[] };
-}
+const isRecord = (value: unknown): value is JsonRecord => typeof value === "object" && value !== null && !Array.isArray(value);
 
-/** A "genuine" user turn: a real prompt, not a tool_result envelope. */
-function isGenuineUser(entry: Entry): boolean {
-  if (entry.type !== "user") return false;
-  const content = entry.message?.content;
-  if (typeof content === "string") return true;
-  return Array.isArray(content) && content.every((b) => b.type !== "tool_result");
-}
+const stringField = (value: JsonRecord, names: ReadonlyArray<string>) => {
+  for (const name of names) {
+    const candidate = value[name];
+    if (typeof candidate === "string") {
+      return candidate;
+    }
+  }
+  return "";
+};
 
-/** Collect assistant text emitted after the last genuine user prompt. */
-function proseSinceLastPrompt(entries: Entry[]): string {
+const parseJson = (value: string): unknown => JSON.parse(value);
+
+const blockType = (value: unknown) => (isRecord(value) && typeof value.type === "string" ? value.type : "");
+
+const entryContent = (entry: JsonRecord) => {
+  if (isRecord(entry.message)) {
+    return entry.message.content;
+  }
+  return entry.content;
+};
+
+const isGenuineUser = (entry: unknown) => {
+  if (!isRecord(entry) || (entry.type !== "user" && entry.role !== "user")) {
+    return false;
+  }
+  const content = entryContent(entry);
+  if (typeof content === "string") {
+    return true;
+  }
+  return Array.isArray(content) && content.every((block) => blockType(block) !== "tool_result");
+};
+
+const assistantText = (entry: unknown) => {
+  if (!isRecord(entry) || (entry.type !== "assistant" && entry.role !== "assistant")) {
+    return [];
+  }
+  const content = entryContent(entry);
+  if (typeof content === "string") {
+    return content.trim() ? [content] : [];
+  }
+  if (!Array.isArray(content)) {
+    return [];
+  }
+  return content.flatMap((block) =>
+    isRecord(block) && block.type === "text" && typeof block.text === "string" && block.text.trim() ? [block.text] : [],
+  );
+};
+
+const responseFromTranscript = (transcriptPath: string) => {
+  const entries = readFileSync(transcriptPath, "utf8")
+    .split("\n")
+    .filter((line) => line.trim())
+    .map(parseJson);
   let start = 0;
-  for (let i = entries.length - 1; i >= 0; i--) {
-    if (isGenuineUser(entries[i]!)) {
-      start = i + 1;
+  for (let index = entries.length - 1; index >= 0; index -= 1) {
+    if (isGenuineUser(entries[index])) {
+      start = index + 1;
       break;
     }
   }
-  const out: string[] = [];
-  for (const entry of entries.slice(start)) {
-    if (entry.type !== "assistant" || !Array.isArray(entry.message?.content)) continue;
-    for (const block of entry.message.content) {
-      if (block.type === "text" && block.text) out.push(block.text);
-    }
+  return entries.slice(start).flatMap(assistantText).join("\n\n");
+};
+
+const agentId = () => {
+  const flag = process.argv.indexOf("--dufflebag-agent-id");
+  const value = flag >= 0 ? process.argv[flag + 1] : "";
+  return value?.trim() || "unknown-agent";
+};
+
+const isFinalGrokEvent = (input: JsonRecord) => {
+  const reason = stringField(input, ["reason", "hook_reason", "hookReason"]);
+  return !reason || ["complete", "completed", "end_turn", "stop"].includes(reason) || reason.endsWith(":end_turn");
+};
+
+const directResponse = (input: JsonRecord) =>
+  stringField(input, ["last_assistant_message", "lastAssistantMessage", "last_agent_message", "lastAgentMessage"]);
+
+const voiceStateHome = () => {
+  const override = process.env.DUFFLEBAG_VOICE_HOME?.trim();
+  if (override) {
+    return path.resolve(override);
   }
-  return out.join("\n");
-}
+  if (process.platform === "win32") {
+    return path.join(process.env.LOCALAPPDATA || path.join(homedir(), "AppData", "Local"), "dufflebag", "voice");
+  }
+  if (process.platform === "darwin") {
+    return path.join(homedir(), "Library", "Application Support", "dufflebag", "voice");
+  }
+  return path.join(process.env.XDG_STATE_HOME || path.join(homedir(), ".local", "state"), "dufflebag", "voice");
+};
 
-/** Strip markdown/code so we speak conversation, not syntax. */
-function stripMarkdown(text: string): string {
-  return text
-    .replace(/```[\s\S]*?```/g, "") // e.g. ```ts\ncode\n``` → removed
-    .replace(/`([^`]*)`/g, "$1") // e.g. `foo` → foo
-    .replace(/!\[[^\]]*\]\([^)]*\)/g, "") // e.g. ![alt](url) → removed
-    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1") // e.g. [docs](url) → docs
-    .replace(/^\s{0,3}#{1,6}\s*/gm, "") // e.g. "## Title" → "Title"
-    .replace(/^\s*[-*+]\s+/gm, " ") // e.g. "- item" → " item"
-    .replace(/^\s*>\s?/gm, "") // e.g. "> quote" → "quote"
-    .replace(/[*_~]/g, "") // e.g. **bold** / _em_ / ~~x~~ markers stripped
-    .replace(/\s+/g, " ") // collapse runs of whitespace to one space
-    .trim();
-}
+const queueResponse = (markdown: string, source: string, responseId: string) => {
+  const inbox = path.join(voiceStateHome(), "inbox");
+  mkdirSync(inbox, { recursive: true });
+  const id = `${Date.now()}-${randomUUID()}`;
+  const destination = path.join(inbox, `${id}.json`);
+  const temporary = path.join(inbox, `.${id}.tmp`);
+  writeFileSync(
+    temporary,
+    JSON.stringify({
+      markdown,
+      received_at: Date.now() / 1_000,
+      response_id: responseId,
+      source,
+    }),
+    { encoding: "utf8", mode: 0o600 },
+  );
+  renameSync(temporary, destination);
+};
 
-function main(): void {
-  if (process.platform !== "darwin") return; // `say` is macOS-only
+const startWorker = () => {
+  const voicePath = path.join(path.dirname(path.dirname(fileURLToPath(import.meta.url))), "voice.py");
+  const worker = spawn("uv", ["run", "--frozen", "--script", voicePath, "start"], {
+    cwd: path.dirname(voicePath),
+    detached: true,
+    stdio: "ignore",
+    windowsHide: true,
+  });
+  worker.on("error", () => undefined);
+  worker.unref();
+};
 
-  let transcript = "";
-  try {
-    transcript = (JSON.parse(readFileSync(0, "utf8")) as { transcript_path?: string }).transcript_path ?? "";
-  } catch {
+const main = () => {
+  const input = parseJson(readFileSync(0, "utf8"));
+  if (!isRecord(input)) {
     return;
   }
-  if (!transcript) return;
-
-  let entries: Entry[];
-  try {
-    entries = readFileSync(transcript, "utf8")
-      .split("\n")
-      .filter(Boolean)
-      .map((line) => JSON.parse(line) as Entry);
-  } catch {
+  const source = agentId();
+  if (source === "grok" && !isFinalGrokEvent(input)) {
     return;
   }
 
-  const clean = stripMarkdown(proseSinceLastPrompt(entries));
-  if (!clean) return;
+  const transcriptPath = stringField(input, ["transcript_path", "transcriptPath"]);
+  const markdown = directResponse(input) || (transcriptPath ? responseFromTranscript(transcriptPath) : "");
+  if (!markdown.trim()) {
+    return;
+  }
 
-  const { speechVoice, speechWordsPerMinute } = readConfig();
-  // Kill any in-progress speech so turns don't pile up, then detach.
-  spawn("pkill", ["-x", "say"], { stdio: "ignore" }).on("error", () => {});
-  const args = ["-v", speechVoice, ...(speechWordsPerMinute ? ["-r", String(speechWordsPerMinute)] : []), clean];
-  spawn("/usr/bin/say", args, { detached: true, stdio: "ignore" }).unref();
-}
+  const responseId = stringField(input, ["response_id", "responseId", "turn_id", "turnId"]);
+  queueResponse(markdown, source, responseId);
+  startWorker();
+};
 
 try {
   main();
 } catch {
-  /* fail-open */
-} finally {
-  process.exit(0);
+  // Agent hooks must never block the coding session.
 }

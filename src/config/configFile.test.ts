@@ -48,7 +48,7 @@ layer(NodeContext.layer)("configFile", (it) => {
         const path = yield* Path.Path;
         const root = yield* fileSystem.makeTempDirectoryScoped({ prefix: "dufflebag-config-file-012-" });
         const configPath = path.join(root, "config.json");
-        const { idleAutoCompact: _removed, ...oldConfig } = defaultBagConfig;
+        const { idleAutoCompact: _idleRemoved, dictationReplacements: _dictationRemoved, ...oldConfig } = defaultBagConfig;
 
         yield* fileSystem.writeFileString(configPath, JSON.stringify(oldConfig));
 

@@ -40,6 +40,15 @@ describe("stagePackage", () => {
         expect(existsSync(path.join(contextGuardRoot, "lib/config.js"))).toBe(true);
         expect(existsSync(path.join(contextGuardRoot, "lib/io.js"))).toBe(true);
 
+        const voiceRoot = path.join(staged.root, "runtime/speakResponse");
+        for (const asset of ["voice.py", "voice.py.lock"]) {
+          expect(readFileSync(path.join(voiceRoot, asset))).toEqual(
+            readFileSync(path.join(packageRoot, "src/skills/speakResponse", asset)),
+          );
+        }
+        expect(existsSync(path.join(voiceRoot, "lib/config.js"))).toBe(false);
+        expect(existsSync(path.join(voiceRoot, "lib/io.js"))).toBe(false);
+
         const execution = spawnSync(process.execPath, [contextGuard], {
           input: '{"hook_event_name":"UserPromptSubmit","session_id":"stage-package-test"}',
           encoding: "utf8",

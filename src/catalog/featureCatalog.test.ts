@@ -121,6 +121,7 @@ const validFixture = [
     runtime: {
       _tag: "hook",
       sourceEntrypoint: "hooks/beta.ts",
+      shippedPaths: [],
       registrations: [
         {
           event: "Stop",
@@ -218,6 +219,7 @@ describe("featureCatalog", () => {
               id: feature.id,
               platform: feature.platform,
               sourceEntrypoint: feature.runtime.sourceEntrypoint,
+              shippedPaths: feature.runtime.shippedPaths,
               registrations: feature.runtime.registrations,
             },
           ]
@@ -231,6 +233,7 @@ describe("featureCatalog", () => {
         id: "context-guard",
         platform: "any",
         sourceEntrypoint: "hooks/contextGuard.ts",
+        shippedPaths: [],
         registrations: [
           {
             event: "PreToolUse",
@@ -286,8 +289,9 @@ describe("featureCatalog", () => {
       },
       {
         id: "speak-response",
-        platform: "macos",
+        platform: "any",
         sourceEntrypoint: "hooks/speakResponse.ts",
+        shippedPaths: ["voice.py", "voice.py.lock"],
         registrations: [
           {
             event: "Stop",
@@ -300,6 +304,7 @@ describe("featureCatalog", () => {
         id: "dedup-guard",
         platform: "any",
         sourceEntrypoint: "hooks/dedupGuard.ts",
+        shippedPaths: [],
         registrations: [
           {
             event: "PreToolUse",
@@ -311,7 +316,6 @@ describe("featureCatalog", () => {
     ]);
     expect(featureCatalog.filter((feature) => feature.platform !== "any").map((feature) => [feature.id, feature.platform])).toEqual([
       ["autonomous-loop", "macos+ghostty"],
-      ["speak-response", "macos"],
       ["make-a-trailer", "macos"],
     ]);
     expect(runtimeEntrypoints.every((entrypoint) => entrypoint.endsWith(".ts"))).toBe(true);
@@ -409,6 +413,7 @@ describe("featureCatalogSchema", () => {
           runtime: {
             _tag: "hook",
             sourceEntrypoint: "hooks/beta.js",
+            shippedPaths: [],
             registrations: [],
           },
         },

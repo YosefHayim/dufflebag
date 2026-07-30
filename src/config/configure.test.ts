@@ -206,6 +206,7 @@ describe("planManagedConfig", () => {
       autorunIdleThresholdSeconds: 9,
       speechVoice: "Ava",
       speechWordsPerMinute: 240,
+      dictationReplacements: "Joseph=Yosef",
       dedupEnforcement: "warn",
       dedupSkipDirectories: "dist,fixtures",
       debugEnabled: true,
@@ -220,7 +221,7 @@ describe("planManagedConfig", () => {
     );
 
     expect(plan.config).toEqual(config);
-    expect(expectCleanup(plan).values).toHaveLength(12);
+    expect(expectCleanup(plan).values).toHaveLength(13);
   });
 
   it.each([

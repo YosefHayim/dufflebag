@@ -509,9 +509,11 @@ const desiredHookGroups = (input: {
       const executable = input.agent.detection.commands[0] ?? input.agent.id;
       const runtime = runtimeCommand(input.root, feature.sourceDirectory, entrypoint, input.path);
       const command =
-        `DUFFLEBAG_AGENT_ID=${input.agent.id} DUFFLEBAG_AGENT_COMMAND=${executable} ` +
-        `DUFFLEBAG_COMPACT_COMMAND=${nativeHooks.compactCommand} ` +
-        `dufflebagIdleAutoCompact=${input.idleAutoCompact} ${runtime}`;
+        feature.id === "speak-response"
+          ? `${runtime} --dufflebag-agent-id ${input.agent.id}`
+          : `DUFFLEBAG_AGENT_ID=${input.agent.id} DUFFLEBAG_AGENT_COMMAND=${executable} ` +
+            `DUFFLEBAG_COMPACT_COMMAND=${nativeHooks.compactCommand} ` +
+            `dufflebagIdleAutoCompact=${input.idleAutoCompact} ${runtime}`;
       const group = managedHookGroupSchema.make({
         ...(registration.matcher._tag === "pattern" ? { matcher: registration.matcher.value } : {}),
         hooks: [{ type: "command", command }],

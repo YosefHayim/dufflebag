@@ -146,24 +146,36 @@ const rewriteStagedHookRuntimeImports = (input: { hooksRoot: string }) =>
     const fileSystem = yield* FileSystem.FileSystem;
     const path = yield* Path.Path;
     if (!(yield* fileSystem.exists(input.hooksRoot))) {
-      return;
+      return false;
     }
 
     const hookFiles = (yield* fileSystem.readDirectory(input.hooksRoot)).filter((name) => name.endsWith(".js"));
-    yield* Effect.forEach(hookFiles, (name) => {
-      const hookPath = path.join(input.hooksRoot, name);
-      return fileSystem
-        .readFileString(hookPath)
-        .pipe(Effect.flatMap((source) => fileSystem.writeFileString(hookPath, source.replaceAll("../../../runtime/", "../lib/"))));
-    });
+    const sharedRuntimeImports = yield* Effect.forEach(hookFiles, (name) =>
+      Effect.gen(function* () {
+        const hookPath = path.join(input.hooksRoot, name);
+        const source = yield* fileSystem.readFileString(hookPath);
+        const usesSharedRuntime = source.includes("../../../runtime/");
+        if (usesSharedRuntime) {
+          yield* fileSystem.writeFileString(hookPath, source.replaceAll("../../../runtime/", "../lib/"));
+        }
+        return usesSharedRuntime;
+      }),
+    );
+    return sharedRuntimeImports.some(Boolean);
   });
 
-const stageRuntimeFeature = (input: { packageRoot: string; stagedRoot: string; sourceDirectory: string }) =>
+const stageRuntimeFeature = (input: {
+  packageRoot: string;
+  stagedRoot: string;
+  sourceDirectory: string;
+  shippedPaths: ReadonlyArray<string>;
+}) =>
   Effect.gen(function* () {
     const fileSystem = yield* FileSystem.FileSystem;
     const path = yield* Path.Path;
     const compiledFeatureRoot = path.join(input.packageRoot, "dist", "src", "skills", input.sourceDirectory);
     const compiledSharedRuntimeRoot = path.join(input.packageRoot, "dist", "src", "runtime");
+    const authoredFeatureRoot = path.join(input.packageRoot, "src", "skills", input.sourceDirectory);
     const stagedFeatureRoot = path.join(input.stagedRoot, "runtime", input.sourceDirectory);
     const compiledExists = yield* fileSystem.exists(compiledFeatureRoot);
     if (!compiledExists) {
@@ -183,11 +195,27 @@ const stageRuntimeFeature = (input: { packageRoot: string; stagedRoot: string; s
       }
     }
 
-    yield* copyTree({
-      source: compiledSharedRuntimeRoot,
-      destination: path.join(stagedFeatureRoot, "lib"),
-    });
-    yield* rewriteStagedHookRuntimeImports({ hooksRoot: path.join(stagedFeatureRoot, "hooks") });
+    const needsSharedRuntime = yield* rewriteStagedHookRuntimeImports({ hooksRoot: path.join(stagedFeatureRoot, "hooks") });
+    if (needsSharedRuntime) {
+      yield* copyTree({
+        source: compiledSharedRuntimeRoot,
+        destination: path.join(stagedFeatureRoot, "lib"),
+      });
+    }
+
+    for (const shippedPath of input.shippedPaths) {
+      const source = path.join(authoredFeatureRoot, shippedPath);
+      if (!(yield* fileSystem.exists(source))) {
+        return yield* new StagePackageError({
+          issue: `Catalog-shipped runtime path ${shippedPath} is missing under ${authoredFeatureRoot}.`,
+        });
+      }
+
+      yield* copyTree({
+        source,
+        destination: path.join(stagedFeatureRoot, shippedPath),
+      });
+    }
   });
 
 const stageSkillFeature = (input: {
@@ -248,6 +276,7 @@ export const stagePackage = Effect.gen(function* () {
         packageRoot,
         stagedRoot,
         sourceDirectory: feature.sourceDirectory,
+        shippedPaths: feature.runtime.shippedPaths,
       });
     }
 
