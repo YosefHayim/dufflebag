@@ -24,6 +24,15 @@ const stageContextGuardRuntime = (stagedRoot: string) =>
     }
   });
 
+const stageSpeakResponseRuntime = (stagedRoot: string) =>
+  Effect.gen(function* () {
+    const fileSystem = yield* FileSystem.FileSystem;
+    const path = yield* Path.Path;
+    const destination = path.join(stagedRoot, "runtime/speakResponse/hooks/speakResponse.js");
+    yield* fileSystem.makeDirectory(path.dirname(destination), { recursive: true });
+    yield* fileSystem.writeFile(destination, textEncoder.encode("export {};\n"));
+  });
+
 const installRequest = (input: { root: string; stagedRoot: string }) => ({
   destination: { _tag: "project", root: input.root },
   host: { homeRoot: input.root },
@@ -119,6 +128,32 @@ layer(NodeContext.layer)("install", (it) => {
 
         const claudeExists = yield* fileSystem.exists(path.join(root, ".claude/settings.json"));
         expect(claudeExists).toBe(false);
+      }),
+    ),
+  );
+
+  it.effect("generates portable voice hook commands for Claude, Codex, and Grok", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const fileSystem = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const root = yield* fileSystem.makeTempDirectoryScoped({ prefix: "dufflebag-voice-hooks-root-" });
+        const stagedRoot = yield* fileSystem.makeTempDirectoryScoped({ prefix: "dufflebag-voice-hooks-stage-" });
+
+        yield* stageSpeakResponseRuntime(stagedRoot);
+        yield* install({
+          ...installRequest({ root, stagedRoot }),
+          features: { _tag: "selected", ids: ["speak-response"] },
+          agents: { _tag: "selected", ids: ["claude-code", "codex", "grok"] },
+        });
+
+        const settings = yield* fileSystem.readFileString(path.join(root, ".claude/settings.json"));
+        const codex = yield* fileSystem.readFileString(path.join(root, ".codex/hooks.json"));
+        const grok = yield* fileSystem.readFileString(path.join(root, ".grok/hooks/dufflebag.json"));
+        expect(settings).toContain("--dufflebag-agent-id claude-code");
+        expect(codex).toContain("--dufflebag-agent-id codex");
+        expect(grok).toContain("--dufflebag-agent-id grok");
+        expect(`${settings}\n${codex}\n${grok}`).not.toContain("DUFFLEBAG_AGENT_ID=");
       }),
     ),
   );

@@ -93,11 +93,11 @@ export const bagConfigSchema = Schema.Struct({
     Schema.Trim.pipe(
       Schema.compose(
         Schema.Trimmed.annotations({
-          description: "macOS speech voice name; empty selects the system default.",
+          description: "Supertonic voice ID (F1-F5 or M1-M5); unsupported legacy names fall back to F4.",
         }),
       ),
     ),
-    { default: () => "Samantha", exact: true },
+    { default: () => "F4", exact: true },
   ),
   speechWordsPerMinute: Schema.optionalWith(
     Schema.Number.pipe(
@@ -109,6 +109,16 @@ export const bagConfigSchema = Schema.Struct({
       }),
     ),
     { default: () => 230, exact: true },
+  ),
+  dictationReplacements: Schema.optionalWith(
+    Schema.Trim.pipe(
+      Schema.compose(
+        Schema.Trimmed.annotations({
+          description: "Semicolon-separated speech replacements in heard=written form.",
+        }),
+      ),
+    ),
+    { default: () => "", exact: true },
   ),
   dedupEnforcement: Schema.optionalWith(
     Schema.Trim.pipe(
@@ -200,6 +210,10 @@ export const legacyBagConfigEnvironmentSchema = Schema.Struct({
     legacyNumberStringSchema.pipe(Schema.compose(bagConfigSchema.from.fields.speechWordsPerMinute.from)),
     { default: () => defaultBagConfig.speechWordsPerMinute, exact: true },
   ).pipe(Schema.fromKey("dufflebagSpeechWordsPerMinute")),
+  dictationReplacements: Schema.optionalWith(bagConfigSchema.from.fields.dictationReplacements.from, {
+    default: () => defaultBagConfig.dictationReplacements,
+    exact: true,
+  }).pipe(Schema.fromKey("dufflebagDictationReplacements")),
   dedupEnforcement: Schema.optionalWith(bagConfigSchema.from.fields.dedupEnforcement.from, {
     default: () => defaultBagConfig.dedupEnforcement,
     exact: true,

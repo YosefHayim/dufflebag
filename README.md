@@ -67,6 +67,67 @@ dufflebag config --warn 0.15 --block 0.22 --budget 5
 dufflebag config --auto-compact-idle 1m
 ```
 
+### Natural voice and dictation
+
+Turn on complete-response narration and play a first example:
+
+```bash
+dufflebag voice on devin --example "Read this number one. Now read this number two."
+```
+
+Claude Code, Codex, and Grok use native end-of-turn hooks. Run Devin through its
+official ATIF export wrapper so only completed responses are narrated:
+
+```bash
+dufflebag voice devin -- <devin arguments>
+```
+
+Markdown is translated into speech instead of read as punctuation: tables name
+their columns and cells, links stay understandable, and code blocks are announced
+and read in full. Nothing is truncated.
+
+Hold Control for 350 ms to dictate locally into the active caret. A small
+bottom-center pill moves through **Starting microphone**, **Listening**, and
+**Finishing**; release Control to finish the phrase. Dufflebag keeps a short
+release tail so the final word is not clipped. Say punctuation and structure
+directly, for example:
+
+```text
+hello comma my name is Joseph period
+bullet fix authentication next bullet add tests
+numbered list fix login next item deploy
+use literal comma as the field name period
+```
+
+Add machine-specific corrections without an LLM:
+
+```bash
+dufflebag config --dictation-words "Joseph=Yosef;type script=TypeScript"
+```
+
+```bash
+dufflebag voice status
+dufflebag voice example "Release status: Devin is ready."
+dufflebag voice off
+```
+
+Voice supports macOS, Windows, and Linux and requires only
+[`uv`](https://docs.astral.sh/uv/). `dufflebag voice on` uses the adjacent lockfile
+to prepare a compatible Python, pinned packages, and both local speech models
+before starting the worker. Later runs reuse uv and model caches; narration and
+transcription stay on the machine.
+
+There is intentionally no Docker image. Global Control capture, the host
+microphone, the focused caret, and the desktop listening pill must run in the
+host session; a container would add a second dependency/model cache while still
+requiring platform-specific host access. Grant microphone and input-control
+permissions when your OS asks. Linux desktop and Wayland security policy can
+restrict global key capture or caret typing. If Tkinter or a graphical desktop
+is unavailable, dictation continues without the visual pill.
+
+The installed runtime stays small in source: one zero-dependency hook, one
+PEP 723 Python worker, and its generated uv lockfile.
+
 Idle auto-compact is off by default. On macOS with Ghostty 1.3+, verified native
 hooks for Claude Code, Codex, and Grok bind each session to its exact terminal.
 Override one launched agent without changing persistent config, for example
@@ -74,14 +135,14 @@ Override one launched agent without changing persistent config, for example
 
 ## What it installs
 
-`context-guard` is the safe default. `dedup-guard` blocks duplicate TypeScript functions and type shapes at write time where the agent platform supports it. `autonomous-loop` and `speak-response` are macOS-specific conveniences; the loop is driven in-session by `/autorun`. The remaining entries are pure skills with no hooks — no configuration needed, just ask your agent to do the thing (e.g. "convert this PNG to code"). Skills authored by others are bundled too, but credited separately under [Recommended community skills](#recommended-community-skills).
+`context-guard` is the safe default. `dedup-guard` blocks duplicate TypeScript functions and type shapes at write time where the agent platform supports it. `autonomous-loop` is a macOS-specific convenience driven in-session by `/autorun`; `speak-response` is cross-platform. The remaining entries are pure skills with no hooks — no configuration needed, just ask your agent to do the thing (e.g. "convert this PNG to code"). Skills authored by others are bundled too, but credited separately under [Recommended community skills](#recommended-community-skills).
 
 <!-- AUTO:FEATURES:START -->
 | Feature | What it does | Runs on |
 | --- | --- | --- |
 | **context-guard** | Guard long sessions near their context cap and optionally compact idle Claude Code, Codex, or Grok sessions in their exact Ghostty terminal. | 🟢 any OS |
 | **autonomous-loop** | A skill that arms the context-guard SessionStart daemon to auto-/compact and resume hands-free once context nears the guardrail and a fresh handoff exists. macOS + Ghostty only (it types into your terminal window). Hook runtime lives under context-guard. | 🔴 macOS + Ghostty |
-| **speak-response** | A Stop hook that speaks Claude's prose (code blocks stripped) via the macOS `say` command. macOS only. | 🟡 macOS |
+| **speak-response** | Read complete Claude, Codex, Grok, and Devin responses naturally, including Markdown structure, with local cross-platform speech and dictation. | 🟢 any OS |
 | **dedup-guard** | Block a Write/Edit that pastes a function body or interface/type shape already defined elsewhere in the repo — DRY enforced at the moment of the write. Uses the repo's own TypeScript; deny by default (tune with dufflebagDedupEnforcement). Also wires Cursor (warn) + an AGENTS.md rule for Codex. | 🟢 any OS |
 | **png-to-code** | A skill that turns a PNG design (illustration, logo, UI mockup) into SVG/HTML/CSS that measurably converges to a 1:1 match — a decompose → reuse-or-build → render → screenshot-diff → refine loop, plus a rig-first doctrine for animation. Pure skill (no hooks); its diff harness needs Node + Playwright. | 🟢 any OS |
 | **github-repo-metadata** | A skill that writes and audits GitHub repository About metadata: concise descriptions, homepage/demo links, and topics/tags grounded in official GitHub guidance. Pure skill (no hooks). | 🟢 any OS |

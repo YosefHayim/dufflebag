@@ -2,7 +2,7 @@ import { FileSystem } from "@effect/platform";
 import { PlatformError } from "@effect/platform/Error";
 import { Effect, Either, Option, ParseResult, Predicate, Schema } from "effect";
 
-import { bagConfigSchema } from "./bagConfigSchema.js";
+import { bagConfigSchema, defaultBagConfig } from "./bagConfigSchema.js";
 import { findDuplicateJsonProperty } from "./jsonDocument.js";
 
 const textDecoder = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
@@ -49,10 +49,16 @@ const decodeManagedConfigFile = Schema.decodeUnknownEither(managedConfigFileSche
   onExcessProperty: "error",
 });
 
+const additiveConfigFields = ["idleAutoCompact", "dictationReplacements"] as const;
+
 const decodeManagedConfigValue = (value: unknown) => {
   const current = decodeManagedConfigFile(value);
-  if (Either.isRight(current) || !Predicate.isRecord(value) || Object.hasOwn(value, "idleAutoCompact")) return current;
-  return decodeManagedConfigFile({ ...value, idleAutoCompact: "off" });
+  if (Either.isRight(current) || !Predicate.isRecord(value)) return current;
+  const migrated = { ...value };
+  for (const field of additiveConfigFields) {
+    if (!Object.hasOwn(migrated, field)) migrated[field] = defaultBagConfig[field];
+  }
+  return decodeManagedConfigFile(migrated);
 };
 
 const formatParseError = (error: ParseResult.ParseError): string => ParseResult.TreeFormatter.formatErrorSync(error);

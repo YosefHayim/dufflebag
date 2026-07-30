@@ -22,6 +22,7 @@ import { runMenu } from "./menuCommand.js";
 import { scaffoldWorkflowsCommand } from "./scaffoldWorkflowsCommand.js";
 import { uninstallCommand } from "./uninstallCommand.js";
 import { updateCommand } from "./updateCommand.js";
+import { voiceCommand } from "./voiceCommand.js";
 
 const readPackageVersion = (): string => {
   let directory = dirname(fileURLToPath(import.meta.url));
@@ -50,9 +51,7 @@ const readPackageVersion = (): string => {
 const VERSION = readPackageVersion();
 
 const dufflebag = Command.make("dufflebag").pipe(
-  Command.withDescription(
-    "Install a personal bag of AI coding agent skills & hooks for Claude Code, Kimi, and Kiro (context guard, autonomous loop, TTS).",
-  ),
+  Command.withDescription("Install a personal bag of AI coding-agent skills, hooks, natural voice, and reusable workflows."),
   Command.withSubcommands([
     installCommand,
     updateCommand,
@@ -61,6 +60,7 @@ const dufflebag = Command.make("dufflebag").pipe(
     doctorCommand,
     dedupCommand,
     scaffoldWorkflowsCommand,
+    voiceCommand,
   ]),
 );
 

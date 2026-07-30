@@ -34,8 +34,9 @@ describe("bagConfigSchema", () => {
       autorunPollIntervalSeconds: 5,
       autorunIdleThresholdSeconds: 8,
       idleAutoCompact: "off",
-      speechVoice: "Samantha",
+      speechVoice: "F4",
       speechWordsPerMinute: 230,
+      dictationReplacements: "",
       dedupEnforcement: "deny",
       dedupSkipDirectories: "",
       debugEnabled: false,
@@ -53,6 +54,7 @@ describe("bagConfigSchema", () => {
     expectDescription(bagConfigSchema.from.fields.idleAutoCompact);
     expectDescription(bagConfigSchema.from.fields.speechVoice);
     expectDescription(bagConfigSchema.from.fields.speechWordsPerMinute);
+    expectDescription(bagConfigSchema.from.fields.dictationReplacements);
     expectDescription(bagConfigSchema.from.fields.dedupEnforcement);
     expectDescription(bagConfigSchema.from.fields.dedupSkipDirectories);
     expectDescription(bagConfigSchema.from.fields.debugEnabled);
@@ -76,6 +78,7 @@ describe("bagConfigSchema", () => {
     "idleAutoCompact",
     "speechVoice",
     "speechWordsPerMinute",
+    "dictationReplacements",
     "dedupEnforcement",
     "dedupSkipDirectories",
     "debugEnabled",
@@ -164,11 +167,13 @@ describe("bagConfigSchema", () => {
     expect(
       decodeBagConfig({
         speechVoice: "  Ava  ",
+        dictationReplacements: "  Joseph=Yosef; type script=TypeScript  ",
         dedupEnforcement: " warn ",
         dedupSkipDirectories: "  templates, fixtures  ",
       }),
     ).toMatchObject({
       speechVoice: "Ava",
+      dictationReplacements: "Joseph=Yosef; type script=TypeScript",
       dedupEnforcement: "warn",
       dedupSkipDirectories: "templates, fixtures",
     });
@@ -245,11 +250,13 @@ describe("legacyBagConfigEnvironmentSchema", () => {
     expect(
       decodeLegacyBagConfig({
         dufflebagSpeechVoice: "  Ava  ",
+        dufflebagDictationReplacements: "  Joseph=Yosef  ",
         dufflebagDedupEnforcement: " off ",
         dufflebagDedupSkipDirectories: "  templates, fixtures  ",
       }),
     ).toMatchObject({
       speechVoice: "Ava",
+      dictationReplacements: "Joseph=Yosef",
       dedupEnforcement: "off",
       dedupSkipDirectories: "templates, fixtures",
     });
@@ -283,6 +290,6 @@ describe("bagConfigJsonSchema", () => {
     const json = Schema.encodeSync(bagConfigJsonSchema)(defaultBagConfig);
 
     expect(JSON.parse(json)).toEqual(defaultBagConfig);
-    expect(Object.keys(JSON.parse(json))).toHaveLength(12);
+    expect(Object.keys(JSON.parse(json))).toHaveLength(13);
   });
 });

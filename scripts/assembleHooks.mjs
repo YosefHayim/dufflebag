@@ -16,11 +16,12 @@
  * import specifiers verbatim under NodeNext, so the rewrite targets are stable.
  */
 
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const CLI_ENTRY = path.join(ROOT, "dist", "src", "cli", "main.js");
 const DIST_SKILLS = path.join(ROOT, "dist", "src", "skills");
 const PAYLOAD_DIR = path.join(ROOT, "dist", "src", "runtime");
 const OUT_HOOKS = path.join(ROOT, "dist", "hooks");
@@ -59,6 +60,10 @@ function main() {
   if (!existsSync(DIST_SKILLS)) {
     throw new Error("dist/src/skills is missing — run `tsc` before assembling the hook payload.");
   }
+  if (!existsSync(CLI_ENTRY)) {
+    throw new Error("dist/src/cli/main.js is missing — run `tsc` before finalizing the build.");
+  }
+  chmodSync(CLI_ENTRY, 0o755);
   rmSync(OUT_HOOKS, { recursive: true, force: true });
   mkdirSync(OUT_LIB, { recursive: true });
 

@@ -1,4 +1,4 @@
-import { execFileSync } from "node:child_process";
+import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -13,6 +13,27 @@ import { isBareArgv, VERSION } from "./main.js";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const CLI_ENTRY = path.join(REPO_ROOT, "src/cli/main.ts");
+const CLI_TEST_TIMEOUT = 75_000;
+const runCli = (args: ReadonlyArray<string>) =>
+  new Promise<string>((resolve, reject) => {
+    execFile(
+      process.execPath,
+      ["--import", "tsx", CLI_ENTRY, ...args],
+      {
+        cwd: REPO_ROOT,
+        encoding: "utf8",
+        timeout: 60_000,
+        env: { ...process.env, FORCE_COLOR: "0" },
+      },
+      (error, stdout) => {
+        if (error !== null) {
+          reject(error);
+          return;
+        }
+        resolve(stdout);
+      },
+    );
+  });
 
 describe("isBareArgv", () => {
   it("detects bare invocations that should route to the menu or help", () => {
@@ -23,42 +44,50 @@ describe("isBareArgv", () => {
 });
 
 describe("CLI help", () => {
-  it("prints help for --help without hanging", () => {
-    const output = execFileSync("pnpm", ["exec", "tsx", CLI_ENTRY, "--help"], {
-      cwd: REPO_ROOT,
-      encoding: "utf8",
-      timeout: 30_000,
-      env: { ...process.env, FORCE_COLOR: "0" },
-    });
+  it(
+    "prints help for --help without hanging",
+    async () => {
+      const output = await runCli(["--help"]);
 
-    expect(output.toLowerCase()).toContain("dufflebag");
-    expect(output.toLowerCase()).toMatch(/install|usage|commands/);
-  }, 45_000);
+      expect(output.toLowerCase()).toContain("dufflebag");
+      expect(output.toLowerCase()).toMatch(/install|usage|commands/);
+      expect(output.toLowerCase()).toContain("voice");
+    },
+    CLI_TEST_TIMEOUT,
+  );
 
-  it("prints version", () => {
-    const output = execFileSync("pnpm", ["exec", "tsx", CLI_ENTRY, "--version"], {
-      cwd: REPO_ROOT,
-      encoding: "utf8",
-      timeout: 30_000,
-      env: { ...process.env, FORCE_COLOR: "0" },
-    });
+  it(
+    "documents the exact voice-on example option",
+    async () => {
+      const output = await runCli(["voice", "on", "--help"]);
 
-    expect(output).toContain(VERSION);
-  }, 45_000);
+      expect(output).toContain("--example");
+      expect(output.toLowerCase()).toContain("devin");
+    },
+    CLI_TEST_TIMEOUT,
+  );
+
+  it(
+    "prints version",
+    async () => {
+      const output = await runCli(["--version"]);
+
+      expect(output).toContain(VERSION);
+    },
+    CLI_TEST_TIMEOUT,
+  );
 });
 
 describe("non-TTY bare invocation", () => {
-  it("exits without hanging when stdin is not a TTY", () => {
-    const output = execFileSync("pnpm", ["exec", "tsx", CLI_ENTRY], {
-      cwd: REPO_ROOT,
-      encoding: "utf8",
-      timeout: 30_000,
-      stdio: ["pipe", "pipe", "pipe"],
-      env: { ...process.env, FORCE_COLOR: "0" },
-    });
+  it(
+    "exits without hanging when stdin is not a TTY",
+    async () => {
+      const output = await runCli([]);
 
-    expect(output.toLowerCase()).toMatch(/dufflebag|usage|help|commands/);
-  }, 45_000);
+      expect(output.toLowerCase()).toMatch(/dufflebag|usage|help|commands/);
+    },
+    CLI_TEST_TIMEOUT,
+  );
 });
 
 describe("install request schema decoding smoke", () => {

@@ -18,6 +18,7 @@ export type BagConfig = {
   readonly idleAutoCompact: string;
   readonly speechVoice: string;
   readonly speechWordsPerMinute: number;
+  readonly dictationReplacements: string;
   readonly dedupEnforcement: DedupMode;
   readonly dedupSkipDirectories: string;
   readonly debugEnabled: boolean;
@@ -37,6 +38,7 @@ export const ENV_KEYS = {
   idleAutoCompact: "dufflebagIdleAutoCompact",
   speechVoice: "dufflebagSpeechVoice",
   speechWordsPerMinute: "dufflebagSpeechWordsPerMinute",
+  dictationReplacements: "dufflebagDictationReplacements",
   dedupEnforcement: "dufflebagDedupEnforcement",
   dedupSkipDirectories: "dufflebagDedupSkipDirectories",
   debugEnabled: "dufflebagDebugEnabled",
@@ -57,8 +59,9 @@ export const DEFAULTS: BagConfig = {
   autorunPollIntervalSeconds: 5,
   autorunIdleThresholdSeconds: 8,
   idleAutoCompact: "off",
-  speechVoice: "Samantha",
+  speechVoice: "F4",
   speechWordsPerMinute: 230,
+  dictationReplacements: "",
   dedupEnforcement: "deny",
   dedupSkipDirectories: "",
   debugEnabled: false,
@@ -107,6 +110,7 @@ export const readConfig = (env: NodeJS.Dict<string> = process.env): BagConfig =>
   idleAutoCompact: env[ENV_KEYS.idleAutoCompact] ?? DEFAULTS.idleAutoCompact,
   speechVoice: env[ENV_KEYS.speechVoice] ?? DEFAULTS.speechVoice,
   speechWordsPerMinute: numberFromEnv(env[ENV_KEYS.speechWordsPerMinute], DEFAULTS.speechWordsPerMinute),
+  dictationReplacements: env[ENV_KEYS.dictationReplacements] ?? DEFAULTS.dictationReplacements,
   dedupEnforcement: dedupModeFromEnv(env[ENV_KEYS.dedupEnforcement]),
   dedupSkipDirectories: env[ENV_KEYS.dedupSkipDirectories] ?? DEFAULTS.dedupSkipDirectories,
   debugEnabled: booleanFromEnv(env[ENV_KEYS.debugEnabled], DEFAULTS.debugEnabled),
@@ -126,6 +130,7 @@ export const configToEnvMap = (config: BagConfig): Record<string, string> => ({
   [ENV_KEYS.idleAutoCompact]: config.idleAutoCompact,
   [ENV_KEYS.speechVoice]: config.speechVoice,
   [ENV_KEYS.speechWordsPerMinute]: String(config.speechWordsPerMinute),
+  [ENV_KEYS.dictationReplacements]: config.dictationReplacements,
   [ENV_KEYS.dedupEnforcement]: config.dedupEnforcement,
   [ENV_KEYS.dedupSkipDirectories]: config.dedupSkipDirectories,
   [ENV_KEYS.debugEnabled]: config.debugEnabled ? "true" : "false",

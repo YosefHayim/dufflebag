@@ -115,6 +115,14 @@ export const featureRuntimeSchema = Schema.Union(
         description: "Feature-relative TypeScript entrypoint compiled into dist/runtime.",
       }),
     ),
+    shippedPaths: Schema.Array(shippedPathSchema).pipe(
+      Schema.filter((paths) => paths.length === new Set(paths).size, {
+        message: () => "Runtime shipped paths must be unique within one feature.",
+      }),
+      Schema.annotations({
+        description: "Exact authored runtime assets copied beside the compiled hook.",
+      }),
+    ),
     registrations: Schema.Array(hookRegistrationSchema).annotations({
       description: "Hook registrations derived into supported agent settings.",
     }),
@@ -246,6 +254,7 @@ export const featureCatalog = Schema.decodeUnknownSync(featureCatalogSchema, {
     runtime: {
       _tag: "hook",
       sourceEntrypoint: "hooks/contextGuard.ts",
+      shippedPaths: [],
       registrations: [
         {
           event: "PreToolUse",
@@ -321,13 +330,15 @@ export const featureCatalog = Schema.decodeUnknownSync(featureCatalogSchema, {
     sourceDirectory: "speakResponse",
     installedSkill: { _tag: "none" },
     title: "Speak responses (TTS)",
-    summary: "A Stop hook that speaks Claude's prose (code blocks stripped) via the macOS `say` command. macOS only.",
+    summary:
+      "Read complete Claude, Codex, Grok, and Devin responses naturally, including Markdown structure, with local cross-platform speech and dictation.",
     selectedByDefault: false,
     dependencies: [],
-    platform: "macos",
+    platform: "any",
     runtime: {
       _tag: "hook",
       sourceEntrypoint: "hooks/speakResponse.ts",
+      shippedPaths: ["voice.py", "voice.py.lock"],
       registrations: [
         {
           event: "Stop",
@@ -350,6 +361,7 @@ export const featureCatalog = Schema.decodeUnknownSync(featureCatalogSchema, {
     runtime: {
       _tag: "hook",
       sourceEntrypoint: "hooks/dedupGuard.ts",
+      shippedPaths: [],
       registrations: [
         {
           event: "PreToolUse",
