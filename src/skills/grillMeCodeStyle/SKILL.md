@@ -71,9 +71,9 @@ The code-style grill runs as **pick-the-code**, not prose. For each dimension I 
 Run the full catalog: **[STYLE-CATALOG.md](_shared/STYLE-CATALOG.md)** — all language-conditional sections filtered by the Q0 answer, all new dimensions included.
 
 Key behaviors:
-- **Each pick → a rule.** Chosen variant = the `✓` example; rejected variant = a plausible `✗ not this`. Every rule carries an **enforced-vs-taste tag** (`[lint: <rule>]` / `[taste]`).
+- **Each pick → a rule card.** Chosen variant = the `✓` example; rejected variant = the `✗` case. Every card follows the fixed five-slot anatomy in [CODE-STYLE-FORMAT.md](_shared/CODE-STYLE-FORMAT.md): heading, `[rule:<id>] · verify: <command>` metadata line, **one-sentence** assertion, ✓/✗ block, `Why:` line. `verify:` names a real command, or `judgment` when a reviewer owns it.
 - **Formatting** — quotes, semicolons, line width, trailing commas, import order. Grill my preference, but **the answer becomes a formatter config, not prose**: pick and scaffold the appropriate config per [FORMATTERS.md](_shared/FORMATTERS.md), and record the choice as an ADR.
-- **Anti-patterns / AI-slop fingerprint** — the explicit "never do this here" list. Grill the recognizable AI tells up front so generated code avoids them from day one. Each becomes a concrete `Never` entry (an illustrative snippet, since there's no code yet) with an enforced-vs-taste tag.
+- **Anti-patterns / AI-slop fingerprint** — the explicit "never do this here" list. Grill the recognizable AI tells up front so generated code avoids them from day one. Each becomes a concrete `Never` entry (an illustrative snippet, since there's no code yet) cross-referencing the `[rule:<id>]` that owns it.
 - **Over-engineering (the "too much" fingerprint)** — run [STYLE-CATALOG.md](_shared/STYLE-CATALOG.md) **Round 7**: grill each over-engineering family (needless indirection, fake robustness, control-flow contortion, shape noise, dead space, structural too-much/too-little, **and ceremony/tool-slop C1–C8** — tool wrappers, house typegen, scripts only under `scripts/{dev,production}`, tool-first CLIs, no parallel vendor schemas, structured logging + one env mute) against the one test — *an abstraction earns its place only with a second real caller or a genuine domain concept* — and the **tool-first test** — *if the framework CLI already does it, call it; no house wrapper*. Illustrative before/after: `deslop-v2` references including **`ceremony-smells`**. Killed families fold into `Never`; recommend tool-first + two-nest scripts as default. Point ongoing enforcement at `deslop-v2` per-diff.
 - **Compose the canonical example.** After the rounds, assemble every pick into one **canonical example** — a representative feature for this project written in the agreed style — so I see the whole pattern together. It becomes the Step 6 litmus and the `## Canonical example` block of `CODE-STYLE.md`; with no code yet, it's the single clearest picture of what "good" looks like here.
 
@@ -105,7 +105,7 @@ With the picks, CLI, structure, and dependency policy settled, compose the one a
 
 - **Name the unit** of extension (feature / endpoint / screen / component / Actor / module) — parameterize the section to the project's real word.
 - **Derive a draft numbered path** from the picks + canonical example, then grill it **step-by-step** (keep / adjust / reorder / cut); end with a **definition-of-done** checklist.
-- **Wire the guard** in layers: machine-catchable `## Never` tells → the **lint config** (CI blocks; flips `[taste]`→`[lint]`); taste tells → **`deslop` per-diff**; the checklist → the human/agent gate. Slop is "off the golden path".
+- **Wire the guard** in layers: machine-catchable `## Never` tells → the **lint config** (CI blocks; flips a rule's `verify` from `judgment` to a real command); taste tells → **`deslop` per-diff**; the checklist → the human/agent gate. Slop is "off the golden path".
 
 Lands a first-class `## Golden path — adding a {unit}` in `CODE-STYLE.md` + a tight mirror in the `AGENTS.md` digest.
 
