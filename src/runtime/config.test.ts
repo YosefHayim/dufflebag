@@ -26,6 +26,9 @@ describe("daemon spawn env", () => {
     expect(env[ENV_KEYS.debugEnabled]).toBe("false");
     expect(env[ENV_KEYS.idleAutoCompact]).toBe("off");
     expect(env[ENV_KEYS.speechVoice]).toBe("F4");
+    expect(env[ENV_KEYS.speechResponseMode]).toBe("auto");
+    expect(env[ENV_KEYS.speechReadAlong]).toBe("true");
+    expect(env[ENV_KEYS.promptRefinementMode]).toBe("off");
     expect(env[ENV_KEYS.dictationReplacements]).toBe("");
     expect(Object.keys(env).sort()).toEqual(Object.values(ENV_KEYS).sort());
   });

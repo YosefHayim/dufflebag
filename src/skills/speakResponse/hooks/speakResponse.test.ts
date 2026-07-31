@@ -16,15 +16,19 @@ const stateHome = () => {
   return home;
 };
 
-const runHook = (input: unknown, agentId: string, home: string) =>
+const runHook = (input: unknown, agentId: string, home: string, environment: Record<string, string> = {}) =>
   spawnSync(process.execPath, ["--import", "tsx", hookPath, "--dufflebag-agent-id", agentId], {
     cwd: packageRoot,
     input: JSON.stringify(input),
     encoding: "utf8",
     env: {
       ...process.env,
+      CMUX_SOCKET_PATH: "",
+      CMUX_SURFACE_ID: "",
+      CMUX_WORKSPACE_ID: "",
       DUFFLEBAG_VOICE_HOME: home,
       PATH: "",
+      ...environment,
     },
   });
 
@@ -50,7 +54,30 @@ describe("speak-response hook", () => {
 
     expect(execution.status).toBe(0);
     expect(execution.stderr).toBe("");
-    expect(queued(home)).toMatchObject({ markdown, source: "claude-code" });
+    expect(queued(home)).toMatchObject({ markdown, origin: { kind: "terminal" }, source: "claude-code" });
+  });
+
+  it("binds a Cmux response to its originating surface without persisting socket capabilities", () => {
+    const home = stateHome();
+
+    expect(
+      runHook({ last_assistant_message: "Focused response" }, "codex", home, {
+        CMUX_SOCKET_CAPABILITY: "must-not-leak",
+        CMUX_SOCKET_PATH: "/tmp/cmux-test.sock",
+        CMUX_SURFACE_ID: "surface-uuid",
+        CMUX_WORKSPACE_ID: "workspace-uuid",
+      }).status,
+    ).toBe(0);
+
+    expect(queued(home)).toMatchObject({
+      origin: {
+        kind: "cmux",
+        socket_path: "/tmp/cmux-test.sock",
+        surface_id: "surface-uuid",
+        workspace_id: "workspace-uuid",
+      },
+    });
+    expect(JSON.stringify(queued(home))).not.toContain("must-not-leak");
   });
 
   it("queues a Grok end-turn response and ignores non-final hook events", () => {

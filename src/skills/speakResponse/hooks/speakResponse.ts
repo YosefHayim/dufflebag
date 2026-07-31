@@ -10,6 +10,10 @@ import { fileURLToPath } from "node:url";
 
 type JsonRecord = Record<string, unknown>;
 
+type ResponseOrigin =
+  | { kind: "cmux"; socket_path: string; surface_id: string; workspace_id: string }
+  | { kind: "terminal" };
+
 const isRecord = (value: unknown): value is JsonRecord =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
@@ -104,6 +108,20 @@ const voiceStateHome = () => {
   return path.join(process.env.XDG_STATE_HOME || path.join(homedir(), ".local", "state"), "dufflebag", "voice");
 };
 
+const responseOrigin = (): ResponseOrigin => {
+  const workspaceId = process.env.CMUX_WORKSPACE_ID?.trim() || "";
+  const surfaceId = process.env.CMUX_SURFACE_ID?.trim() || "";
+  if (!workspaceId || !surfaceId) {
+    return { kind: "terminal" };
+  }
+  return {
+    kind: "cmux",
+    socket_path: process.env.CMUX_SOCKET_PATH?.trim() || "/tmp/cmux.sock",
+    surface_id: surfaceId,
+    workspace_id: workspaceId,
+  };
+};
+
 const queueResponse = (markdown: string, source: string, responseId: string) => {
   const inbox = path.join(voiceStateHome(), "inbox");
   mkdirSync(inbox, { recursive: true });
@@ -114,6 +132,7 @@ const queueResponse = (markdown: string, source: string, responseId: string) => 
     temporary,
     JSON.stringify({
       markdown,
+      origin: responseOrigin(),
       received_at: Date.now() / 1_000,
       response_id: responseId,
       source,

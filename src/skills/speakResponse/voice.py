@@ -1,9 +1,13 @@
 #!/usr/bin/env -S uv run --script
 # /// script
-# requires-python = ">=3.10,<3.14"
+# requires-python = ">=3.10,<3.13"
 # dependencies = [
-#   "moonshine-voice==0.1.0",
+#   "apple-fm-sdk==0.2.1; sys_platform == 'darwin'",
+#   "faster-whisper==1.2.1",
 #   "num2words==0.5.14",
+#   "numpy==2.2.6; python_version < '3.11'",
+#   "numpy==2.4.6; python_version == '3.11'",
+#   "numpy==2.5.1; python_version >= '3.12'",
 #   "pynput==1.8.2",
 #   "sounddevice==0.5.5",
 #   "supertonic==1.3.1",
@@ -19,6 +23,7 @@ from __future__ import annotations
 import argparse
 from collections import deque
 from decimal import Decimal, ROUND_HALF_UP
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -30,6 +35,25 @@ import threading
 import time
 from typing import Any
 import uuid
+
+SCRIPT_DIRECTORY = str(Path(__file__).resolve().parent)
+if SCRIPT_DIRECTORY not in sys.path:
+    sys.path.insert(0, SCRIPT_DIRECTORY)
+
+from cmux_focus import (
+    CMUX_BUNDLE_IDENTIFIER,
+    cached_cmux_identify,
+    clear_focus_cache,
+    cmux_identify,
+    frontmost_bundle_identifier,
+)
+from prompt_refinement import (
+    prompt_literals,
+    refine_prompt,
+    refinement_availability,
+    refinement_unavailable_reason,
+    validate_refined_prompt,
+)
 
 
 LANGUAGE_NAMES = {
@@ -87,13 +111,20 @@ PROTECTED_SPAN_PATTERN = re.compile(
     r"|\b(?=[A-Fa-f0-9]{7,}\b)(?=[A-Fa-f0-9]*[A-Fa-f])[A-Fa-f0-9]+\b"
 )
 
-CONTROL_HOLD_SECONDS = 0.35
+CONTROL_HOLD_SECONDS = 0.12
+CONTROL_DOUBLE_TAP_SECONDS = 0.45
 DICTATION_RELEASE_GRACE_SECONDS = 0.3
 DICTATION_LIVE_TAIL_WORDS = 4
+DICTATION_PULSE_SECONDS = 0.5
+DICTATION_SAMPLE_RATE = 16_000
+DICTATION_UPDATE_SECONDS = 0.5
+STT_MODEL = "small.en"
 HOTKEY_LABEL = "hold-control"
+PENDING_RESPONSE_TTL_SECONDS = 60 * 60
+SEEN_RESPONSE_TTL_SECONDS = 24 * 60 * 60
 CONTROL_HOLD_TRANSITIONS = {
     ("idle", "control_down"): ("waiting", "schedule"),
-    ("waiting", "control_up"): ("idle", "cancel"),
+    ("waiting", "control_up"): ("idle", "tap"),
     ("waiting", "other_down"): ("shortcut", "cancel"),
     ("waiting", "hold_elapsed"): ("listening", "start"),
     ("shortcut", "control_up"): ("idle", "none"),
@@ -127,27 +158,39 @@ DICTATION_COMMANDS = [
 
 _tts_engine: Any = None
 _tts_style: Any = None
+_stt_engine: Any = None
+_audio_lock = threading.Lock()
+_audio: dict[str, Any] = {"generation": 0, "state": "idle"}
 _dictation_lock = threading.Lock()
+_dictation_audio_lock = threading.Lock()
 _dictation_control_lock = threading.Lock()
+_dictation_inference_lock = threading.Lock()
 _dictation_start_lock = threading.Lock()
+_stt_engine_lock = threading.Lock()
 _dictation: dict[str, Any] = {
     "active": False,
+    "audio_chunks": [],
+    "audio_generation": 0,
+    "capture": None,
     "controller": None,
     "format_state": None,
     "hypotheses": deque(maxlen=3),
+    "line_start_state": None,
+    "line_typed_text": "",
     "replacements": {},
     "request_generation": 0,
     "requested": False,
     "stage": "inactive",
-    "transcriber": None,
     "typed_words": [],
 }
 _control_hold_lock = threading.Lock()
 _control_hold: dict[str, Any] = {
     "key": None,
+    "last_tap_at": 0.0,
     "state": "idle",
     "timer": None,
 }
+_prompt_refinement_lock = threading.Lock()
 
 
 def control_hold_transition(state: str, event: str, injected: bool = False) -> dict[str, str]:
@@ -429,13 +472,13 @@ def render_speech(markdown: str) -> str:
 
         unordered = re.match(r"^\s*[-+*]\s+(.+)$", line)
         if unordered is not None:
-            spoken.append(sentence(f"Item. {inline_speech(unordered.group(1))}"))
+            spoken.append(sentence(inline_speech(unordered.group(1))))
             index += 1
             continue
 
         ordered = re.match(r"^\s*([0-9]+)[.)]\s+(.+)$", line)
         if ordered is not None:
-            spoken.append(sentence(f"Item {ordered.group(1)}. {inline_speech(ordered.group(2))}"))
+            spoken.append(sentence(f"{ordered.group(1)}. {inline_speech(ordered.group(2))}"))
             index += 1
             continue
 
@@ -718,6 +761,24 @@ def worker_status(state_home: Path | None = None) -> dict[str, Any]:
     return status
 
 
+def voice_status_report() -> dict[str, Any]:
+    status = worker_status()
+    preferences = voice_preferences()
+    status.update(
+        {
+            "prompt_refinement": preferences["prompt_refinement"],
+            "read_along": preferences["read_along"],
+            "response_mode": preferences["response_mode"],
+        }
+    )
+    if preferences["prompt_refinement"] == "review":
+        available, reason = refinement_availability()
+        status["prompt_refinement_available"] = available
+        if reason:
+            status["prompt_refinement_detail"] = reason
+    return status
+
+
 def write_worker_status(dictation: str, detail: str = "") -> None:
     value: dict[str, Any] = {
         "dictation": dictation,
@@ -750,8 +811,76 @@ def dictation_indicator(stage: str, frame: int = 0) -> dict[str, Any]:
     }
     return {
         "color": colors[stage],
+        "kind": "dictation",
         "label": label,
         "pulse": "●" if frame % 2 == 0 else "◉",
+        "visible": True,
+    }
+
+
+def read_along_frame(text: str, elapsed: float, duration: float, max_words: int = 15) -> dict[str, Any]:
+    matches = list(re.finditer(r"\S+", text))
+    if not matches or duration <= 0:
+        return {"active_length": 0, "active_start": 0, "text": "", "visible": False}
+    weights = [
+        max(1.0, len(re.sub(r"\W", "", match.group(0))) ** 0.6)
+        + (0.8 if match.group(0).endswith((".", "!", "?", ":", ";")) else 0.0)
+        for match in matches
+    ]
+    target = min(0.999_999, max(0.0, elapsed / duration)) * sum(weights)
+    active_index = 0
+    consumed = 0.0
+    for index, weight in enumerate(weights):
+        active_index = index
+        consumed += weight
+        if consumed > target:
+            break
+
+    radius = max(1, max_words // 2)
+    start_index = max(0, active_index - radius)
+    end_index = min(len(matches), start_index + max_words)
+    start_index = max(0, end_index - max_words)
+    selected = [match.group(0) for match in matches[start_index:end_index]]
+    relative_index = active_index - start_index
+    rendered = " ".join(selected)
+    active_start = sum(len(word) + 1 for word in selected[:relative_index])
+    return {
+        "active_length": len(selected[relative_index]),
+        "active_start": active_start,
+        "text": rendered,
+        "visible": True,
+    }
+
+
+def read_along_indicator(now: float | None = None) -> dict[str, Any]:
+    document = read_json_file(voice_state_home() / "read-along.json")
+    if not isinstance(document, dict):
+        return {"active_length": 0, "active_start": 0, "text": "", "visible": False}
+    text = document.get("text")
+    started_at = document.get("started_at")
+    duration = document.get("duration")
+    if not isinstance(text, str) or not isinstance(started_at, (int, float)) or not isinstance(duration, (int, float)):
+        return {"active_length": 0, "active_start": 0, "text": "", "visible": False}
+    current_time = time.time() if now is None else now
+    return {"kind": "read-along", **read_along_frame(text, current_time - started_at, duration)}
+
+
+def refinement_indicator(now: float | None = None) -> dict[str, Any]:
+    document = read_json_file(voice_state_home() / "refinement.json")
+    if not isinstance(document, dict) or not isinstance(document.get("message"), str):
+        return {"visible": False}
+    current_time = time.time() if now is None else now
+    expires_at = document.get("expires_at")
+    if isinstance(expires_at, (int, float)) and current_time >= float(expires_at):
+        (voice_state_home() / "refinement.json").unlink(missing_ok=True)
+        return {"visible": False}
+    stage = document.get("stage")
+    colors = {"error": "#f87171", "ready": "#34d399", "refining": "#c084fc"}
+    return {
+        "color": colors.get(stage, "#cbd5e1"),
+        "kind": "refinement",
+        "label": document["message"],
+        "pulse": "✦",
         "visible": True,
     }
 
@@ -774,6 +903,7 @@ def create_macos_dictation_overlay() -> dict[str, Any]:
         NSWindowStyleMaskBorderless,
         NSWindowStyleMaskNonactivatingPanel,
     )
+    from Foundation import NSRunLoop
 
     class DictationPanel(NSPanel):
         def canBecomeKeyWindow(self) -> bool:
@@ -784,9 +914,10 @@ def create_macos_dictation_overlay() -> dict[str, Any]:
 
     application = NSApplication.sharedApplication()
     application.setActivationPolicy_(NSApplicationActivationPolicyAccessory)
+    application.finishLaunching()
     screen = NSScreen.mainScreen().visibleFrame()
-    width = 250
-    height = 52
+    width = min(760, max(320, screen.size.width - 96))
+    height = 68
     x = screen.origin.x + max(0, (screen.size.width - width) / 2)
     y = screen.origin.y + 72
     panel = DictationPanel.alloc().initWithContentRect_styleMask_backing_defer_(
@@ -816,7 +947,11 @@ def create_macos_dictation_overlay() -> dict[str, Any]:
         "backend": "appkit",
         "frame": 0,
         "label": label,
+        "last_pulse_at": time.monotonic(),
+        "mode": "hidden",
         "panel": panel,
+        "rendered_indicator": None,
+        "run_loop": NSRunLoop.currentRunLoop(),
         "visible": False,
     }
 
@@ -833,8 +968,8 @@ def create_tk_dictation_overlay() -> dict[str, Any] | None:
             root.attributes("-alpha", 0.94)
         except tkinter.TclError:
             pass
-        width = 250
-        height = 52
+        width = min(760, max(320, root.winfo_screenwidth() - 96))
+        height = 68
         x = max(0, (root.winfo_screenwidth() - width) // 2)
         y = max(0, root.winfo_screenheight() - height - 72)
         root.geometry(f"{width}x{height}+{x}+{y}")
@@ -848,7 +983,15 @@ def create_tk_dictation_overlay() -> dict[str, Any] | None:
             pady=12,
         )
         label.pack(fill="both", expand=True)
-        return {"frame": 0, "label": label, "root": root, "visible": False}
+        return {
+            "frame": 0,
+            "label": label,
+            "last_pulse_at": time.monotonic(),
+            "mode": "hidden",
+            "rendered_indicator": None,
+            "root": root,
+            "visible": False,
+        }
     except Exception:
         return None
 
@@ -866,46 +1009,100 @@ def update_dictation_overlay(overlay: dict[str, Any] | None) -> None:
     if overlay is None or overlay.get("disabled"):
         return
     try:
+        now = time.monotonic()
+        if now - float(overlay["last_pulse_at"]) >= DICTATION_PULSE_SECONDS:
+            overlay["frame"] = int(overlay["frame"]) + 1
+            overlay["last_pulse_at"] = now
         indicator = dictation_indicator(str(_dictation.get("stage", "inactive")), int(overlay["frame"]))
+        if not indicator["visible"]:
+            indicator = read_along_indicator()
+        if not indicator["visible"]:
+            indicator = refinement_indicator()
+        rendered_indicator = tuple(sorted(indicator.items()))
+        indicator_changed = rendered_indicator != overlay["rendered_indicator"]
         if overlay.get("backend") == "appkit":
-            from AppKit import NSColor
+            from AppKit import (
+                NSBackgroundColorAttributeName,
+                NSColor,
+                NSFont,
+                NSFontAttributeName,
+                NSForegroundColorAttributeName,
+            )
+            from Foundation import NSDate, NSMutableAttributedString, NSMakeRange
 
             panel = overlay["panel"]
-            if indicator["visible"]:
-                color = indicator["color"].lstrip("#")
-                overlay["label"].setTextColor_(
-                    NSColor.colorWithSRGBRed_green_blue_alpha_(
-                        int(color[0:2], 16) / 255,
-                        int(color[2:4], 16) / 255,
-                        int(color[4:6], 16) / 255,
-                        1,
+            if indicator["visible"] and indicator_changed:
+                if indicator.get("kind") == "read-along":
+                    rendered = str(indicator["text"])
+                    attributed = NSMutableAttributedString.alloc().initWithString_(rendered)
+                    full_range = NSMakeRange(0, len(rendered.encode("utf-16-le")) // 2)
+                    attributed.addAttribute_value_range_(
+                        NSForegroundColorAttributeName,
+                        NSColor.colorWithSRGBRed_green_blue_alpha_(226 / 255, 232 / 255, 240 / 255, 1),
+                        full_range,
                     )
-                )
-                overlay["label"].setStringValue_(f"{indicator['pulse']}  {indicator['label']}")
+                    attributed.addAttribute_value_range_(NSFontAttributeName, NSFont.systemFontOfSize_(17), full_range)
+                    active_start = int(indicator["active_start"])
+                    active_end = active_start + int(indicator["active_length"])
+                    active_range = NSMakeRange(
+                        len(rendered[:active_start].encode("utf-16-le")) // 2,
+                        len(rendered[active_start:active_end].encode("utf-16-le")) // 2,
+                    )
+                    attributed.addAttribute_value_range_(
+                        NSBackgroundColorAttributeName,
+                        NSColor.colorWithSRGBRed_green_blue_alpha_(3 / 255, 105 / 255, 161 / 255, 1),
+                        active_range,
+                    )
+                    attributed.addAttribute_value_range_(
+                        NSForegroundColorAttributeName,
+                        NSColor.colorWithSRGBRed_green_blue_alpha_(1, 1, 1, 1),
+                        active_range,
+                    )
+                    overlay["label"].setAttributedStringValue_(attributed)
+                    overlay["mode"] = "read-along"
+                else:
+                    color = indicator["color"].lstrip("#")
+                    overlay["label"].setTextColor_(
+                        NSColor.colorWithSRGBRed_green_blue_alpha_(
+                            int(color[0:2], 16) / 255,
+                            int(color[2:4], 16) / 255,
+                            int(color[4:6], 16) / 255,
+                            1,
+                        )
+                    )
+                    overlay["label"].setFont_(NSFont.boldSystemFontOfSize_(14))
+                    overlay["label"].setStringValue_(f"{indicator['pulse']}  {indicator['label']}")
+                    overlay["mode"] = "dictation"
                 if not overlay["visible"]:
                     panel.orderFrontRegardless()
                     overlay["visible"] = True
                 panel.displayIfNeeded()
-            elif overlay["visible"]:
+            elif not indicator["visible"] and overlay["visible"]:
                 panel.orderOut_(None)
                 overlay["visible"] = False
-            overlay["frame"] = int(overlay["frame"]) + 1
+            overlay["rendered_indicator"] = rendered_indicator
             overlay["application"].updateWindows()
+            overlay["run_loop"].runUntilDate_(NSDate.dateWithTimeIntervalSinceNow_(0.001))
             return
         root = overlay["root"]
-        if indicator["visible"]:
+        if indicator["visible"] and indicator_changed:
             overlay["label"].configure(
-                foreground=indicator["color"],
-                text=f"{indicator['pulse']}  {indicator['label']}",
+                background="#0369a1" if indicator.get("kind") == "read-along" else "#111827",
+                foreground="#ffffff" if indicator.get("kind") == "read-along" else indicator["color"],
+                text=(
+                    str(indicator["text"])
+                    if indicator.get("kind") == "read-along"
+                    else f"{indicator['pulse']}  {indicator['label']}"
+                ),
             )
             if not overlay["visible"]:
                 root.deiconify()
                 root.lift()
                 overlay["visible"] = True
-        elif overlay["visible"]:
+        elif not indicator["visible"] and overlay["visible"]:
             root.withdraw()
             overlay["visible"] = False
-        overlay["frame"] = int(overlay["frame"]) + 1
+        overlay["rendered_indicator"] = rendered_indicator
         root.update_idletasks()
         root.update()
     except Exception:
@@ -1008,6 +1205,48 @@ def installed_config() -> dict[str, Any]:
     return {}
 
 
+def voice_preferences(config: dict[str, Any] | None = None) -> dict[str, Any]:
+    values = installed_config() if config is None else config
+    response_mode = values.get("speechResponseMode", "auto")
+    if response_mode not in {"auto", "focused", "immediate", "off"}:
+        response_mode = "auto"
+    refinement_mode = values.get("promptRefinementMode", "off")
+    if refinement_mode not in {"off", "review"}:
+        refinement_mode = "off"
+    return {
+        "prompt_refinement": refinement_mode,
+        "read_along": values.get("speechReadAlong", True) is not False,
+        "response_mode": response_mode,
+    }
+
+
+def envelope_eligible(
+    envelope: dict[str, Any],
+    *,
+    focused_context: dict[str, Any] | None = None,
+    frontmost_bundle: str | None = None,
+    preferences: dict[str, Any] | None = None,
+) -> bool:
+    settings = voice_preferences() if preferences is None else preferences
+    mode = settings["response_mode"]
+    if mode == "off":
+        return False
+    origin = envelope.get("origin")
+    if not isinstance(origin, dict) or origin.get("kind") != "cmux" or mode == "immediate":
+        return True
+    focused = focused_context
+    if focused is None:
+        focused = cached_cmux_identify(str(origin.get("socket_path", "")))
+    frontmost = frontmost_bundle_identifier() if frontmost_bundle is None else frontmost_bundle
+    selected = focused.get("focused") if isinstance(focused, dict) else None
+    return bool(
+        frontmost == CMUX_BUNDLE_IDENTIFIER
+        and isinstance(selected, dict)
+        and selected.get("surface_id") == origin.get("surface_id")
+        and selected.get("workspace_id") == origin.get("workspace_id")
+    )
+
+
 def parse_dictation_replacements(raw: Any) -> dict[str, str]:
     if not isinstance(raw, str):
         return {}
@@ -1037,6 +1276,42 @@ def voice_settings() -> tuple[str, float]:
     return voice.upper(), speed
 
 
+def macos_clipboard_text() -> str:
+    if sys.platform != "darwin":
+        raise RuntimeError("Clipboard prompt refinement currently requires macOS")
+    result = subprocess.run(["pbpaste"], check=True, capture_output=True, text=True, timeout=2)
+    return result.stdout
+
+
+def write_macos_clipboard(text: str) -> None:
+    subprocess.run(["pbcopy"], check=True, input=text, text=True, timeout=2)
+
+
+def write_refinement_status(stage: str, message: str, *, lifetime: float = 0.0) -> None:
+    value: dict[str, Any] = {"message": message, "stage": stage}
+    if lifetime > 0:
+        value["expires_at"] = time.time() + lifetime
+    atomic_json(voice_state_home() / "refinement.json", value)
+
+
+def refine_clipboard_prompt() -> None:
+    if not _prompt_refinement_lock.acquire(blocking=False):
+        return
+    try:
+        write_refinement_status("refining", "Refining copied prompt locally…")
+        original = macos_clipboard_text().strip()
+        if not original:
+            raise ValueError("Copy a prompt before double-tapping Control")
+        refined = refine_prompt(original)
+        write_macos_clipboard(refined)
+        write_refinement_status("ready", "Refined prompt copied — press ⌘V to paste", lifetime=10)
+        speak_markdown(refined)
+    except Exception as error:
+        write_refinement_status("error", f"Prompt refinement unavailable: {error}", lifetime=8)
+    finally:
+        _prompt_refinement_lock.release()
+
+
 def tts_runtime() -> tuple[Any, Any]:
     global _tts_engine, _tts_style
     if _tts_engine is None:
@@ -1048,41 +1323,147 @@ def tts_runtime() -> tuple[Any, Any]:
     return _tts_engine, _tts_style
 
 
+def stt_runtime() -> Any:
+    global _stt_engine
+    with _stt_engine_lock:
+        if _stt_engine is None:
+            from faster_whisper import WhisperModel
+
+            # Float32 avoids the ARM64 int8 short-utterance failures reported by Moonshine users.
+            _stt_engine = WhisperModel(STT_MODEL, device="cpu", compute_type="float32")
+    return _stt_engine
+
+
 def prepare_voice() -> dict[str, str]:
-    from moonshine_voice import get_model_for_language
-
     tts_runtime()
-    get_model_for_language(wanted_language="en")
-    return {"dictation": "ready", "narration": "ready"}
+    stt_runtime()
+    result = {"dictation": "ready", "narration": "ready"}
+    if voice_preferences()["prompt_refinement"] == "review":
+        available, reason = refinement_availability()
+        result["prompt_refinement"] = "ready" if available else f"unavailable: {reason}"
+    return result
 
 
-def speak_markdown(markdown: str) -> None:
+def begin_audio_state(state: str) -> int:
+    with _audio_lock:
+        _audio["generation"] += 1
+        _audio["state"] = state
+        return int(_audio["generation"])
+
+
+def audio_state_active(generation: int, state: str) -> bool:
+    with _audio_lock:
+        return _audio["generation"] == generation and _audio["state"] == state
+
+
+def finish_audio_state(generation: int, state: str) -> None:
+    with _audio_lock:
+        if _audio["generation"] == generation and _audio["state"] == state:
+            _audio["state"] = "idle"
+
+
+def clear_read_along() -> None:
+    (voice_state_home() / "read-along.json").unlink(missing_ok=True)
+
+
+def cancel_narration() -> bool:
+    with _audio_lock:
+        if _audio["state"] != "narrating":
+            return False
+        _audio["generation"] += 1
+        _audio["state"] = "idle"
+    clear_read_along()
+    try:
+        import sounddevice
+
+        sounddevice.stop()
+    except Exception:
+        pass
+    return True
+
+
+def publish_read_along(text: str, duration: float) -> None:
+    if not voice_preferences()["read_along"]:
+        clear_read_along()
+        return
+    atomic_json(
+        voice_state_home() / "read-along.json",
+        {"duration": max(0.01, duration), "started_at": time.time(), "text": text},
+    )
+
+
+def narration_still_eligible(origin: Any) -> bool:
+    if not isinstance(origin, dict) or origin.get("kind") != "cmux":
+        return True
+    return envelope_eligible({"origin": origin})
+
+
+def speak_markdown(markdown: str, origin: Any = None, *, respect_focus: bool = False) -> str:
     import sounddevice
 
     speech = render_speech(markdown)
     if not speech:
-        return
-    engine, style = tts_runtime()
-    _, speed = voice_settings()
-    # Synthesize bounded pieces so giant responses remain interruptible.
-    for chunk in chunk_speech(speech):
-        if (voice_state_home() / "stop").exists():
-            return
-        audio, _ = engine.synthesize(
-            chunk.strip(),
-            voice_style=style,
-            total_steps=4,
-            speed=speed,
-            max_chunk_length=300,
-            silence_duration=0.24,
-            lang="en",
-            verbose=False,
-        )
-        sounddevice.play(audio.squeeze(), engine.sample_rate)
-        sounddevice.wait()
+        return "completed"
+    generation = begin_audio_state("narrating")
+    last_focus_check = 0.0
+    focus_allowed = True
+
+    def focus_is_allowed(*, force: bool = False) -> bool:
+        nonlocal focus_allowed, last_focus_check
+        if not respect_focus:
+            return True
+        now = time.monotonic()
+        if force or now - last_focus_check >= 0.25:
+            focus_allowed = narration_still_eligible(origin)
+            last_focus_check = now
+        return focus_allowed
+
+    try:
+        engine, style = tts_runtime()
+        _, speed = voice_settings()
+        # Synthesize bounded pieces so giant responses remain interruptible.
+        for chunk in chunk_speech(speech):
+            if (voice_state_home() / "stop").exists():
+                return "stopped"
+            if not audio_state_active(generation, "narrating"):
+                return "cancelled"
+            if not focus_is_allowed(force=True):
+                return "focus-lost"
+            audio, _ = engine.synthesize(
+                chunk.strip(),
+                voice_style=style,
+                total_steps=4,
+                speed=speed,
+                max_chunk_length=300,
+                silence_duration=0.24,
+                lang="en",
+                verbose=False,
+            )
+            if not audio_state_active(generation, "narrating"):
+                return "cancelled"
+            if not focus_is_allowed(force=True):
+                return "focus-lost"
+            samples = audio.squeeze()
+            duration = max(0.01, float(len(samples)) / float(engine.sample_rate))
+            sounddevice.play(samples, engine.sample_rate)
+            publish_read_along(chunk.strip(), duration)
+            started_at = time.monotonic()
+            while time.monotonic() - started_at < duration:
+                if not audio_state_active(generation, "narrating"):
+                    sounddevice.stop()
+                    return "cancelled"
+                if not focus_is_allowed():
+                    sounddevice.stop()
+                    return "focus-lost"
+                time.sleep(0.04)
+            sounddevice.wait()
+        return "completed"
+    finally:
+        clear_read_along()
+        finish_audio_state(generation, "narrating")
 
 
-def enqueue_response(markdown: str, source: str, response_id: str = "") -> Path:
+def enqueue_response(markdown: str, source: str, response_id: str = "", origin: Any = None) -> Path:
     inbox = voice_state_home() / "inbox"
     inbox.mkdir(parents=True, exist_ok=True)
     path = inbox / f"{time.time_ns()}-{uuid.uuid4().hex}.json"
@@ -1090,6 +1471,7 @@ def enqueue_response(markdown: str, source: str, response_id: str = "") -> Path:
         path,
         {
             "markdown": markdown,
+            "origin": origin if isinstance(origin, dict) else {"kind": "terminal"},
             "received_at": time.time(),
             "response_id": response_id,
             "source": source,
@@ -1098,19 +1480,93 @@ def enqueue_response(markdown: str, source: str, response_id: str = "") -> Path:
     return path
 
 
+def envelope_identity(envelope: dict[str, Any]) -> str:
+    response_id = envelope.get("response_id")
+    token = response_id.strip() if isinstance(response_id, str) and response_id.strip() else hashlib.sha256(
+        str(envelope.get("markdown", "")).encode("utf-8")
+    ).hexdigest()
+    surface = envelope_surface_identity(envelope) or "terminal"
+    return f"{envelope.get('source', 'unknown')}:{surface}:{token}"
+
+
+def envelope_surface_identity(envelope: dict[str, Any]) -> str:
+    origin = envelope.get("origin")
+    if not isinstance(origin, dict) or origin.get("kind") != "cmux":
+        return ""
+    workspace = origin.get("workspace_id")
+    surface = origin.get("surface_id")
+    return f"{workspace}:{surface}" if isinstance(workspace, str) and isinstance(surface, str) else ""
+
+
+def seen_response_keys() -> dict[str, float]:
+    document = read_json_file(voice_state_home() / "seen.json")
+    if not isinstance(document, dict):
+        return {}
+    now = time.time()
+    return {
+        key: float(value)
+        for key, value in document.items()
+        if isinstance(key, str) and isinstance(value, (int, float)) and now - float(value) <= SEEN_RESPONSE_TTL_SECONDS
+    }
+
+
+def remember_envelope(envelope: dict[str, Any]) -> None:
+    seen = seen_response_keys()
+    seen[envelope_identity(envelope)] = time.time()
+    atomic_json(voice_state_home() / "seen.json", seen)
+
+
 def next_envelope() -> tuple[Path, dict[str, Any]] | None:
     inbox = voice_state_home() / "inbox"
     inbox.mkdir(parents=True, exist_ok=True)
-    # Filename timestamps preserve response order across provider processes.
+    pending: list[tuple[Path, dict[str, Any]]] = []
     for path in sorted(inbox.glob("*.json")):
         try:
             value = json.loads(path.read_text(encoding="utf-8"))
         except (json.JSONDecodeError, OSError):
             path.unlink(missing_ok=True)
             continue
-        if isinstance(value, dict) and isinstance(value.get("markdown"), str) and value["markdown"].strip():
+        if not isinstance(value, dict) or not isinstance(value.get("markdown"), str) or not value["markdown"].strip():
+            path.unlink(missing_ok=True)
+            continue
+        received_at = value.get("received_at")
+        if isinstance(received_at, (int, float)) and time.time() - float(received_at) > PENDING_RESPONSE_TTL_SECONDS:
+            path.unlink(missing_ok=True)
+            continue
+        pending.append((path, value))
+
+    settings = voice_preferences()
+    if settings["response_mode"] == "off":
+        for path, _ in pending:
+            path.unlink(missing_ok=True)
+        return None
+
+    newest_identity = {envelope_identity(value): path for path, value in pending}
+    newest_surface: dict[str, Path] = {}
+    for path, value in pending:
+        surface_key = envelope_surface_identity(value)
+        if surface_key:
+            newest_surface[surface_key] = path
+
+    seen = seen_response_keys()
+    focused_by_socket: dict[str, dict[str, Any] | None] = {}
+    frontmost = frontmost_bundle_identifier() if newest_surface else ""
+    for path, value in pending:
+        identity = envelope_identity(value)
+        origin = value.get("origin")
+        surface_key = envelope_surface_identity(value)
+        superseded = newest_identity[identity] != path or (surface_key != "" and newest_surface.get(surface_key) != path)
+        if superseded or identity in seen:
+            path.unlink(missing_ok=True)
+            continue
+        focused = None
+        if isinstance(origin, dict) and origin.get("kind") == "cmux":
+            socket_path = str(origin.get("socket_path", ""))
+            if socket_path not in focused_by_socket:
+                focused_by_socket[socket_path] = cached_cmux_identify(socket_path)
+            focused = focused_by_socket[socket_path]
+        if envelope_eligible(value, focused_context=focused, frontmost_bundle=frontmost, preferences=settings):
             return path, value
-        path.unlink(missing_ok=True)
     return None
 
 
@@ -1119,6 +1575,24 @@ def type_text(text: str) -> None:
     if controller is None or not text:
         return
     controller.type(text)
+
+
+def reconcile_typed_text(previous: str, completed: str) -> None:
+    controller = _dictation.get("controller")
+    if controller is None or previous == completed:
+        return
+    shared_length = 0
+    shared_limit = min(len(previous), len(completed))
+    # Keep the already-correct character prefix and replace only the revised tail.
+    while shared_length < shared_limit and previous[shared_length] == completed[shared_length]:
+        shared_length += 1
+    from pynput.keyboard import Key
+
+    # Remove the live tail that the completed transcription revised.
+    for _ in previous[shared_length:]:
+        controller.press(Key.backspace)
+        controller.release(Key.backspace)
+    controller.type(completed[shared_length:])
 
 
 def finalize_dictation_output() -> bool:
@@ -1131,19 +1605,11 @@ def finalize_dictation_output() -> bool:
         return True
 
 
-def transcript_event(event: Any) -> None:
-    from moonshine_voice import LineCompleted, LineStarted, LineTextChanged
-
+def update_dictation_transcript(text: str, *, completed: bool) -> None:
     with _dictation_lock:
-        if isinstance(event, LineStarted):
-            _dictation["hypotheses"].clear()
-            _dictation["typed_words"] = []
-            return
-        if not isinstance(event, (LineTextChanged, LineCompleted)):
-            return
-        text = event.line.text.strip()
-        if isinstance(event, LineTextChanged):
-            _dictation["hypotheses"].append(text)
+        clean = text.strip()
+        if not completed:
+            _dictation["hypotheses"].append(clean)
             stable = stable_words(list(_dictation["hypotheses"]))
             typed = _dictation["typed_words"]
             if stable[: len(typed)] != typed:
@@ -1159,37 +1625,69 @@ def transcript_event(event: Any) -> None:
             if consumed:
                 type_text(projection["text"])
                 _dictation["format_state"] = projection["state"]
+                _dictation["line_typed_text"] += projection["text"]
                 _dictation["typed_words"] = [*typed, *pending[:consumed]]
             return
 
-        typed = _dictation["typed_words"]
-        completed_words = text.split()
-        typed_count = min(len(typed), len(completed_words))
+        completed_words = clean.split()
         projection = dictation_projection(
-            completed_words[typed_count:],
-            state=_dictation["format_state"],
+            completed_words,
+            state=_dictation["line_start_state"],
             replacements=_dictation["replacements"],
         )
-        type_text(projection["text"])
+        reconcile_typed_text(_dictation["line_typed_text"], projection["text"])
         _dictation["format_state"] = projection["state"]
         _dictation["hypotheses"].clear()
+        _dictation["line_start_state"] = dict(projection["state"])
+        _dictation["line_typed_text"] = ""
         _dictation["typed_words"] = []
 
 
-def ensure_transcriber() -> Any:
-    transcriber = _dictation.get("transcriber")
-    if transcriber is not None:
-        return transcriber
-    from moonshine_voice import get_model_for_language, MicTranscriber
+def collect_dictation_audio(in_data: Any, _frames: int, _time_info: Any, _status: Any) -> None:
+    with _dictation_audio_lock:
+        _dictation["audio_chunks"].append(in_data.copy())
 
-    model_path, model_arch = get_model_for_language(wanted_language="en")
-    transcriber = MicTranscriber(model_path=model_path, model_arch=model_arch, update_interval=0.25)
-    transcriber.add_listener(transcript_event)
-    _dictation["transcriber"] = transcriber
-    return transcriber
+
+def dictation_audio_snapshot() -> Any:
+    import numpy
+
+    with _dictation_audio_lock:
+        chunks = list(_dictation["audio_chunks"])
+    if not chunks:
+        return numpy.empty(0, dtype=numpy.float32)
+    return numpy.concatenate(chunks, axis=0).reshape(-1).astype(numpy.float32, copy=False)
+
+
+def transcribe_dictation_audio(audio: Any) -> str:
+    if getattr(audio, "size", 0) == 0:
+        return ""
+    with _dictation_inference_lock:
+        segments, _ = stt_runtime().transcribe(
+            audio,
+            beam_size=5,
+            condition_on_previous_text=False,
+            language="en",
+            temperature=0.0,
+            without_timestamps=True,
+        )
+        return " ".join(segment.text.strip() for segment in segments if segment.text.strip())
+
+
+def stream_dictation_updates(request_generation: int) -> None:
+    while True:
+        time.sleep(DICTATION_UPDATE_SECONDS)
+        with _dictation_control_lock:
+            if not _dictation["requested"] or _dictation["request_generation"] != request_generation:
+                return
+        transcript = transcribe_dictation_audio(dictation_audio_snapshot())
+        with _dictation_control_lock:
+            if not _dictation["requested"] or _dictation["request_generation"] != request_generation:
+                return
+            update_dictation_transcript(transcript, completed=False)
 
 
 def start_dictation(request_generation: int) -> None:
+    capture = None
     try:
         with _dictation_start_lock:
             with _dictation_control_lock:
@@ -1201,33 +1699,62 @@ def start_dictation(request_generation: int) -> None:
             import sounddevice
 
             sounddevice.stop()
-            transcriber = ensure_transcriber()
+            with _dictation_audio_lock:
+                _dictation["audio_chunks"] = []
+            capture = sounddevice.InputStream(
+                blocksize=1024,
+                callback=collect_dictation_audio,
+                channels=1,
+                dtype="float32",
+                samplerate=DICTATION_SAMPLE_RATE,
+            )
             with _dictation_control_lock:
                 if not _dictation["requested"] or _dictation["request_generation"] != request_generation:
+                    capture.close()
                     return
-                transcriber.start()
+                capture.start()
+                _dictation["capture"] = capture
                 _dictation["active"] = True
                 set_dictation_stage("listening")
+            threading.Thread(
+                target=stream_dictation_updates,
+                args=(request_generation,),
+                name="dufflebag-dictation-live",
+                daemon=True,
+            ).start()
     except Exception as error:
+        if capture is not None:
+            try:
+                capture.close()
+            except Exception:
+                pass
         with _dictation_control_lock:
             if _dictation["request_generation"] != request_generation:
                 return
             _dictation["active"] = False
             _dictation["requested"] = False
         set_dictation_stage("unavailable", str(error))
+        finish_audio_state(int(_dictation.get("audio_generation", 0)), "listening")
 
 
 def request_dictation_start() -> None:
+    cancel_narration()
+    audio_generation = begin_audio_state("listening")
     replacements = dictation_replacements()
     with _dictation_lock:
         _dictation["format_state"] = initial_dictation_format_state()
         _dictation["hypotheses"].clear()
+        _dictation["line_start_state"] = dict(_dictation["format_state"])
+        _dictation["line_typed_text"] = ""
         _dictation["replacements"] = replacements
         _dictation["typed_words"] = []
+    with _dictation_audio_lock:
+        _dictation["audio_chunks"] = []
     with _dictation_control_lock:
         _dictation["request_generation"] += 1
         request_generation = _dictation["request_generation"]
         _dictation["requested"] = True
+        _dictation["audio_generation"] = audio_generation
         set_dictation_stage("starting")
     threading.Thread(
         target=start_dictation,
@@ -1245,18 +1772,40 @@ def stop_dictation(request_generation: int) -> None:
     with _dictation_control_lock:
         if _dictation["requested"] or _dictation["request_generation"] != request_generation:
             return
-        transcriber = _dictation.get("transcriber")
-        if not _dictation["active"] or transcriber is None:
+        capture = _dictation.get("capture")
+        if not _dictation["active"] or capture is None:
+            _dictation["active"] = False
             set_dictation_stage("inactive")
+            finish_audio_state(int(_dictation.get("audio_generation", 0)), "listening")
             return
         try:
-            transcriber.stop()
+            capture.stop()
+            capture.close()
+        except Exception as error:
+            _dictation["active"] = False
+            _dictation["capture"] = None
+            set_dictation_stage("unavailable", str(error))
+            finish_audio_state(int(_dictation.get("audio_generation", 0)), "listening")
+            return
+        audio = dictation_audio_snapshot()
+        _dictation["active"] = False
+        _dictation["capture"] = None
+        with _dictation_audio_lock:
+            _dictation["audio_chunks"] = []
+    try:
+        transcript = transcribe_dictation_audio(audio)
+        with _dictation_control_lock:
+            if _dictation["requested"] or _dictation["request_generation"] != request_generation:
+                return
+            update_dictation_transcript(transcript, completed=True)
             finalize_dictation_output()
             set_dictation_stage("inactive")
-        except Exception as error:
-            set_dictation_stage("unavailable", str(error))
-        finally:
-            _dictation["active"] = False
+            finish_audio_state(int(_dictation.get("audio_generation", 0)), "listening")
+    except Exception as error:
+        with _dictation_control_lock:
+            if not _dictation["requested"] and _dictation["request_generation"] == request_generation:
+                set_dictation_stage("unavailable", str(error))
+        finish_audio_state(int(_dictation.get("audio_generation", 0)), "listening")
 
 
 def request_dictation_stop() -> None:
@@ -1275,7 +1824,7 @@ def request_dictation_stop() -> None:
 
 def dictation_owns_audio() -> bool:
     with _dictation_control_lock:
-        return bool(_dictation["requested"] or _dictation["active"])
+        return bool(_dictation["requested"] or _dictation["active"] or _dictation["stage"] == "finishing")
 
 
 def is_control_key(key: Any) -> bool:
@@ -1297,6 +1846,24 @@ def begin_control_dictation(key: Any) -> None:
         set_dictation_stage("unavailable", str(error))
 
 
+def handle_control_tap() -> None:
+    if cancel_narration():
+        return
+    if voice_preferences()["prompt_refinement"] != "review":
+        return
+    now = time.monotonic()
+    should_refine = False
+    with _control_hold_lock:
+        last_tap = float(_control_hold.get("last_tap_at", 0.0))
+        if now - last_tap <= CONTROL_DOUBLE_TAP_SECONDS:
+            _control_hold["last_tap_at"] = 0.0
+            should_refine = True
+        else:
+            _control_hold["last_tap_at"] = now
+    if should_refine:
+        threading.Thread(target=refine_clipboard_prompt, name="dufflebag-prompt-refinement", daemon=True).start()
+
+
 def handle_control_event(event: str, key: Any = None, injected: bool = False) -> None:
     timer_to_start = None
     held_key = None
@@ -1310,7 +1877,7 @@ def handle_control_event(event: str, key: Any = None, injected: bool = False) ->
             _control_hold["key"] = key
             _control_hold["timer"] = timer
             timer_to_start = timer
-        elif action == "cancel":
+        elif action in {"cancel", "tap"}:
             timer = _control_hold.get("timer")
             if timer is not None:
                 timer.cancel()
@@ -1328,6 +1895,8 @@ def handle_control_event(event: str, key: Any = None, injected: bool = False) ->
         begin_control_dictation(held_key)
     elif action == "stop":
         request_dictation_stop()
+    elif action == "tap":
+        handle_control_tap()
 
 
 def control_pressed(key: Any, injected: bool = False) -> None:
@@ -1367,18 +1936,20 @@ def close_dictation(listener: Any) -> None:
     with _dictation_control_lock:
         _dictation["request_generation"] += 1
         _dictation["requested"] = False
-        transcriber = _dictation.get("transcriber")
-        if transcriber is None:
+        capture = _dictation.get("capture")
+        if capture is None:
             return
         try:
             if _dictation["active"]:
-                transcriber.stop()
-            transcriber.close()
+                capture.stop()
+            capture.close()
         except Exception:
             pass
         finally:
             _dictation["active"] = False
+            _dictation["capture"] = None
             _dictation["stage"] = "inactive"
+            finish_audio_state(int(_dictation.get("audio_generation", 0)), "listening")
 
 
 def run_daemon() -> int:
@@ -1406,8 +1977,10 @@ def run_daemon() -> int:
                 continue
             path, value = envelope
             try:
-                speak_markdown(value["markdown"])
-                path.unlink(missing_ok=True)
+                outcome = speak_markdown(value["markdown"], value.get("origin"), respect_focus=True)
+                if outcome != "stopped":
+                    remember_envelope(value)
+                    path.unlink(missing_ok=True)
             except Exception as error:
                 write_worker_status("inactive", f"Narration failed: {error}")
                 failed = home / "failed" / path.name
@@ -1509,6 +2082,9 @@ def argument_parser() -> argparse.ArgumentParser:
     example = commands.add_parser("example", help="play one response through Supertonic")
     example.add_argument("--text", required=True)
     example.add_argument("--source", default="example")
+    refine = commands.add_parser("refine", help="refine one prompt with Apple's on-device model")
+    refine.add_argument("--speak", action="store_true")
+    refine.add_argument("--text", required=True)
     commands.add_parser("prepare", help="download and verify the pinned local speech models")
     commands.add_parser("start", help="start the local narration and dictation worker")
     commands.add_parser("daemon", help=argparse.SUPPRESS)
@@ -1529,6 +2105,16 @@ def main() -> int:
     if args.command == "example":
         speak_markdown(args.text)
         return 0
+    if args.command == "refine":
+        try:
+            refined = refine_prompt(args.text)
+            print(refined)
+            if args.speak:
+                speak_markdown(refined)
+            return 0
+        except Exception as error:
+            print(str(error), file=sys.stderr)
+            return 1
     if args.command == "prepare":
         print(json.dumps(prepare_voice()))
         return 0
@@ -1543,7 +2129,7 @@ def main() -> int:
         stop_worker()
         return 0
     if args.command == "status":
-        print(json.dumps(worker_status()))
+        print(json.dumps(voice_status_report()))
         return 0
     if args.command == "watch-devin":
         return watch_devin(args.path)

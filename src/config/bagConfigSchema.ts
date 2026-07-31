@@ -110,6 +110,33 @@ export const bagConfigSchema = Schema.Struct({
     ),
     { default: () => 230, exact: true },
   ),
+  speechResponseMode: Schema.optionalWith(
+    Schema.Trim.pipe(
+      Schema.compose(
+        Schema.Literal("auto", "focused", "immediate", "off").annotations({
+          description:
+            "Response narration policy; auto waits for the originating Cmux surface and speaks immediately elsewhere.",
+        }),
+      ),
+    ),
+    { default: () => "auto", exact: true },
+  ),
+  speechReadAlong: Schema.optionalWith(
+    Schema.Boolean.annotations({
+      description: "Whether narration shows a synchronized active-word read-along panel.",
+    }),
+    { default: () => true, exact: true },
+  ),
+  promptRefinementMode: Schema.optionalWith(
+    Schema.Trim.pipe(
+      Schema.compose(
+        Schema.Literal("off", "review").annotations({
+          description: "Optional local prompt-refinement review triggered by a Control double-tap.",
+        }),
+      ),
+    ),
+    { default: () => "off", exact: true },
+  ),
   dictationReplacements: Schema.optionalWith(
     Schema.Trim.pipe(
       Schema.compose(
@@ -210,6 +237,21 @@ export const legacyBagConfigEnvironmentSchema = Schema.Struct({
     legacyNumberStringSchema.pipe(Schema.compose(bagConfigSchema.from.fields.speechWordsPerMinute.from)),
     { default: () => defaultBagConfig.speechWordsPerMinute, exact: true },
   ).pipe(Schema.fromKey("dufflebagSpeechWordsPerMinute")),
+  speechResponseMode: Schema.optionalWith(bagConfigSchema.from.fields.speechResponseMode.from, {
+    default: () => defaultBagConfig.speechResponseMode,
+    exact: true,
+  }).pipe(Schema.fromKey("dufflebagSpeechResponseMode")),
+  speechReadAlong: Schema.optionalWith(
+    legacyBooleanStringSchema.pipe(Schema.compose(bagConfigSchema.from.fields.speechReadAlong.from)),
+    {
+      default: () => defaultBagConfig.speechReadAlong,
+      exact: true,
+    },
+  ).pipe(Schema.fromKey("dufflebagSpeechReadAlong")),
+  promptRefinementMode: Schema.optionalWith(bagConfigSchema.from.fields.promptRefinementMode.from, {
+    default: () => defaultBagConfig.promptRefinementMode,
+    exact: true,
+  }).pipe(Schema.fromKey("dufflebagPromptRefinementMode")),
   dictationReplacements: Schema.optionalWith(bagConfigSchema.from.fields.dictationReplacements.from, {
     default: () => defaultBagConfig.dictationReplacements,
     exact: true,

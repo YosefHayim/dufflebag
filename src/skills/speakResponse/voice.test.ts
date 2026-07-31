@@ -8,6 +8,7 @@ import { describe, expect, it } from "vitest";
 
 const voiceScript = path.join(path.dirname(fileURLToPath(import.meta.url)), "voice.py");
 const pythonEnvironment = { ...process.env, PYTHONDONTWRITEBYTECODE: "1" };
+const pythonExecutable = process.platform === "win32" ? "python" : "python3";
 
 const runVoice = (args: ReadonlyArray<string>): string =>
   execFileSync("uv", ["run", "--frozen", "--script", voiceScript, ...args], {
@@ -30,7 +31,7 @@ const callVoiceFunction = (functionName: string, input: unknown): unknown => {
     "print(json.dumps(getattr(module, sys.argv[2])(**payload)))",
   ].join("\n");
 
-  const output = execFileSync("python3", ["-c", source, voiceScript, functionName, JSON.stringify(input)], {
+  const output = execFileSync(pythonExecutable, ["-c", source, voiceScript, functionName, JSON.stringify(input)], {
     encoding: "utf8",
     env: pythonEnvironment,
     timeout: 10_000,
@@ -50,8 +51,6 @@ const probeStaleDictationStart = (): unknown => {
     "spec = importlib.util.spec_from_file_location('dufflebag_voice', script_path)",
     "module = importlib.util.module_from_spec(spec)",
     "spec.loader.exec_module(module)",
-    "sys.modules['sounddevice'] = types.SimpleNamespace(stop=lambda: None)",
-    "module.ensure_transcriber = lambda: types.SimpleNamespace(start=lambda: None)",
     "module.write_worker_status = lambda *args: None",
     "module._dictation['request_generation'] = 2",
     "module._dictation['requested'] = True",
@@ -59,7 +58,7 @@ const probeStaleDictationStart = (): unknown => {
     "print(json.dumps({'active': module._dictation['active']}))",
   ].join("\n");
 
-  const output = execFileSync("python3", ["-c", source, voiceScript], {
+  const output = execFileSync(pythonExecutable, ["-c", source, voiceScript], {
     encoding: "utf8",
     env: pythonEnvironment,
     timeout: 10_000,
@@ -79,24 +78,25 @@ const probeTranscriptFormatting = (): unknown => {
     "spec = importlib.util.spec_from_file_location('dufflebag_voice', script_path)",
     "module = importlib.util.module_from_spec(spec)",
     "spec.loader.exec_module(module)",
-    "class LineStarted: pass",
-    "class LineTextChanged:",
-    "    def __init__(self, text): self.line = types.SimpleNamespace(text=text)",
-    "class LineCompleted:",
-    "    def __init__(self, text): self.line = types.SimpleNamespace(text=text)",
-    "sys.modules['moonshine_voice'] = types.SimpleNamespace(LineCompleted=LineCompleted, LineStarted=LineStarted, LineTextChanged=LineTextChanged)",
-    "typed = []",
-    "module._dictation['controller'] = types.SimpleNamespace(type=typed.append)",
+    "class FakeController:",
+    "    def __init__(self): self.text = ''",
+    "    def type(self, value): self.text += value",
+    "    def press(self, key):",
+    "        if key == 'backspace': self.text = self.text[:-1]",
+    "    def release(self, _key): pass",
+    "sys.modules['pynput.keyboard'] = types.SimpleNamespace(Key=types.SimpleNamespace(backspace='backspace'))",
+    "controller = FakeController()",
+    "module._dictation['controller'] = controller",
     "module._dictation['format_state'] = module.initial_dictation_format_state()",
+    "module._dictation['line_start_state'] = module.initial_dictation_format_state()",
     "module._dictation['replacements'] = {'Joseph': 'Yosef'}",
-    "module.transcript_event(LineStarted())",
-    "for _ in range(3): module.transcript_event(LineTextChanged('hello comma my name is Joseph and'))",
-    "module.transcript_event(LineCompleted('hello comma my name is Joseph period'))",
+    "for _ in range(3): module.update_dictation_transcript('hello comma your name is Joseph and', completed=False)",
+    "module.update_dictation_transcript('hello comma my name is Joseph period', completed=True)",
     "module.finalize_dictation_output()",
-    "print(json.dumps({'text': ''.join(typed), 'typed_words': module._dictation['typed_words']}))",
+    "print(json.dumps({'text': controller.text, 'typed_words': module._dictation['typed_words']}))",
   ].join("\n");
 
-  const output = execFileSync("python3", ["-c", source, voiceScript], {
+  const output = execFileSync(pythonExecutable, ["-c", source, voiceScript], {
     encoding: "utf8",
     env: pythonEnvironment,
     timeout: 10_000,
@@ -119,17 +119,49 @@ const probeDictationStop = (stale: boolean): unknown => {
     "spec.loader.exec_module(module)",
     "calls = []",
     "module.write_worker_status = lambda status, detail='': calls.append(status)",
-    "module._dictation['transcriber'] = types.SimpleNamespace(stop=lambda: calls.append('stopped'))",
+    "module._dictation['capture'] = types.SimpleNamespace(stop=lambda: calls.append('stopped'), close=lambda: calls.append('closed'))",
     "module._dictation['active'] = True",
     "module._dictation['request_generation'] = 4 if sys.argv[2] == 'stale' else 3",
     "module._dictation['requested'] = sys.argv[2] == 'stale'",
+    "module.dictation_audio_snapshot = lambda: object()",
+    "module.transcribe_dictation_audio = lambda _audio: calls.append('transcribed') or ''",
     "started = time.monotonic()",
     "module.stop_dictation(3)",
     "elapsed = time.monotonic() - started",
     "print(json.dumps({'active': module._dictation['active'], 'calls': calls, 'elapsed': elapsed}))",
   ].join("\n");
 
-  const output = execFileSync("python3", ["-c", source, voiceScript, stale ? "stale" : "current"], {
+  const output = execFileSync(pythonExecutable, ["-c", source, voiceScript, stale ? "stale" : "current"], {
+    encoding: "utf8",
+    env: pythonEnvironment,
+    timeout: 10_000,
+  });
+
+  return JSON.parse(output);
+};
+
+const probeSttRuntime = (): unknown => {
+  const source = [
+    "import importlib.util",
+    "import json",
+    "import pathlib",
+    "import sys",
+    "import types",
+    "script_path = pathlib.Path(sys.argv[1])",
+    "spec = importlib.util.spec_from_file_location('dufflebag_voice', script_path)",
+    "module = importlib.util.module_from_spec(spec)",
+    "spec.loader.exec_module(module)",
+    "settings = {}",
+    "class FakeWhisperModel:",
+    "    def __init__(self, model, **options):",
+    "        settings.update({'model': model, **options})",
+    "sys.modules['faster_whisper'] = types.SimpleNamespace(WhisperModel=FakeWhisperModel)",
+    "first = module.stt_runtime()",
+    "second = module.stt_runtime()",
+    "print(json.dumps({**settings, 'reused': first is second}))",
+  ].join("\n");
+
+  const output = execFileSync(pythonExecutable, ["-c", source, voiceScript], {
     encoding: "utf8",
     env: pythonEnvironment,
     timeout: 10_000,
@@ -163,9 +195,13 @@ const probeMacNativeOverlay = (): unknown => {
     "    def setHidesOnDeactivate_(self, _value): pass",
     "    def setIgnoresMouseEvents_(self, value): self.ignores_mouse = value",
     "    def setCollectionBehavior_(self, _value): pass",
+    "    def orderFrontRegardless(self): self.visible = True",
+    "    def displayIfNeeded(self): pass",
     "    def contentView(self): return types.SimpleNamespace(addSubview_=lambda _view: None)",
     "class FakeApplication:",
     "    def setActivationPolicy_(self, _policy): pass",
+    "    def finishLaunching(self): self.finished = True",
+    "    def updateWindows(self): pass",
     "class FakeNSApplication:",
     "    @staticmethod",
     "    def sharedApplication(): return FakeApplication()",
@@ -175,24 +211,58 @@ const probeMacNativeOverlay = (): unknown => {
     "        return types.SimpleNamespace(visibleFrame=lambda: types.SimpleNamespace(origin=types.SimpleNamespace(x=0, y=0), size=types.SimpleNamespace(width=1440, height=900)))",
     "class FakeLabel:",
     "    @staticmethod",
-    "    def labelWithString_(_value): return FakeLabel()",
+    "    def labelWithString_(_value):",
+    "        label = FakeLabel()",
+    "        label.values = []",
+    "        return label",
     "    def setFrame_(self, _value): pass",
     "    def setAlignment_(self, _value): pass",
     "    def setFont_(self, _value): pass",
     "    def setTextColor_(self, _value): pass",
+    "    def setStringValue_(self, value): self.values.append(value)",
+    "    def setAttributedStringValue_(self, value): self.values.append(value)",
     "class FakeColor:",
     "    @staticmethod",
     "    def colorWithSRGBRed_green_blue_alpha_(*_args): return object()",
     "class FakeFont:",
     "    @staticmethod",
     "    def boldSystemFontOfSize_(_size): return object()",
-    "sys.modules['AppKit'] = types.SimpleNamespace(NSApplication=FakeNSApplication, NSApplicationActivationPolicyAccessory=1, NSBackingStoreBuffered=2, NSColor=FakeColor, NSFloatingWindowLevel=3, NSFont=FakeFont, NSMakeRect=lambda *values: values, NSPanel=FakePanel, NSScreen=FakeScreen, NSTextAlignmentCenter=4, NSTextField=FakeLabel, NSWindowCollectionBehaviorCanJoinAllSpaces=8, NSWindowCollectionBehaviorFullScreenAuxiliary=16, NSWindowStyleMaskBorderless=32, NSWindowStyleMaskNonactivatingPanel=64)",
+    "    @staticmethod",
+    "    def systemFontOfSize_(_size): return object()",
+    "class FakeAttributed:",
+    "    @classmethod",
+    "    def alloc(cls): return cls()",
+    "    def initWithString_(self, value): self.value = value; self.attributes = []; return self",
+    "    def addAttribute_value_range_(self, name, _value, value_range): self.attributes.append((name, value_range))",
+    "class FakeDate:",
+    "    @staticmethod",
+    "    def dateWithTimeIntervalSinceNow_(value): return value",
+    "class FakeRunLoop:",
+    "    def __init__(self): self.ticks = []",
+    "    def runUntilDate_(self, value): self.ticks.append(value)",
+    "run_loop = FakeRunLoop()",
+    "class FakeNSRunLoop:",
+    "    @staticmethod",
+    "    def currentRunLoop(): return run_loop",
+    "sys.modules['AppKit'] = types.SimpleNamespace(NSApplication=FakeNSApplication, NSApplicationActivationPolicyAccessory=1, NSBackgroundColorAttributeName='background', NSBackingStoreBuffered=2, NSColor=FakeColor, NSFloatingWindowLevel=3, NSFont=FakeFont, NSFontAttributeName='font', NSForegroundColorAttributeName='foreground', NSMakeRect=lambda *values: values, NSPanel=FakePanel, NSScreen=FakeScreen, NSTextAlignmentCenter=4, NSTextField=FakeLabel, NSWindowCollectionBehaviorCanJoinAllSpaces=8, NSWindowCollectionBehaviorFullScreenAuxiliary=16, NSWindowStyleMaskBorderless=32, NSWindowStyleMaskNonactivatingPanel=64)",
+    "sys.modules['Foundation'] = types.SimpleNamespace(NSDate=FakeDate, NSMutableAttributedString=FakeAttributed, NSMakeRange=lambda start, length: (start, length), NSRunLoop=FakeNSRunLoop)",
+    "clock = [10.0]",
+    "module.time.monotonic = lambda: clock[0]",
     "factory = getattr(module, 'create_macos_dictation_overlay', lambda: None)",
     "overlay = factory()",
-    "print(json.dumps(None if overlay is None else {'backend': overlay['backend'], 'can_become_key': overlay['panel'].canBecomeKeyWindow(), 'ignores_mouse': overlay['panel'].ignores_mouse, 'style_mask': overlay['panel'].style_mask}))",
+    "module._dictation['stage'] = 'starting'",
+    "module.update_dictation_overlay(overlay)",
+    "module.update_dictation_overlay(overlay)",
+    "clock[0] = 10.6",
+    "module.update_dictation_overlay(overlay)",
+    "module._dictation['stage'] = 'inactive'",
+    "module.read_along_indicator = lambda: {'active_length': 4, 'active_start': 6, 'kind': 'read-along', 'text': 'Alpha beta gamma', 'visible': True}",
+    "module.update_dictation_overlay(overlay)",
+    "background_ranges = [item[1] for item in overlay['label'].values[-1].attributes if item[0] == 'background']",
+    "print(json.dumps(None if overlay is None else {'application_finished': overlay['application'].finished, 'backend': overlay['backend'], 'background_ranges': background_ranges, 'can_become_key': overlay['panel'].canBecomeKeyWindow(), 'ignores_mouse': overlay['panel'].ignores_mouse, 'label_updates': len(overlay['label'].values), 'run_loop_ticks': run_loop.ticks, 'style_mask': overlay['panel'].style_mask, 'visible': overlay['panel'].visible}))",
   ].join("\n");
 
-  const output = execFileSync("python3", ["-c", source, voiceScript], {
+  const output = execFileSync(pythonExecutable, ["-c", source, voiceScript], {
     encoding: "utf8",
     env: pythonEnvironment,
     timeout: 10_000,
@@ -230,7 +300,84 @@ const probeDaemonOverlayIsolation = (): unknown => {
     "print(json.dumps({'calls': calls, 'exit_code': exit_code}))",
   ].join("\n");
 
-  const output = execFileSync("python3", ["-c", source, voiceScript], {
+  const output = execFileSync(pythonExecutable, ["-c", source, voiceScript], {
+    encoding: "utf8",
+    env: pythonEnvironment,
+    timeout: 10_000,
+  });
+
+  return JSON.parse(output);
+};
+
+const probeNarrationCancellation = (): unknown => {
+  const source = [
+    "import importlib.util",
+    "import json",
+    "import pathlib",
+    "import sys",
+    "import tempfile",
+    "import types",
+    "script_path = pathlib.Path(sys.argv[1])",
+    "spec = importlib.util.spec_from_file_location('dufflebag_voice', script_path)",
+    "module = importlib.util.module_from_spec(spec)",
+    "spec.loader.exec_module(module)",
+    "state_home = pathlib.Path(tempfile.mkdtemp(prefix='dufflebag-narration-cancel-'))",
+    "module.voice_state_home = lambda: state_home",
+    "module.render_speech = lambda _text: 'first second'",
+    "module.chunk_speech = lambda _text: ['first', 'second']",
+    "module.voice_settings = lambda: ('F4', 1.0)",
+    "module.publish_read_along = lambda *_args: None",
+    "calls = []",
+    "class Engine:",
+    "    sample_rate = 10",
+    "    def synthesize(self, text, **_options): calls.append('synth:' + text); return types.SimpleNamespace(squeeze=lambda: [0]), None",
+    "module.tts_runtime = lambda: (Engine(), object())",
+    "def play(_samples, _rate): calls.append('play'); module.cancel_narration()",
+    "sys.modules['sounddevice'] = types.SimpleNamespace(play=play, stop=lambda: calls.append('stop'), wait=lambda: calls.append('wait'))",
+    "outcome = module.speak_markdown('ignored')",
+    "print(json.dumps({'calls': calls, 'outcome': outcome}))",
+  ].join("\n");
+
+  const output = execFileSync(pythonExecutable, ["-c", source, voiceScript], {
+    encoding: "utf8",
+    env: pythonEnvironment,
+    timeout: 10_000,
+  });
+
+  return JSON.parse(output);
+};
+
+const probeFocusedQueue = (): unknown => {
+  const source = [
+    "import importlib.util",
+    "import json",
+    "import pathlib",
+    "import sys",
+    "import tempfile",
+    "script_path = pathlib.Path(sys.argv[1])",
+    "spec = importlib.util.spec_from_file_location('dufflebag_voice', script_path)",
+    "module = importlib.util.module_from_spec(spec)",
+    "spec.loader.exec_module(module)",
+    "state_home = pathlib.Path(tempfile.mkdtemp(prefix='dufflebag-focused-queue-'))",
+    "module.voice_state_home = lambda: state_home",
+    "module.voice_preferences = lambda *_args, **_kwargs: {'prompt_refinement': 'off', 'read_along': True, 'response_mode': 'auto'}",
+    "module.frontmost_bundle_identifier = lambda: module.CMUX_BUNDLE_IDENTIFIER",
+    "focus = {'surface_id': 'surface-b', 'workspace_id': 'workspace'}",
+    "module.cached_cmux_identify = lambda _path: {'focused': dict(focus)}",
+    "origin_a = {'kind': 'cmux', 'socket_path': '/tmp/cmux.sock', 'surface_id': 'surface-a', 'workspace_id': 'workspace'}",
+    "origin_b = {'kind': 'cmux', 'socket_path': '/tmp/cmux.sock', 'surface_id': 'surface-b', 'workspace_id': 'workspace'}",
+    "first_a = module.enqueue_response('old a', 'codex', 'a1', origin_a)",
+    "second_a = module.enqueue_response('new a', 'codex', 'a2', origin_a)",
+    "module.enqueue_response('new b', 'codex', 'b1', origin_b)",
+    "selected_b = module.next_envelope()",
+    "module.remember_envelope(selected_b[1])",
+    "selected_b[0].unlink()",
+    "focus.update({'surface_id': 'surface-a'})",
+    "selected_a = module.next_envelope()",
+    "print(json.dumps({'first_removed': not first_a.exists(), 'a': selected_a[1]['markdown'], 'b': selected_b[1]['markdown'], 'second_kept': second_a.exists()}))",
+  ].join("\n");
+
+  const output = execFileSync(pythonExecutable, ["-c", source, voiceScript], {
     encoding: "utf8",
     env: pythonEnvironment,
     timeout: 10_000,
@@ -273,6 +420,14 @@ describe("voice speech document", () => {
     expect(spoken).toBe("Code block, TypeScript.\nconst count equals 2 semicolon.\nEnd code block.");
   });
 
+  it("reads list content without repeating a generic item label", () => {
+    const markdown = ["- Fix authentication", "- Add tests", "1. Deploy", "2. Verify"].join("\n");
+
+    expect(runVoice(["render", "--text", markdown])).toBe(
+      ["Fix authentication.", "Add tests.", "1. Deploy.", "2. Verify."].join("\n"),
+    );
+  });
+
   it("naturally reads quantities and technical terms in every prose response", () => {
     const markdown =
       "Your disk is full: 127Mi free of 460Gi, 100% capacity. All 13 full-suite failures are ENOSPC on the jest transform cache; zero logic failures. Also 1,381 stale tsx IPC pipes.";
@@ -313,6 +468,70 @@ describe("voice speech document", () => {
     expect(chunks).toBeInstanceOf(Array);
     expect((chunks as Array<string>).join("")).toBe(text);
     expect((chunks as Array<string>).every((chunk) => chunk.length <= 24)).toBe(true);
+  });
+
+  it("maps playback progress to one active read-along word", () => {
+    expect(
+      callVoiceFunction("read_along_frame", { text: "Alpha beta gamma delta", elapsed: 1.2, duration: 4 }),
+    ).toMatchObject({
+      active_length: 4,
+      text: "Alpha beta gamma delta",
+      visible: true,
+    });
+  });
+
+  it("cancels the complete narration generation before another chunk can restart", () => {
+    expect(probeNarrationCancellation()).toEqual({
+      calls: ["synth:first", "play", "stop", "stop"],
+      outcome: "cancelled",
+    });
+  });
+});
+
+describe("focused response queue", () => {
+  it("waits for the originating Cmux surface and coalesces older responses from that surface", () => {
+    expect(probeFocusedQueue()).toEqual({
+      a: "new a",
+      b: "new b",
+      first_removed: true,
+      second_kept: true,
+    });
+  });
+
+  it("requires both the frontmost Cmux app and matching workspace and surface", () => {
+    const envelope = {
+      origin: { kind: "cmux", socket_path: "/tmp/cmux.sock", surface_id: "surface", workspace_id: "workspace" },
+    };
+    const preferences = { prompt_refinement: "off", read_along: true, response_mode: "auto" };
+    const focusedContext = { focused: { surface_id: "surface", workspace_id: "workspace" } };
+
+    expect(
+      callVoiceFunction("envelope_eligible", {
+        envelope,
+        focused_context: focusedContext,
+        frontmost_bundle: "com.cmuxterm.app",
+        preferences,
+      }),
+    ).toBe(true);
+    expect(
+      callVoiceFunction("envelope_eligible", {
+        envelope,
+        focused_context: focusedContext,
+        frontmost_bundle: "another.app",
+        preferences,
+      }),
+    ).toBe(false);
+  });
+});
+
+describe("prompt refinement safeguards", () => {
+  it("preserves code, paths, URLs, and quoted literals", () => {
+    const original = 'Please run `pnpm verify` for /tmp/app and keep "exact value" from https://example.com/docs';
+
+    expect(callVoiceFunction("validate_refined_prompt", { original, refined: `Precisely ${original}` })).toBe(
+      `Precisely ${original}`,
+    );
+    expect(() => callVoiceFunction("validate_refined_prompt", { original, refined: "Please verify it." })).toThrow();
   });
 });
 
@@ -418,6 +637,15 @@ describe("human dictation formatting", () => {
 });
 
 describe("hold-Control push-to-talk", () => {
+  it("uses a reusable unquantized Whisper small English model", () => {
+    expect(probeSttRuntime()).toEqual({
+      compute_type: "float32",
+      device: "cpu",
+      model: "small.en",
+      reused: true,
+    });
+  });
+
   it("keeps Tk and AppKit out of the keyboard-injection process", () => {
     expect(probeDaemonOverlayIsolation()).toEqual({
       calls: ["overlay_process_started"],
@@ -427,10 +655,15 @@ describe("hold-Control push-to-talk", () => {
 
   it("uses a non-key native panel for the macOS listening pill", () => {
     expect(probeMacNativeOverlay()).toEqual({
+      application_finished: true,
       backend: "appkit",
+      background_ranges: [[6, 4]],
       can_become_key: false,
       ignores_mouse: true,
+      label_updates: 3,
+      run_loop_ticks: [0.001, 0.001, 0.001, 0.001],
       style_mask: 96,
+      visible: true,
     });
   });
 
@@ -461,9 +694,9 @@ describe("hold-Control push-to-talk", () => {
     });
   });
 
-  it("cancels quick taps and Control shortcuts before listening", () => {
+  it("turns a quick tap into narration stop and preserves Control shortcuts", () => {
     expect(callVoiceFunction("control_hold_transition", { event: "control_up", state: "waiting" })).toEqual({
-      action: "cancel",
+      action: "tap",
       state: "idle",
     });
     expect(callVoiceFunction("control_hold_transition", { event: "other_down", state: "waiting" })).toEqual({
@@ -497,7 +730,7 @@ describe("hold-Control push-to-talk", () => {
     const result = probeDictationStop(false) as { active: boolean; calls: Array<string>; elapsed: number };
 
     expect(result.elapsed).toBeGreaterThanOrEqual(0.28);
-    expect(result).toMatchObject({ active: false, calls: ["stopped", "inactive"] });
+    expect(result).toMatchObject({ active: false, calls: ["stopped", "closed", "transcribed", "inactive"] });
   });
 
   it("cancels an old release when Control is held again", () => {
@@ -531,6 +764,7 @@ describe("voice worker lifecycle", () => {
     const help = runVoice(["--help"]);
 
     expect(help).toContain("example");
+    expect(help).toContain("refine");
     expect(help).toContain("prepare");
     expect(help).toContain("start");
     expect(help).toContain("stop");
@@ -540,7 +774,7 @@ describe("voice worker lifecycle", () => {
 
   it("reports a stopped worker from an empty state directory", () => {
     const stateHome = mkdtempSync(path.join(tmpdir(), "dufflebag-voice-status-"));
-    const output = execFileSync("python3", [voiceScript, "status"], {
+    const output = execFileSync(pythonExecutable, [voiceScript, "status"], {
       encoding: "utf8",
       env: { ...pythonEnvironment, DUFFLEBAG_VOICE_HOME: stateHome },
       timeout: 10_000,
@@ -549,6 +783,9 @@ describe("voice worker lifecycle", () => {
     expect(JSON.parse(output)).toEqual({
       dictation: "inactive",
       hotkey: "hold-control",
+      prompt_refinement: "off",
+      read_along: true,
+      response_mode: "auto",
       running: false,
     });
   });
