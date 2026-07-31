@@ -148,7 +148,10 @@ function simplify(pts: [number, number][], eps: number): [number, number][] {
 }
 
 function simplifyClosed(pts: [number, number][], eps: number): [number, number][] {
-  const ring = pts.length > 1 && pts[0][0] === pts[pts.length - 1][0] && pts[0][1] === pts[pts.length - 1][1] ? pts.slice(0, -1) : pts;
+  const ring =
+    pts.length > 1 && pts[0][0] === pts[pts.length - 1][0] && pts[0][1] === pts[pts.length - 1][1]
+      ? pts.slice(0, -1)
+      : pts;
   if (ring.length < 4) return ring;
   let far = 0,
     fd = -1;

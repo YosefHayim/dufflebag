@@ -54,7 +54,10 @@ describe("planRuleFiles", () => {
   it("plans one ordered rule write per installed skill with exact ownership", () => {
     const plan = unwrap(planRuleFiles(ruleFileRequest));
 
-    expect(plan.writes.map((write) => write.artifact.path)).toEqual([".cursor/rules/autorun.mdc", ".cursor/rules/png-to-code.mdc"]);
+    expect(plan.writes.map((write) => write.artifact.path)).toEqual([
+      ".cursor/rules/autorun.mdc",
+      ".cursor/rules/png-to-code.mdc",
+    ]);
     expect(plan.writes.map((write) => textDecoder.decode(write.bytes))).toEqual([
       "Start with /workspace/.claude/dufflebag/hooks/ctxLoopCtl.js.\n",
       "Convert a PNG.\n\n---\nThis divider is body content.\n",
@@ -151,7 +154,10 @@ describe("planRuleFiles", () => {
       name: "an extra previous-file state",
       request: {
         ...ruleFileRequest,
-        previousFiles: [...ruleFileRequest.previousFiles, { path: ".cursor/rules/extra.mdc", previous: missingPrevious }],
+        previousFiles: [
+          ...ruleFileRequest.previousFiles,
+          { path: ".cursor/rules/extra.mdc", previous: missingPrevious },
+        ],
       },
       issue: "exactly match",
     },

@@ -1,159 +1,161 @@
 {
+  "version": 3,
+  "guide": "CODE-STYLE.md",
   "rules": [
     {
       "id": "path.capability-layout",
-      "summary": "Source paths expose named capabilities instead of generic technical layers.",
-      "enforcement": "path"
+      "statement": "Behavior lives in the named capability directory that owns it.",
+      "verify": "pnpm style"
     },
     {
       "id": "path.no-generic-bucket",
-      "summary": "Generic bucket filenames are forbidden.",
-      "enforcement": "path"
+      "statement": "Every authored file name states the domain job it performs.",
+      "verify": "pnpm style"
     },
     {
       "id": "path.source-directory-case",
-      "summary": "Authored source directories use camelCase.",
-      "enforcement": "path"
+      "statement": "Authored source directories use camelCase.",
+      "verify": "pnpm style"
     },
     {
       "id": "architecture.no-wrapper-layer",
-      "summary": "Capabilities call official services without pass-through wrapper layers.",
-      "enforcement": "manual"
+      "statement": "A repository-owned layer exists only when it owns policy the official service does not.",
+      "verify": "judgment"
     },
     {
       "id": "function.arrow-only",
-      "summary": "Named functions use arrow constants declared before use.",
-      "enforcement": "ast"
+      "statement": "Named functions are arrow constants declared before first use.",
+      "verify": "pnpm style"
     },
     {
       "id": "function.effect-generator",
-      "summary": "Anonymous generators appear only as the direct Effect.gen callback.",
-      "enforcement": "ast"
+      "statement": "The only generator is an anonymous callback passed directly to `Effect.gen`.",
+      "verify": "pnpm style"
     },
     {
       "id": "function.input-shape",
-      "summary": "Functions use cohesive inputs and no positional boolean flags.",
-      "enforcement": "ast"
+      "statement": "A function takes one cohesive input, or two only as a natural pair.",
+      "verify": "pnpm style"
     },
     {
       "id": "function.one-job",
-      "summary": "A function performs one visible domain job without ceremonial wrappers.",
-      "enforcement": "manual"
+      "statement": "A function performs one job its name fully describes.",
+      "verify": "judgment"
     },
     {
       "id": "function.blank-line",
-      "summary": "Adjacent function declarations have one blank line between them.",
-      "enforcement": "ast"
+      "statement": "Adjacent function declarations are separated by exactly one blank line.",
+      "verify": "pnpm style"
     },
     {
       "id": "function.nesting",
-      "summary": "Function control flow nests no more than two levels.",
-      "enforcement": "ast"
+      "statement": "Control flow nests at most two levels deep.",
+      "verify": "pnpm style"
     },
     {
       "id": "class.tagged-error-only",
-      "summary": "Schema.TaggedError is the only authored class form.",
-      "enforcement": "ast"
+      "statement": "The only authored class directly extends `Schema.TaggedError`.",
+      "verify": "pnpm style"
     },
     {
       "id": "comment.loop-intent",
-      "summary": "Every explicit loop has an immediately preceding intent comment.",
-      "enforcement": "ast"
+      "statement": "Every explicit loop carries an intent comment on the line directly above it.",
+      "verify": "pnpm style"
     },
     {
       "id": "comment.index-proof",
-      "summary": "Indexed non-null access has an immediately preceding proof comment.",
-      "enforcement": "ast"
+      "statement": "Every indexed non-null access carries a bounds proof comment directly above it.",
+      "verify": "pnpm style"
     },
     {
       "id": "comment.pipeline-contract",
-      "summary": "Ordered multi-phase pipelines have a contract and numbered phases.",
-      "enforcement": "manual"
-    },
-    {
-      "id": "type.no-handrolled-parser",
-      "summary": "Do not export type-guard/parse helpers for schema-owned literals and numbers; decode with Schema or private switch inside hook readConfig only.",
-      "enforcement": "manual"
+      "statement": "A multi-phase pipeline states its contract above the orchestration and numbers each phase inside it.",
+      "verify": "judgment"
     },
     {
       "id": "type.schema-owned-runtime",
-      "summary": "Runtime object types derive from executable Effect Schema definitions.",
-      "enforcement": "ast"
+      "statement": "Data crossing a runtime, persistence, CLI, environment, catalog, or agent-format boundary is defined as Effect Schema first, with its TypeScript type derived.",
+      "verify": "pnpm style"
+    },
+    {
+      "id": "type.no-handrolled-parser",
+      "statement": "Schema owns validation, and no exported type-guard or parse helper duplicates it.",
+      "verify": "judgment"
     },
     {
       "id": "type.no-interface",
-      "summary": "Interfaces are reserved for declaration-file augmentation.",
-      "enforcement": "ast"
+      "statement": "Interfaces appear only in declaration-file augmentation.",
+      "verify": "pnpm style"
     },
     {
       "id": "type.no-enum",
-      "summary": "Enums are forbidden.",
-      "enforcement": "ast"
+      "statement": "Unions derived from schema literals replace enums.",
+      "verify": "pnpm style"
     },
     {
       "id": "type.no-conditional",
-      "summary": "Authored conditional and infer type machinery is forbidden.",
-      "enforcement": "ast"
+      "statement": "Types are derived from schemas, never computed with conditional or `infer` machinery.",
+      "verify": "pnpm style"
     },
     {
       "id": "type.no-assertion",
-      "summary": "Authored TypeScript assertions are forbidden.",
-      "enforcement": "ast"
+      "statement": "Unknown input is decoded or narrowed, never asserted.",
+      "verify": "pnpm style"
     },
     {
       "id": "type.no-suppression",
-      "summary": "TypeScript and tool suppression directives are forbidden.",
-      "enforcement": "ast"
+      "statement": "No suppression directive silences a type, lint, format, or coverage error.",
+      "verify": "pnpm style"
     },
     {
       "id": "barrel.direct-wildcard",
-      "summary": "Barrels contain direct wildcard exports only.",
-      "enforcement": "ast"
+      "statement": "Every statement in a barrel is a direct wildcard export.",
+      "verify": "pnpm style"
     },
     {
       "id": "name.domain-specific",
-      "summary": "Identifiers use domain-specific names instead of vague generic roles.",
-      "enforcement": "ast"
+      "statement": "Every identifier names its domain job or value.",
+      "verify": "pnpm style"
     },
     {
       "id": "mutation.no-input",
-      "summary": "Function inputs are never mutated.",
-      "enforcement": "ast"
+      "statement": "A function never mutates a value it received.",
+      "verify": "pnpm style"
     },
     {
       "id": "collection.no-builder-reduce",
-      "summary": "Reduce is not used to build arrays or objects.",
-      "enforcement": "ast"
+      "statement": "Collections are built with `map`, `filter`, `flatMap`, or `Object.fromEntries`, never `reduce`.",
+      "verify": "pnpm style"
     },
     {
       "id": "effect.no-promise-all",
-      "summary": "Application effects do not use Promise.all.",
-      "enforcement": "ast"
+      "statement": "Application code composes concurrency with Effect operators, never `Promise.all`.",
+      "verify": "pnpm style"
     },
     {
       "id": "effect.runtime-edge",
-      "summary": "Effect.run calls exist only at src/cli/main.ts.",
-      "enforcement": "ast"
+      "statement": "Only `src/cli/main.ts` starts the Effect runtime.",
+      "verify": "pnpm style"
     },
     {
       "id": "effect.official-services",
-      "summary": "Capabilities use official Effect services without pass-through wrappers.",
-      "enforcement": "manual"
+      "statement": "Capabilities call official Effect platform services directly.",
+      "verify": "judgment"
     },
     {
       "id": "import.hook-runtime",
-      "summary": "Installed hook graphs import only node modules and their runtime island.",
-      "enforcement": "importGraph"
+      "statement": "An installed hook imports only `node:*` builtins, shared `src/runtime/**`, and its own feature runtime.",
+      "verify": "pnpm style"
     },
     {
       "id": "import.application-boundary",
-      "summary": "Application modules do not import the installed hook runtime.",
-      "enforcement": "importGraph"
+      "statement": "Application code never imports installed hook-runtime modules.",
+      "verify": "pnpm style"
     },
     {
       "id": "presentation.terminal-ui",
-      "summary": "Application presentation routes through TerminalUI.",
-      "enforcement": "ast"
+      "statement": "Application code returns structured results and leaves terminal output to `TerminalUI`.",
+      "verify": "pnpm style"
     }
   ],
   "protectedPaths": [
@@ -167,11 +169,7 @@
     },
     {
       "path": "src/skills/makeATrailer/scripts/assembleCut.mjs",
-      "codeRuleExemptions": [
-        "function.arrow-only",
-        "function.input-shape",
-        "comment.loop-intent"
-      ]
+      "codeRuleExemptions": ["function.arrow-only", "function.input-shape", "comment.loop-intent"]
     }
   ]
 }

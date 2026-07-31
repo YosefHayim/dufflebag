@@ -123,7 +123,10 @@ describe("planManagedConfig", () => {
 
   it.each([
     ["first project", { _tag: "firstProjectInstall", globalConfig: missingConfigSnapshot }],
-    ["legacy migration", { _tag: "legacyEnvironment", settingsBytes: settingsBytes({ env: { dufflebagDebugEnabled: "true" } }) }],
+    [
+      "legacy migration",
+      { _tag: "legacyEnvironment", settingsBytes: settingsBytes({ env: { dufflebagDebugEnabled: "true" } }) },
+    ],
   ])("rejects a one-time %s selection when a target config already exists", (_case, selection) => {
     const result = planManagedConfig({
       scope: "project",
@@ -139,7 +142,9 @@ describe("planManagedConfig", () => {
 
   it("keeps later global and project selections independent", () => {
     const global = unwrap(planManagedConfig(selectedRequest("global", { ...defaultBagConfig, speechVoice: "Daniel" })));
-    const project = unwrap(planManagedConfig(selectedRequest("project", { ...defaultBagConfig, speechVoice: "Moira" })));
+    const project = unwrap(
+      planManagedConfig(selectedRequest("project", { ...defaultBagConfig, speechVoice: "Moira" })),
+    );
 
     expect(global.config.speechVoice).toBe("Daniel");
     expect(project.config.speechVoice).toBe("Moira");
@@ -183,7 +188,8 @@ describe("planManagedConfig", () => {
   });
 
   it("retains every original source byte for the single later settings planner", () => {
-    const original = '{"before":-0,"env":{"keep":"x","dufflebagDebugEnabled":"true","escaped":"\\u0061"},"huge":1e400}\n';
+    const original =
+      '{"before":-0,"env":{"keep":"x","dufflebagDebugEnabled":"true","escaped":"\\u0061"},"huge":1e400}\n';
     const plan = unwrap(
       planManagedConfig({
         scope: "project",
@@ -229,7 +235,10 @@ describe("planManagedConfig", () => {
     ["case-folded alias", { env: { DufflebagDebugEnabled: "true" } }],
     ["invalid value", { env: { dufflebagDebugEnabled: "yes" } }],
     ["invalid bound", { env: { dufflebagSpeechWordsPerMinute: "79" } }],
-    ["cross-field contradiction", { env: { dufflebagContextWarnFraction: "0.3", dufflebagContextBlockFraction: "0.2" } }],
+    [
+      "cross-field contradiction",
+      { env: { dufflebagContextWarnFraction: "0.3", dufflebagContextBlockFraction: "0.2" } },
+    ],
     ["missing legacy keys", { env: { userSetting: "keep" } }],
   ])("returns no plan for %s", (_case, settings) => {
     const result = planManagedConfig({

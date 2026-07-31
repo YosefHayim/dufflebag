@@ -36,7 +36,10 @@ export const featuresOption = Options.text("features").pipe(
   Options.withDescription("Comma-separated feature ids from the catalog"),
 );
 
-export const resolveScope = (input: { project: boolean; global: boolean }): Effect.Effect<"global" | "project", ScopeOptionError> => {
+export const resolveScope = (input: {
+  project: boolean;
+  global: boolean;
+}): Effect.Effect<"global" | "project", ScopeOptionError> => {
   if (input.project && input.global) {
     return Effect.fail(
       new ScopeOptionError({

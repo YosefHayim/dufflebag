@@ -18,7 +18,14 @@ import { readFileSync, writeSync } from "node:fs";
 
 import { readConfig } from "../../../runtime/config.js";
 import { allow } from "../../../runtime/io.js";
-import { buildIndex, findDuplicatesInAddedText, isSourcePath, loadTypeScript, parseSkipList, resolveRepoRoot } from "../lib/dupIndex.js";
+import {
+  buildIndex,
+  findDuplicatesInAddedText,
+  isSourcePath,
+  loadTypeScript,
+  parseSkipList,
+  resolveRepoRoot,
+} from "../lib/dupIndex.js";
 
 /**
  * Cursor's afterFileEdit payload shape is normalized defensively — field names
@@ -63,7 +70,8 @@ function main(): void {
   if (hits.length === 0) allow();
 
   const lines = hits.map(
-    (h) => `• ${h.kind} \`${h.name}\` is structurally identical to \`${h.existing.name}\` at ${h.existing.file}:${h.existing.line}`,
+    (h) =>
+      `• ${h.kind} \`${h.name}\` is structurally identical to \`${h.existing.name}\` at ${h.existing.file}:${h.existing.line}`,
   );
   const message = [
     `⚠️ dedup-guard: ${filePath} introduces duplicate code:`,

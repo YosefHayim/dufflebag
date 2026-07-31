@@ -1,6 +1,12 @@
 /** Pure decision policy for one idle auto-compact session. */
 
-export type IdleCompactPhase = "working" | "waitingIdle" | "awaitingPrompt" | "compacting" | "compactionFinished" | "parked";
+export type IdleCompactPhase =
+  | "working"
+  | "waitingIdle"
+  | "awaitingPrompt"
+  | "compacting"
+  | "compactionFinished"
+  | "parked";
 
 export type IdleCompactSnapshot = {
   readonly phase: IdleCompactPhase;
@@ -30,7 +36,9 @@ export const decideIdleCompactAction = (snapshot: IdleCompactSnapshot): IdleComp
   if (snapshot.phase === "compacting") return { _tag: "wait", reason: "compacting" };
   if (snapshot.phase === "compactionFinished" || snapshot.phase === "parked") return { _tag: "park" };
   if (snapshot.phase === "waitingIdle") {
-    return elapsedSeconds(snapshot) >= snapshot.idleSeconds ? { _tag: "submitDraft" } : { _tag: "wait", reason: "idle-duration" };
+    return elapsedSeconds(snapshot) >= snapshot.idleSeconds
+      ? { _tag: "submitDraft" }
+      : { _tag: "wait", reason: "idle-duration" };
   }
   return elapsedSeconds(snapshot) >= snapshot.acknowledgementSeconds
     ? { _tag: "compact" }

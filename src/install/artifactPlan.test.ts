@@ -1,7 +1,13 @@
 import { Either, Option, Schema } from "effect";
 import { describe, expect, it } from "vitest";
 
-import { artifactPlanSchema, createUninstallPlan, createUpdatePlan, migrateLegacyManifest, validateArtifactPlan } from "./artifactPlan.js";
+import {
+  artifactPlanSchema,
+  createUninstallPlan,
+  createUpdatePlan,
+  migrateLegacyManifest,
+  validateArtifactPlan,
+} from "./artifactPlan.js";
 
 const oldHash = "1111111111111111111111111111111111111111111111111111111111111111";
 const newHash = "2222222222222222222222222222222222222222222222222222222222222222";
@@ -249,7 +255,9 @@ describe("artifactPlanSchema", () => {
     expect(new Set(plan.receipt.receipt.artifacts.map((artifact) => artifact.ownership._tag))).toEqual(
       new Set(["wholeFile", "managedBlock", "jsonValues", "yamlSequenceValue"]),
     );
-    expect(new Set(plan.receipt.receipt.artifacts.map((artifact) => artifact.owner._tag))).toEqual(new Set(["application", "agent"]));
+    expect(new Set(plan.receipt.receipt.artifacts.map((artifact) => artifact.owner._tag))).toEqual(
+      new Set(["application", "agent"]),
+    );
     expect(plan.receipt.target.kind).toEqual({ _tag: "receipt" });
   });
 
@@ -297,7 +305,12 @@ describe("artifactPlanSchema", () => {
     expect(String(Option.getOrThrow(Either.getLeft(result)))).toContain("path");
   });
 
-  it.each(["/workspace", "/", "C:/workspace", "z:/workspace/project"])("accepts canonical cross-platform absolute root %s", (root) => {
+  it.each([
+    "/workspace",
+    "/",
+    "C:/workspace",
+    "z:/workspace/project",
+  ])("accepts canonical cross-platform absolute root %s", (root) => {
     expect(Either.isRight(validateArtifactPlan({ ...completePlan, root }))).toBe(true);
   });
 
@@ -353,8 +366,14 @@ describe("artifactPlanSchema", () => {
   it.each([
     { name: "runtime owned by an agent", artifact: { ...runtimeArtifact, owner: agentOwner(["codex"]) } },
     { name: "skill owned by the application", artifact: { ...skillArtifact, owner: applicationOwner } },
-    { name: "instruction with whole-file ownership", artifact: { ...instructionArtifact, ownership: skillArtifact.ownership } },
-    { name: "settings with managed-block ownership", artifact: { ...settingsArtifact, ownership: instructionArtifact.ownership } },
+    {
+      name: "instruction with whole-file ownership",
+      artifact: { ...instructionArtifact, ownership: skillArtifact.ownership },
+    },
+    {
+      name: "settings with managed-block ownership",
+      artifact: { ...settingsArtifact, ownership: instructionArtifact.ownership },
+    },
   ])("rejects invalid ownership-kind combination: $name", ({ artifact }) => {
     const result = validateArtifactPlan({ ...completePlan, operations: [write(artifact)] });
 
@@ -437,7 +456,9 @@ describe("artifactPlanSchema", () => {
     });
 
     expect(Either.isLeft(result)).toBe(true);
-    expect(String(Option.getOrThrow(Either.getLeft(result)))).toContain('["receipt"]["receipt"]["artifacts"][0]["path"]');
+    expect(String(Option.getOrThrow(Either.getLeft(result)))).toContain(
+      '["receipt"]["receipt"]["artifacts"][0]["path"]',
+    );
     expect(String(Option.getOrThrow(Either.getLeft(result)))).toContain("recovery.json");
   });
 
@@ -943,7 +964,10 @@ describe("createUpdatePlan", () => {
       ownership: {
         ...desiredArtifact.ownership,
         filePreviouslyPresent: false,
-        values: [{ ...desiredArtifact.ownership.values[0], previous: missingPrevious }, desiredArtifact.ownership.values[1]],
+        values: [
+          { ...desiredArtifact.ownership.values[0], previous: missingPrevious },
+          desiredArtifact.ownership.values[1],
+        ],
       },
     };
     const plan = unwrap(
@@ -1237,7 +1261,9 @@ describe("createUpdatePlan", () => {
     });
 
     expect(Either.isLeft(result)).toBe(true);
-    expect(String(Option.getOrThrow(Either.getLeft(result)))).toContain('["desired"]["receipt"]["artifacts"][0]["ownership"]["_tag"]');
+    expect(String(Option.getOrThrow(Either.getLeft(result)))).toContain(
+      '["desired"]["receipt"]["artifacts"][0]["ownership"]["_tag"]',
+    );
     expect(String(Option.getOrThrow(Either.getLeft(result)))).toContain("remove the prior ownership first");
   });
 
@@ -1395,7 +1421,10 @@ describe("migrateLegacyManifest", () => {
       }),
     );
 
-    expect(plan.operations.map((operation) => operation.artifact.path)).toEqual([runtimeArtifact.path, skillArtifact.path]);
+    expect(plan.operations.map((operation) => operation.artifact.path)).toEqual([
+      runtimeArtifact.path,
+      skillArtifact.path,
+    ]);
     expect(plan.operations.every((operation) => operation._tag === "write")).toBe(true);
     expect(plan.receipt._tag).toBe("receiptPublish");
     if (plan.receipt._tag === "receiptPublish") {

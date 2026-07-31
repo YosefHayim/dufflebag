@@ -34,11 +34,56 @@ const DEFAULT_BUDGETS = {
  * used when CrUX gives no category. `cls` metrics are unitless (÷100 in CrUX).
  */
 const METRICS = [
-  { id: "LCP", field: "LARGEST_CONTENTFUL_PAINT_MS", audit: "largest-contentful-paint", budget: "lcpMs", good: 2500, poor: 4000, cls: false, core: true },
-  { id: "INP", field: "INTERACTION_TO_NEXT_PAINT", audit: "total-blocking-time", budget: "inpMs", good: 200, poor: 500, cls: false, core: true },
-  { id: "CLS", field: "CUMULATIVE_LAYOUT_SHIFT_SCORE", audit: "cumulative-layout-shift", budget: "clsScore", good: 0.1, poor: 0.25, cls: true, core: true },
-  { id: "FCP", field: "FIRST_CONTENTFUL_PAINT_MS", audit: "first-contentful-paint", budget: "fcpMs", good: 1800, poor: 3000, cls: false, core: false },
-  { id: "TTFB", field: "EXPERIMENTAL_TIME_TO_FIRST_BYTE", audit: "server-response-time", budget: "ttfbMs", good: 800, poor: 1800, cls: false, core: false },
+  {
+    id: "LCP",
+    field: "LARGEST_CONTENTFUL_PAINT_MS",
+    audit: "largest-contentful-paint",
+    budget: "lcpMs",
+    good: 2500,
+    poor: 4000,
+    cls: false,
+    core: true,
+  },
+  {
+    id: "INP",
+    field: "INTERACTION_TO_NEXT_PAINT",
+    audit: "total-blocking-time",
+    budget: "inpMs",
+    good: 200,
+    poor: 500,
+    cls: false,
+    core: true,
+  },
+  {
+    id: "CLS",
+    field: "CUMULATIVE_LAYOUT_SHIFT_SCORE",
+    audit: "cumulative-layout-shift",
+    budget: "clsScore",
+    good: 0.1,
+    poor: 0.25,
+    cls: true,
+    core: true,
+  },
+  {
+    id: "FCP",
+    field: "FIRST_CONTENTFUL_PAINT_MS",
+    audit: "first-contentful-paint",
+    budget: "fcpMs",
+    good: 1800,
+    poor: 3000,
+    cls: false,
+    core: false,
+  },
+  {
+    id: "TTFB",
+    field: "EXPERIMENTAL_TIME_TO_FIRST_BYTE",
+    audit: "server-response-time",
+    budget: "ttfbMs",
+    good: 800,
+    poor: 1800,
+    cls: false,
+    core: false,
+  },
 ];
 
 function usage() {
@@ -68,7 +113,8 @@ function parseArgs(argv) {
     else throw new Error(`Unexpected argument: ${arg}`);
   }
   if (!args.help && !args.url) throw new Error("A URL is required. Try --help.");
-  if (args.strategy !== "mobile" && args.strategy !== "desktop") throw new Error("--strategy must be mobile or desktop");
+  if (args.strategy !== "mobile" && args.strategy !== "desktop")
+    throw new Error("--strategy must be mobile or desktop");
   return args;
 }
 
@@ -107,7 +153,12 @@ function resolveMetric(metric, urlField, originField, labAudits) {
     const value = metric.cls ? audit.numericValue : Math.round(audit.numericValue);
     // INP has no lab equivalent — total-blocking-time is only a proxy, so we
     // report it but never hard-fail on it.
-    return { value, rating: ratingFromValue(value, metric.good, metric.poor), source: "lab", proxy: metric.id === "INP" };
+    return {
+      value,
+      rating: ratingFromValue(value, metric.good, metric.poor),
+      source: "lab",
+      proxy: metric.id === "INP",
+    };
   }
   return { value: null, rating: "n/a", source: "none" };
 }
@@ -136,20 +187,31 @@ function evaluate(data, budgets, strict) {
 
   const scoreFailed = labScore !== null && labScore < budgets.performanceScore;
   const passed = !scoreFailed && !rows.some((row) => row.failed);
-  return { labScore, rows, scoreFailed, passed, fieldOrigin: urlField ? "this-url" : originField ? "origin" : "lab-only" };
+  return {
+    labScore,
+    rows,
+    scoreFailed,
+    passed,
+    fieldOrigin: urlField ? "this-url" : originField ? "origin" : "lab-only",
+  };
 }
 
 function renderReport(result, meta) {
   const lines = [`PageSpeed Insights — ${meta.url} (${meta.strategy})`, ""];
   const score = result.labScore === null ? "n/a" : Math.round(result.labScore * 100);
   const scoreMark = result.scoreFailed ? "FAIL" : "PASS";
-  lines.push(`Lab performance score: ${score}  (budget ≥ ${Math.round(meta.budgets.performanceScore * 100)})  ${scoreMark}`, "");
+  lines.push(
+    `Lab performance score: ${score}  (budget ≥ ${Math.round(meta.budgets.performanceScore * 100)})  ${scoreMark}`,
+    "",
+  );
   lines.push(`Real-user Core Web Vitals (source: ${result.fieldOrigin}):`);
   for (const row of result.rows) {
     const flag = row.failed ? "  ✗ FAIL" : row.rating === "needs-improvement" ? "  ! warn" : "";
     const proxy = row.proxy ? " [lab TBT proxy]" : "";
     const budget = `budget ${row.cls ? "≤ " : "≤ "}${formatValue(row, row.budget)}`;
-    lines.push(`  ${row.id.padEnd(5)} ${formatValue(row, row.value).padEnd(9)} ${row.rating.padEnd(18)} (${budget})${proxy}${flag}`);
+    lines.push(
+      `  ${row.id.padEnd(5)} ${formatValue(row, row.value).padEnd(9)} ${row.rating.padEnd(18)} (${budget})${proxy}${flag}`,
+    );
   }
   lines.push("", `Verdict: ${result.passed ? "PASS" : "FAIL"}`);
   return lines.join("\n");

@@ -1,8 +1,19 @@
 import { FileSystem, Path } from "@effect/platform";
 import { Effect, ParseResult, Schema } from "effect";
 
-import { type AgentEvidence, agentCatalog, agentEvidenceSchema, agentIdSchema, classifyAgents } from "./catalog/agentCatalog.js";
-import { type FeatureDefinition, featureCatalog, featureDefinitionSchema, featureIdSchema } from "./catalog/featureCatalog.js";
+import {
+  type AgentEvidence,
+  agentCatalog,
+  agentEvidenceSchema,
+  agentIdSchema,
+  classifyAgents,
+} from "./catalog/agentCatalog.js";
+import {
+  type FeatureDefinition,
+  featureCatalog,
+  featureDefinitionSchema,
+  featureIdSchema,
+} from "./catalog/featureCatalog.js";
 import { type ManagedConfigFile, managedConfigFileSchema, readConfigFile } from "./config/configFile.js";
 import { managedConfigPath } from "./config/configure.js";
 import {
@@ -378,7 +389,9 @@ const createDaemonDiagnostics = (request: DoctorRequest) =>
     for (const name of entries) {
       if (!name.endsWith(".pid")) continue;
       const sessionId = name.slice(0, -".pid".length);
-      const pidText = yield* fileSystem.readFileString(path.join(loopStateDir, name)).pipe(Effect.catchAll(() => Effect.succeed("")));
+      const pidText = yield* fileSystem
+        .readFileString(path.join(loopStateDir, name))
+        .pipe(Effect.catchAll(() => Effect.succeed("")));
       const pid = Number.parseInt(pidText.trim(), 10);
       if (!Number.isFinite(pid) || !processAlive(pid)) continue;
 
@@ -503,9 +516,14 @@ export const doctor = (input: unknown) =>
       }
     });
 
-    appendDaemonDiscrepancies(discrepancies, daemonDiagnostics, configSnapshot._tag === "present" ? configSnapshot.config : undefined);
+    appendDaemonDiscrepancies(
+      discrepancies,
+      daemonDiagnostics,
+      configSnapshot._tag === "present" ? configSnapshot.config : undefined,
+    );
 
-    const config = configSnapshot._tag === "missing" ? { _tag: "missing" } : { _tag: "present", config: configSnapshot.config };
+    const config =
+      configSnapshot._tag === "missing" ? { _tag: "missing" } : { _tag: "present", config: configSnapshot.config };
 
     // 5. Validate one presentation-ready report and return without invoking a writer.
     return yield* Schema.validate(doctorReportSchema, {

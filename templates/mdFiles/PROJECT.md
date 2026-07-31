@@ -39,6 +39,8 @@ immediately — a toolbelt, not a platform.
   turn when one starts, compacts once, and parks until the next human prompt.
 - A **duplicate** function/type is blocked at write time on Claude (warned on Cursor,
   gated in CI by `dedup check`).
+- Complete agent responses are narrated locally without cross-pane Cmux spam, with
+  push-to-talk dictation and an optional reviewed on-device prompt-refinement step.
 - A PNG **converges to pixel-perfect code** via a measured screenshot-diff loop, not
   eyeballing.
 - Any repo adopts the **single-purpose CI set** (and templated `publish.yml`) with one

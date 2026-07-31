@@ -291,7 +291,8 @@ describe("voice speech document", () => {
   });
 
   it("does not reinterpret structured technical literals", () => {
-    const text = "See https://example.com/v1.2.3?q=100, dev@example.com, /tmp/build-123/log.txt, v1.2.3, 127.0.0.1, and a1b2c3d4.";
+    const text =
+      "See https://example.com/v1.2.3?q=100, dev@example.com, /tmp/build-123/log.txt, v1.2.3, 127.0.0.1, and a1b2c3d4.";
 
     expect(runVoice(["render", "--text", text])).toBe(text);
   });
@@ -480,7 +481,9 @@ describe("hold-Control push-to-talk", () => {
       action: "stop",
       state: "idle",
     });
-    expect(callVoiceFunction("control_hold_transition", { event: "control_up", injected: true, state: "listening" })).toEqual({
+    expect(
+      callVoiceFunction("control_hold_transition", { event: "control_up", injected: true, state: "listening" }),
+    ).toEqual({
       action: "none",
       state: "listening",
     });

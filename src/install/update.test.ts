@@ -140,7 +140,9 @@ layer(NodeContext.layer)("update", (it) => {
         const fileSystem = yield* FileSystem.FileSystem;
         const path = yield* Path.Path;
         const root = yield* fileSystem.makeTempDirectoryScoped({ prefix: "dufflebag-update-created-hooks-root-" });
-        const stagedRoot = yield* fileSystem.makeTempDirectoryScoped({ prefix: "dufflebag-update-created-hooks-stage-" });
+        const stagedRoot = yield* fileSystem.makeTempDirectoryScoped({
+          prefix: "dufflebag-update-created-hooks-stage-",
+        });
         const settingsPath = path.join(root, ".claude/settings.json");
         const originalSettings = '{\r\n\t"theme":"dark"\r\n}\r\n';
 
@@ -168,7 +170,9 @@ layer(NodeContext.layer)("update", (it) => {
         const fileSystem = yield* FileSystem.FileSystem;
         const path = yield* Path.Path;
         const root = yield* fileSystem.makeTempDirectoryScoped({ prefix: "dufflebag-update-cleanup-hooks-root-" });
-        const stagedRoot = yield* fileSystem.makeTempDirectoryScoped({ prefix: "dufflebag-update-cleanup-hooks-stage-" });
+        const stagedRoot = yield* fileSystem.makeTempDirectoryScoped({
+          prefix: "dufflebag-update-cleanup-hooks-stage-",
+        });
         const settingsPath = path.join(root, ".claude/settings.json");
         const originalSettings = '{\r\n\t"env": { "keep":"yes", "dufflebagDebugEnabled":"true" }\r\n}\r\n';
         const baseRequest = request({ root, stagedRoot, features: ["context-guard"] });

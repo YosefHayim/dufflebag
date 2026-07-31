@@ -45,7 +45,8 @@ export const nextVoiceFeatures = (current: ReadonlyArray<string>, enabled: boole
   return featureCatalog.map((feature) => feature.id).filter((id) => selected.has(id));
 };
 
-export const normalizeVoiceId = (voice: string): string => (/^[MF][1-5]$/i.test(voice.trim()) ? voice.trim().toUpperCase() : "F4");
+export const normalizeVoiceId = (voice: string): string =>
+  /^[MF][1-5]$/i.test(voice.trim()) ? voice.trim().toUpperCase() : "F4";
 
 const agentArgument = Args.choice<VoiceAgent>(voiceAgents, { name: "agent" }).pipe(
   Args.optional,
@@ -78,12 +79,16 @@ const inheritedCommand = (executable: string, args: ReadonlyArray<string>) =>
 const requireSuccess = (command: PlatformCommand.Command, label: string) =>
   PlatformCommand.exitCode(command).pipe(
     Effect.flatMap((code) =>
-      code === 0 ? Effect.void : Effect.fail(new VoiceCommandError({ issue: `${label} exited with status ${String(code)}.` })),
+      code === 0
+        ? Effect.void
+        : Effect.fail(new VoiceCommandError({ issue: `${label} exited with status ${String(code)}.` })),
     ),
     Effect.mapError((error) =>
       error instanceof VoiceCommandError
         ? error
-        : new VoiceCommandError({ issue: `${label} could not start: ${error instanceof Error ? error.message : String(error)}` }),
+        : new VoiceCommandError({
+            issue: `${label} could not start: ${error instanceof Error ? error.message : String(error)}`,
+          }),
     ),
   );
 
@@ -232,7 +237,8 @@ const statusCommand = CliCommand.make(
       const location = yield* voiceLocation(args);
       const path = yield* Path.Path;
       const snapshot = yield* readArtifactReceiptSnapshot(path.join(location.destination.root, receiptPath));
-      const installed = snapshot._tag === "present" && snapshot.receipt.features.some((feature) => feature === voiceFeatureId);
+      const installed =
+        snapshot._tag === "present" && snapshot.receipt.features.some((feature) => feature === voiceFeatureId);
       if (!installed) {
         yield* TerminalUI.note(`feature  off\nscope    ${location.scope}`, "Voice");
         yield* TerminalUI.outro("Enable with `dufflebag voice on`.");
@@ -241,7 +247,9 @@ const statusCommand = CliCommand.make(
 
       yield* requireUv;
       const script = yield* requireInstalledVoice(location.destination.root);
-      const status = yield* PlatformCommand.string(PlatformCommand.make("uv", "run", "--frozen", "--script", script, "status"));
+      const status = yield* PlatformCommand.string(
+        PlatformCommand.make("uv", "run", "--frozen", "--script", script, "status"),
+      );
       yield* TerminalUI.note(`feature  on\nscope    ${location.scope}\nworker   ${status.trim()}`, "Voice");
       yield* TerminalUI.outro("Hold Control to dictate; release it to stop.");
     }).pipe(Effect.catchAll((error) => TerminalUI.presentError(error))),
@@ -283,7 +291,9 @@ const devinCommand = CliCommand.make(
         const sessionRoot = yield* fileSystem.makeTempDirectoryScoped({ prefix: "dufflebag-devin-voice-" });
         const exportPath = path.join(sessionRoot, "session.atif.json");
         const watcher = yield* Effect.acquireRelease(
-          PlatformCommand.start(inheritedCommand("uv", ["run", "--frozen", "--script", script, "watch-devin", "--path", exportPath])),
+          PlatformCommand.start(
+            inheritedCommand("uv", ["run", "--frozen", "--script", script, "watch-devin", "--path", exportPath]),
+          ),
           (process) => process.kill().pipe(Effect.catchAll(() => Effect.void)),
         );
         yield* TerminalUI.info(`Watching Devin's official ATIF export (watcher ${String(watcher.pid)}).`);

@@ -37,7 +37,13 @@ export type CycleGateSnapshot = {
 };
 
 /** Why the daemon waits without typing or halting. */
-export type CycleGateWaitReason = "no-occupancy" | "below-warn" | "no-fresh-handoff" | "not-idle" | "not-frontmost" | "window-not-located";
+export type CycleGateWaitReason =
+  | "no-occupancy"
+  | "below-warn"
+  | "no-fresh-handoff"
+  | "not-idle"
+  | "not-frontmost"
+  | "window-not-located";
 
 /** Why the daemon disarms and records a halt marker. */
 export type CycleGateHaltReason = "hard-cap" | "budget-reached" | "done";

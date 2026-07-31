@@ -130,7 +130,9 @@ const runDoctor = Effect.gen(function* () {
       platform: host.platform,
       agentEvidence: host.agentEvidence,
     });
-    yield* TerminalUI.step(`${scope}: ${report.installation._tag === "present" ? `v${report.installation.version}` : "missing"}`);
+    yield* TerminalUI.step(
+      `${scope}: ${report.installation._tag === "present" ? `v${report.installation.version}` : "missing"}`,
+    );
   }
 });
 
@@ -170,7 +172,9 @@ export const runMenu = Effect.gen(function* () {
       yield* runUpdate;
       break;
     case "config":
-      yield* TerminalUI.info("Use `dufflebag config` with flags to change tunables, or bare `dufflebag config` to show values.");
+      yield* TerminalUI.info(
+        "Use `dufflebag config` with flags to change tunables, or bare `dufflebag config` to show values.",
+      );
       break;
     case "doctor":
       yield* runDoctor;

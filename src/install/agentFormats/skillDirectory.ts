@@ -91,7 +91,9 @@ type StagedSkillFields = Schema.Schema.Type<typeof stagedSkillFieldsSchema>;
 const shippedPathShapeIssues = (skill: StagedSkillFields) =>
   skill.installedSkill.shippedPaths.flatMap((shippedPath) => {
     const rootIndex = skill.sourceFiles.findIndex((file) => normalizedPath(file.path) === normalizedPath(shippedPath));
-    const descendantIndex = skill.sourceFiles.findIndex((file) => normalizedPath(file.path).startsWith(`${normalizedPath(shippedPath)}/`));
+    const descendantIndex = skill.sourceFiles.findIndex((file) =>
+      normalizedPath(file.path).startsWith(`${normalizedPath(shippedPath)}/`),
+    );
     const shippedPathIsFile = isShippedFilePath(shippedPath);
 
     return [
@@ -276,7 +278,9 @@ const skillDirectoryRequestIssues = (request: SkillDirectoryRequestFields) => [
   ...previousFileIssues(request),
 ];
 
-export const skillDirectoryRequestSchema = skillDirectoryRequestFieldsSchema.pipe(Schema.filter(skillDirectoryRequestIssues));
+export const skillDirectoryRequestSchema = skillDirectoryRequestFieldsSchema.pipe(
+  Schema.filter(skillDirectoryRequestIssues),
+);
 
 export type SkillDirectoryRequest = Schema.Schema.Type<typeof skillDirectoryRequestSchema>;
 
@@ -350,11 +354,17 @@ const renderSkillBytes = (bytes: Uint8Array, ctl: string): Uint8Array => {
   return textEncoder.encode(text.right.split(templateToken).join(ctl));
 };
 
-const materializeSkillDirectoryPlan = (request: SkillDirectoryRequest): Either.Either<SkillDirectoryPlan, SkillDirectoryPlanError> => {
+const materializeSkillDirectoryPlan = (
+  request: SkillDirectoryRequest,
+): Either.Either<SkillDirectoryPlan, SkillDirectoryPlanError> => {
   const writes = selectedSourceFiles(request).map((file) => {
     const previous = request.previousFiles.find((candidate) => candidate.path === file.destination);
     if (previous === undefined) {
-      return Either.left(new SkillDirectoryPlanError({ issue: `Missing previous-file state for desired skill file ${file.destination}.` }));
+      return Either.left(
+        new SkillDirectoryPlanError({
+          issue: `Missing previous-file state for desired skill file ${file.destination}.`,
+        }),
+      );
     }
 
     const bytes = renderSkillBytes(file.source.bytes, request.ctl);

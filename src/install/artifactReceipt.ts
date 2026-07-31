@@ -13,7 +13,8 @@ export const scopeSchema = Schema.Literal("global", "project").annotations({
 export type Scope = Schema.Schema.Type<typeof scopeSchema>;
 
 // e.g. "skills/deslop/SKILL.md" — not "/abs", "C:\x", "a/../b", or "a//b"
-const RELATIVE_ARTIFACT_PATH_PATTERN = /^(?!\/)(?![A-Za-z]:)(?!.*(?:^|\/)\.{1,2}(?:\/|$))(?!.*\/\/)[^\\/\0]+(?:\/[^\\/\0]+)*$/;
+const RELATIVE_ARTIFACT_PATH_PATTERN =
+  /^(?!\/)(?![A-Za-z]:)(?!.*(?:^|\/)\.{1,2}(?:\/|$))(?!.*\/\/)[^\\/\0]+(?:\/[^\\/\0]+)*$/;
 // e.g. 64-char lowercase hex: "a1b2…f9"
 const SHA256_HEX_PATTERN = /^[a-f0-9]{64}$/;
 // e.g. "/hooks/0/command", "/a~1b" (~0/~1 escapes) — not "hooks" (relative) or "/a~2"
@@ -497,7 +498,11 @@ const lexicalMatchesPrevious = (value: OwnedJsonValue): boolean => {
 
   const entries = Object.entries(decoded.right);
 
-  return entries.length === 1 && entries[0]?.[0] === pointerKey(value.pointer) && jsonValuesEqual(entries[0][1], value.previous.value);
+  return (
+    entries.length === 1 &&
+    entries[0]?.[0] === pointerKey(value.pointer) &&
+    jsonValuesEqual(entries[0][1], value.previous.value)
+  );
 };
 
 const settingsLexicalIssues = (entry: { kind: ArtifactKind; ownership: ArtifactOwnership }) => {
@@ -694,14 +699,17 @@ export const artifactReceiptSnapshotSchema = Schema.Union(
 
 export type ArtifactReceiptSnapshot = Schema.Schema.Type<typeof artifactReceiptSnapshotSchema>;
 
-export class ArtifactReceiptParseError extends Schema.TaggedError<ArtifactReceiptParseError>()("ArtifactReceiptParseError", {
-  receiptPath: Schema.NonEmptyString.annotations({
-    description: "Artifact receipt file whose contents could not be decoded.",
-  }),
-  issue: Schema.NonEmptyString.annotations({
-    description: "Actionable receipt encoding, JSON, or schema issue.",
-  }),
-}) {
+export class ArtifactReceiptParseError extends Schema.TaggedError<ArtifactReceiptParseError>()(
+  "ArtifactReceiptParseError",
+  {
+    receiptPath: Schema.NonEmptyString.annotations({
+      description: "Artifact receipt file whose contents could not be decoded.",
+    }),
+    issue: Schema.NonEmptyString.annotations({
+      description: "Actionable receipt encoding, JSON, or schema issue.",
+    }),
+  },
+) {
   get message(): string {
     return `Artifact receipt at ${this.receiptPath} is invalid: ${this.issue}. Fix or remove it, then retry.`;
   }

@@ -50,7 +50,9 @@ export const uninstallCommand = Command.make(
       });
 
       yield* TerminalUI.success(
-        result._tag === "uninstalled" ? `Uninstalled ${result.scope} installation.` : `No ${result.scope} installation present.`,
+        result._tag === "uninstalled"
+          ? `Uninstalled ${result.scope} installation.`
+          : `No ${result.scope} installation present.`,
       );
       yield* TerminalUI.outro("Done.");
     }).pipe(Effect.catchAll((error) => TerminalUI.presentError(error))),

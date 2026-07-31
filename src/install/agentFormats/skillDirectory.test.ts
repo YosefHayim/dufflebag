@@ -6,7 +6,12 @@ import { describe, expect, it } from "vitest";
 import { findAgent } from "../../catalog/agentCatalog.js";
 import { featureCatalog, findFeature } from "../../catalog/featureCatalog.js";
 import type { PreviousFileValue } from "../artifactReceipt.js";
-import { planSkillDirectory, type SkillDirectoryPlan, SkillDirectoryPlanError, skillDirectoryPlanSchema } from "./skillDirectory.js";
+import {
+  planSkillDirectory,
+  type SkillDirectoryPlan,
+  SkillDirectoryPlanError,
+  skillDirectoryPlanSchema,
+} from "./skillDirectory.js";
 
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
@@ -106,10 +111,18 @@ describe("planSkillDirectory", () => {
 
   it("substitutes the control command in UTF-8 text and preserves other bytes exactly", () => {
     const plan = unwrap(planSkillDirectory(request()));
-    const skillWrite = Option.getOrThrow(Option.fromNullable(plan.writes.find((write) => write.artifact.path === skillPath)));
-    const guideWrite = Option.getOrThrow(Option.fromNullable(plan.writes.find((write) => write.artifact.path === guidePath)));
-    const binaryWrite = Option.getOrThrow(Option.fromNullable(plan.writes.find((write) => write.artifact.path === binaryPath)));
-    const plainWrite = Option.getOrThrow(Option.fromNullable(plan.writes.find((write) => write.artifact.path === plainPath)));
+    const skillWrite = Option.getOrThrow(
+      Option.fromNullable(plan.writes.find((write) => write.artifact.path === skillPath)),
+    );
+    const guideWrite = Option.getOrThrow(
+      Option.fromNullable(plan.writes.find((write) => write.artifact.path === guidePath)),
+    );
+    const binaryWrite = Option.getOrThrow(
+      Option.fromNullable(plan.writes.find((write) => write.artifact.path === binaryPath)),
+    );
+    const plainWrite = Option.getOrThrow(
+      Option.fromNullable(plan.writes.find((write) => write.artifact.path === plainPath)),
+    );
 
     expect(textDecoder.decode(skillWrite.bytes)).toBe("Run `dufflebag ctl status`.\n");
     expect(textDecoder.decode(guideWrite.bytes)).toBe("Use dufflebag ctl with care.\n");
@@ -119,14 +132,18 @@ describe("planSkillDirectory", () => {
 
   it("preserves literal replacement tokens in the concrete control command", () => {
     const plan = unwrap(planSkillDirectory({ ...request(), ctl: "$&/ctl" }));
-    const skillWrite = Option.getOrThrow(Option.fromNullable(plan.writes.find((write) => write.artifact.path === skillPath)));
+    const skillWrite = Option.getOrThrow(
+      Option.fromNullable(plan.writes.find((write) => write.artifact.path === skillPath)),
+    );
 
     expect(textDecoder.decode(skillWrite.bytes)).toBe("Run `$&/ctl status`.\n");
   });
 
   it("returns whole-file ownership with matching hashes and exact previous states", () => {
     const plan = unwrap(planSkillDirectory(request()));
-    const skillWrite = Option.getOrThrow(Option.fromNullable(plan.writes.find((write) => write.artifact.path === skillPath)));
+    const skillWrite = Option.getOrThrow(
+      Option.fromNullable(plan.writes.find((write) => write.artifact.path === skillPath)),
+    );
 
     expect(skillWrite.artifact).toMatchObject({
       owner: { _tag: "agent", agentIds: ["claude-code"] },
@@ -168,7 +185,9 @@ describe("planSkillDirectory", () => {
       ),
     };
     invalidRequest.previousFiles = previousFiles().map((file) =>
-      file.path === skillPath ? { path: ".claude/skills/readme-editor/SKILL.md/evil", previous: missingPrevious } : file,
+      file.path === skillPath
+        ? { path: ".claude/skills/readme-editor/SKILL.md/evil", previous: missingPrevious }
+        : file,
     );
 
     expect(errorMessage(invalidRequest)).toContain("file path");
@@ -190,7 +209,10 @@ describe("planSkillDirectory", () => {
       installedSkill: skillDefinition,
       sourceFiles: [...sourceFiles(), { path: parentPath, bytes: textEncoder.encode("parent file\n") }],
     };
-    invalidRequest.previousFiles = [...previousFiles(), { path: `.claude/skills/readme-editor/${parentPath}`, previous: missingPrevious }];
+    invalidRequest.previousFiles = [
+      ...previousFiles(),
+      { path: `.claude/skills/readme-editor/${parentPath}`, previous: missingPrevious },
+    ];
 
     expect(errorMessage(invalidRequest)).toContain("file and directory");
   });
@@ -232,7 +254,9 @@ describe("planSkillDirectory", () => {
       ],
     };
     const plan = unwrap(planSkillDirectory(request()));
-    const skillWrite = Option.getOrThrow(Option.fromNullable(plan.writes.find((write) => write.artifact.path === skillPath)));
+    const skillWrite = Option.getOrThrow(
+      Option.fromNullable(plan.writes.find((write) => write.artifact.path === skillPath)),
+    );
 
     const tamperedPlan = {
       writes: [

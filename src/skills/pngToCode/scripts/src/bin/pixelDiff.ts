@@ -83,7 +83,8 @@ const cellCounts = new Array<number>(rows * cols).fill(0);
 for (let y = 0; y < height; y++) {
   for (let x = 0; x < width; x++) {
     const p = (y * width + x) * 4;
-    const isDiff = diff.data[p] === diffColor[0] && diff.data[p + 1] === diffColor[1] && diff.data[p + 2] === diffColor[2];
+    const isDiff =
+      diff.data[p] === diffColor[0] && diff.data[p + 1] === diffColor[1] && diff.data[p + 2] === diffColor[2];
     if (!isDiff) continue;
     const c = Math.min(cols - 1, Math.floor(x / cellW));
     const r = Math.min(rows - 1, Math.floor(y / cellH));

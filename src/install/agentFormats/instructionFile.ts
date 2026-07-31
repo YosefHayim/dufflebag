@@ -4,7 +4,12 @@ import { Either, ParseResult, Schema } from "effect";
 
 import { agentCatalog, agentIdSchema } from "../../catalog/agentCatalog.js";
 import { featureCatalog, installedSkillDefinitionSchema } from "../../catalog/featureCatalog.js";
-import { artifactKindSchema, artifactOwnerSchema, managedBlockOwnershipSchema, relativeArtifactPathSchema } from "../artifactReceipt.js";
+import {
+  artifactKindSchema,
+  artifactOwnerSchema,
+  managedBlockOwnershipSchema,
+  relativeArtifactPathSchema,
+} from "../artifactReceipt.js";
 
 export const instructionBlockStartMarker = "<!-- dufflebag:skills start -->";
 export const instructionBlockEndMarker = "<!-- dufflebag:skills end -->";
@@ -24,11 +29,14 @@ const catalogInstalledSkills = featureCatalog.flatMap((feature) =>
   feature.installedSkill._tag === "skill" ? [feature.installedSkill] : [],
 );
 
-export class InstructionFilePlanError extends Schema.TaggedError<InstructionFilePlanError>()("InstructionFilePlanError", {
-  issue: Schema.NonEmptyString.annotations({
-    description: "Actionable instruction-file request or materialization issue.",
-  }),
-}) {
+export class InstructionFilePlanError extends Schema.TaggedError<InstructionFilePlanError>()(
+  "InstructionFilePlanError",
+  {
+    issue: Schema.NonEmptyString.annotations({
+      description: "Actionable instruction-file request or materialization issue.",
+    }),
+  },
+) {
   get message(): string {
     return `Cannot plan instruction file: ${this.issue}`;
   }
@@ -90,7 +98,9 @@ const inspectManagedBlock = (bytes: Uint8Array): Either.Either<CurrentManagedBlo
   }
 
   if (starts.length !== 1 || ends.length !== 1) {
-    return Either.left(new InstructionFilePlanError({ issue: "managed block markers must occur exactly once as a pair." }));
+    return Either.left(
+      new InstructionFilePlanError({ issue: "managed block markers must occur exactly once as a pair." }),
+    );
   }
 
   const start = starts[0];
@@ -111,13 +121,17 @@ const inspectManagedBlock = (bytes: Uint8Array): Either.Either<CurrentManagedBlo
 const hasCompleteLeadingFrontmatter = (markdown: string): boolean =>
   !leadingFrontmatterOpeningPattern.test(markdown) || leadingFrontmatterBlockPattern.test(markdown);
 
-const stripLeadingFrontmatter = (markdown: string): string => markdown.replace(leadingFrontmatterBlockPattern, "").replaceAll("\r\n", "\n");
+const stripLeadingFrontmatter = (markdown: string): string =>
+  markdown.replace(leadingFrontmatterBlockPattern, "").replaceAll("\r\n", "\n");
 
 const instructionSkillSchema = Schema.Struct({
   installedSkill: catalogSkillDefinitionSchema.pipe(
-    Schema.filter((installedSkill) => catalogInstalledSkills.some((candidate) => installedSkillsEqual(candidate, installedSkill)), {
-      message: () => "Instruction-file installed skills must exactly match the decoded feature catalog.",
-    }),
+    Schema.filter(
+      (installedSkill) => catalogInstalledSkills.some((candidate) => installedSkillsEqual(candidate, installedSkill)),
+      {
+        message: () => "Instruction-file installed skills must exactly match the decoded feature catalog.",
+      },
+    ),
     Schema.annotations({
       description: "Catalog-owned installed skill rendered into the managed instruction block.",
     }),
@@ -137,12 +151,18 @@ export type InstructionSkill = Schema.Schema.Type<typeof instructionSkillSchema>
 const renderSkillSection = (skill: InstructionSkill, ctl: string) => {
   const body = stripLeadingFrontmatter(skill.markdown).split(templateToken).join(ctl).trim();
   if (body.length === 0) {
-    return Either.left(new InstructionFilePlanError({ issue: `skill ${skill.installedSkill.id} has no markdown body after frontmatter.` }));
+    return Either.left(
+      new InstructionFilePlanError({
+        issue: `skill ${skill.installedSkill.id} has no markdown body after frontmatter.`,
+      }),
+    );
   }
 
   if (body.includes(instructionBlockStartMarker) || body.includes(instructionBlockEndMarker)) {
     return Either.left(
-      new InstructionFilePlanError({ issue: `skill ${skill.installedSkill.id} contains a reserved managed block marker.` }),
+      new InstructionFilePlanError({
+        issue: `skill ${skill.installedSkill.id} contains a reserved managed block marker.`,
+      }),
     );
   }
 
@@ -155,8 +175,16 @@ const renderManagedBody = (skills: ReadonlyArray<InstructionSkill>, ctl: string)
   return Either.map(sections, (values) => textEncoder.encode(`\n${values.join("\n\n---\n\n")}\n`));
 };
 
-const replaceManagedBlock = (input: { currentBytes: Uint8Array; block: ManagedBlockLocation; desiredBlock: Uint8Array }): Uint8Array =>
-  concatenateBytes([input.currentBytes.slice(0, input.block.start), input.desiredBlock, input.currentBytes.slice(input.block.end)]);
+const replaceManagedBlock = (input: {
+  currentBytes: Uint8Array;
+  block: ManagedBlockLocation;
+  desiredBlock: Uint8Array;
+}): Uint8Array =>
+  concatenateBytes([
+    input.currentBytes.slice(0, input.block.start),
+    input.desiredBlock,
+    input.currentBytes.slice(input.block.end),
+  ]);
 
 const appendedInstructionBytes = (currentBytes: Uint8Array, block: Uint8Array): Uint8Array =>
   concatenateBytes([currentBytes, blockSeparatorBytes, block, lineFeedBytes]);
@@ -168,7 +196,9 @@ const receiptedBlockRemovalRange = (input: {
 }): Either.Either<readonly [number, number], InstructionFilePlanError> => {
   const hasTrailingFrame = input.currentBytes[input.block.end] === lineFeedBytes[0];
   if (!hasTrailingFrame) {
-    return Either.left(new InstructionFilePlanError({ issue: "managed block framing changed after the closing marker." }));
+    return Either.left(
+      new InstructionFilePlanError({ issue: "managed block framing changed after the closing marker." }),
+    );
   }
 
   const end = input.block.end + lineFeedBytes.byteLength;
@@ -179,20 +209,29 @@ const receiptedBlockRemovalRange = (input: {
   const frameStart = input.block.start - blockSeparatorBytes.byteLength;
   const frame = input.currentBytes.slice(frameStart, input.block.start);
   if (frameStart < 0 || !bytesEqual(frame, blockSeparatorBytes)) {
-    return Either.left(new InstructionFilePlanError({ issue: "managed block framing changed before the opening marker." }));
+    return Either.left(
+      new InstructionFilePlanError({ issue: "managed block framing changed before the opening marker." }),
+    );
   }
 
   return Either.right([frameStart, end]);
 };
 
-const stripReceiptedBlock = (input: { currentBytes: Uint8Array; block: ManagedBlockLocation; filePreviouslyPresent: boolean }) =>
+const stripReceiptedBlock = (input: {
+  currentBytes: Uint8Array;
+  block: ManagedBlockLocation;
+  filePreviouslyPresent: boolean;
+}) =>
   Either.map(receiptedBlockRemovalRange(input), ([start, end]) => {
     const prefix = input.currentBytes.slice(0, start);
     const suffix = input.currentBytes.slice(end);
     const suffixStartsLineEnding =
       suffix[0] === lineFeedBytes[0] || (suffix[0] === carriageReturnBytes[0] && suffix[1] === lineFeedBytes[0]);
     const needsSeparator =
-      prefix.byteLength > 0 && suffix.byteLength > 0 && prefix[prefix.byteLength - 1] !== lineFeedBytes[0] && !suffixStartsLineEnding;
+      prefix.byteLength > 0 &&
+      suffix.byteLength > 0 &&
+      prefix[prefix.byteLength - 1] !== lineFeedBytes[0] &&
+      !suffixStartsLineEnding;
 
     return concatenateBytes([prefix, ...(needsSeparator ? [lineFeedBytes] : []), suffix]);
   });
@@ -339,7 +378,9 @@ const agentIdsMatchPath = (agentIds: ReadonlyArray<string>, path: string): boole
   agentIds.every((agentId) => instructionPathForAgent(agentId) === path);
 
 const previousAgentIdsMatchPath = (agentIds: ReadonlyArray<string>, path: string): boolean =>
-  agentIds.every((agentId) => instructionPathForAgent(agentId) === path || (agentId === "codex" && path === "AGENTS.md"));
+  agentIds.every(
+    (agentId) => instructionPathForAgent(agentId) === path || (agentId === "codex" && path === "AGENTS.md"),
+  );
 
 const requestIssues = (request: InstructionFileRequestFields) => {
   const previousArtifact = request.previousArtifact._tag === "owned" ? request.previousArtifact.artifact : undefined;
@@ -387,7 +428,10 @@ export type InstructionFileRequest = Schema.Schema.Type<typeof instructionFileRe
 const instructionOperationIssues = (operation: InstructionOperationFields) => {
   const ownership = operation.artifact.ownership;
   const issues: Array<{ path: ReadonlyArray<string>; message: string } | undefined> = [
-    (operation._tag === "write" ? agentIdsMatchPath : previousAgentIdsMatchPath)(operation.artifact.owner.agentIds, operation.artifact.path)
+    (operation._tag === "write" ? agentIdsMatchPath : previousAgentIdsMatchPath)(
+      operation.artifact.owner.agentIds,
+      operation.artifact.path,
+    )
       ? undefined
       : {
           path: ["artifact", "owner"],
@@ -448,7 +492,9 @@ const validateInstructionPlan = (input: unknown): Either.Either<InstructionFileP
 
 const validateReceiptedBlock = (request: InstructionFileRequest, block: ManagedBlockLocation) => {
   if (request.previousArtifact._tag === "missing" || request.currentFile._tag === "missing") {
-    return Either.left(new InstructionFilePlanError({ issue: "current managed block has no complete prior receipt evidence." }));
+    return Either.left(
+      new InstructionFilePlanError({ issue: "current managed block has no complete prior receipt evidence." }),
+    );
   }
 
   const ownership = request.previousArtifact.artifact.ownership;
@@ -512,7 +558,11 @@ const planInstructionWrite = (input: {
 
   if (input.currentBlock._tag === "missing") {
     if (input.request.previousArtifact._tag === "owned") {
-      return Either.left(new InstructionFilePlanError({ issue: "receipted managed block is missing from the current instruction file." }));
+      return Either.left(
+        new InstructionFilePlanError({
+          issue: "receipted managed block is missing from the current instruction file.",
+        }),
+      );
     }
 
     return validateInstructionPlan({
@@ -557,7 +607,9 @@ const planInstructionRemoval = (
   }
 
   if (request.currentFile._tag === "missing" || currentBlock._tag === "missing") {
-    return Either.left(new InstructionFilePlanError({ issue: "receipted managed block is missing from the current instruction file." }));
+    return Either.left(
+      new InstructionFilePlanError({ issue: "receipted managed block is missing from the current instruction file." }),
+    );
   }
 
   const ownership = validateReceiptedBlock(request, currentBlock);
@@ -583,12 +635,16 @@ const planInstructionRemoval = (
   );
 };
 
-const materializeInstructionPlan = (request: InstructionFileRequest): Either.Either<InstructionFilePlan, InstructionFilePlanError> => {
+const materializeInstructionPlan = (
+  request: InstructionFileRequest,
+): Either.Either<InstructionFilePlan, InstructionFilePlanError> => {
   if (request.desired._tag === "absent" && request.previousArtifact._tag === "missing") {
     return validateInstructionPlan({ _tag: "none" });
   }
 
-  const currentBlock = inspectManagedBlock(request.currentFile._tag === "missing" ? new Uint8Array() : request.currentFile.bytes);
+  const currentBlock = inspectManagedBlock(
+    request.currentFile._tag === "missing" ? new Uint8Array() : request.currentFile.bytes,
+  );
   if (Either.isLeft(currentBlock)) {
     return Either.left(currentBlock.left);
   }

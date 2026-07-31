@@ -75,7 +75,8 @@ export const terminalInputScript = (terminalId: string, text: string, submit: bo
 export const decodeClaimResult = (output: string): TerminalClaim => {
   if (output === "") return { _tag: "refused", reason: "ghostty-unavailable" };
   const prefix = "OK\t";
-  if (!output.startsWith(prefix) || output.length === prefix.length) return { _tag: "refused", reason: "terminal-not-proven" };
+  if (!output.startsWith(prefix) || output.length === prefix.length)
+    return { _tag: "refused", reason: "terminal-not-proven" };
   return { _tag: "claimed", terminalId: output.slice(prefix.length) };
 };
 
@@ -98,9 +99,11 @@ export const claimFocusedGhosttyTerminal = (): TerminalClaim => {
   return decodeClaimResult(runAppleScript(claimFocusedTerminalScript()));
 };
 
-export const terminalExists = (terminalId: string): boolean => runAppleScript(terminalInputScript(terminalId, "", false)) === "OK";
+export const terminalExists = (terminalId: string): boolean =>
+  runAppleScript(terminalInputScript(terminalId, "", false)) === "OK";
 
-export const sendTerminalEnter = (terminalId: string): boolean => runAppleScript(terminalInputScript(terminalId, "", true)) === "OK";
+export const sendTerminalEnter = (terminalId: string): boolean =>
+  runAppleScript(terminalInputScript(terminalId, "", true)) === "OK";
 
 export const sendTerminalText = (terminalId: string, text: string, submit = false): boolean =>
   runAppleScript(terminalInputScript(terminalId, text, submit)) === "OK";

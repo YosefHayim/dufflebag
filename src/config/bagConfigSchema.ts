@@ -222,10 +222,13 @@ export const legacyBagConfigEnvironmentSchema = Schema.Struct({
     default: () => defaultBagConfig.dedupSkipDirectories,
     exact: true,
   }).pipe(Schema.fromKey("dufflebagDedupSkipDirectories")),
-  debugEnabled: Schema.optionalWith(legacyBooleanStringSchema.pipe(Schema.compose(bagConfigSchema.from.fields.debugEnabled.from)), {
-    default: () => defaultBagConfig.debugEnabled,
-    exact: true,
-  }).pipe(Schema.fromKey("dufflebagDebugEnabled")),
+  debugEnabled: Schema.optionalWith(
+    legacyBooleanStringSchema.pipe(Schema.compose(bagConfigSchema.from.fields.debugEnabled.from)),
+    {
+      default: () => defaultBagConfig.debugEnabled,
+      exact: true,
+    },
+  ).pipe(Schema.fromKey("dufflebagDebugEnabled")),
 }).pipe(Schema.compose(Schema.typeSchema(bagConfigSchema)));
 
 export const readSchemaDescription = (property: Schema.PropertySignature.All): Option.Option<string> => {

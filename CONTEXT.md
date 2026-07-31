@@ -22,7 +22,6 @@ Application code is grouped by capability, not by technical layer:
 - `src/runtime/` — dependency-free hook kernel (`config` + `io`)
 - `src/skills/<sourceDirectory>/` — authored skills (camelCase directories) and feature-local hooks
 - `src/doctor.ts` / `src/scaffoldWorkflows.ts` — doctor and workflow scaffolding capabilities
-- `scripts/` — package build and repository verification tooling (not product runtime)
 - `scripts/` — outer-ring maintainer tooling (build, README generation, style contract); never imported by product code
 - `templates/` — copyable workflows and markdown guides
 - `dist/hooks/` — flat, compiled, zero-dep hook payload assembled at build time
@@ -38,4 +37,5 @@ Application code is grouped by capability, not by technical layer:
 - Idle compaction is off by default, requires macOS + Ghostty 1.3+, and targets a stable terminal ID claimed by the session itself.
 - A provider-specific `DUFFLEBAG_<AGENT_ID>_AUTO_COMPACT` process override wins over persistent `idleAutoCompact` config.
 - Authored skill directories use **camelCase**; public feature IDs and installed skill IDs remain **kebab-case** data.
-- One strict style bar across maintained TypeScript, enforced by Biome + `scripts/checkCodeStyle.ts` and documented in root `CODE-STYLE.md`.
+- One strict style bar across maintained TypeScript, documented in root `CODE-STYLE.md`. Biome is enforced now;
+  `scripts/checkCodeStyle.ts` remains the explicit migration target until its maintained-tree findings are resolved.

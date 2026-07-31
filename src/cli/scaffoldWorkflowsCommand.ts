@@ -66,7 +66,12 @@ export const scaffoldWorkflowsCommand = Command.make(
         ...result.written.map((name) => `✓ .github/workflows/${name}`),
         ...result.skipped.map((name) => `• .github/workflows/${name} exists — kept (use --force to overwrite)`),
       ];
-      yield* TerminalUI.note(lines.join("\n"), result.written.length > 0 ? "Scaffolded" : "Nothing written (all present)");
-      yield* TerminalUI.outro("Next: register the npm trusted publisher (repo + publish.yml) — see the publish.yml header.");
+      yield* TerminalUI.note(
+        lines.join("\n"),
+        result.written.length > 0 ? "Scaffolded" : "Nothing written (all present)",
+      );
+      yield* TerminalUI.outro(
+        "Next: register the npm trusted publisher (repo + publish.yml) — see the publish.yml header.",
+      );
     }).pipe(Effect.catchAll((error) => TerminalUI.presentError(error))),
 ).pipe(Command.withDescription("Copy the CI + publish workflow set into a repo (each repo owns its CI)"));

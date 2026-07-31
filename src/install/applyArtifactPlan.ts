@@ -142,7 +142,8 @@ type TransactionRuntime = {
 
 const isNotFound = (error: PlatformError): boolean => error._tag === "SystemError" && error.reason === "NotFound";
 
-const isAlreadyExists = (error: PlatformError): boolean => error._tag === "SystemError" && error.reason === "AlreadyExists";
+const isAlreadyExists = (error: PlatformError): boolean =>
+  error._tag === "SystemError" && error.reason === "AlreadyExists";
 
 const bytesEqual = (left: Uint8Array, right: Uint8Array): boolean =>
   left.byteLength === right.byteLength && left.every((value, index) => value === right[index]);
@@ -256,7 +257,10 @@ const validateTarget = (validation: TargetValidation) =>
     const currentRealRoot = yield* fileSystem.realPath(validation.validatedRoot.root);
     let existingPath = validation.targetPath;
 
-    if (currentRealRoot !== validation.validatedRoot.root || !isPathWithin(validation.validatedRoot.root, validation.targetPath)) {
+    if (
+      currentRealRoot !== validation.validatedRoot.root ||
+      !isPathWithin(validation.validatedRoot.root, validation.targetPath)
+    ) {
       return yield* new BadArgument({
         module: "FileSystem",
         method: "realPath",
@@ -324,7 +328,9 @@ const captureTarget = (capture: TargetCapture) =>
   });
 
 const removeTransaction = (stagedPlan: StagedPlan) =>
-  Effect.flatMap(FileSystem.FileSystem, (fileSystem) => fileSystem.remove(stagedPlan.transactionRoot, { recursive: true, force: true }));
+  Effect.flatMap(FileSystem.FileSystem, (fileSystem) =>
+    fileSystem.remove(stagedPlan.transactionRoot, { recursive: true, force: true }),
+  );
 
 const captureTargets = (request: CaptureTargetsRequest) =>
   Effect.uninterruptibleMask(() =>
@@ -381,7 +387,9 @@ const stageTargets = (stagedPlan: StagedPlan) =>
     yield* Effect.forEach(
       stagedPlan.artifacts,
       (artifact) =>
-        artifact.operation._tag === "remove" ? Effect.void : fileSystem.writeFile(artifact.stagedPath, artifact.operation.bytes),
+        artifact.operation._tag === "remove"
+          ? Effect.void
+          : fileSystem.writeFile(artifact.stagedPath, artifact.operation.bytes),
       { discard: true },
     );
 
@@ -453,16 +461,21 @@ const publishRecoveryMarker = (transaction: TransactionRuntime) =>
     const fileSystem = yield* FileSystem.FileSystem;
     const recoveryJson = yield* Schema.encode(artifactRecoveryRecordJsonSchema)(pendingRecoveryRecord(transaction));
 
-    yield* fileSystem.writeFileString(transaction.stagedPlan.pendingRecordPath, recoveryJson, { flag: "wx", mode: 0o600 });
+    yield* fileSystem.writeFileString(transaction.stagedPlan.pendingRecordPath, recoveryJson, {
+      flag: "wx",
+      mode: 0o600,
+    });
     yield* ensureTargetParent(transaction, transaction.stagedPlan.receipt.recoveryPath);
     yield* validateTarget({
       validatedRoot: transaction.validatedRoot,
       targetPath: transaction.stagedPlan.receipt.recoveryPath,
     });
-    return yield* fileSystem.link(transaction.stagedPlan.pendingRecordPath, transaction.stagedPlan.receipt.recoveryPath).pipe(
-      Effect.as(true),
-      Effect.catchIf(isAlreadyExists, () => Effect.succeed(false)),
-    );
+    return yield* fileSystem
+      .link(transaction.stagedPlan.pendingRecordPath, transaction.stagedPlan.receipt.recoveryPath)
+      .pipe(
+        Effect.as(true),
+        Effect.catchIf(isAlreadyExists, () => Effect.succeed(false)),
+      );
   });
 
 const recoveryRecordsEqual = Schema.equivalence(artifactRecoveryRecordSchema);
@@ -488,7 +501,9 @@ const removeRecoveryMarker = (transaction: TransactionRuntime) =>
 const findSnapshot = (snapshots: ReadonlyArray<TargetSnapshot>, targetPath: string) => {
   const snapshot = snapshots.find((candidate) => candidate.targetPath === targetPath);
 
-  return snapshot === undefined ? Effect.dieMessage(`Transaction snapshot missing for ${targetPath}`) : Effect.succeed(snapshot);
+  return snapshot === undefined
+    ? Effect.dieMessage(`Transaction snapshot missing for ${targetPath}`)
+    : Effect.succeed(snapshot);
 };
 
 const validatePlanPreconditions = (validation: PlanPreconditionValidation) =>
@@ -620,7 +635,9 @@ const applyReceiptOperation = (mutation: ReceiptMutation) =>
   Effect.gen(function* () {
     const fileSystem = yield* FileSystem.FileSystem;
     const receiptBytes =
-      mutation.receipt.operation._tag === "receiptPublish" ? yield* fileSystem.readFile(mutation.receipt.stagedPath) : undefined;
+      mutation.receipt.operation._tag === "receiptPublish"
+        ? yield* fileSystem.readFile(mutation.receipt.stagedPath)
+        : undefined;
 
     yield* recordMutation(mutation.mutations, mutation.snapshot);
     yield* fileSystem.remove(mutation.receipt.targetPath, { force: true });
@@ -648,7 +665,11 @@ const commitReceipt = (transaction: TransactionRuntime) =>
 
       const snapshot = yield* findSnapshot(transaction.snapshots, transaction.stagedPlan.receipt.targetPath);
       yield* validateTargetState({ validatedRoot: transaction.validatedRoot, snapshot });
-      yield* applyReceiptOperation({ receipt: transaction.stagedPlan.receipt, mutations: transaction.mutations, snapshot });
+      yield* applyReceiptOperation({
+        receipt: transaction.stagedPlan.receipt,
+        mutations: transaction.mutations,
+        snapshot,
+      });
     }),
   );
 
@@ -707,9 +728,14 @@ const restoreTargets = (transaction: TransactionRuntime) =>
   Effect.gen(function* () {
     const recordedMutations = yield* Ref.get(transaction.mutations);
     const outcomes = yield* Effect.forEach([...recordedMutations].reverse(), (mutation) =>
-      Effect.map(Effect.exit(restoreTarget({ validatedRoot: transaction.validatedRoot, mutation })), (exit) => ({ mutation, exit })),
+      Effect.map(Effect.exit(restoreTarget({ validatedRoot: transaction.validatedRoot, mutation })), (exit) => ({
+        mutation,
+        exit,
+      })),
     );
-    const failedSnapshots = outcomes.flatMap((outcome) => (Exit.isFailure(outcome.exit) ? [outcome.mutation.snapshot] : []));
+    const failedSnapshots = outcomes.flatMap((outcome) =>
+      Exit.isFailure(outcome.exit) ? [outcome.mutation.snapshot] : [],
+    );
     const rollbackCauses = outcomes.flatMap((outcome) => (Exit.isFailure(outcome.exit) ? [outcome.exit.cause] : []));
 
     return { failedSnapshots, rollbackCause: combineCauses(rollbackCauses) };
@@ -752,10 +778,14 @@ const cleanupUnpublishedMarker = (transaction: TransactionRuntime) =>
 
 const failForOccupiedMarker = (transaction: TransactionRuntime) =>
   Effect.gen(function* () {
-    const pendingCause = Cause.fail(new ArtifactRecoveryPendingError({ recoveryPath: transaction.stagedPlan.receipt.recoveryPath }));
+    const pendingCause = Cause.fail(
+      new ArtifactRecoveryPendingError({ recoveryPath: transaction.stagedPlan.receipt.recoveryPath }),
+    );
     const cleanupExit = yield* Effect.exit(cleanupUnpublishedMarker(transaction));
 
-    return yield* Effect.failCause(Exit.isFailure(cleanupExit) ? Cause.sequential(pendingCause, cleanupExit.cause) : pendingCause);
+    return yield* Effect.failCause(
+      Exit.isFailure(cleanupExit) ? Cause.sequential(pendingCause, cleanupExit.cause) : pendingCause,
+    );
   });
 
 const cleanupReleasedTransaction = (transaction: TransactionRuntime) =>
@@ -788,7 +818,9 @@ const failAfterMarkerAttempt = (transaction: TransactionRuntime, cause: Cause.Ca
       return yield* Effect.failCause(cause);
     }
 
-    const pendingCause = Cause.fail(new ArtifactRecoveryPendingError({ recoveryPath: transaction.stagedPlan.transactionRoot }));
+    const pendingCause = Cause.fail(
+      new ArtifactRecoveryPendingError({ recoveryPath: transaction.stagedPlan.transactionRoot }),
+    );
 
     return yield* Effect.failCause(combineCauses([cause, reconciliationExit.cause, pendingCause]));
   });
@@ -822,10 +854,14 @@ const recoverCommit = (transaction: TransactionRuntime, originalCause: Cause.Cau
       }),
     );
     const cleanupCauses = Exit.isFailure(recoveryCleanupExit) ? [recoveryCleanupExit.cause] : [];
-    const pendingCause = Cause.fail(new ArtifactRecoveryPendingError({ recoveryPath: transaction.stagedPlan.receipt.recoveryPath }));
+    const pendingCause = Cause.fail(
+      new ArtifactRecoveryPendingError({ recoveryPath: transaction.stagedPlan.receipt.recoveryPath }),
+    );
 
     // 4. Re-raise the commit and rollback causes with the pending recovery location.
-    return yield* Effect.failCause(combineCauses([originalCause, restoration.rollbackCause, pendingCause, ...cleanupCauses]));
+    return yield* Effect.failCause(
+      combineCauses([originalCause, restoration.rollbackCause, pendingCause, ...cleanupCauses]),
+    );
   });
 
 /**
@@ -846,7 +882,9 @@ export const applyArtifactPlan = (plan: ArtifactPlan) =>
       const snapshots = yield* captureTargets(captureRequest);
 
       // 3. Reject stale planning evidence before staging any desired state.
-      const preconditionExit = yield* Effect.exit(restoreInterruptibility(validatePlanPreconditions({ stagedPlan, snapshots })));
+      const preconditionExit = yield* Effect.exit(
+        restoreInterruptibility(validatePlanPreconditions({ stagedPlan, snapshots })),
+      );
       if (Exit.isFailure(preconditionExit)) {
         return yield* failAfterCleanup(stagedPlan, preconditionExit.cause);
       }

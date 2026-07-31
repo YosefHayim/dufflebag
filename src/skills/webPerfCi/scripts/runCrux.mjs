@@ -45,7 +45,15 @@ const METRICS = [
   { id: "INP", key: "interaction_to_next_paint", budget: "inpMs", good: 200, poor: 500, cls: false, core: true },
   { id: "CLS", key: "cumulative_layout_shift", budget: "clsScore", good: 0.1, poor: 0.25, cls: true, core: true },
   { id: "FCP", key: "first_contentful_paint", budget: "fcpMs", good: 1800, poor: 3000, cls: false, core: false },
-  { id: "TTFB", key: "experimental_time_to_first_byte", budget: "ttfbMs", good: 800, poor: 1800, cls: false, core: false },
+  {
+    id: "TTFB",
+    key: "experimental_time_to_first_byte",
+    budget: "ttfbMs",
+    good: 800,
+    poor: 1800,
+    cls: false,
+    core: false,
+  },
 ];
 
 function usage() {
@@ -82,7 +90,8 @@ function parseArgs(argv) {
     else throw new Error(`Unexpected argument: ${arg}`);
   }
   if (!args.help && !args.url) throw new Error("A URL is required. Try --help.");
-  if (!["PHONE", "DESKTOP", "TABLET"].includes(args.formFactor)) throw new Error("--form-factor must be PHONE, DESKTOP, or TABLET");
+  if (!["PHONE", "DESKTOP", "TABLET"].includes(args.formFactor))
+    throw new Error("--form-factor must be PHONE, DESKTOP, or TABLET");
   return args;
 }
 
@@ -134,7 +143,9 @@ function renderReport(result, meta) {
   lines.push("", "Real-user Core Web Vitals (p75):");
   for (const row of result.rows) {
     const flag = row.failed ? "  ✗ FAIL" : row.rating === "needs-improvement" ? "  ! warn" : "";
-    lines.push(`  ${row.id.padEnd(5)} ${formatValue(row, row.value).padEnd(9)} ${row.rating.padEnd(18)} (budget ≤ ${formatValue(row, row.budget)})${flag}`);
+    lines.push(
+      `  ${row.id.padEnd(5)} ${formatValue(row, row.value).padEnd(9)} ${row.rating.padEnd(18)} (budget ≤ ${formatValue(row, row.budget)})${flag}`,
+    );
   }
   lines.push("", `Verdict: ${result.passed ? "PASS" : "FAIL"}`);
   return lines.join("\n");

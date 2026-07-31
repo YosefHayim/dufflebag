@@ -6,7 +6,12 @@ import { describe, expect, expectTypeOf, it } from "vitest";
 import { agentCatalog } from "../../catalog/agentCatalog.js";
 import { findFeature } from "../../catalog/featureCatalog.js";
 import type { ReceiptEntry } from "../artifactReceipt.js";
-import { type InstructionFilePlan, InstructionFilePlanError, instructionFilePlanSchema, planInstructionFile } from "./instructionFile.js";
+import {
+  type InstructionFilePlan,
+  InstructionFilePlanError,
+  instructionFilePlanSchema,
+  planInstructionFile,
+} from "./instructionFile.js";
 
 const startMarker = "<!-- dufflebag:skills start -->";
 const endMarker = "<!-- dufflebag:skills end -->";
@@ -15,7 +20,9 @@ const textDecoder = new TextDecoder();
 const deslop = Option.getOrThrow(findFeature("deslop"));
 const deslopV2 = Option.getOrThrow(findFeature("deslop-v2"));
 const deslopSkill = Option.getOrThrow(Option.liftPredicate(deslop.installedSkill, (skill) => skill._tag === "skill"));
-const deslopV2Skill = Option.getOrThrow(Option.liftPredicate(deslopV2.installedSkill, (skill) => skill._tag === "skill"));
+const deslopV2Skill = Option.getOrThrow(
+  Option.liftPredicate(deslopV2.installedSkill, (skill) => skill._tag === "skill"),
+);
 
 const encode = (value: string): Uint8Array => textEncoder.encode(value);
 
@@ -45,7 +52,8 @@ const request = (input?: {
           ctl: input?.ctl ?? "dufflebag",
         },
   currentFile: input?.currentBytes === undefined ? { _tag: "missing" } : { _tag: "file", bytes: input.currentBytes },
-  previousArtifact: input?.previousArtifact === undefined ? { _tag: "missing" } : { _tag: "owned", artifact: input.previousArtifact },
+  previousArtifact:
+    input?.previousArtifact === undefined ? { _tag: "missing" } : { _tag: "owned", artifact: input.previousArtifact },
 });
 
 const unwrap = (result: ReturnType<typeof planInstructionFile>): InstructionFilePlan =>

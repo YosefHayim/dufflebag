@@ -154,7 +154,11 @@ function freshHandoffExists(sinceMs: number): boolean {
 /** Run an AppleScript, returning trimmed stdout or null on any error/nonzero exit. */
 function osa(script: string, timeoutMs = 5000): string | null {
   try {
-    return execFileSync("osascript", ["-e", script], { encoding: "utf8", timeout: timeoutMs, stdio: ["ignore", "pipe", "ignore"] }).trim();
+    return execFileSync("osascript", ["-e", script], {
+      encoding: "utf8",
+      timeout: timeoutMs,
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
   } catch {
     return null;
   }
@@ -171,7 +175,9 @@ function ghosttyIsFrontmost(): boolean {
 
 /** Title of Ghostty's focused window, or null. */
 function focusedWindowTitle(): string | null {
-  const out = osa('tell application "System Events" to tell process "Ghostty" to get title of (value of attribute "AXFocusedWindow")');
+  const out = osa(
+    'tell application "System Events" to tell process "Ghostty" to get title of (value of attribute "AXFocusedWindow")',
+  );
   return out || null;
 }
 

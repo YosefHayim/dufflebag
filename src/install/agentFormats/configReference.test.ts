@@ -54,7 +54,8 @@ const request = (input?: {
   agent: input?.agent ?? aider,
   desired: { _tag: input?.desired ?? "present" },
   currentFile: input?.currentBytes === undefined ? missingFile : { _tag: "file", bytes: input.currentBytes },
-  previousArtifact: input?.previousArtifact === undefined ? noPreviousArtifact : { _tag: "owned", artifact: input.previousArtifact },
+  previousArtifact:
+    input?.previousArtifact === undefined ? noPreviousArtifact : { _tag: "owned", artifact: input.previousArtifact },
 });
 
 describe("planConfigReference", () => {
@@ -161,7 +162,11 @@ describe("planConfigReference", () => {
     );
 
     expect(textDecoder.decode(write.bytes)).toBe("model: sonnet\nread:\n  - USER.md\n  - AGENTS.md\ntheme: dark\n");
-    expect(write.artifact.ownership).toMatchObject({ keyPreviouslyPresent: true, insertedPrefix: "", previouslyPresent: false });
+    expect(write.artifact.ownership).toMatchObject({
+      keyPreviouslyPresent: true,
+      insertedPrefix: "",
+      previouslyPresent: false,
+    });
   });
 
   it.each([
@@ -233,7 +238,11 @@ describe("planConfigReference", () => {
     );
 
     expect(textDecoder.decode(write.bytes)).toBe(current);
-    expect(write.artifact.ownership).toMatchObject({ keyPreviouslyPresent: true, insertedPrefix: "", previouslyPresent: true });
+    expect(write.artifact.ownership).toMatchObject({
+      keyPreviouslyPresent: true,
+      insertedPrefix: "",
+      previouslyPresent: true,
+    });
   });
 
   it("restores the exact prior Continue rules value while preserving unrelated JSON bytes", () => {

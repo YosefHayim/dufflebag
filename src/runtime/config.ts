@@ -105,8 +105,14 @@ export const readConfig = (env: NodeJS.Dict<string> = process.env): BagConfig =>
   contextBlockFraction: numberFromEnv(env[ENV_KEYS.contextBlockFraction], DEFAULTS.contextBlockFraction),
   autorunDefaultCycleCount: numberFromEnv(env[ENV_KEYS.autorunDefaultCycleCount], DEFAULTS.autorunDefaultCycleCount),
   autorunMaxCycleCount: numberFromEnv(env[ENV_KEYS.autorunMaxCycleCount], DEFAULTS.autorunMaxCycleCount),
-  autorunPollIntervalSeconds: numberFromEnv(env[ENV_KEYS.autorunPollIntervalSeconds], DEFAULTS.autorunPollIntervalSeconds),
-  autorunIdleThresholdSeconds: numberFromEnv(env[ENV_KEYS.autorunIdleThresholdSeconds], DEFAULTS.autorunIdleThresholdSeconds),
+  autorunPollIntervalSeconds: numberFromEnv(
+    env[ENV_KEYS.autorunPollIntervalSeconds],
+    DEFAULTS.autorunPollIntervalSeconds,
+  ),
+  autorunIdleThresholdSeconds: numberFromEnv(
+    env[ENV_KEYS.autorunIdleThresholdSeconds],
+    DEFAULTS.autorunIdleThresholdSeconds,
+  ),
   idleAutoCompact: env[ENV_KEYS.idleAutoCompact] ?? DEFAULTS.idleAutoCompact,
   speechVoice: env[ENV_KEYS.speechVoice] ?? DEFAULTS.speechVoice,
   speechWordsPerMinute: numberFromEnv(env[ENV_KEYS.speechWordsPerMinute], DEFAULTS.speechWordsPerMinute),
@@ -216,7 +222,10 @@ export const configFromSnapshot = (raw: unknown): BagConfig => {
   if (raw == null || typeof raw !== "object") return readConfig({});
   const record = raw as Record<string, unknown>;
   // Env-style snapshot (string map keyed by dufflebag*).
-  if (typeof record[ENV_KEYS.contextWarnFraction] === "string" || typeof record[ENV_KEYS.contextWarnFraction] === "number") {
+  if (
+    typeof record[ENV_KEYS.contextWarnFraction] === "string" ||
+    typeof record[ENV_KEYS.contextWarnFraction] === "number"
+  ) {
     const env: NodeJS.Dict<string> = {};
     // Copy only known dufflebag* keys so stray fields cannot pollute parsing.
     for (const key of Object.values(ENV_KEYS)) {

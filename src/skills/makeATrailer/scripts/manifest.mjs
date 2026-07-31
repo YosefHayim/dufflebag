@@ -129,8 +129,18 @@ function main() {
 
   const m = load(dir);
   if (cmd === "show") process.stdout.write(`${JSON.stringify(m, null, 2)}\n`);
-  else if (cmd === "pending-stills") process.stdout.write(`${pendingStills(m).map((s) => s.id).join(" ")}\n`);
-  else if (cmd === "pending-clips") process.stdout.write(`${pendingClips(m).map((s) => s.id).join(" ")}\n`);
+  else if (cmd === "pending-stills")
+    process.stdout.write(
+      `${pendingStills(m)
+        .map((s) => s.id)
+        .join(" ")}\n`,
+    );
+  else if (cmd === "pending-clips")
+    process.stdout.write(
+      `${pendingClips(m)
+        .map((s) => s.id)
+        .join(" ")}\n`,
+    );
   else if (cmd === "add-scene") save(dir, addScene(m, JSON.parse(f.json ?? "{}")));
   else if (cmd === "set") {
     if (!f.id || !f.key) throw new Error("set needs --id and --key (and --value)");

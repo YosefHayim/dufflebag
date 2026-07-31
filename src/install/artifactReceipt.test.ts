@@ -242,7 +242,16 @@ describe("artifactReceiptSchema", () => {
   });
 
   it("decodes all eight tagged artifact kinds while preventing receipt self-ownership", () => {
-    const kindTags = ["runtime", "skill", "rule", "instruction", "configReference", "settings", "managedConfig", "receipt"];
+    const kindTags = [
+      "runtime",
+      "skill",
+      "rule",
+      "instruction",
+      "configReference",
+      "settings",
+      "managedConfig",
+      "receipt",
+    ];
     const receiptEntry = {
       owner: applicationOwner,
       path: ".dufflebag/receipt.json",
@@ -453,7 +462,10 @@ describe("artifactReceiptSchema", () => {
     });
 
     expect(ownership.createdContainers).toEqual(["/hooks"]);
-    expect(ownership.values.map((value) => value.installed)).toEqual([{ _tag: "missing" }, { _tag: "value", hash: installedValueHash }]);
+    expect(ownership.values.map((value) => value.installed)).toEqual([
+      { _tag: "missing" },
+      { _tag: "value", hash: installedValueHash },
+    ]);
   });
 
   it("rejects meaningless missing-to-missing JSON ownership", () => {

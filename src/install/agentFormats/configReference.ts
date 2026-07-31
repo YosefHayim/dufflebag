@@ -25,11 +25,14 @@ const instructionReferencesSchema = Schema.Array(Schema.String);
 const isInstructionReferences = Schema.is(instructionReferencesSchema);
 const agentDefinitionsEqual = Schema.equivalence(agentDefinitionSchema);
 
-export class ConfigReferencePlanError extends Schema.TaggedError<ConfigReferencePlanError>()("ConfigReferencePlanError", {
-  issue: Schema.NonEmptyString.annotations({
-    description: "Actionable request, native configuration, or correlated-plan validation issue.",
-  }),
-}) {
+export class ConfigReferencePlanError extends Schema.TaggedError<ConfigReferencePlanError>()(
+  "ConfigReferencePlanError",
+  {
+    issue: Schema.NonEmptyString.annotations({
+      description: "Actionable request, native configuration, or correlated-plan validation issue.",
+    }),
+  },
+) {
   get message(): string {
     return `Cannot plan native config reference: ${this.issue}`;
   }
@@ -41,7 +44,8 @@ const formatUnknownError = (error: unknown): string => (error instanceof Error ?
 
 const hashBytes = (bytes: Uint8Array): string => createHash("sha256").update(bytes).digest("hex");
 
-const hashJsonValue = (value: unknown): string => hashBytes(textEncoder.encode(Schema.encodeSync(jsonValueSchema)(value)));
+const hashJsonValue = (value: unknown): string =>
+  hashBytes(textEncoder.encode(Schema.encodeSync(jsonValueSchema)(value)));
 
 const installedJsonValueMatches = (installed: InstalledJsonValue, value: unknown): boolean =>
   installed._tag === "missing" ? value === undefined : value !== undefined && hashJsonValue(value) === installed.hash;
@@ -218,7 +222,9 @@ const previousArtifactIssues = (request: ConfigReferenceRequestFields) => {
   ];
 };
 
-export const configReferenceRequestSchema = configReferenceRequestFieldsSchema.pipe(Schema.filter(previousArtifactIssues));
+export const configReferenceRequestSchema = configReferenceRequestFieldsSchema.pipe(
+  Schema.filter(previousArtifactIssues),
+);
 
 export type ConfigReferenceRequest = Schema.Schema.Type<typeof configReferenceRequestSchema>;
 
@@ -233,7 +239,8 @@ const decodeRequest = (input: unknown): Either.Either<ConfigReferenceRequest, Co
 const decodeText = (bytes: Uint8Array, filename: string): Either.Either<string, ConfigReferencePlanError> => {
   const decoded = Either.try({
     try: () => textDecoder.decode(bytes),
-    catch: (error) => new ConfigReferencePlanError({ issue: `${filename} is not strict UTF-8: ${formatUnknownError(error)}` }),
+    catch: (error) =>
+      new ConfigReferencePlanError({ issue: `${filename} is not strict UTF-8: ${formatUnknownError(error)}` }),
   });
 
   return Either.flatMap(decoded, (source) =>
@@ -277,7 +284,10 @@ const jsonPropertyName = (property: JsonNode): string | undefined => {
   return typeof value === "string" ? value : undefined;
 };
 
-const insertMissingJsonRules = (source: string, rules: ReadonlyArray<string>): Either.Either<string, ConfigReferencePlanError> => {
+const insertMissingJsonRules = (
+  source: string,
+  rules: ReadonlyArray<string>,
+): Either.Either<string, ConfigReferencePlanError> => {
   const root = parseJsonObjectNode(source);
   if (Either.isLeft(root)) {
     return Either.left(root.left);
@@ -289,7 +299,9 @@ const insertMissingJsonRules = (source: string, rules: ReadonlyArray<string>): E
   const separator = lastProperty === undefined ? "" : ",";
   const encodedRules = Schema.encodeSync(jsonValueSchema)(rules);
 
-  return Either.right(`${source.slice(0, insertionIndex)}${separator}"rules":${encodedRules}${source.slice(insertionIndex)}`);
+  return Either.right(
+    `${source.slice(0, insertionIndex)}${separator}"rules":${encodedRules}${source.slice(insertionIndex)}`,
+  );
 };
 
 const removeInsertedJsonRules = (source: string): Either.Either<string, ConfigReferencePlanError> => {
@@ -306,20 +318,26 @@ const removeInsertedJsonRules = (source: string): Either.Either<string, ConfigRe
   }
 
   if (properties.length === 1) {
-    return Either.right(`${source.slice(0, rulesProperty.offset)}${source.slice(rulesProperty.offset + rulesProperty.length)}`);
+    return Either.right(
+      `${source.slice(0, rulesProperty.offset)}${source.slice(rulesProperty.offset + rulesProperty.length)}`,
+    );
   }
 
   if (rulesIndex > 0) {
     const previousProperty = properties[rulesIndex - 1];
     if (previousProperty === undefined) {
-      return Either.left(new ConfigReferencePlanError({ issue: "Continue rules member has no stable preceding property." }));
+      return Either.left(
+        new ConfigReferencePlanError({ issue: "Continue rules member has no stable preceding property." }),
+      );
     }
 
     const previousEnd = previousProperty.offset + previousProperty.length;
     const separator = source.slice(previousEnd, rulesProperty.offset);
     const commaOffset = separator.lastIndexOf(",");
     if (commaOffset < 0) {
-      return Either.left(new ConfigReferencePlanError({ issue: "Continue rules member has no stable preceding comma." }));
+      return Either.left(
+        new ConfigReferencePlanError({ issue: "Continue rules member has no stable preceding comma." }),
+      );
     }
 
     const removalStart = previousEnd + commaOffset;
@@ -329,7 +347,9 @@ const removeInsertedJsonRules = (source: string): Either.Either<string, ConfigRe
 
   const nextProperty = properties[1];
   if (nextProperty === undefined) {
-    return Either.left(new ConfigReferencePlanError({ issue: "Continue rules member has no stable following property." }));
+    return Either.left(
+      new ConfigReferencePlanError({ issue: "Continue rules member has no stable following property." }),
+    );
   }
 
   const rulesEnd = rulesProperty.offset + rulesProperty.length;
@@ -366,7 +386,9 @@ const decodeJsonConfiguration = (
     onExcessProperty: "preserve",
   })(decodedText.right);
   if (Either.isLeft(configuration)) {
-    return Either.left(new ConfigReferencePlanError({ issue: `${filename} is invalid: ${formatParseError(configuration.left)}` }));
+    return Either.left(
+      new ConfigReferencePlanError({ issue: `${filename} is invalid: ${formatParseError(configuration.left)}` }),
+    );
   }
 
   return Either.right({ source: decodedText.right, rules: configuration.right.rules });
@@ -479,7 +501,9 @@ const inspectYamlReadDocument = (source: string): Either.Either<YamlReadDocument
     const start = lineStartAt(source, item.range[0]);
     const prefix = source.slice(start, item.range[0]);
     if (!/^ +-\s+$/.test(prefix) || (itemPrefix !== undefined && itemPrefix !== prefix)) {
-      return Either.left(new ConfigReferencePlanError({ issue: "Aider read must use one consistent space-indented block sequence." }));
+      return Either.left(
+        new ConfigReferencePlanError({ issue: "Aider read must use one consistent space-indented block sequence." }),
+      );
     }
 
     itemPrefix = prefix;
@@ -606,7 +630,9 @@ const createReferenceRestoration = (
   bytes: Uint8Array,
 ): Either.Either<ConfigReferencePlan, ConfigReferencePlanError> => {
   if (request.previousArtifact._tag === "missing") {
-    return Either.left(new ConfigReferencePlanError({ issue: "Native reference restoration requires prior receipt ownership." }));
+    return Either.left(
+      new ConfigReferencePlanError({ issue: "Native reference restoration requires prior receipt ownership." }),
+    );
   }
 
   const artifact = request.previousArtifact.artifact;
@@ -635,7 +661,9 @@ const validateCurrentJsonOwnership = (
     : Either.left(new ConfigReferencePlanError({ issue: "Receipted Continue rules changed after installation." }));
 };
 
-const planJsonReference = (request: ConfigReferenceRequest): Either.Either<ConfigReferenceWrite, ConfigReferencePlanError> => {
+const planJsonReference = (
+  request: ConfigReferenceRequest,
+): Either.Either<ConfigReferenceWrite, ConfigReferencePlanError> => {
   const current =
     request.currentFile._tag === "missing"
       ? Either.right({ source: "{}\n", rules: undefined })
@@ -651,7 +679,9 @@ const planJsonReference = (request: ConfigReferenceRequest): Either.Either<Confi
 
   const previousRules = current.right.rules;
   const instructionPath = request.agent.target.instructionPath;
-  const desiredRules = previousRules?.includes(instructionPath) ? previousRules : [...(previousRules ?? []), instructionPath];
+  const desiredRules = previousRules?.includes(instructionPath)
+    ? previousRules
+    : [...(previousRules ?? []), instructionPath];
   let desiredSource = current.right.source;
   if (desiredRules !== previousRules && previousRules === undefined) {
     const insertion = insertMissingJsonRules(current.right.source, desiredRules);
@@ -680,7 +710,9 @@ const planJsonReference = (request: ConfigReferenceRequest): Either.Either<Confi
   );
 };
 
-const restoredRulesValue = (ownership: JsonValuesOwnership): Either.Either<ReadonlyArray<string> | undefined, ConfigReferencePlanError> => {
+const restoredRulesValue = (
+  ownership: JsonValuesOwnership,
+): Either.Either<ReadonlyArray<string> | undefined, ConfigReferencePlanError> => {
   const ownedRules = ownership.values.find((value) => value.pointer === "/rules");
   if (ownedRules === undefined) {
     return Either.left(new ConfigReferencePlanError({ issue: "Continue ownership must contain the /rules pointer." }));
@@ -701,13 +733,17 @@ const jsonObjectIsEmpty = (source: string): boolean => {
   return Either.isRight(decoded) && Object.keys(decoded.right).length === 0;
 };
 
-const removeJsonReference = (request: ConfigReferenceRequest): Either.Either<ConfigReferencePlan, ConfigReferencePlanError> => {
+const removeJsonReference = (
+  request: ConfigReferenceRequest,
+): Either.Either<ConfigReferencePlan, ConfigReferencePlanError> => {
   if (
     request.previousArtifact._tag === "missing" ||
     request.previousArtifact.artifact.ownership._tag !== "jsonValues" ||
     request.currentFile._tag === "missing"
   ) {
-    return Either.left(new ConfigReferencePlanError({ issue: "Receipted Continue configuration is missing or incompatible." }));
+    return Either.left(
+      new ConfigReferencePlanError({ issue: "Receipted Continue configuration is missing or incompatible." }),
+    );
   }
 
   const ownership = request.previousArtifact.artifact.ownership;
@@ -750,9 +786,13 @@ const removeJsonReference = (request: ConfigReferenceRequest): Either.Either<Con
   return createReferenceRestoration(request, textEncoder.encode(desiredSource));
 };
 
-const planYamlReference = (request: ConfigReferenceRequest): Either.Either<ConfigReferenceWrite, ConfigReferencePlanError> => {
+const planYamlReference = (
+  request: ConfigReferenceRequest,
+): Either.Either<ConfigReferenceWrite, ConfigReferencePlanError> => {
   const current =
-    request.currentFile._tag === "missing" ? Either.right("") : decodeText(request.currentFile.bytes, request.agent.target.configPath);
+    request.currentFile._tag === "missing"
+      ? Either.right("")
+      : decodeText(request.currentFile.bytes, request.agent.target.configPath);
   if (Either.isLeft(current)) {
     return Either.left(current.left);
   }
@@ -768,17 +808,23 @@ const planYamlReference = (request: ConfigReferenceRequest): Either.Either<Confi
     document.right.source.length > 0 &&
     !document.right.source.endsWith("\n")
   ) {
-    return Either.left(new ConfigReferencePlanError({ issue: "Aider read key must end its line before a reference can be added." }));
+    return Either.left(
+      new ConfigReferencePlanError({ issue: "Aider read key must end its line before a reference can be added." }),
+    );
   }
 
   const instructionPath = request.agent.target.instructionPath;
   const referenceItems = yamlReferenceItems(document.right, instructionPath);
   if (request.previousArtifact._tag === "owned" && referenceItems.length !== 1) {
-    return Either.left(new ConfigReferencePlanError({ issue: "Receipted Aider read reference changed after installation." }));
+    return Either.left(
+      new ConfigReferencePlanError({ issue: "Receipted Aider read reference changed after installation." }),
+    );
   }
 
   if (referenceItems.length > 1) {
-    return Either.left(new ConfigReferencePlanError({ issue: "Aider read contains the managed reference more than once." }));
+    return Either.left(
+      new ConfigReferencePlanError({ issue: "Aider read contains the managed reference more than once." }),
+    );
   }
 
   const desired = appendYamlReference({ document: document.right, reference: instructionPath });
@@ -797,13 +843,17 @@ const planYamlReference = (request: ConfigReferenceRequest): Either.Either<Confi
   );
 };
 
-const removeYamlReference = (request: ConfigReferenceRequest): Either.Either<ConfigReferencePlan, ConfigReferencePlanError> => {
+const removeYamlReference = (
+  request: ConfigReferenceRequest,
+): Either.Either<ConfigReferencePlan, ConfigReferencePlanError> => {
   if (
     request.previousArtifact._tag === "missing" ||
     request.previousArtifact.artifact.ownership._tag !== "yamlSequenceValue" ||
     request.currentFile._tag === "missing"
   ) {
-    return Either.left(new ConfigReferencePlanError({ issue: "Receipted Aider configuration is missing or incompatible." }));
+    return Either.left(
+      new ConfigReferencePlanError({ issue: "Receipted Aider configuration is missing or incompatible." }),
+    );
   }
 
   const ownership = request.previousArtifact.artifact.ownership;
@@ -814,13 +864,17 @@ const removeYamlReference = (request: ConfigReferenceRequest): Either.Either<Con
 
   const document = inspectYamlReadDocument(source.right);
   if (Either.isLeft(document) || document.right._tag === "missing") {
-    return Either.left(new ConfigReferencePlanError({ issue: "Receipted Aider read reference changed after installation." }));
+    return Either.left(
+      new ConfigReferencePlanError({ issue: "Receipted Aider read reference changed after installation." }),
+    );
   }
 
   const referenceItems = yamlReferenceItems(document.right, ownership.reference);
   const referenceItem = referenceItems[0];
   if (referenceItems.length !== 1 || referenceItem === undefined) {
-    return Either.left(new ConfigReferencePlanError({ issue: "Receipted Aider read reference changed after installation." }));
+    return Either.left(
+      new ConfigReferencePlanError({ issue: "Receipted Aider read reference changed after installation." }),
+    );
   }
 
   if (ownership.previouslyPresent) {
@@ -830,7 +884,9 @@ const removeYamlReference = (request: ConfigReferenceRequest): Either.Either<Con
   const installedReferenceLine = source.right.slice(referenceItem.start, referenceItem.end);
   const expectedReferenceLine = `${document.right.itemPrefix}${ownership.reference}${lineEnding(source.right)}`;
   if (installedReferenceLine !== expectedReferenceLine) {
-    return Either.left(new ConfigReferencePlanError({ issue: "Receipted Aider reference line changed after installation." }));
+    return Either.left(
+      new ConfigReferencePlanError({ issue: "Receipted Aider reference line changed after installation." }),
+    );
   }
 
   if (!ownership.keyPreviouslyPresent && document.right.items.length === 1) {
@@ -838,19 +894,25 @@ const removeYamlReference = (request: ConfigReferenceRequest): Either.Either<Con
     const expectedPair = `read:${ending}${document.right.itemPrefix}${ownership.reference}${ending}`;
     const installedPair = source.right.slice(document.right.pairStart, document.right.pairEnd);
     if (installedPair !== expectedPair) {
-      return Either.left(new ConfigReferencePlanError({ issue: "Receipted Aider key pair changed after installation." }));
+      return Either.left(
+        new ConfigReferencePlanError({ issue: "Receipted Aider key pair changed after installation." }),
+      );
     }
 
     const prefixStart = document.right.pairStart - ownership.insertedPrefix.length;
     if (prefixStart < 0 || source.right.slice(prefixStart, document.right.pairStart) !== ownership.insertedPrefix) {
-      return Either.left(new ConfigReferencePlanError({ issue: "Receipted Aider key framing changed after installation." }));
+      return Either.left(
+        new ConfigReferencePlanError({ issue: "Receipted Aider key framing changed after installation." }),
+      );
     }
 
     const prefix = source.right.slice(0, prefixStart);
     const suffix = source.right.slice(document.right.pairEnd);
     const suffixStartsLineEnding = suffix.startsWith("\n") || suffix.startsWith("\r\n");
     const separator =
-      prefix.length > 0 && suffix.length > 0 && !prefix.endsWith("\n") && !suffixStartsLineEnding ? lineEnding(source.right) : "";
+      prefix.length > 0 && suffix.length > 0 && !prefix.endsWith("\n") && !suffixStartsLineEnding
+        ? lineEnding(source.right)
+        : "";
     const desiredSource = `${prefix}${separator}${suffix}`;
 
     return createReferenceRestoration(request, textEncoder.encode(desiredSource));
@@ -875,7 +937,10 @@ const configReferenceOperationSchema = configReferenceOperationFieldsSchema.pipe
         : { path: ["artifact", "owner"], message: "Native references require exactly one catalog agent owner." },
       target?._tag === "configReference" && target.configPath === operation.artifact.path
         ? undefined
-        : { path: ["artifact", "path"], message: "Native-reference owner and path must match the decoded agent catalog." },
+        : {
+            path: ["artifact", "path"],
+            message: "Native-reference owner and path must match the decoded agent catalog.",
+          },
       target?._tag !== "configReference" ||
       (target.referenceFormat === "yamlReadArray" && operation.artifact.ownership._tag === "yamlSequenceValue") ||
       (target.referenceFormat === "jsonRulesArray" && operation.artifact.ownership._tag === "jsonValues")
@@ -935,7 +1000,9 @@ const configReferenceOperationSchema = configReferenceOperationFieldsSchema.pipe
     const document = inspectYamlReadDocument(source.right);
     const ownership = operation.artifact.ownership;
 
-    return ownership.key === "read" && Either.isRight(document) && yamlReferenceItems(document.right, ownership.reference).length === 1
+    return ownership.key === "read" &&
+      Either.isRight(document) &&
+      yamlReferenceItems(document.right, ownership.reference).length === 1
       ? undefined
       : {
           path: ["artifact", "ownership"],
@@ -956,16 +1023,22 @@ const validatePlan = (input: unknown): Either.Either<ConfigReferencePlan, Config
     (error) => new ConfigReferencePlanError({ issue: formatParseError(error) }),
   );
 
-const materializeReferencePlan = (request: ConfigReferenceRequest): Either.Either<ConfigReferencePlan, ConfigReferencePlanError> => {
+const materializeReferencePlan = (
+  request: ConfigReferenceRequest,
+): Either.Either<ConfigReferencePlan, ConfigReferencePlanError> => {
   if (request.desired._tag === "absent" && request.previousArtifact._tag === "missing") {
     return Either.right({ _tag: "none" });
   }
 
   if (request.desired._tag === "absent") {
-    return request.agent.target.referenceFormat === "yamlReadArray" ? removeYamlReference(request) : removeJsonReference(request);
+    return request.agent.target.referenceFormat === "yamlReadArray"
+      ? removeYamlReference(request)
+      : removeJsonReference(request);
   }
 
-  return request.agent.target.referenceFormat === "yamlReadArray" ? planYamlReference(request) : planJsonReference(request);
+  return request.agent.target.referenceFormat === "yamlReadArray"
+    ? planYamlReference(request)
+    : planJsonReference(request);
 };
 
 // Plan one native config reference: decode the catalog target, materialize its format, then validate the direct action.

@@ -45,7 +45,14 @@ const booleanProperty = (input: object, key: string): boolean | null => {
   return typeof value === "boolean" ? value : null;
 };
 
-const phases: ReadonlySet<string> = new Set(["working", "waitingIdle", "awaitingPrompt", "compacting", "compactionFinished", "parked"]);
+const phases: ReadonlySet<string> = new Set([
+  "working",
+  "waitingIdle",
+  "awaitingPrompt",
+  "compacting",
+  "compactionFinished",
+  "parked",
+]);
 
 export const decodeIdleCompactSessionState = (input: unknown): IdleCompactSessionState | null => {
   if (typeof input !== "object" || input === null) return null;
@@ -99,13 +106,18 @@ const normalizedEvent = (value: string): IdleCompactEventName | null => {
   return null;
 };
 
-export const normalizeIdleCompactEvent = (input: unknown, environment: Environment, occurredAtMs: number): IdleCompactEvent | null => {
+export const normalizeIdleCompactEvent = (
+  input: unknown,
+  environment: Environment,
+  occurredAtMs: number,
+): IdleCompactEvent | null => {
   if (typeof input !== "object" || input === null) return null;
 
   const agentId = environment.DUFFLEBAG_AGENT_ID;
   if (!agentId) return null;
 
-  const rawEvent = stringProperty(input, "hook_event_name") ?? stringProperty(input, "hookEventName") ?? environment.GROK_HOOK_EVENT;
+  const rawEvent =
+    stringProperty(input, "hook_event_name") ?? stringProperty(input, "hookEventName") ?? environment.GROK_HOOK_EVENT;
   const sessionId =
     stringProperty(input, "session_id") ??
     stringProperty(input, "sessionId") ??
@@ -118,12 +130,21 @@ export const normalizeIdleCompactEvent = (input: unknown, environment: Environme
   return { agentId, sessionId, event, occurredAtMs };
 };
 
-export const applyIdleCompactEvent = (state: IdleCompactSessionState, event: IdleCompactEvent): IdleCompactSessionState => {
+export const applyIdleCompactEvent = (
+  state: IdleCompactSessionState,
+  event: IdleCompactEvent,
+): IdleCompactSessionState => {
   if (state.agentId !== event.agentId || state.sessionId !== event.sessionId) return state;
 
   if (event.event === "session-ended") return { ...state, sessionEnded: true, lastEventAtMs: event.occurredAtMs };
   if (event.event === "prompt-started") {
-    return { ...state, phase: "working", phaseStartedAtMs: event.occurredAtMs, sessionEnded: false, lastEventAtMs: event.occurredAtMs };
+    return {
+      ...state,
+      phase: "working",
+      phaseStartedAtMs: event.occurredAtMs,
+      sessionEnded: false,
+      lastEventAtMs: event.occurredAtMs,
+    };
   }
   if (event.event === "turn-ended") {
     if (state.phase === "compacting" || state.phase === "compactionFinished" || state.phase === "parked") {
@@ -135,7 +156,12 @@ export const applyIdleCompactEvent = (state: IdleCompactSessionState, event: Idl
     return { ...state, phase: "compacting", phaseStartedAtMs: event.occurredAtMs, lastEventAtMs: event.occurredAtMs };
   }
   if (event.event === "compact-finished") {
-    return { ...state, phase: "compactionFinished", phaseStartedAtMs: event.occurredAtMs, lastEventAtMs: event.occurredAtMs };
+    return {
+      ...state,
+      phase: "compactionFinished",
+      phaseStartedAtMs: event.occurredAtMs,
+      lastEventAtMs: event.occurredAtMs,
+    };
   }
   return { ...state, phase: "working", phaseStartedAtMs: event.occurredAtMs, lastEventAtMs: event.occurredAtMs };
 };

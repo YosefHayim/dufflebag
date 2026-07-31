@@ -7,7 +7,7 @@ export default {
   js2svg: { pretty: false },
   plugins: [
     {
-      name: 'preset-default',
+      name: "preset-default",
       params: {
         overrides: {
           removeViewBox: false,

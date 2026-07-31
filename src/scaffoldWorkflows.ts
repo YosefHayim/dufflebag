@@ -96,7 +96,8 @@ export const resolveWorkflows = (input: {
     .filter((file) => file.name.endsWith(".yml"))
     .map((file) => ({
       name: file.name,
-      content: file.name === "publish.yml" ? fillPublishTemplate({ template: file.raw, inputs: input.inputs }) : file.raw,
+      content:
+        file.name === "publish.yml" ? fillPublishTemplate({ template: file.raw, inputs: input.inputs }) : file.raw,
     }));
 
 const readTemplates = (templateDirectory: string) =>

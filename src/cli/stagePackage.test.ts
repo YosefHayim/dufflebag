@@ -41,7 +41,7 @@ describe("stagePackage", () => {
         expect(existsSync(path.join(contextGuardRoot, "lib/io.js"))).toBe(true);
 
         const voiceRoot = path.join(staged.root, "runtime/speakResponse");
-        for (const asset of ["voice.py", "voice.py.lock"]) {
+        for (const asset of ["cmux_focus.py", "prompt_refinement.py", "voice.py", "voice.py.lock"]) {
           expect(readFileSync(path.join(voiceRoot, asset))).toEqual(
             readFileSync(path.join(packageRoot, "src/skills/speakResponse", asset)),
           );

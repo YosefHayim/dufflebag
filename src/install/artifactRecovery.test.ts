@@ -53,14 +53,20 @@ layer(Layer.empty)("artifactRecovery", (it) => {
           name: "recovery marker target",
           record: {
             ...validRecord,
-            snapshots: [{ targetPath: "/safe/.dufflebag/recovery.json", original: { _tag: "missing" } }, receiptSnapshot],
+            snapshots: [
+              { targetPath: "/safe/.dufflebag/recovery.json", original: { _tag: "missing" } },
+              receiptSnapshot,
+            ],
           },
         },
         {
           name: "recovery marker descendant",
           record: {
             ...validRecord,
-            snapshots: [{ targetPath: "/safe/.dufflebag/recovery.json/child", original: { _tag: "missing" } }, receiptSnapshot],
+            snapshots: [
+              { targetPath: "/safe/.dufflebag/recovery.json/child", original: { _tag: "missing" } },
+              receiptSnapshot,
+            ],
           },
         },
         {
@@ -74,7 +80,10 @@ layer(Layer.empty)("artifactRecovery", (it) => {
           name: "transaction target",
           record: {
             ...validRecord,
-            snapshots: [{ targetPath: `${transactionRoot}/snapshots/evidence`, original: { _tag: "missing" } }, receiptSnapshot],
+            snapshots: [
+              { targetPath: `${transactionRoot}/snapshots/evidence`, original: { _tag: "missing" } },
+              receiptSnapshot,
+            ],
           },
         },
         {
@@ -126,7 +135,10 @@ layer(Layer.empty)("artifactRecovery", (it) => {
           record: {
             ...validRecord,
             snapshots: [
-              { targetPath: "/safe/a", original: { _tag: "file", snapshotPath: `${transactionRoot}/snapshots/nested/0` } },
+              {
+                targetPath: "/safe/a",
+                original: { _tag: "file", snapshotPath: `${transactionRoot}/snapshots/nested/0` },
+              },
               receiptSnapshot,
             ],
           },

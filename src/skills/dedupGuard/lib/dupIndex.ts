@@ -24,7 +24,16 @@
  */
 
 import { createHash } from "node:crypto";
-import { type Dirent, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync, writeFileSync } from "node:fs";
+import {
+  type Dirent,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  renameSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -164,7 +173,9 @@ function canonicalMembers(ts: typeof TS, members: readonly TS.TypeElement[], sou
     if (ts.isPropertySignature(member) && member.name) {
       const name = member.name.getText(sourceFile);
       const optional = member.questionToken ? "?" : "";
-      const readonly = (member.modifiers ?? []).some((mod) => mod.kind === ts.SyntaxKind.ReadonlyKeyword) ? "readonly " : "";
+      const readonly = (member.modifiers ?? []).some((mod) => mod.kind === ts.SyntaxKind.ReadonlyKeyword)
+        ? "readonly "
+        : "";
       const typeText = member.type ? normalizeWhitespace(member.type.getText(sourceFile)) : "any";
       parts.push(`${readonly}${name}${optional}:${typeText}`);
     } else {
@@ -189,7 +200,10 @@ function heritageToken(node: TS.InterfaceDeclaration, sourceFile: TS.SourceFile)
 /** Type/interface object-shape signature for `node`, or null if it isn't one. */
 function typeSignature(ts: typeof TS, node: TS.Node, sourceFile: TS.SourceFile): { name: string; sig: string } | null {
   if (ts.isInterfaceDeclaration(node)) {
-    return { name: node.name.text, sig: canonicalMembers(ts, node.members, sourceFile) + heritageToken(node, sourceFile) };
+    return {
+      name: node.name.text,
+      sig: canonicalMembers(ts, node.members, sourceFile) + heritageToken(node, sourceFile),
+    };
   }
   if (ts.isTypeAliasDeclaration(node) && ts.isTypeLiteralNode(node.type)) {
     return { name: node.name.text, sig: canonicalMembers(ts, node.type.members, sourceFile) };
@@ -310,7 +324,8 @@ function extractEntries(ts: typeof TS, text: string, fileName: string): ExtractR
   const types: TypeEntry[] = [];
   const fns: FnEntry[] = [];
   const lines = text.split("\n");
-  const lineOf = (node: TS.Node): number => sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1;
+  const lineOf = (node: TS.Node): number =>
+    sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1;
   const ignoredAt = (line: number): boolean => (lines[line - 1] ?? "").includes("dup-ignore");
   const visit = (node: TS.Node): void => {
     const t = typeSignature(ts, node, sourceFile);
@@ -466,8 +481,10 @@ export function buildIndex(options: BuildIndexOptions): DupIndex {
     else map.set(key, [value]);
   };
   for (const rel in nextFiles) {
-    for (const t of nextFiles[rel].types) push(index.typeSig, t.sig, { name: t.name, file: rel, line: t.line, ignored: t.ignored });
-    for (const f of nextFiles[rel].fns) push(index.fnFp, f.fp, { name: f.name, file: rel, line: f.line, ignored: f.ignored });
+    for (const t of nextFiles[rel].types)
+      push(index.typeSig, t.sig, { name: t.name, file: rel, line: t.line, ignored: t.ignored });
+    for (const f of nextFiles[rel].fns)
+      push(index.fnFp, f.fp, { name: f.name, file: rel, line: f.line, ignored: f.ignored });
   }
   return index;
 }
