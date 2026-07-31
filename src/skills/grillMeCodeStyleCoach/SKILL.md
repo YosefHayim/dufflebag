@@ -19,15 +19,15 @@ variants, and make me **confirm the direction before you write**. Then teach me 
 the file to imitate. I get better; the code stays on-style.
 
 **Read first (never coach from memory):** the repo's `code-style.rules.json` (the machine ruleset —
-channels + exemplars), `CODE-STYLE.md` (the prose), and `PROJECT.md` / `CONTEXT.md` (so "where does
+each rule's `verify` command + exemplars), `CODE-STYLE.md` (the prose), and `PROJECT.md` / `CONTEXT.md` (so "where does
 this go" comes from *my* docs, not generic advice). No ruleset in the repo? Say so and offer to run
 `grill-me-code-style` / `grill-me-code-style-with-docs` first.
 
-**Only grill me on what matters.** The ruleset's `channel` tells you what to skip and what to teach:
+**Only grill me on what matters.** Each rule's `verify` field tells you what to skip and what to teach:
 
-- `biome-builtin` / `biome-builtin-scoped` / `biome-restricted-import` / `biome-grit-plugin` →
-  **Biome already enforces these. Do NOT grill me on them** — just follow them and let `verify`
-  catch any slip. Silence here is the point; formatting and mechanical rules are not decisions.
+- A **real command** (`biome ci .`, `pnpm style`, …) → **a tool already enforces this. Do NOT grill
+  me on it** — just follow it and let the gate catch any slip. Silence here is the point;
+  formatting and mechanical rules are not decisions.
 - `judgment` (taste / architecture / placement) → **this is where you stop and coach.** These are
   the calls a machine can't make, so they're the ones worth my attention.
 
@@ -58,7 +58,7 @@ Ask **one question at a time** and wait. Never batch.
 
 ## What counts as a "decision" worth stopping on
 
-Stop for: **placement** (which layer/file, extend vs new), **shape** (the judgment-channel rules —
+Stop for: **placement** (which layer/file, extend vs new), **shape** (the `judgment` rules —
 pure/IO split, single named return, clone-in-clone-out, re-export vs re-declare), **the unit's
 golden path** (am I following it or inventing?), and **an abstraction's justification** (YAGNI — does
 a second real caller exist yet?). Don't stop for anything Biome enforces, or for a change that
@@ -74,7 +74,7 @@ the rule.
 ## Never
 
 - Never coach from memory — re-read `code-style.rules.json` + `CONTEXT.md` for this change.
-- Never grill me on a rule Biome already enforces (any non-`judgment` channel) — just follow it.
+- Never grill me on a rule a tool already enforces (any rule with a real `verify` command) — just follow it.
 - Never write the code before I've confirmed the direction on a judgment decision.
 - Never invent a pattern when a `CODE-STYLE.md` recipe/exemplar fits — mirror it and tell me which.
 - Never add an abstraction for a second consumer that doesn't exist yet (YAGNI).

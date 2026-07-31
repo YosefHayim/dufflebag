@@ -30,7 +30,7 @@ When a dimension is language-specific, a note like `[TS/JS only]` appears in the
 
 ### Both variants
 
-- **Every pick is recorded.** Chosen variant → the `✓` example on a `CODE-STYLE.md` rule; rejected variant → the `✗ not this` line. A rejected variant that's *actual slop* also becomes a concrete `## Never` entry (with a real `file:symbol` offender for existing repos). Tag each rule `[lint: <rule>]` (a linter catches it) or `[taste]`.
+- **Every pick is recorded.** Chosen variant → the `✓` example on a `CODE-STYLE.md` rule card; rejected variant → the `✗` case. A rejected variant that's *actual slop* also becomes a concrete `## Never` entry (with a real `file:symbol` offender for existing repos). Give each rule a `verify:` command (the tool that catches it) or `judgment`.
 - **Compose at the end.** After the rounds, assemble every pick into one **canonical example** — a real feature slice (existing) or representative feature (greenfield) written in the agreed style — and land it as the `## Canonical example` block in `CODE-STYLE.md` (see [CODE-STYLE-FORMAT.md](CODE-STYLE-FORMAT.md)). It's the litmus you show in the plan before approval.
 
 ---

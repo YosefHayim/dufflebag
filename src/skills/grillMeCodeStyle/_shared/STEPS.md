@@ -35,7 +35,7 @@ See **[EXTENSION-PATTERN.md](EXTENSION-PATTERN.md)** for the full procedure. In 
 - **Name the unit of extension** (feature / endpoint / screen / component / Actor / module) — parameterize everything to the project's real word; don't hardcode "feature".
 - **Derive a draft golden path** from the picks (existing repos also mine how the last 1–3 units were really added — see [SCAN.md](../../grill-me-code-style-with-docs/SCAN.md)), then grill it **step-by-step** (keep / adjust / reorder / cut) — react to a concrete draft, never a blank prompt.
 - End it with a short **definition of done** checklist.
-- **Wire the slop guard** in three layers: machine-catchable `## Never` tells → **lint config** (CI blocks, flips `[taste]`→`[lint]`); taste tells → **`deslop` per-diff**; the done-checklist → the human/agent gate. Slop is "off the golden path".
+- **Wire the slop guard** in three layers: machine-catchable `## Never` tells → **lint config** (CI blocks, flips a rule's `verify` from `judgment` to a real command); taste tells → **`deslop` per-diff**; the done-checklist → the human/agent gate. Slop is "off the golden path".
 
 Feeds a new **golden-path block** into the Step 7 plan and a `## Golden path` section (+ tight `AGENTS.md` digest mirror + lint rules) into the Step 8 write-list.
 

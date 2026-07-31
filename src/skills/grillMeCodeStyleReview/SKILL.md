@@ -19,7 +19,7 @@ out **understanding what changed**, not alienated from my own code. So collapse 
 short, teaching report: let the machine carry the mechanical load, and spend judgment (and my
 attention) only where a machine can't.
 
-**Read first:** the repo's `code-style.rules.json` (channels + exemplars), `CODE-STYLE.md`,
+**Read first:** the repo's `code-style.rules.json` (each rule's `verify` command + exemplars), `CODE-STYLE.md`,
 `PROJECT.md`/`CONTEXT.md`, and **my original prompt/intent** (ask me for it if you don't have it —
 Tier 3 checks the diff *did what I asked* and flags scope creep). No ruleset? Offer
 `grill-me-code-style(-with-docs)` first.
@@ -33,14 +33,14 @@ tree, or a named PR. That file list is the review surface.
 
 ## The three tiers — cheapest enforcement first
 
-Walk **every** rule in the ruleset by its `channel`. Most never reach me:
+Walk **every** rule in the ruleset by its `verify` command. Most never reach me:
 
-1. **Tier 1+2 — deterministic, whole-tree, auto-fix (all Biome channels).**
-   Run the repo's gate: `biome ci .` / `lint:fix`, then `verify` (biome + tsc + tests + build).
-   The `biome-builtin`, `biome-builtin-scoped`, `biome-restricted-import`, and `biome-grit-plugin`
-   rules **all** run here — across all files at once. **Auto-fix everything safe**, re-run to green.
-   I read **nothing** for this tier. Never weaken a rule/test to go green — fix the code.
-2. **Tier 3 — judgment, fanned out over the diff.** For the `judgment`-channel rules (taste,
+1. **Tier 1+2 — deterministic, whole-tree, auto-fix (every rule with a real `verify` command).**
+   Run the repo's gate: `biome ci .` / `lint:fix`, then `verify` (biome + tsc + tests + build), plus
+   any repo style script a rule points at (e.g. `pnpm style`). Those rules **all** run here — across
+   all files at once. **Auto-fix everything safe**, re-run to green. I read **nothing** for this tier.
+   Never weaken a rule/test to go green — fix the code.
+2. **Tier 3 — judgment, fanned out over the diff.** For rules whose `verify` is `judgment` (taste,
    architecture, placement) + **my intent**, split the changed files into slices and dispatch
    read-only sub-agents (see below). Each returns **only deviations** — never a file dump.
 
