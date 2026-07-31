@@ -6,7 +6,13 @@ import { Effect, Either, ParseResult, Schema } from "effect";
 import { applyArtifactPlan } from "./applyArtifactPlan.js";
 import { createUninstallPlan } from "./artifactPlan.js";
 import { readArtifactReceiptSnapshot, scopeSchema } from "./artifactReceipt.js";
-import { InstallError, installationLocationSchema, interactionSchema, materializeArtifactRestorations, receiptPath } from "./install.js";
+import {
+  InstallError,
+  installationLocationSchema,
+  interactionSchema,
+  materializeArtifactRestorations,
+  receiptPath,
+} from "./install.js";
 
 export const uninstallRequestSchema = Schema.extend(
   installationLocationSchema,
@@ -116,7 +122,9 @@ export const uninstall = (input: unknown) =>
       receiptExpectedCurrent: { _tag: "file", sha256: hashBytes(receiptSnapshot.bytes) },
     });
     if (Either.isLeft(planResult)) {
-      return yield* new UninstallError({ issue: `Generated uninstall plan is invalid: ${formatParseError(planResult.left)}` });
+      return yield* new UninstallError({
+        issue: `Generated uninstall plan is invalid: ${formatParseError(planResult.left)}`,
+      });
     }
 
     // 5. Apply restorations atomically and remove the receipt last.

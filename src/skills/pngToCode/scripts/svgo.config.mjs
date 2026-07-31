@@ -11,7 +11,7 @@ export default {
   floatPrecision: 3,
   plugins: [
     {
-      name: 'preset-default',
+      name: "preset-default",
       params: {
         overrides: {
           removeViewBox: false,

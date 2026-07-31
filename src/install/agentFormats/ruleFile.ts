@@ -74,9 +74,12 @@ const ruleFileMarkdownSchema = Schema.String.pipe(
 
 const ruleFileSkillSchema = Schema.Struct({
   installedSkill: catalogSkillDefinitionSchema.pipe(
-    Schema.filter((installedSkill) => catalogInstalledSkills.some((candidate) => installedSkillsEqual(candidate, installedSkill)), {
-      message: () => "Rule-file installed skills must exactly match the decoded feature catalog.",
-    }),
+    Schema.filter(
+      (installedSkill) => catalogInstalledSkills.some((candidate) => installedSkillsEqual(candidate, installedSkill)),
+      {
+        message: () => "Rule-file installed skills must exactly match the decoded feature catalog.",
+      },
+    ),
     Schema.annotations({
       description: "Catalog-owned installed skill identity used for the output filename.",
     }),
@@ -238,7 +241,9 @@ const createRuleWrites = (request: RuleFileRequest): Either.Either<ReadonlyArray
     const path = `${target.directory}/${installedSkill.id}${target.extension}`;
     const previousFile = request.previousFiles.find((file) => file.path === path);
     if (previousFile === undefined) {
-      return Either.left(new RuleFilePlanError({ issue: `Missing previous-file state for desired rule file ${path}.` }));
+      return Either.left(
+        new RuleFilePlanError({ issue: `Missing previous-file state for desired rule file ${path}.` }),
+      );
     }
 
     const bytes = textEncoder.encode(substituteControlPath(stripLeadingFrontmatter(markdown), request.ctl));

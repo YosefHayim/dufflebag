@@ -20,13 +20,15 @@ const receiptFilename = "receipt.json";
 const recoveryFilename = "recovery.json";
 
 // e.g. "/Users/me/.claude" or "C:/Users/me/.claude" — not "rel", "a/../b", or "C:\\x"
-const ABSOLUTE_ROOT_PATTERN = /^(?:\/|[A-Za-z]:\/)(?!.*(?:^|\/)\.{1,2}(?:\/|$))(?!.*\/\/)(?:[^\\/\0]+(?:\/[^\\/\0]+)*)?$/;
+const ABSOLUTE_ROOT_PATTERN =
+  /^(?:\/|[A-Za-z]:\/)(?!.*(?:^|\/)\.{1,2}(?:\/|$))(?!.*\/\/)(?:[^\\/\0]+(?:\/[^\\/\0]+)*)?$/;
 // e.g. "deslop" — legacy kebab skill id in uninstall manifests
 const LEGACY_SKILL_ID_PATTERN = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
 
 export const absoluteRootSchema = Schema.NonEmptyTrimmedString.pipe(
   Schema.pattern(ABSOLUTE_ROOT_PATTERN, {
-    message: () => "Artifact plan roots must be canonical POSIX or drive-absolute forward-slash paths with no parent traversal.",
+    message: () =>
+      "Artifact plan roots must be canonical POSIX or drive-absolute forward-slash paths with no parent traversal.",
   }),
   Schema.annotations({
     description: "Absolute filesystem root used to resolve every scope-relative artifact path.",
@@ -203,7 +205,10 @@ export type ArtifactRestorationOperation = Schema.Schema.Type<typeof artifactRes
 const plannedWriteOperationSchema = Schema.extend(writeOperationSchema, expectedCurrentFieldsSchema);
 const plannedRestoreOperationSchema = Schema.extend(restoreOperationSchema, expectedCurrentFieldsSchema);
 const plannedRemoveOperationSchema = Schema.extend(artifactRemoveOperationSchema, expectedCurrentFieldsSchema);
-const plannedArtifactRestorationOperationSchema = Schema.Union(plannedRestoreOperationSchema, plannedRemoveOperationSchema);
+const plannedArtifactRestorationOperationSchema = Schema.Union(
+  plannedRestoreOperationSchema,
+  plannedRemoveOperationSchema,
+);
 
 type PlannedArtifactRestorationOperation = Schema.Schema.Type<typeof plannedArtifactRestorationOperationSchema>;
 
@@ -232,7 +237,8 @@ const pathsConflict = (left: string, right: string): boolean => {
   );
 };
 
-const recoveryPathForReceipt = (receiptPath: string): string => `${receiptPath.slice(0, -receiptFilename.length)}${recoveryFilename}`;
+const recoveryPathForReceipt = (receiptPath: string): string =>
+  `${receiptPath.slice(0, -receiptFilename.length)}${recoveryFilename}`;
 
 const reservedReceiptPaths = (receiptTarget: ReceiptTarget): ReadonlyArray<string> => [
   receiptTarget.path,
@@ -293,7 +299,9 @@ const orderRestorations = (
 
 const operationPathIssues = (operations: ReadonlyArray<ArtifactOperation>, receiptTarget: ReceiptTarget) =>
   operations.flatMap((operation, index) => {
-    const reservedPath = reservedReceiptPaths(receiptTarget).find((path) => pathsConflict(operation.artifact.path, path));
+    const reservedPath = reservedReceiptPaths(receiptTarget).find((path) =>
+      pathsConflict(operation.artifact.path, path),
+    );
 
     return [
       ...operations.slice(index + 1).flatMap((candidate, offset) => {
@@ -377,7 +385,8 @@ const artifactPlanFieldsSchema = Schema.Struct({
   }),
   root: absoluteRootSchema,
   operations: Schema.Array(artifactOperationSchema).annotations({
-    description: "Ordered desired writes, host-file restorations, and host-file deletions committed before the receipt.",
+    description:
+      "Ordered desired writes, host-file restorations, and host-file deletions committed before the receipt.",
   }),
   preconditions: Schema.Array(artifactPreconditionSchema).annotations({
     description: "Validation-only guards retained for desired artifacts whose bytes need no write.",
@@ -394,7 +403,9 @@ const artifactPlanIssues = (plan: ArtifactPlanFields) => {
 
   const preconditionIssues = [
     ...plan.preconditions.flatMap((precondition, index) =>
-      plan.preconditions.slice(0, index).some((candidate) => normalizedPath(candidate.path) === normalizedPath(precondition.path))
+      plan.preconditions
+        .slice(0, index)
+        .some((candidate) => normalizedPath(candidate.path) === normalizedPath(precondition.path))
         ? [
             {
               path: ["preconditions", index, "path"],
@@ -518,7 +529,11 @@ const desiredStateSchema = Schema.Struct({
   ]),
 );
 
-const jsonContainerAcquisitionIssues = (previous: JsonValuesOwnership, desired: JsonValuesOwnership, artifactIndex: number) =>
+const jsonContainerAcquisitionIssues = (
+  previous: JsonValuesOwnership,
+  desired: JsonValuesOwnership,
+  artifactIndex: number,
+) =>
   desired.createdContainers.flatMap((container, containerIndex) => {
     if (previous.createdContainers.includes(container)) {
       return [];
@@ -526,7 +541,8 @@ const jsonContainerAcquisitionIssues = (previous: JsonValuesOwnership, desired: 
 
     const ownsNewDescendant = desired.values.some(
       (value) =>
-        value.pointer.startsWith(`${container}/`) && !previous.values.some((previousValue) => previousValue.pointer === value.pointer),
+        value.pointer.startsWith(`${container}/`) &&
+        !previous.values.some((previousValue) => previousValue.pointer === value.pointer),
     );
 
     return ownsNewDescendant
@@ -555,7 +571,8 @@ export const updatePlanInputSchema = Schema.Struct({
     const previousArtifacts = input.previous._tag === "receipt" ? input.previous.receipt.artifacts : [];
     const staleArtifacts = reverseValues(
       previousArtifacts.filter(
-        (previousArtifact) => !input.desired.receipt.artifacts.some((artifact) => artifact.path === previousArtifact.path),
+        (previousArtifact) =>
+          !input.desired.receipt.artifacts.some((artifact) => artifact.path === previousArtifact.path),
       ),
     );
 
@@ -614,7 +631,9 @@ export const updatePlanInputSchema = Schema.Struct({
           : [];
       }),
       ...input.desired.receipt.artifacts.flatMap((artifact, index) => {
-        const reservedPath = reservedReceiptPaths(input.receiptTarget).find((path) => pathsConflict(artifact.path, path));
+        const reservedPath = reservedReceiptPaths(input.receiptTarget).find((path) =>
+          pathsConflict(artifact.path, path),
+        );
 
         return reservedPath !== undefined
           ? [
@@ -641,7 +660,9 @@ export const uninstallPlanInputSchema = Schema.Struct({
   receiptExpectedCurrent: artifactExpectedCurrentSchema.annotations({
     description: "Receipt target state captured during capability inspection.",
   }),
-}).pipe(Schema.filter((input) => restorationConsistencyIssues(reverseValues(input.receipt.artifacts), input.restorations)));
+}).pipe(
+  Schema.filter((input) => restorationConsistencyIssues(reverseValues(input.receipt.artifacts), input.restorations)),
+);
 
 export type UninstallPlanInput = Schema.Schema.Type<typeof uninstallPlanInputSchema>;
 
@@ -686,7 +707,9 @@ const preserveJsonRestoration = (previous: JsonValuesOwnership, desired: JsonVal
   ...desired,
   filePreviouslyPresent: previous.filePreviouslyPresent,
   createdContainers: [
-    ...previous.createdContainers.filter((container) => desired.values.some((value) => value.pointer.startsWith(`${container}/`))),
+    ...previous.createdContainers.filter((container) =>
+      desired.values.some((value) => value.pointer.startsWith(`${container}/`)),
+    ),
     ...desired.createdContainers.filter((container) => !previous.createdContainers.includes(container)),
   ],
   values: desired.values.map((value) => {
@@ -738,7 +761,9 @@ const installedOwnershipEqual = (left: ArtifactOwnership, right: ArtifactOwnersh
 
   if (left._tag === "managedBlock" && right._tag === "managedBlock") {
     return (
-      left.startMarker === right.startMarker && left.endMarker === right.endMarker && left.installedBodyHash === right.installedBodyHash
+      left.startMarker === right.startMarker &&
+      left.endMarker === right.endMarker &&
+      left.installedBodyHash === right.installedBodyHash
     );
   }
 
@@ -749,7 +774,9 @@ const installedOwnershipEqual = (left: ArtifactOwnership, right: ArtifactOwnersh
         const candidate = right.values[index];
 
         return (
-          candidate !== undefined && value.pointer === candidate.pointer && installedJsonValuesEqual(value.installed, candidate.installed)
+          candidate !== undefined &&
+          value.pointer === candidate.pointer &&
+          installedJsonValuesEqual(value.installed, candidate.installed)
         );
       })
     );
@@ -796,12 +823,16 @@ export const createUpdatePlan = (input: unknown) =>
     const nextArtifacts = request.desired.receipt.artifacts.map((desiredArtifact) => {
       const previousArtifact = previousArtifacts.find((artifact) => artifact.path === desiredArtifact.path);
 
-      return previousArtifact === undefined ? desiredArtifact : preserveArtifactRestoration(previousArtifact, desiredArtifact);
+      return previousArtifact === undefined
+        ? desiredArtifact
+        : preserveArtifactRestoration(previousArtifact, desiredArtifact);
     });
 
     // 2. Identify stale ownership in reverse prior-receipt order.
     const staleArtifacts = reverseValues(
-      previousArtifacts.filter((previousArtifact) => !nextArtifacts.some((artifact) => artifact.path === previousArtifact.path)),
+      previousArtifacts.filter(
+        (previousArtifact) => !nextArtifacts.some((artifact) => artifact.path === previousArtifact.path),
+      ),
     );
 
     // 3. Order the caller's exact restoration set by that prior receipt.
@@ -814,12 +845,16 @@ export const createUpdatePlan = (input: unknown) =>
         .flatMap((artifact) => {
           const previousArtifact = previousArtifacts.find((candidate) => candidate.path === artifact.path);
 
-          return previousArtifact !== undefined && installedArtifactsEqual(previousArtifact, artifact) ? [] : [{ ...operation, artifact }];
+          return previousArtifact !== undefined && installedArtifactsEqual(previousArtifact, artifact)
+            ? []
+            : [{ ...operation, artifact }];
         }),
     );
     const changedPaths = new Set(changedWrites.map((operation) => operation.artifact.path));
     const preconditions = request.desired.writes.flatMap((operation) =>
-      changedPaths.has(operation.artifact.path) ? [] : [{ path: operation.artifact.path, expectedCurrent: operation.expectedCurrent }],
+      changedPaths.has(operation.artifact.path)
+        ? []
+        : [{ path: operation.artifact.path, expectedCurrent: operation.expectedCurrent }],
     );
 
     // 5. Publish the complete next receipt after every filesystem action.
@@ -863,7 +898,9 @@ export const migrateLegacyManifest = (input: unknown) =>
   Either.flatMap(validateLegacyMigrationInput(input), (request) => {
     const writes = request.knownArtifacts
       .filter(({ recordedBy }) =>
-        recordedBy._tag === "feature" ? request.manifest.features.includes(recordedBy.id) : request.manifest.skills.includes(recordedBy.id),
+        recordedBy._tag === "feature"
+          ? request.manifest.features.includes(recordedBy.id)
+          : request.manifest.skills.includes(recordedBy.id),
       )
       .map(({ write }) => write);
 

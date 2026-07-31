@@ -118,7 +118,8 @@ export function resolveSessionId(): string | null {
     for (const entry of readdirSync(dir, { withFileTypes: true })) {
       const full = path.join(dir, entry.name);
       if (entry.isDirectory()) walk(full);
-      else if (entry.name.endsWith(".jsonl")) found.push({ sid: entry.name.slice(0, -".jsonl".length), mtime: statSync(full).mtimeMs });
+      else if (entry.name.endsWith(".jsonl"))
+        found.push({ sid: entry.name.slice(0, -".jsonl".length), mtime: statSync(full).mtimeMs });
     }
   };
   walk(PROJECTS_DIR);

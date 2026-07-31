@@ -39,7 +39,8 @@ for (let k = 0; k + 1 < WRIST_ARC.length; k++) {
   const [ax, ay] = WRIST_ARC[k],
     [bx, by] = WRIST_ARC[k + 1];
   const n = Math.ceil(Math.hypot(bx - ax, by - ay));
-  for (let s = 0; s <= n; s++) stamp(wall, Math.round(ax + ((bx - ax) * s) / n), Math.round(ay + ((by - ay) * s) / n), 3);
+  for (let s = 0; s <= n; s++)
+    stamp(wall, Math.round(ax + ((bx - ax) * s) / n), Math.round(ay + ((by - ay) * s) / n), 3);
 }
 
 const ring = new Uint8Array(W * H);

@@ -5,12 +5,15 @@ const portablePath = (filePath: string): string => filePath.replaceAll("\\", "/"
 const normalizedRecoveryPath = (filePath: string): string => {
   const normalized = portablePath(filePath);
 
-  return normalized.endsWith("/") && normalized !== "/" && !/^[A-Za-z]:\/$/.test(normalized) ? normalized.slice(0, -1) : normalized;
+  return normalized.endsWith("/") && normalized !== "/" && !/^[A-Za-z]:\/$/.test(normalized)
+    ? normalized.slice(0, -1)
+    : normalized;
 };
 
 const childPathPrefix = (root: string): string => (root.endsWith("/") ? root : `${root}/`);
 
-const transactionDirectoryNamePattern = /^\.dufflebag-transaction-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+const transactionDirectoryNamePattern =
+  /^\.dufflebag-transaction-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
 const isCanonicalAbsolutePath = (filePath: string): boolean => {
   if (filePath.includes("\0")) {
@@ -45,7 +48,11 @@ const recoveryPathsConflict = (left: string, right: string): boolean => {
   const leftKey = recoveryPathKey(left);
   const rightKey = recoveryPathKey(right);
 
-  return leftKey === rightKey || leftKey.startsWith(childPathPrefix(rightKey)) || rightKey.startsWith(childPathPrefix(leftKey));
+  return (
+    leftKey === rightKey ||
+    leftKey.startsWith(childPathPrefix(rightKey)) ||
+    rightKey.startsWith(childPathPrefix(leftKey))
+  );
 };
 
 const firstConflictingPathIndex = (paths: ReadonlyArray<string>): number =>
@@ -61,7 +68,9 @@ const recoveryMarkerPath = (receiptPath: string): string => {
 const isDirectSnapshotPath = (transactionRoot: string, snapshotPath: string): boolean => {
   const snapshotsPrefix = `${childPathPrefix(normalizedRecoveryPath(transactionRoot))}snapshots/`;
   const normalizedSnapshotPath = normalizedRecoveryPath(snapshotPath);
-  const snapshotName = normalizedSnapshotPath.startsWith(snapshotsPrefix) ? normalizedSnapshotPath.slice(snapshotsPrefix.length) : "";
+  const snapshotName = normalizedSnapshotPath.startsWith(snapshotsPrefix)
+    ? normalizedSnapshotPath.slice(snapshotsPrefix.length)
+    : "";
 
   return snapshotName !== "" && !snapshotName.includes("/");
 };
@@ -72,11 +81,14 @@ const absolutePathSchema = Schema.NonEmptyTrimmedString.pipe(
   }),
 );
 
-export class ArtifactRecoveryPendingError extends Schema.TaggedError<ArtifactRecoveryPendingError>()("ArtifactRecoveryPendingError", {
-  recoveryPath: absolutePathSchema.annotations({
-    description: "Durable recovery record that must be resolved before another transaction starts.",
-  }),
-}) {
+export class ArtifactRecoveryPendingError extends Schema.TaggedError<ArtifactRecoveryPendingError>()(
+  "ArtifactRecoveryPendingError",
+  {
+    recoveryPath: absolutePathSchema.annotations({
+      description: "Durable recovery record that must be resolved before another transaction starts.",
+    }),
+  },
+) {
   get message(): string {
     return `Recovery is pending at ${this.recoveryPath}`;
   }
@@ -171,7 +183,9 @@ export const artifactRecoveryRecordSchema = artifactRecoveryRecordFieldsSchema.p
   }),
   Schema.filter((record) => {
     const invalidSnapshotIndex = record.snapshots.findIndex(
-      (snapshot) => snapshot.original._tag === "file" && !isDirectSnapshotPath(record.transactionRoot, snapshot.original.snapshotPath),
+      (snapshot) =>
+        snapshot.original._tag === "file" &&
+        !isDirectSnapshotPath(record.transactionRoot, snapshot.original.snapshotPath),
     );
     if (invalidSnapshotIndex < 0) {
       return true;

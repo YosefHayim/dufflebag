@@ -2,7 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import { decideIdleCompactAction, type IdleCompactSnapshot } from "./idleCompactGate.js";
 
-const snapshot = (phase: IdleCompactSnapshot["phase"], overrides: Partial<IdleCompactSnapshot> = {}): IdleCompactSnapshot => ({
+const snapshot = (
+  phase: IdleCompactSnapshot["phase"],
+  overrides: Partial<IdleCompactSnapshot> = {},
+): IdleCompactSnapshot => ({
   phase,
   nowMs: 20_000,
   phaseStartedAtMs: 10_000,

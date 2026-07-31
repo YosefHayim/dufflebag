@@ -195,7 +195,9 @@ const stageRuntimeFeature = (input: {
       }
     }
 
-    const needsSharedRuntime = yield* rewriteStagedHookRuntimeImports({ hooksRoot: path.join(stagedFeatureRoot, "hooks") });
+    const needsSharedRuntime = yield* rewriteStagedHookRuntimeImports({
+      hooksRoot: path.join(stagedFeatureRoot, "hooks"),
+    });
     if (needsSharedRuntime) {
       yield* copyTree({
         source: compiledSharedRuntimeRoot,

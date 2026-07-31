@@ -176,7 +176,9 @@ layer(NodeContext.layer)("doctor", (it) => {
         const fileSystem = yield* FileSystem.FileSystem;
         const path = yield* Path.Path;
         const root = yield* fileSystem.makeTempDirectoryScoped({ prefix: "dufflebag-doctor-missing-config-root-" });
-        const stagedRoot = yield* fileSystem.makeTempDirectoryScoped({ prefix: "dufflebag-doctor-missing-config-stage-" });
+        const stagedRoot = yield* fileSystem.makeTempDirectoryScoped({
+          prefix: "dufflebag-doctor-missing-config-stage-",
+        });
         const receiptPath = path.join(root, ".claude/dufflebag/receipt.json");
 
         yield* fileSystem.makeDirectory(path.dirname(receiptPath), { recursive: true });
@@ -223,7 +225,10 @@ layer(NodeContext.layer)("doctor", (it) => {
         );
         // Use this process's pid so the live check passes without spawning a fake daemon.
         yield* fileSystem.writeFileString(path.join(loopStateDir, `${sessionId}.pid`), `${process.pid}\n`);
-        yield* fileSystem.writeFileString(path.join(loopStateDir, `${sessionId}.config`), `${JSON.stringify(frozen)}\n`);
+        yield* fileSystem.writeFileString(
+          path.join(loopStateDir, `${sessionId}.config`),
+          `${JSON.stringify(frozen)}\n`,
+        );
 
         const report = yield* doctor({
           destination: { _tag: "global", root },
@@ -256,7 +261,9 @@ layer(NodeContext.layer)("doctor", (it) => {
         const fileSystem = yield* FileSystem.FileSystem;
         const path = yield* Path.Path;
         const root = yield* fileSystem.makeTempDirectoryScoped({ prefix: "dufflebag-doctor-invalid-receipt-root-" });
-        const stagedRoot = yield* fileSystem.makeTempDirectoryScoped({ prefix: "dufflebag-doctor-invalid-receipt-stage-" });
+        const stagedRoot = yield* fileSystem.makeTempDirectoryScoped({
+          prefix: "dufflebag-doctor-invalid-receipt-stage-",
+        });
         const configPath = path.join(root, ".claude/dufflebag/config.json");
         const receiptPath = path.join(root, ".claude/dufflebag/receipt.json");
         const receiptBytes = new TextEncoder().encode(

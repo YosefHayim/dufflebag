@@ -120,10 +120,17 @@ const stagedSkillPathIssues = (stagedSkill: {
       (shippedPath) => sourceFile.path === shippedPath || sourceFile.path.startsWith(`${shippedPath}/`),
     )
       ? []
-      : [{ path: ["sourceFiles", index, "path"], message: `Staged skill file ${sourceFile.path} is not catalog-shipped.` }],
+      : [
+          {
+            path: ["sourceFiles", index, "path"],
+            message: `Staged skill file ${sourceFile.path} is not catalog-shipped.`,
+          },
+        ],
   ),
   ...stagedSkill.installedSkill.shippedPaths.flatMap((shippedPath, index) =>
-    stagedSkill.sourceFiles.some((sourceFile) => sourceFile.path === shippedPath || sourceFile.path.startsWith(`${shippedPath}/`))
+    stagedSkill.sourceFiles.some(
+      (sourceFile) => sourceFile.path === shippedPath || sourceFile.path.startsWith(`${shippedPath}/`),
+    )
       ? []
       : [
           {
@@ -209,7 +216,8 @@ const hashBytes = (bytes: Uint8Array): string => createHash("sha256").update(byt
 const bytesEqual = (left: Uint8Array, right: Uint8Array): boolean =>
   left.byteLength === right.byteLength && left.every((value, index) => value === right[index]);
 
-const hashJsonValue = (value: unknown): string => hashBytes(textEncoder.encode(Schema.encodeSync(jsonValueSchema)(value)));
+const hashJsonValue = (value: unknown): string =>
+  hashBytes(textEncoder.encode(Schema.encodeSync(jsonValueSchema)(value)));
 
 const isNotFound = (error: PlatformError): boolean => error._tag === "SystemError" && error.reason === "NotFound";
 
@@ -243,7 +251,9 @@ const resolveFeatures = (request: InstallRequest) => {
   return Either.mapLeft(resolveFeatureSelection(ids), (error) => new InstallError({ issue: error.message }));
 };
 
-const resolveSelectedAgents = (ids: ReadonlyArray<string>): Either.Either<ReadonlyArray<AgentDefinition>, InstallError> => {
+const resolveSelectedAgents = (
+  ids: ReadonlyArray<string>,
+): Either.Either<ReadonlyArray<AgentDefinition>, InstallError> => {
   const unknownId = ids.find((id) => !agentCatalog.some((agent) => agent.id === id));
   if (unknownId !== undefined) {
     return Either.left(new InstallError({ issue: `Unknown agent: ${unknownId}` }));
@@ -286,7 +296,9 @@ const decodeSettings = (snapshot: FileSnapshot): Either.Either<DecodedSettings, 
     const duplicateProperty = findDuplicateJsonProperty(source);
     if (duplicateProperty !== undefined) {
       return Either.left(
-        new InstallError({ issue: `settings.json contains duplicate JSON property ${JSON.stringify(duplicateProperty)}.` }),
+        new InstallError({
+          issue: `settings.json contains duplicate JSON property ${JSON.stringify(duplicateProperty)}.`,
+        }),
       );
     }
 
@@ -302,7 +314,9 @@ const decodeSettings = (snapshot: FileSnapshot): Either.Either<DecodedSettings, 
 const hookEventFromPointer = (pointer: string): string | undefined => {
   const prefix = "/hooks/";
 
-  return pointer.startsWith(prefix) && !pointer.slice(prefix.length).includes("/") ? pointer.slice(prefix.length) : undefined;
+  return pointer.startsWith(prefix) && !pointer.slice(prefix.length).includes("/")
+    ? pointer.slice(prefix.length)
+    : undefined;
 };
 
 const previousHookGroups = (ownership: JsonValuesOwnership | undefined, event: string): PreviousJsonValue | undefined =>
@@ -323,7 +337,9 @@ const baseHookGroups = (input: {
   const history = previousHookGroups(input.ownership, input.event);
   if (history?._tag === "value") {
     if (history.lexical === undefined) {
-      return Either.left(new InstallError({ issue: `Receipted hook event ${input.event} lacks lexical restoration evidence.` }));
+      return Either.left(
+        new InstallError({ issue: `Receipted hook event ${input.event} lacks lexical restoration evidence.` }),
+      );
     }
 
     return Either.map(decodeHookGroups(history.value, input.event), (groups) => ({ groups, previous: history }));
@@ -353,7 +369,8 @@ const baseHookGroups = (input: {
 
 const decodeJsonPointerSegment = (segment: string): string => segment.replaceAll("~1", "/").replaceAll("~0", "~");
 
-const jsonPointerPath = (pointer: string): ReadonlyArray<string> => pointer.slice(1).split("/").map(decodeJsonPointerSegment);
+const jsonPointerPath = (pointer: string): ReadonlyArray<string> =>
+  pointer.slice(1).split("/").map(decodeJsonPointerSegment);
 
 const settingsValueAtPointer = (document: SettingsDocument, pointer: string): unknown => {
   const [container, key, extra] = jsonPointerPath(pointer);
@@ -369,7 +386,9 @@ const settingsValueAtPointer = (document: SettingsDocument, pointer: string): un
 };
 
 const installedJsonValueMatches = (value: OwnedJsonValue, current: unknown): boolean =>
-  value.installed._tag === "missing" ? current === undefined : current !== undefined && hashJsonValue(current) === value.installed.hash;
+  value.installed._tag === "missing"
+    ? current === undefined
+    : current !== undefined && hashJsonValue(current) === value.installed.hash;
 
 const validateCurrentSettingsOwnership = (
   document: SettingsDocument,
@@ -387,7 +406,9 @@ const validateCurrentSettingsOwnership = (
 
   return conflict === undefined
     ? Either.right(undefined)
-    : Either.left(new InstallError({ issue: `Receipted settings value ${conflict.pointer} changed after installation.` }));
+    : Either.left(
+        new InstallError({ issue: `Receipted settings value ${conflict.pointer} changed after installation.` }),
+      );
 };
 
 const settingsOperationSchema = (artifactPath: string) =>
@@ -433,7 +454,10 @@ const settingsOperationSchema = (artifactPath: string) =>
     }),
   );
 
-const validateSettingsOperation = (input: unknown, artifactPath = settingsPath): Either.Either<ArtifactOperation, InstallError> =>
+const validateSettingsOperation = (
+  input: unknown,
+  artifactPath = settingsPath,
+): Either.Either<ArtifactOperation, InstallError> =>
   Either.mapLeft(
     Schema.validateEither(settingsOperationSchema(artifactPath), {
       onExcessProperty: "error",
@@ -465,7 +489,8 @@ type ManagedHookGroup = Schema.Schema.Type<typeof managedHookGroupSchema>;
 
 const stagedRuntimeEntrypoint = (sourceEntrypoint: string): string => `${sourceEntrypoint.slice(0, -3)}.js`;
 
-const installedRuntimeFile = (sourceDirectory: string, filePath: string): string => `${runtimePath}/${sourceDirectory}/${filePath}`;
+const installedRuntimeFile = (sourceDirectory: string, filePath: string): string =>
+  `${runtimePath}/${sourceDirectory}/${filePath}`;
 
 const runtimeCommand = (root: string, sourceDirectory: string, sourceEntrypoint: string, path: Path.Path): string =>
   `node "${path.join(root, installedRuntimeFile(sourceDirectory, stagedRuntimeEntrypoint(sourceEntrypoint)))}"`;
@@ -491,7 +516,10 @@ const desiredHookGroups = (input: {
   idleAutoCompact: string;
   path: Path.Path;
 }) => {
-  if (!input.selectedAgents.some((agent) => agent.id === input.agent.id) || input.agent.nativeHooks._tag === "unsupported") {
+  if (
+    !input.selectedAgents.some((agent) => agent.id === input.agent.id) ||
+    input.agent.nativeHooks._tag === "unsupported"
+  ) {
     return new Map<string, ReadonlyArray<ManagedHookGroup>>();
   }
   const nativeHooks = input.agent.nativeHooks;
@@ -541,7 +569,11 @@ const commaBetween = (input: { source: string; start: number; end: number }): nu
   return offset >= input.start && offset < input.end ? offset : undefined;
 };
 
-const removeJsonProperty = (input: { source: string; parent: Node; property: Node }): Either.Either<string, InstallError> => {
+const removeJsonProperty = (input: {
+  source: string;
+  parent: Node;
+  property: Node;
+}): Either.Either<string, InstallError> => {
   const properties = objectProperties(input.parent);
   const index = properties.indexOf(input.property);
   const previous = properties[index - 1];
@@ -554,7 +586,9 @@ const removeJsonProperty = (input: { source: string; parent: Node; property: Nod
       end: next.offset,
     });
     if (comma === undefined) {
-      return Either.left(new InstallError({ issue: "settings.json property separators could not be preserved safely." }));
+      return Either.left(
+        new InstallError({ issue: "settings.json property separators could not be preserved safely." }),
+      );
     }
 
     return Either.right(input.source.slice(0, input.property.offset) + input.source.slice(comma + 1));
@@ -567,21 +601,33 @@ const removeJsonProperty = (input: { source: string; parent: Node; property: Nod
       end: input.property.offset,
     });
     if (comma === undefined) {
-      return Either.left(new InstallError({ issue: "settings.json property separators could not be preserved safely." }));
+      return Either.left(
+        new InstallError({ issue: "settings.json property separators could not be preserved safely." }),
+      );
     }
 
-    return Either.right(input.source.slice(0, comma) + input.source.slice(input.property.offset + input.property.length));
+    return Either.right(
+      input.source.slice(0, comma) + input.source.slice(input.property.offset + input.property.length),
+    );
   }
 
-  return Either.right(input.source.slice(0, input.property.offset) + input.source.slice(input.property.offset + input.property.length));
+  return Either.right(
+    input.source.slice(0, input.property.offset) + input.source.slice(input.property.offset + input.property.length),
+  );
 };
 
-const editJsonValue = (input: { source: string; path: ReadonlyArray<string>; value: unknown }): Either.Either<string, InstallError> => {
+const editJsonValue = (input: {
+  source: string;
+  path: ReadonlyArray<string>;
+  value: unknown;
+}): Either.Either<string, InstallError> => {
   const root = parseTree(input.source);
   const key = input.path.at(-1);
   const parent = root === undefined ? undefined : findNodeAtLocation(root, input.path.slice(0, -1));
   if (root === undefined || key === undefined || parent?.type !== "object") {
-    return Either.left(new InstallError({ issue: `settings.json path /${input.path.join("/")} is not an editable object property.` }));
+    return Either.left(
+      new InstallError({ issue: `settings.json path /${input.path.join("/")} is not an editable object property.` }),
+    );
   }
 
   const properties = objectProperties(parent);
@@ -598,7 +644,9 @@ const editJsonValue = (input: { source: string; path: ReadonlyArray<string>; val
 
     const encoded = Schema.encodeSync(jsonValueSchema)(input.value);
     return Either.right(
-      input.source.slice(0, currentValue.offset) + encoded + input.source.slice(currentValue.offset + currentValue.length),
+      input.source.slice(0, currentValue.offset) +
+        encoded +
+        input.source.slice(currentValue.offset + currentValue.length),
     );
   }
 
@@ -679,7 +727,9 @@ const removeJsonPropertyWithLexical = (input: {
     const comma = commaBetween({ source: separator, start: 0, end: separator.length });
     const nextKey = propertyKey(next);
     if (comma === undefined || nextKey === undefined) {
-      return Either.left(new InstallError({ issue: "settings.json next-property evidence could not be captured safely." }));
+      return Either.left(
+        new InstallError({ issue: "settings.json next-property evidence could not be captured safely." }),
+      );
     }
 
     return Either.right({
@@ -693,11 +743,15 @@ const removeJsonPropertyWithLexical = (input: {
     const comma = commaBetween({ source: separator, start: 0, end: separator.length });
     const previousKey = propertyKey(previous);
     if (comma === undefined || previousKey === undefined) {
-      return Either.left(new InstallError({ issue: "settings.json previous-property evidence could not be captured safely." }));
+      return Either.left(
+        new InstallError({ issue: "settings.json previous-property evidence could not be captured safely." }),
+      );
     }
 
     return Either.right({
-      source: input.source.slice(0, previous.offset + previous.length) + input.source.slice(property.offset + property.length),
+      source:
+        input.source.slice(0, previous.offset + previous.length) +
+        input.source.slice(property.offset + property.length),
       lexical: { _tag: "afterProperty", previousKey, separator, property: propertySource },
     });
   }
@@ -733,7 +787,9 @@ const restoreJsonLexical = (input: {
 
     return value === undefined
       ? Either.left(new InstallError({ issue: `settings.json property /${input.path.join("/")} has no value.` }))
-      : Either.right(input.source.slice(0, value.offset) + lexical.source + input.source.slice(value.offset + value.length));
+      : Either.right(
+          input.source.slice(0, value.offset) + lexical.source + input.source.slice(value.offset + value.length),
+        );
   }
 
   const root = parseTree(input.source);
@@ -741,7 +797,9 @@ const restoreJsonLexical = (input: {
   const parent = root === undefined ? undefined : findNodeAtLocation(root, parentPath);
   const key = input.path.at(-1);
   if (parent?.type !== "object" || key === undefined) {
-    return Either.left(new InstallError({ issue: `Settings parent /${parentPath.join("/")} cannot be restored safely.` }));
+    return Either.left(
+      new InstallError({ issue: `Settings parent /${parentPath.join("/")} cannot be restored safely.` }),
+    );
   }
 
   const properties = objectProperties(parent);
@@ -754,7 +812,9 @@ const restoreJsonLexical = (input: {
 
     return next === undefined
       ? Either.left(new InstallError({ issue: `Settings restoration anchor ${lexical.nextKey} is missing.` }))
-      : Either.right(input.source.slice(0, next.offset) + lexical.property + lexical.separator + input.source.slice(next.offset));
+      : Either.right(
+          input.source.slice(0, next.offset) + lexical.property + lexical.separator + input.source.slice(next.offset),
+        );
   }
 
   if (lexical._tag === "afterProperty") {
@@ -774,11 +834,17 @@ const restoreJsonLexical = (input: {
   const parentEnd = parent.offset + parent.length - 1;
   const currentInterior = input.source.slice(parentStart, parentEnd);
   if (properties.length > 0 || currentInterior !== lexical.prefix + lexical.suffix) {
-    return Either.left(new InstallError({ issue: `Settings sole-property framing changed at /${parentPath.join("/")}.` }));
+    return Either.left(
+      new InstallError({ issue: `Settings sole-property framing changed at /${parentPath.join("/")}.` }),
+    );
   }
 
   return Either.right(
-    input.source.slice(0, parentStart) + lexical.prefix + lexical.property + lexical.suffix + input.source.slice(parentEnd),
+    input.source.slice(0, parentStart) +
+      lexical.prefix +
+      lexical.property +
+      lexical.suffix +
+      input.source.slice(parentEnd),
   );
 };
 
@@ -800,14 +866,20 @@ const legacyOwnershipValues = (input: {
   }
 
   if (input.snapshot._tag !== "file" || !bytesEqual(input.snapshot.bytes, input.legacySettings.originalBytes)) {
-    return Either.left(new InstallError({ issue: "Legacy settings evidence does not match the inspected settings bytes." }));
+    return Either.left(
+      new InstallError({ issue: "Legacy settings evidence does not match the inspected settings bytes." }),
+    );
   }
 
   return Either.all(
     input.legacySettings.values.map((evidence) => {
       const current = settingsValueAtPointer(input.decoded.document, evidence.pointer);
       if (current === undefined || hashJsonValue(current) !== evidence.currentValueHash) {
-        return Either.left(new InstallError({ issue: `Legacy settings value ${evidence.pointer} changed after configuration planning.` }));
+        return Either.left(
+          new InstallError({
+            issue: `Legacy settings value ${evidence.pointer} changed after configuration planning.`,
+          }),
+        );
       }
 
       return Either.right({ pointer: evidence.pointer, value: current });
@@ -833,7 +905,8 @@ const planSettings = (input: {
   legacySettings: LegacySettingsPlan;
 }): Either.Either<ArtifactOperation | undefined, InstallError> => {
   const artifactPath = input.artifactPath ?? settingsPath;
-  const previousOwnership = input.previousArtifact?.ownership._tag === "jsonValues" ? input.previousArtifact.ownership : undefined;
+  const previousOwnership =
+    input.previousArtifact?.ownership._tag === "jsonValues" ? input.previousArtifact.ownership : undefined;
   if (
     input.previousArtifact !== undefined &&
     (input.previousArtifact.path !== artifactPath ||
@@ -841,7 +914,9 @@ const planSettings = (input: {
       input.previousArtifact.owner._tag !== "application" ||
       previousOwnership === undefined)
   ) {
-    return Either.left(new InstallError({ issue: "Receipted settings entry must keep its exact path, kind, and application owner." }));
+    return Either.left(
+      new InstallError({ issue: "Receipted settings entry must keep its exact path, kind, and application owner." }),
+    );
   }
 
   if (previousOwnership !== undefined && input.snapshot._tag === "missing") {
@@ -942,7 +1017,11 @@ const planSettings = (input: {
     return Either.left(finalDocument.left);
   }
 
-  if (createdHooksContainer && finalDocument.right.hooks !== undefined && Object.keys(finalDocument.right.hooks).length === 0) {
+  if (
+    createdHooksContainer &&
+    finalDocument.right.hooks !== undefined &&
+    Object.keys(finalDocument.right.hooks).length === 0
+  ) {
     const edited = editJsonValue({ source, path: ["hooks"], value: undefined });
     if (Either.isLeft(edited)) {
       return Either.left(edited.left);
@@ -978,10 +1057,14 @@ const planSettings = (input: {
     return validateSettingsOperation(operation, artifactPath);
   }
 
-  const containerCandidates = [...(previousOwnership?.createdContainers ?? []), ...(createdHooksContainer ? ["/hooks"] : [])];
+  const containerCandidates = [
+    ...(previousOwnership?.createdContainers ?? []),
+    ...(createdHooksContainer ? ["/hooks"] : []),
+  ];
   const createdContainers = containerCandidates.filter(
     (container, index) =>
-      containerCandidates.indexOf(container) === index && ownershipValues.some((value) => value.pointer.startsWith(`${container}/`)),
+      containerCandidates.indexOf(container) === index &&
+      ownershipValues.some((value) => value.pointer.startsWith(`${container}/`)),
   );
 
   const ownership: JsonValuesOwnership = {
@@ -1009,7 +1092,9 @@ const planSettings = (input: {
   });
 
   if (mismatchedValue !== undefined) {
-    return Either.left(new InstallError({ issue: `Generated settings ownership drifted at ${mismatchedValue.pointer}.` }));
+    return Either.left(
+      new InstallError({ issue: `Generated settings ownership drifted at ${mismatchedValue.pointer}.` }),
+    );
   }
 
   return validateSettingsOperation(operation, artifactPath);
@@ -1047,7 +1132,9 @@ const createRuntimeWrites = (input: {
   Effect.gen(function* () {
     const path = yield* Path.Path;
     const selectedIds = new Set(input.featureIds);
-    const runtimeFeatures = featureCatalog.filter((feature) => selectedIds.has(feature.id) && feature.runtime._tag === "hook");
+    const runtimeFeatures = featureCatalog.filter(
+      (feature) => selectedIds.has(feature.id) && feature.runtime._tag === "hook",
+    );
     const writes = yield* Effect.forEach(runtimeFeatures, (feature) =>
       Effect.gen(function* () {
         if (feature.runtime._tag === "none") {
@@ -1062,7 +1149,9 @@ const createRuntimeWrites = (input: {
         // Prove every registration entrypoint is present in the staged feature tree.
         for (const entrypoint of entrypoints) {
           if (!files.some((file) => file.path === entrypoint)) {
-            return yield* new InstallError({ issue: `Staged runtime entrypoint is missing: ${feature.sourceDirectory}/${entrypoint}` });
+            return yield* new InstallError({
+              issue: `Staged runtime entrypoint is missing: ${feature.sourceDirectory}/${entrypoint}`,
+            });
           }
         }
 
@@ -1110,7 +1199,10 @@ const decodeStagedMarkdown = (bytes: Uint8Array, filePath: string): Either.Eithe
   );
 };
 
-const readStagedSkills = (input: { request: InstallRequest; featureIds: ReadonlyArray<Schema.Schema.Type<typeof featureIdSchema>> }) =>
+const readStagedSkills = (input: {
+  request: InstallRequest;
+  featureIds: ReadonlyArray<Schema.Schema.Type<typeof featureIdSchema>>;
+}) =>
   Effect.gen(function* () {
     const path = yield* Path.Path;
     const skills = installedSkillsFor(input.featureIds);
@@ -1124,13 +1216,16 @@ const readStagedSkills = (input: { request: InstallRequest; featureIds: Readonly
           return yield* new InstallError({ issue: `Staged skill ${installedSkill.id} is missing SKILL.md.` });
         }
 
-        const markdown = yield* effectFromEither(decodeStagedMarkdown(skillFile.bytes, path.join(directory, "SKILL.md")));
+        const markdown = yield* effectFromEither(
+          decodeStagedMarkdown(skillFile.bytes, path.join(directory, "SKILL.md")),
+        );
 
         return yield* Schema.validate(stagedInstalledSkillSchema, {
           onExcessProperty: "error",
         })({ installedSkill, sourceFiles, markdown }).pipe(
           Effect.mapError(
-            (error) => new InstallError({ issue: `Staged skill ${installedSkill.id} is invalid: ${formatParseError(error)}` }),
+            (error) =>
+              new InstallError({ issue: `Staged skill ${installedSkill.id} is invalid: ${formatParseError(error)}` }),
           ),
         );
       }),
@@ -1144,7 +1239,9 @@ const inspectArtifacts = (root: string, artifactPaths: ReadonlyArray<string>) =>
     return yield* Effect.forEach(
       artifactPaths,
       (artifactPath): Effect.Effect<InspectedArtifact, PlatformError, FileSystem.FileSystem> =>
-        readFileSnapshot(path.join(root, artifactPath)).pipe(Effect.map((snapshot) => ({ path: artifactPath, snapshot }))),
+        readFileSnapshot(path.join(root, artifactPath)).pipe(
+          Effect.map((snapshot) => ({ path: artifactPath, snapshot })),
+        ),
     );
   });
 
@@ -1170,11 +1267,15 @@ const previousWholeFile = (
   }
 
   if (artifact.ownership._tag !== "wholeFile") {
-    return Either.left(new InstallError({ issue: `Receipted whole-file artifact ${artifactPath} has incompatible ownership.` }));
+    return Either.left(
+      new InstallError({ issue: `Receipted whole-file artifact ${artifactPath} has incompatible ownership.` }),
+    );
   }
 
   if (snapshot._tag !== "file" || hashBytes(snapshot.bytes) !== artifact.ownership.installedHash) {
-    return Either.left(new InstallError({ issue: `Receipted whole-file artifact ${artifactPath} changed after installation.` }));
+    return Either.left(
+      new InstallError({ issue: `Receipted whole-file artifact ${artifactPath} changed after installation.` }),
+    );
   }
 
   return Either.right(artifact.ownership.previous);
@@ -1191,11 +1292,18 @@ const guardHandlerOperations = (
       }
 
       const artifact = Schema.decodeUnknownEither(
-        Schema.Struct({ artifact: Schema.Struct({ path: Schema.String }) }, Schema.Record({ key: Schema.String, value: Schema.Unknown })),
+        Schema.Struct(
+          { artifact: Schema.Struct({ path: Schema.String }) },
+          Schema.Record({ key: Schema.String, value: Schema.Unknown }),
+        ),
         { onExcessProperty: "preserve" },
       )(operation);
       if (Either.isLeft(artifact)) {
-        return Either.left(new InstallError({ issue: `Format handler returned an invalid operation: ${formatParseError(artifact.left)}` }));
+        return Either.left(
+          new InstallError({
+            issue: `Format handler returned an invalid operation: ${formatParseError(artifact.left)}`,
+          }),
+        );
       }
 
       return Either.flatMap(inspectedSnapshot(inspected, artifact.right.artifact.path), (snapshot) =>
@@ -1214,7 +1322,9 @@ const controlPath = (root: string, path: Path.Path): Either.Either<string, Insta
   // Loop control lives under context-guard (ctxLoopCtl), not the skill-only autorun feature.
   const feature = featureCatalog.find((candidate) => candidate.id === "context-guard");
   if (feature?.runtime._tag !== "hook") {
-    return Either.left(new InstallError({ issue: "The context-guard catalog feature must declare one runtime entrypoint." }));
+    return Either.left(
+      new InstallError({ issue: "The context-guard catalog feature must declare one runtime entrypoint." }),
+    );
   }
 
   return Either.right(path.join(root, installedRuntimeFile(feature.sourceDirectory, "hooks/ctxLoopCtl.js")));
@@ -1272,7 +1382,9 @@ const createRuleFileWrites = (input: {
     }
 
     const target = input.agent.target;
-    const paths = input.stagedSkills.map((skill) => `${target.directory}/${skill.installedSkill.id}${target.extension}`);
+    const paths = input.stagedSkills.map(
+      (skill) => `${target.directory}/${skill.installedSkill.id}${target.extension}`,
+    );
     const inspected = yield* inspectArtifacts(input.request.destination.root, paths);
     const previousFiles = yield* Effect.forEach(inspected, (artifact) =>
       effectFromEither(previousWholeFile(input.previousReceipt, artifact.path, artifact.snapshot)).pipe(
@@ -1321,7 +1433,9 @@ const createInstructionWrites = (input: {
 
       return artifactPath === undefined ? [] : [artifactPath];
     });
-    const instructionPaths = candidatePaths.filter((artifactPath, index) => candidatePaths.indexOf(artifactPath) === index);
+    const instructionPaths = candidatePaths.filter(
+      (artifactPath, index) => candidatePaths.indexOf(artifactPath) === index,
+    );
     const path = yield* Path.Path;
     const operations = yield* Effect.forEach(instructionPaths, (artifactPath) =>
       Effect.gen(function* () {
@@ -1329,7 +1443,9 @@ const createInstructionWrites = (input: {
         const snapshot = yield* readFileSnapshot(path.join(input.request.destination.root, artifactPath));
         const previousArtifact = previousReceiptArtifact(input.previousReceipt, artifactPath);
         if (previousArtifact !== undefined && previousArtifact.kind._tag !== "instruction") {
-          return yield* new InstallError({ issue: `Receipted instruction path ${artifactPath} has an incompatible artifact kind.` });
+          return yield* new InstallError({
+            issue: `Receipted instruction path ${artifactPath} has an incompatible artifact kind.`,
+          });
         }
 
         const plan = yield* effectFromEither(
@@ -1346,7 +1462,8 @@ const createInstructionWrites = (input: {
                 ctl: input.ctl,
               },
               currentFile: snapshot._tag === "missing" ? { _tag: "missing" } : { _tag: "file", bytes: snapshot.bytes },
-              previousArtifact: previousArtifact === undefined ? { _tag: "missing" } : { _tag: "owned", artifact: previousArtifact },
+              previousArtifact:
+                previousArtifact === undefined ? { _tag: "missing" } : { _tag: "owned", artifact: previousArtifact },
             }),
           ),
         );
@@ -1354,7 +1471,9 @@ const createInstructionWrites = (input: {
           return [];
         }
 
-        return [yield* effectFromEither(validateArtifactOperation({ ...plan, expectedCurrent: expectedCurrent(snapshot) }))];
+        return [
+          yield* effectFromEither(validateArtifactOperation({ ...plan, expectedCurrent: expectedCurrent(snapshot) })),
+        ];
       }),
     );
 
@@ -1394,7 +1513,8 @@ const createConfigReferenceWrites = (input: {
               agent,
               desired: { _tag: "present" },
               currentFile: snapshot._tag === "missing" ? { _tag: "missing" } : { _tag: "file", bytes: snapshot.bytes },
-              previousArtifact: previousArtifact === undefined ? { _tag: "missing" } : { _tag: "owned", artifact: previousArtifact },
+              previousArtifact:
+                previousArtifact === undefined ? { _tag: "missing" } : { _tag: "owned", artifact: previousArtifact },
             }),
           ),
         );
@@ -1402,7 +1522,9 @@ const createConfigReferenceWrites = (input: {
           return [];
         }
 
-        return [yield* effectFromEither(validateArtifactOperation({ ...plan, expectedCurrent: expectedCurrent(snapshot) }))];
+        return [
+          yield* effectFromEither(validateArtifactOperation({ ...plan, expectedCurrent: expectedCurrent(snapshot) })),
+        ];
       }),
     );
 
@@ -1442,13 +1564,20 @@ const createAgentWrites = (input: {
     return [...directoryWrites.flat(), ...ruleWrites.flat(), ...instructionWrites, ...configReferenceWrites];
   });
 
-const restoreWholeFile = (input: { artifact: ReceiptEntry; snapshot: FileSnapshot }): Either.Either<ArtifactOperation, InstallError> => {
+const restoreWholeFile = (input: {
+  artifact: ReceiptEntry;
+  snapshot: FileSnapshot;
+}): Either.Either<ArtifactOperation, InstallError> => {
   if (input.artifact.ownership._tag !== "wholeFile") {
-    return Either.left(new InstallError({ issue: `Artifact ${input.artifact.path} requires a format-specific restoration.` }));
+    return Either.left(
+      new InstallError({ issue: `Artifact ${input.artifact.path} requires a format-specific restoration.` }),
+    );
   }
 
   if (input.snapshot._tag !== "file" || hashBytes(input.snapshot.bytes) !== input.artifact.ownership.installedHash) {
-    return Either.left(new InstallError({ issue: `Receipted artifact ${input.artifact.path} changed after installation.` }));
+    return Either.left(
+      new InstallError({ issue: `Receipted artifact ${input.artifact.path} changed after installation.` }),
+    );
   }
 
   const operation =
@@ -1477,14 +1606,17 @@ const restoreInstructionFile = (input: {
     planInstructionFile({
       path: input.artifact.path,
       desired: { _tag: "absent" },
-      currentFile: input.snapshot._tag === "missing" ? { _tag: "missing" } : { _tag: "file", bytes: input.snapshot.bytes },
+      currentFile:
+        input.snapshot._tag === "missing" ? { _tag: "missing" } : { _tag: "file", bytes: input.snapshot.bytes },
       previousArtifact: { _tag: "owned", artifact: input.artifact },
     }),
   );
 
   return Either.flatMap(plan, (operation) =>
     operation._tag === "none"
-      ? Either.left(new InstallError({ issue: `Instruction restoration for ${input.artifact.path} returned no operation.` }))
+      ? Either.left(
+          new InstallError({ issue: `Instruction restoration for ${input.artifact.path} returned no operation.` }),
+        )
       : validateArtifactOperation({ ...operation, expectedCurrent: expectedCurrent(input.snapshot) }),
   );
 };
@@ -1494,27 +1626,34 @@ const restoreConfigReference = (input: {
   snapshot: FileSnapshot;
 }): Either.Either<ArtifactOperation, InstallError> => {
   if (input.artifact.owner._tag !== "agent" || input.artifact.owner.agentIds.length !== 1) {
-    return Either.left(new InstallError({ issue: `Native config restoration for ${input.artifact.path} requires one agent owner.` }));
+    return Either.left(
+      new InstallError({ issue: `Native config restoration for ${input.artifact.path} requires one agent owner.` }),
+    );
   }
 
   const agentId = input.artifact.owner.agentIds.at(0);
   const agent = agentCatalog.find((candidate) => candidate.id === agentId);
   if (agent === undefined || agent.target._tag !== "configReference") {
-    return Either.left(new InstallError({ issue: `Native config restoration for ${input.artifact.path} has no catalog agent.` }));
+    return Either.left(
+      new InstallError({ issue: `Native config restoration for ${input.artifact.path} has no catalog agent.` }),
+    );
   }
 
   const plan = mapFormatError(
     planConfigReference({
       agent,
       desired: { _tag: "absent" },
-      currentFile: input.snapshot._tag === "missing" ? { _tag: "missing" } : { _tag: "file", bytes: input.snapshot.bytes },
+      currentFile:
+        input.snapshot._tag === "missing" ? { _tag: "missing" } : { _tag: "file", bytes: input.snapshot.bytes },
       previousArtifact: { _tag: "owned", artifact: input.artifact },
     }),
   );
 
   return Either.flatMap(plan, (operation) =>
     operation._tag === "none"
-      ? Either.left(new InstallError({ issue: `Native config restoration for ${input.artifact.path} returned no operation.` }))
+      ? Either.left(
+          new InstallError({ issue: `Native config restoration for ${input.artifact.path} returned no operation.` }),
+        )
       : validateArtifactOperation({ ...operation, expectedCurrent: expectedCurrent(input.snapshot) }),
   );
 };
@@ -1528,11 +1667,15 @@ const restoreSettingsArtifact = (input: {
     input.artifact.owner._tag !== "application" ||
     input.artifact.ownership._tag !== "jsonValues"
   ) {
-    return Either.left(new InstallError({ issue: `Settings restoration for ${input.artifact.path} has invalid ownership.` }));
+    return Either.left(
+      new InstallError({ issue: `Settings restoration for ${input.artifact.path} has invalid ownership.` }),
+    );
   }
 
   if (input.snapshot._tag === "missing") {
-    return Either.left(new InstallError({ issue: `Receipted settings file ${input.artifact.path} was removed after installation.` }));
+    return Either.left(
+      new InstallError({ issue: `Receipted settings file ${input.artifact.path} was removed after installation.` }),
+    );
   }
 
   const decoded = decodeSettings(input.snapshot);
@@ -1556,7 +1699,9 @@ const restoreSettingsArtifact = (input: {
       value.previous._tag === "missing"
         ? editJsonValue({ source, path: pointerPath, value: undefined })
         : value.previous.lexical === undefined
-          ? Either.left(new InstallError({ issue: `Settings value ${value.pointer} lacks lexical restoration evidence.` }))
+          ? Either.left(
+              new InstallError({ issue: `Settings value ${value.pointer} lacks lexical restoration evidence.` }),
+            )
           : restoreJsonLexical({ source, path: pointerPath, lexical: value.previous.lexical });
     if (Either.isLeft(restored)) {
       return Either.left(restored.left);
@@ -1681,8 +1826,10 @@ const receiptTarget = (): ReceiptTarget => ({
   owner: applicationOwner,
 });
 
-const previousReceiptArtifact = (receipt: ArtifactReceipt | undefined, artifactPath: string): ReceiptEntry | undefined =>
-  receipt?.artifacts.find((artifact) => artifact.path === artifactPath);
+const previousReceiptArtifact = (
+  receipt: ArtifactReceipt | undefined,
+  artifactPath: string,
+): ReceiptEntry | undefined => receipt?.artifacts.find((artifact) => artifact.path === artifactPath);
 
 const automaticConfigSelection = (input: {
   request: InstallRequest;
@@ -1796,7 +1943,8 @@ export const reconcileInstallation = (input: unknown) =>
     const configSnapshot = yield* readConfigFile(path.join(request.destination.root, managedConfigPath));
     const settingsSnapshot = yield* readFileSnapshot(path.join(request.destination.root, settingsPath));
     const settings = yield* effectFromEither(decodeSettings(settingsSnapshot));
-    const previousReceipt = reconciliation.receiptSnapshot._tag === "present" ? reconciliation.receiptSnapshot.receipt : undefined;
+    const previousReceipt =
+      reconciliation.receiptSnapshot._tag === "present" ? reconciliation.receiptSnapshot.receipt : undefined;
     if (previousReceipt !== undefined && previousReceipt.scope !== request.destination._tag) {
       return yield* new InstallError({ issue: "Existing receipt scope does not match the requested destination." });
     }
@@ -1844,7 +1992,9 @@ export const reconcileInstallation = (input: unknown) =>
         if (agent.nativeHooks._tag === "unsupported") return undefined;
         const artifactPath = agent.nativeHooks.configPath;
         const snapshot =
-          artifactPath === settingsPath ? settingsSnapshot : yield* readFileSnapshot(path.join(request.destination.root, artifactPath));
+          artifactPath === settingsPath
+            ? settingsSnapshot
+            : yield* readFileSnapshot(path.join(request.destination.root, artifactPath));
         const decoded = artifactPath === settingsPath ? settings : yield* effectFromEither(decodeSettings(snapshot));
         const desiredGroups = desiredHookGroups({
           root: request.destination.root,

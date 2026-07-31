@@ -159,7 +159,9 @@ describe("featureCatalog", () => {
   it("derives defaults, installed skills, and exact shipped allowlists", () => {
     expect(selectedFeatureIds).toEqual(["context-guard"]);
     expect(installedSkillsFor(["context-guard", "speak-response", "dedup-guard"])).toEqual([]);
-    expect(installedSkillsFor(featureCatalog.map((feature) => feature.id)).map((skill) => [skill.id, skill.shippedPaths])).toEqual([
+    expect(
+      installedSkillsFor(featureCatalog.map((feature) => feature.id)).map((skill) => [skill.id, skill.shippedPaths]),
+    ).toEqual([
       ["autorun", ["SKILL.md"]],
       [
         "png-to-code",
@@ -314,7 +316,9 @@ describe("featureCatalog", () => {
         ],
       },
     ]);
-    expect(featureCatalog.filter((feature) => feature.platform !== "any").map((feature) => [feature.id, feature.platform])).toEqual([
+    expect(
+      featureCatalog.filter((feature) => feature.platform !== "any").map((feature) => [feature.id, feature.platform]),
+    ).toEqual([
       ["autonomous-loop", "macos+ghostty"],
       ["make-a-trailer", "macos"],
     ]);
@@ -328,7 +332,10 @@ describe("featureCatalog", () => {
     if (contextGuard.runtime._tag !== "hook") return;
 
     const idleEvents = contextGuard.runtime.registrations
-      .filter((registration) => registration.entrypoint._tag === "path" && registration.entrypoint.value === "hooks/idleCompactHook.ts")
+      .filter(
+        (registration) =>
+          registration.entrypoint._tag === "path" && registration.entrypoint.value === "hooks/idleCompactHook.ts",
+      )
       .map((registration) => registration.event);
 
     expect(idleEvents).toEqual(["SessionStart", "UserPromptSubmit", "Stop", "PreCompact", "PostCompact", "SessionEnd"]);
@@ -341,7 +348,9 @@ describe("featureCatalog", () => {
 
   it("expands dependencies once and returns stable catalog order", () => {
     expect(
-      featureCatalog.filter((feature) => feature.dependencies.length > 0).map((feature) => [feature.id, feature.dependencies]),
+      featureCatalog
+        .filter((feature) => feature.dependencies.length > 0)
+        .map((feature) => [feature.id, feature.dependencies]),
     ).toEqual([
       ["autonomous-loop", ["context-guard"]],
       ["grill-me-code-style-with-docs", ["grill-me-code-style"]],
@@ -351,12 +360,9 @@ describe("featureCatalog", () => {
       ["coordinate-worktrees", ["organized-commits"]],
       ["finish-agent-sessions", ["finish-and-ship", "agent-session-auditor"]],
     ]);
-    expect(Either.getOrThrowWith(resolveFeatureSelection(["make-a-trailer", "autonomous-loop", "context-guard"]), String)).toEqual([
-      "context-guard",
-      "autonomous-loop",
-      "planpage",
-      "make-a-trailer",
-    ]);
+    expect(
+      Either.getOrThrowWith(resolveFeatureSelection(["make-a-trailer", "autonomous-loop", "context-guard"]), String),
+    ).toEqual(["context-guard", "autonomous-loop", "planpage", "make-a-trailer"]);
   });
 
   it("returns a tagged unknown-feature error", () => {
@@ -386,7 +392,10 @@ describe("featureCatalogSchema", () => {
     },
     {
       name: "duplicate installed skill IDs",
-      input: [validFixture[0], { ...validFixture[1], installedSkill: { _tag: "skill", id: "alpha", shippedPaths: [] } }],
+      input: [
+        validFixture[0],
+        { ...validFixture[1], installedSkill: { _tag: "skill", id: "alpha", shippedPaths: [] } },
+      ],
       message: "Installed skill IDs must be unique",
     },
     {

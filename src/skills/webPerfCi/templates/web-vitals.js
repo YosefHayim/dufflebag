@@ -20,9 +20,7 @@ function report(metric) {
     navigationType: metric.navigationType,
     // The element/interaction/shift behind the score (attribution build).
     target:
-      metric.attribution?.element ??
-      metric.attribution?.interactionTarget ??
-      metric.attribution?.largestShiftTarget,
+      metric.attribution?.element ?? metric.attribution?.interactionTarget ?? metric.attribution?.largestShiftTarget,
     url: location.pathname,
   });
 

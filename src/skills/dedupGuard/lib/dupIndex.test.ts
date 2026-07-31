@@ -14,7 +14,14 @@ import path from "node:path";
 import * as ts from "typescript";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { buildIndex, type Decl, type DupIndex, extractFromText, findDuplicatesInAddedText, scanForDuplicates } from "./dupIndex.js";
+import {
+  buildIndex,
+  type Decl,
+  type DupIndex,
+  extractFromText,
+  findDuplicatesInAddedText,
+  scanForDuplicates,
+} from "./dupIndex.js";
 
 const REPO = "/repo";
 const abs = (rel: string): string => path.posix.join(REPO, rel);
@@ -41,13 +48,25 @@ describe("function fingerprints", () => {
   const index = indexFrom({ "a.ts": "export function add(x: number, y: number) { return x + y; }" });
 
   it("flags a renamed copy of an existing function body", () => {
-    const hits = findDuplicatesInAddedText(ts, index, REPO, abs("b.ts"), "export function sum(a: number, b: number) { return a + b; }");
+    const hits = findDuplicatesInAddedText(
+      ts,
+      index,
+      REPO,
+      abs("b.ts"),
+      "export function sum(a: number, b: number) { return a + b; }",
+    );
     expect(hits).toHaveLength(1);
     expect(hits[0]).toMatchObject({ kind: "function", name: "sum", existing: { name: "add", file: "a.ts" } });
   });
 
   it("does NOT flag a body that differs by operator", () => {
-    const hits = findDuplicatesInAddedText(ts, index, REPO, abs("b.ts"), "export function mul(a: number, b: number) { return a * b; }");
+    const hits = findDuplicatesInAddedText(
+      ts,
+      index,
+      REPO,
+      abs("b.ts"),
+      "export function mul(a: number, b: number) { return a * b; }",
+    );
     expect(hits).toHaveLength(0);
   });
 
@@ -64,7 +83,13 @@ describe("function fingerprints", () => {
 
   it("never trips on the function's own name in its own file", () => {
     const self = indexFrom({ "a.ts": "export function add(x: number, y: number) { return x + y; }" });
-    const hits = findDuplicatesInAddedText(ts, self, REPO, abs("a.ts"), "export function add(x: number, y: number) { return x + y; }");
+    const hits = findDuplicatesInAddedText(
+      ts,
+      self,
+      REPO,
+      abs("a.ts"),
+      "export function add(x: number, y: number) { return x + y; }",
+    );
     expect(hits).toHaveLength(0);
   });
 });
@@ -73,13 +98,25 @@ describe("type signatures", () => {
   const index = indexFrom({ "models.ts": "export interface User { id: string; name: string; }" });
 
   it("flags an identical shape under a new name, regardless of field order", () => {
-    const hits = findDuplicatesInAddedText(ts, index, REPO, abs("acct.ts"), "export interface Account { name: string; id: string; }");
+    const hits = findDuplicatesInAddedText(
+      ts,
+      index,
+      REPO,
+      abs("acct.ts"),
+      "export interface Account { name: string; id: string; }",
+    );
     expect(hits).toHaveLength(1);
     expect(hits[0]).toMatchObject({ kind: "type", name: "Account", existing: { name: "User" } });
   });
 
   it("does NOT flag a shape with a different field type", () => {
-    const hits = findDuplicatesInAddedText(ts, index, REPO, abs("acct.ts"), "export interface Account { id: number; name: string; }");
+    const hits = findDuplicatesInAddedText(
+      ts,
+      index,
+      REPO,
+      abs("acct.ts"),
+      "export interface Account { id: number; name: string; }",
+    );
     expect(hits).toHaveLength(0);
   });
 });
@@ -121,7 +158,10 @@ describe("buildIndex on disk", () => {
     writeFileSync(path.join(repoRoot, "src", "b.ts"), "export function sum(a: number, b: number) { return a + b; }");
     // A copy inside node_modules must be skipped (default skip dir).
     mkdirSync(path.join(repoRoot, "node_modules", "dep"), { recursive: true });
-    writeFileSync(path.join(repoRoot, "node_modules", "dep", "x.ts"), "export function add2(x: number, y: number) { return x + y; }");
+    writeFileSync(
+      path.join(repoRoot, "node_modules", "dep", "x.ts"),
+      "export function add2(x: number, y: number) { return x + y; }",
+    );
   });
   afterAll(() => rmSync(repoRoot, { recursive: true, force: true }));
 

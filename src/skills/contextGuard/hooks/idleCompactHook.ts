@@ -71,7 +71,8 @@ const startSession = (event: IdleCompactEvent): void => {
   const terminalDevice = terminalDeviceForPid(agentPid);
   if (terminalDevice === null) return;
   const focusedTerminal = claimFocusedGhosttyTerminal();
-  const terminal = focusedTerminal._tag === "claimed" ? focusedTerminal : claimGhosttyTerminal(event.sessionId, terminalDevice);
+  const terminal =
+    focusedTerminal._tag === "claimed" ? focusedTerminal : claimGhosttyTerminal(event.sessionId, terminalDevice);
   if (terminal._tag !== "claimed") return;
 
   const stateFile = idleCompactFile(event.agentId, event.sessionId);

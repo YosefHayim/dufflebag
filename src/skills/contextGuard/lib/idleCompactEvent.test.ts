@@ -34,7 +34,11 @@ describe("idle compact lifecycle events", () => {
 
   it("uses Grok hook environment when its payload omits lifecycle identity", () => {
     expect(
-      normalizeIdleCompactEvent({}, { DUFFLEBAG_AGENT_ID: "grok", GROK_HOOK_EVENT: "session_start", GROK_SESSION_ID: "grok-env" }, 7_000),
+      normalizeIdleCompactEvent(
+        {},
+        { DUFFLEBAG_AGENT_ID: "grok", GROK_HOOK_EVENT: "session_start", GROK_SESSION_ID: "grok-env" },
+        7_000,
+      ),
     ).toEqual({ agentId: "grok", sessionId: "grok-env", event: "session-started", occurredAtMs: 7_000 });
   });
 

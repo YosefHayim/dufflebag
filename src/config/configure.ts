@@ -57,7 +57,8 @@ const bytesEqual = (left: Uint8Array, right: Uint8Array): boolean =>
 const renderManagedConfigBytes = (config: ManagedConfigFile): Uint8Array =>
   textEncoder.encode(`${Schema.encodeSync(managedConfigJsonSchema)(config)}\n`);
 
-const renderJsonValueHash = (value: unknown): string => hashBytes(textEncoder.encode(Schema.encodeSync(jsonValueCodec)(value)));
+const renderJsonValueHash = (value: unknown): string =>
+  hashBytes(textEncoder.encode(Schema.encodeSync(jsonValueCodec)(value)));
 
 const legacyEnvironmentEntries = (environment: Readonly<Record<string, unknown>>) =>
   Object.entries(environment)
@@ -69,7 +70,9 @@ export const hasLegacySettingsCandidate = (environment: Readonly<Record<string, 
 
 const decodeLegacyConfig = (entries: ReadonlyArray<readonly [string, unknown]>) => {
   if (entries.length === 0) {
-    return Either.left(new ConfigurePlanError({ issue: "settings.json contains no legacy dufflebag environment keys." }));
+    return Either.left(
+      new ConfigurePlanError({ issue: "settings.json contains no legacy dufflebag environment keys." }),
+    );
   }
 
   return Either.mapLeft(
@@ -83,7 +86,8 @@ const decodeLegacyConfig = (entries: ReadonlyArray<readonly [string, unknown]>) 
 const decodeLegacySettingsBytes = (bytes: Uint8Array) => {
   const decodedText = Either.try({
     try: () => textDecoder.decode(bytes),
-    catch: (error) => new ConfigurePlanError({ issue: `settings.json is not valid UTF-8: ${formatUnknownError(error)}` }),
+    catch: (error) =>
+      new ConfigurePlanError({ issue: `settings.json is not valid UTF-8: ${formatUnknownError(error)}` }),
   });
 
   return Either.flatMap(decodedText, (json) => {
@@ -199,7 +203,9 @@ const legacyEvidenceIssues = (evidence: LegacySettingsEvidenceFields) => {
       ];
 };
 
-export const legacySettingsEvidenceSchema = legacySettingsEvidenceFieldsSchema.pipe(Schema.filter(legacyEvidenceIssues));
+export const legacySettingsEvidenceSchema = legacySettingsEvidenceFieldsSchema.pipe(
+  Schema.filter(legacyEvidenceIssues),
+);
 
 export type LegacySettingsEvidence = Schema.Schema.Type<typeof legacySettingsEvidenceSchema>;
 
@@ -222,7 +228,8 @@ const configSelectionSchema = Schema.Union(
   }),
   Schema.TaggedStruct("firstProjectInstall", {
     globalConfig: configFileSnapshotSchema.annotations({
-      description: "Exact validated global snapshot copied once, or a missing snapshot when schema defaults should be used.",
+      description:
+        "Exact validated global snapshot copied once, or a missing snapshot when schema defaults should be used.",
     }),
   }),
   Schema.TaggedStruct("legacyEnvironment", {
@@ -247,7 +254,8 @@ const configureRequestFieldsSchema = Schema.Struct({
 type ConfigureRequestFields = Schema.Schema.Type<typeof configureRequestFieldsSchema>;
 
 const configureRequestIssues = (request: ConfigureRequestFields) => {
-  const oneTimeSelection = request.selection._tag === "firstProjectInstall" || request.selection._tag === "legacyEnvironment";
+  const oneTimeSelection =
+    request.selection._tag === "firstProjectInstall" || request.selection._tag === "legacyEnvironment";
 
   return [
     request.selection._tag === "firstProjectInstall" && request.scope !== "project"
@@ -283,7 +291,8 @@ const managedConfigWriteSchema = writeOperationSchema.pipe(
           path: ["artifact", "kind"],
           message: "Managed configuration writes require the managedConfig artifact kind.",
         },
-    operation.artifact.ownership._tag === "wholeFile" && operation.artifact.ownership.installedHash !== hashBytes(operation.bytes)
+    operation.artifact.ownership._tag === "wholeFile" &&
+    operation.artifact.ownership.installedHash !== hashBytes(operation.bytes)
       ? {
           path: ["artifact", "ownership", "installedHash"],
           message: "Managed-config ownership hash must match its exact desired bytes.",
@@ -370,7 +379,9 @@ const createManagedConfigWrite = (config: ManagedConfigFile, previous: PreviousF
   };
 };
 
-const resolveConfigSelection = (request: ConfigureRequest): Either.Either<ManagedConfigPlanFields, ConfigurePlanError> => {
+const resolveConfigSelection = (
+  request: ConfigureRequest,
+): Either.Either<ManagedConfigPlanFields, ConfigurePlanError> => {
   switch (request.selection._tag) {
     case "selected":
       return Either.right({
@@ -379,7 +390,8 @@ const resolveConfigSelection = (request: ConfigureRequest): Either.Either<Manage
         legacySettings: { _tag: "none" },
       });
     case "firstProjectInstall": {
-      const config = request.selection.globalConfig._tag === "present" ? request.selection.globalConfig.config : defaultBagConfig;
+      const config =
+        request.selection.globalConfig._tag === "present" ? request.selection.globalConfig.config : defaultBagConfig;
 
       return Either.right({
         config,

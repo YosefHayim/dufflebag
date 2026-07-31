@@ -28,8 +28,7 @@ const LIMITS = {
 
 /** Official summary guidance: avoid superlatives like greatest / fastest. */
 // e.g. matches "best", "number one", "#1", "world-class" — not "better" alone
-const SUMMARY_SUPERLATIVES =
-  /\b(best|greatest|fastest|number\s*one|#1|top-rated|world.?class)\b/i;
+const SUMMARY_SUPERLATIVES = /\b(best|greatest|fastest|number\s*one|#1|top-rated|world.?class)\b/i;
 
 /**
  * Keyword Spam examples include bare lists of brands/keywords without value.
@@ -87,7 +86,7 @@ const usage = () =>
     "Chrome Web Store listing copy validator (limits + Keyword Spam heuristics).",
     "",
     "Usage:",
-    "  node validateListingCopy.mjs --name \"…\" --summary \"…\" --description \"…\"",
+    '  node validateListingCopy.mjs --name "…" --summary "…" --description "…"',
     "  node validateListingCopy.mjs --json-file ./listing-copy.json [--strict] [--json]",
     "",
     "Exit 0 = pass, 1 = errors, 2 = usage/IO failure.",
@@ -152,9 +151,7 @@ const validate = ({ name, summary, description }, { strict }) => {
   }
 
   if (SUMMARY_SUPERLATIVES.test(summary)) {
-    errors.push(
-      'summary contains a superlative (avoid "best", "greatest", "fastest", "#1" per CWS listing guide)',
-    );
+    errors.push('summary contains a superlative (avoid "best", "greatest", "fastest", "#1" per CWS listing guide)');
   }
 
   for (const line of description.split(/\r?\n/)) {
@@ -166,9 +163,7 @@ const validate = ({ name, summary, description }, { strict }) => {
   }
 
   const counts = countTokens(description);
-  const over = [...counts.entries()]
-    .filter(([, n]) => n > 5)
-    .sort((a, b) => b[1] - a[1]);
+  const over = [...counts.entries()].filter(([, n]) => n > 5).sort((a, b) => b[1] - a[1]);
 
   for (const [token, n] of over) {
     const msg = `token "${token}" appears ${n} times in description (CWS flags unnatural repeats >5 — review context)`;
@@ -230,15 +225,9 @@ const main = () => {
     console.log(JSON.stringify(report, null, 2));
   } else {
     console.log("CWS listing copy validation");
-    console.log(
-      `  name:        ${report.lengths.name}/${LIMITS.name}`,
-    );
-    console.log(
-      `  summary:     ${report.lengths.summary}/${LIMITS.summary}`,
-    );
-    console.log(
-      `  description: ${report.lengths.description}/${LIMITS.description}`,
-    );
+    console.log(`  name:        ${report.lengths.name}/${LIMITS.name}`);
+    console.log(`  summary:     ${report.lengths.summary}/${LIMITS.summary}`);
+    console.log(`  description: ${report.lengths.description}/${LIMITS.description}`);
     if (report.tokenTop.length) {
       console.log("  high-frequency tokens:");
       for (const { token, count } of report.tokenTop) {

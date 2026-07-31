@@ -99,7 +99,10 @@ export const agentChoiceSchema = Schema.Union(
   description: "Explicit or evidence-derived agent selection.",
 });
 
-export const interactionSchema = Schema.Union(Schema.TaggedStruct("interactive", {}), Schema.TaggedStruct("scripted", {})).annotations({
+export const interactionSchema = Schema.Union(
+  Schema.TaggedStruct("interactive", {}),
+  Schema.TaggedStruct("scripted", {}),
+).annotations({
   description: "Caller interaction mode retained for presentation at the CLI edge.",
 });
 

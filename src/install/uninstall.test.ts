@@ -82,7 +82,9 @@ layer(NodeContext.layer)("uninstall", (it) => {
           }),
         );
         expect(yield* fileSystem.exists(path.join(root, ".claude/dufflebag/receipt.json"))).toBe(false);
-        expect(yield* fileSystem.exists(path.join(root, ".claude/dufflebag/runtime/contextGuard/hooks/ctxWatchSpawn.js"))).toBe(false);
+        expect(
+          yield* fileSystem.exists(path.join(root, ".claude/dufflebag/runtime/contextGuard/hooks/ctxWatchSpawn.js")),
+        ).toBe(false);
         expect(yield* fileSystem.exists(path.join(root, ".claude/skills/autorun/SKILL.md"))).toBe(false);
         expect(yield* fileSystem.exists(path.join(root, ".cursor/rules/autorun.mdc"))).toBe(false);
       }),
@@ -95,7 +97,9 @@ layer(NodeContext.layer)("uninstall", (it) => {
         const fileSystem = yield* FileSystem.FileSystem;
         const path = yield* Path.Path;
         const root = yield* fileSystem.makeTempDirectoryScoped({ prefix: "dufflebag-uninstall-authority-root-" });
-        const stagedRoot = yield* fileSystem.makeTempDirectoryScoped({ prefix: "dufflebag-uninstall-authority-stage-" });
+        const stagedRoot = yield* fileSystem.makeTempDirectoryScoped({
+          prefix: "dufflebag-uninstall-authority-stage-",
+        });
         const userRulePath = path.join(root, ".cursor/rules/user.mdc");
         const userSkillPath = path.join(root, ".claude/skills/user/SKILL.md");
 
@@ -192,9 +196,12 @@ layer(NodeContext.layer)("uninstall", (it) => {
         const fileSystem = yield* FileSystem.FileSystem;
         const path = yield* Path.Path;
         const root = yield* fileSystem.makeTempDirectoryScoped({ prefix: "dufflebag-uninstall-escaped-legacy-root-" });
-        const stagedRoot = yield* fileSystem.makeTempDirectoryScoped({ prefix: "dufflebag-uninstall-escaped-legacy-stage-" });
+        const stagedRoot = yield* fileSystem.makeTempDirectoryScoped({
+          prefix: "dufflebag-uninstall-escaped-legacy-stage-",
+        });
         const settingsPath = path.join(root, ".claude/settings.json");
-        const originalSettings = '{\r\n\t"env": { "dufflebagSpeechVoice":"Dan\\u0069el", "keep":"yes" },\r\n\t"theme":"dark"\r\n}\r\n';
+        const originalSettings =
+          '{\r\n\t"env": { "dufflebagSpeechVoice":"Dan\\u0069el", "keep":"yes" },\r\n\t"theme":"dark"\r\n}\r\n';
         const request = {
           ...installRequest({ root, stagedRoot }),
           agents: { _tag: "selected", ids: ["cursor"] },
@@ -219,7 +226,9 @@ layer(NodeContext.layer)("uninstall", (it) => {
         const fileSystem = yield* FileSystem.FileSystem;
         const path = yield* Path.Path;
         const root = yield* fileSystem.makeTempDirectoryScoped({ prefix: "dufflebag-uninstall-multiline-hook-root-" });
-        const stagedRoot = yield* fileSystem.makeTempDirectoryScoped({ prefix: "dufflebag-uninstall-multiline-hook-stage-" });
+        const stagedRoot = yield* fileSystem.makeTempDirectoryScoped({
+          prefix: "dufflebag-uninstall-multiline-hook-stage-",
+        });
         const settingsPath = path.join(root, ".claude/settings.json");
         const originalSettings = [
           "{",

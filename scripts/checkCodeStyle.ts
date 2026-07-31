@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { globSync } from "glob";
 import ts from "typescript";
+import { checkStyleGuide } from "./checkStyleGuide.js";
 
 export type CodeStyleViolation = {
   ruleId: string;
@@ -17,8 +18,8 @@ export type CodeStyleReport = {
 
 type MachineRule = {
   id: string;
-  summary: string;
-  enforcement: string;
+  statement: string;
+  verify: string;
 };
 
 type ProtectedPathConfiguration = {
@@ -37,13 +38,7 @@ const APPROVED_PROTECTED_PATHS = [
   "src/skills/makeATrailer/scripts/assembleCut.mjs",
 ];
 
-const APPROVED_ASSEMBLE_CUT_EXEMPTIONS = [
-  "function.arrow-only",
-  "function.input-shape",
-  "comment.loop-intent",
-];
-
-const ENFORCEMENT_VALUES = new Set(["ast", "biome", "importGraph", "manual", "path"]);
+const APPROVED_ASSEMBLE_CUT_EXEMPTIONS = ["function.arrow-only", "function.input-shape", "comment.loop-intent"];
 
 const failConfiguration = (message: string): never => {
   throw new Error(`Invalid code-style configuration: ${message}`);
@@ -77,14 +72,11 @@ const readMachineRule = (value: unknown): MachineRule => {
     return failConfiguration("each rule must be an object");
   }
 
-  const id = readStringProperty(value, "id");
-  const summary = readStringProperty(value, "summary");
-  const enforcement = readStringProperty(value, "enforcement");
-  if (!ENFORCEMENT_VALUES.has(enforcement)) {
-    return failConfiguration(`rule ${id} has invalid enforcement ${enforcement}`);
-  }
-
-  return { id, summary, enforcement };
+  return {
+    id: readStringProperty(value, "id"),
+    statement: readStringProperty(value, "statement"),
+    verify: readStringProperty(value, "verify"),
+  };
 };
 
 const readProtectedPath = (value: unknown): ProtectedPathConfiguration => {
@@ -140,22 +132,16 @@ const validateProtectedPaths = (protectedPaths: ReadonlyArray<ProtectedPathConfi
   }
 };
 
-const validateRuleIds = (repositoryRoot: string, rules: ReadonlyArray<MachineRule>): void => {
+const validateStyleGuide = (repositoryRoot: string, rules: ReadonlyArray<MachineRule>): void => {
   const guide = readFileSync(join(repositoryRoot, "CODE-STYLE.md"), "utf8");
-  // e.g. "[rule:comment.regex-example]" → "comment.regex-example"
-  const documentedIds = [...guide.matchAll(/\[rule:([a-z0-9.-]+)\]/gu)].map((match) => match[1] ?? "");
-  const machineIds = rules.map((rule) => rule.id);
-  const allIds = new Set([...documentedIds, ...machineIds]);
-
-  allIds.forEach((ruleId) => {
-    const documentedCount = documentedIds.filter((candidate) => candidate === ruleId).length;
-    const machineCount = machineIds.filter((candidate) => candidate === ruleId).length;
-    if (documentedCount !== 1 || machineCount !== 1) {
-      failConfiguration(
-        `rule ${ruleId} must appear exactly once in CODE-STYLE.md and exactly once in code-style.rules.json`,
-      );
-    }
-  });
+  const violations = checkStyleGuide({ guide, rules });
+  if (violations.length > 0) {
+    failConfiguration(
+      `CODE-STYLE.md does not match the rule-card format:\n${violations
+        .map((violation) => `  CODE-STYLE.md:${violation.line} ${violation.message}`)
+        .join("\n")}`,
+    );
+  }
 };
 
 type ViolationInput = {
@@ -206,13 +192,7 @@ const relativeSourceFiles = (repositoryRoot: string): ReadonlyArray<string> =>
   globSync(["src/**/*.{ts,tsx,js,mjs,mts,cts}", "scripts/**/*.{ts,tsx,js,mjs,mts,cts}"], {
     cwd: repositoryRoot,
     nodir: true,
-    ignore: [
-      "**/node_modules/**",
-      "**/dist/**",
-      ".agents/**",
-      ".cursor/**",
-      ".devin/**",
-    ],
+    ignore: ["**/node_modules/**", "**/dist/**", ".agents/**", ".cursor/**", ".devin/**"],
   }).sort();
 
 const hasImmediatelyPrecedingComment = (sourceFile: ts.SourceFile, node: ts.Node): boolean => {
@@ -259,17 +239,14 @@ const isFunctionStatement = (statement: ts.Statement): boolean => {
 
   return (
     ts.isVariableStatement(statement) &&
-    statement.declarationList.declarations.some(
-      (declaration) => Boolean(declaration.initializer && ts.isArrowFunction(declaration.initializer)),
+    statement.declarationList.declarations.some((declaration) =>
+      Boolean(declaration.initializer && ts.isArrowFunction(declaration.initializer)),
     )
   );
 };
 
 const isControlNode = (node: ts.Node): boolean =>
-  ts.isIfStatement(node) ||
-  ts.isSwitchStatement(node) ||
-  ts.isTryStatement(node) ||
-  isExplicitLoop(node);
+  ts.isIfStatement(node) || ts.isSwitchStatement(node) || ts.isTryStatement(node) || isExplicitLoop(node);
 
 const nestingDepth = (node: ts.Node): number => {
   const parent = node.parent;
@@ -288,9 +265,7 @@ const isHookRuntimeFile = (file: string): boolean =>
   file.startsWith("src/runtime/") || /^src\/skills\/[^/]+\/(?:hooks|runtime)\//u.test(file);
 
 const isApplicationFile = (file: string): boolean =>
-  file.startsWith("src/") &&
-  !isHookRuntimeFile(file) &&
-  !file.startsWith("src/skills/pngToCode/scripts/");
+  file.startsWith("src/") && !isHookRuntimeFile(file) && !file.startsWith("src/skills/pngToCode/scripts/");
 
 const assignedRootIdentifier = (expression: ts.Expression): ts.Identifier | undefined => {
   if (ts.isIdentifier(expression)) {
@@ -333,12 +308,7 @@ const declarationBelongsToParameter = (node: ts.Node): boolean => {
     return true;
   }
 
-  if (
-    ts.isVariableDeclaration(node) ||
-    ts.isCatchClause(node) ||
-    isExecutableFunction(node) ||
-    ts.isSourceFile(node)
-  ) {
+  if (ts.isVariableDeclaration(node) || ts.isCatchClause(node) || isExecutableFunction(node) || ts.isSourceFile(node)) {
     return false;
   }
 
@@ -492,24 +462,18 @@ const resolvesToPureBarrel = (repositoryRoot: string, file: string, specifier: s
   return sourceFile.statements.length > 0 && sourceFile.statements.every(ts.isExportDeclaration);
 };
 
-// e.g. matches "// @ts-ignore", "biome-ignore lint/...", "eslint-disable-next-line", "c8 ignore"
+// Matches TypeScript, Biome, ESLint, and coverage-tool suppression directives.
 const SUPPRESSION_PATTERN =
   /(?:@ts-(?:ignore|expect-error|nocheck)|biome-ignore|prettier-ignore|eslint-disable(?:-next-line|-line)?|(?:c8|istanbul|v8)\s+ignore)\b/u;
 
 const suppressionCommentLines = (sourceFile: ts.SourceFile): ReadonlyArray<number> => {
-  const scanner = ts.createScanner(
-    ts.ScriptTarget.Latest,
-    false,
-    sourceFile.languageVariant,
-    sourceFile.text,
-  );
+  const scanner = ts.createScanner(ts.ScriptTarget.Latest, false, sourceFile.languageVariant, sourceFile.text);
   const lines: Array<number> = [];
 
   // Read lexical comments so suppression-looking strings remain ordinary data.
   while (scanner.scan() !== ts.SyntaxKind.EndOfFileToken) {
     const token = scanner.getToken();
-    const isComment =
-      token === ts.SyntaxKind.SingleLineCommentTrivia || token === ts.SyntaxKind.MultiLineCommentTrivia;
+    const isComment = token === ts.SyntaxKind.SingleLineCommentTrivia || token === ts.SyntaxKind.MultiLineCommentTrivia;
     if (isComment && SUPPRESSION_PATTERN.test(scanner.getTokenText())) {
       lines.push(sourceFile.getLineAndCharacterOfPosition(scanner.getTokenPos()).line + 1);
     }
@@ -540,8 +504,7 @@ const hookImportAllowed = (file: string, specifier: string): boolean => {
 
   const featureRoot = featureRuntimeRoot(file);
   return Boolean(
-    featureRoot &&
-      (target.startsWith(`${featureRoot}/hooks/`) || target.startsWith(`${featureRoot}/runtime/`)),
+    featureRoot && (target.startsWith(`${featureRoot}/hooks/`) || target.startsWith(`${featureRoot}/runtime/`)),
   );
 };
 
@@ -552,8 +515,7 @@ const inspectSourceFile = (
   program: ts.Program,
   typeChecker: ts.TypeChecker,
 ): ReadonlyArray<CodeStyleViolation> => {
-  const sourceFile =
-    program.getSourceFile(join(repositoryRoot, file)) ?? failConfiguration(`could not parse ${file}`);
+  const sourceFile = program.getSourceFile(join(repositoryRoot, file)) ?? failConfiguration(`could not parse ${file}`);
   const sourceText = sourceFile.text;
   const violations: Array<CodeStyleViolation> = [];
   const protectedEntry = protectedPaths.find((entry) => entry.path === file);
@@ -769,9 +731,7 @@ const inspectSourceFile = (
     // e.g. "src/foo/index.ts" — barrel files may only re-export
     if (/\/index\.[cm]?[jt]sx?$/u.test(`/${file}`) && ts.isStatement(node) && node.parent === sourceFile) {
       const exportSpecifier =
-        ts.isExportDeclaration(node) &&
-        node.moduleSpecifier &&
-        ts.isStringLiteral(node.moduleSpecifier)
+        ts.isExportDeclaration(node) && node.moduleSpecifier && ts.isStringLiteral(node.moduleSpecifier)
           ? node.moduleSpecifier.text
           : undefined;
       const directWildcard =
@@ -862,11 +822,7 @@ const inspectSourceFile = (
   };
 
   suppressionCommentLines(sourceFile).forEach((line) => {
-    addLineViolation(
-      "type.no-suppression",
-      line,
-      "Remove the tool suppression and fix the boundary instead.",
-    );
+    addLineViolation("type.no-suppression", line, "Remove the tool suppression and fix the boundary instead.");
   });
 
   inspectStatementSpacing(sourceFile);
@@ -879,7 +835,7 @@ const compareViolations = (left: CodeStyleViolation, right: CodeStyleViolation):
 
 export const checkCodeStyle = (repositoryRoot: string): CodeStyleReport => {
   const configuration = readConfiguration(repositoryRoot);
-  validateRuleIds(repositoryRoot, configuration.rules);
+  validateStyleGuide(repositoryRoot, configuration.rules);
   validateProtectedPaths(configuration.protectedPaths);
 
   const files = relativeSourceFiles(repositoryRoot);
@@ -896,9 +852,7 @@ export const checkCodeStyle = (repositoryRoot: string): CodeStyleReport => {
   });
   const typeChecker = program.getTypeChecker();
   const violations = files
-    .flatMap((file) =>
-      inspectSourceFile(repositoryRoot, file, configuration.protectedPaths, program, typeChecker),
-    )
+    .flatMap((file) => inspectSourceFile(repositoryRoot, file, configuration.protectedPaths, program, typeChecker))
     .sort(compareViolations);
 
   return {

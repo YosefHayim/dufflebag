@@ -55,7 +55,8 @@ const SPARKLES = [
   { cx: 1035, cy: 687, dur: 2.8, delay: -1.5 },
   { cx: 239, cy: 787, dur: 2.2, delay: -0.5 },
 ];
-const nearSparkle = (c: { cx: number; cy: number }) => SPARKLES.findIndex((s) => Math.abs(c.cx - s.cx) < 45 && Math.abs(c.cy - s.cy) < 55);
+const nearSparkle = (c: { cx: number; cy: number }) =>
+  SPARKLES.findIndex((s) => Math.abs(c.cx - s.cx) < 45 && Math.abs(c.cy - s.cy) < 55);
 
 // The wave pivots at the WRIST (where the palm narrows into the forearm). Only the hand
 // turns; the planted forearm hides the junction, so the rock never opens a gap. Measured

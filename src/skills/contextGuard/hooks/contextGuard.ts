@@ -64,7 +64,14 @@ function handlePreToolUse(data: HookInput, pct: number, model: string, window: n
 }
 
 /** Nudge once per warn-band entry (shared by PostToolUse + UserPromptSubmit). */
-function emitNudgeOnce(data: HookInput, pct: number, window: number, event: string, warnPct: number, blockPct: number): void {
+function emitNudgeOnce(
+  data: HookInput,
+  pct: number,
+  window: number,
+  event: string,
+  warnPct: number,
+  blockPct: number,
+): void {
   const sid = data.session_id ?? "session";
   const flag = guardFlag(sid);
   if (pct < warnPct) {

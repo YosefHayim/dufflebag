@@ -187,7 +187,9 @@ const duplicateInstalledSkillIssues = (features: ReadonlyArray<FeatureDefinition
       (candidate) => candidate.installedSkill._tag === "skill" && candidate.installedSkill.id === installedSkillId,
     );
 
-    return firstIndex === index ? [] : [{ path: [index, "installedSkill", "id"], message: "Installed skill IDs must be unique." }];
+    return firstIndex === index
+      ? []
+      : [{ path: [index, "installedSkill", "id"], message: "Installed skill IDs must be unique." }];
   });
 
 const missingDependencyIssues = (features: ReadonlyArray<FeatureDefinition>) => {
@@ -222,7 +224,9 @@ const dependencyCycleIssues = (features: ReadonlyArray<FeatureDefinition>) => {
   };
 
   return features.flatMap((feature, index) =>
-    createsCycle(feature.id, []) ? [{ path: [index, "dependencies"], message: "Feature dependencies must be acyclic." }] : [],
+    createsCycle(feature.id, [])
+      ? [{ path: [index, "dependencies"], message: "Feature dependencies must be acyclic." }]
+      : [],
   );
 };
 
@@ -692,7 +696,8 @@ export const featureCatalog = Schema.decodeUnknownSync(featureCatalogSchema, {
       shippedPaths: ["SKILL.md", "REFERENCE.md"],
     },
     title: "Organized commits",
-    summary: "Organize Git changes into atomic, evidence-backed commits and safely push or consolidate work when requested.",
+    summary:
+      "Organize Git changes into atomic, evidence-backed commits and safely push or consolidate work when requested.",
     selectedByDefault: false,
     dependencies: [],
     platform: "any",
@@ -707,7 +712,8 @@ export const featureCatalog = Schema.decodeUnknownSync(featureCatalogSchema, {
       shippedPaths: ["SKILL.md"],
     },
     title: "Finish and ship",
-    summary: "Close implementation, verification, Git history, push, hosted checks, and handoff without hidden leftovers.",
+    summary:
+      "Close implementation, verification, Git history, push, hosted checks, and handoff without hidden leftovers.",
     selectedByDefault: false,
     dependencies: ["organized-commits"],
     platform: "any",
@@ -722,7 +728,8 @@ export const featureCatalog = Schema.decodeUnknownSync(featureCatalogSchema, {
       shippedPaths: ["SKILL.md"],
     },
     title: "Preview and prove",
-    summary: "Launch the real product surface and prove a user-visible flow through browser, network, and persisted-state evidence.",
+    summary:
+      "Launch the real product surface and prove a user-visible flow through browser, network, and persisted-state evidence.",
     selectedByDefault: false,
     dependencies: [],
     platform: "any",
@@ -737,7 +744,8 @@ export const featureCatalog = Schema.decodeUnknownSync(featureCatalogSchema, {
       shippedPaths: ["SKILL.md"],
     },
     title: "Reuse-first audit",
-    summary: "Search internal code, platform primitives, and primary ecosystem sources before deciding to build new surface.",
+    summary:
+      "Search internal code, platform primitives, and primary ecosystem sources before deciding to build new surface.",
     selectedByDefault: false,
     dependencies: [],
     platform: "any",
@@ -752,7 +760,8 @@ export const featureCatalog = Schema.decodeUnknownSync(featureCatalogSchema, {
       shippedPaths: ["SKILL.md"],
     },
     title: "Agent session auditor",
-    summary: "Privacy-safe local session coverage, prompt extraction, fuzzy clustering, and evidence-backed skill prioritization.",
+    summary:
+      "Privacy-safe local session coverage, prompt extraction, fuzzy clustering, and evidence-backed skill prioritization.",
     selectedByDefault: false,
     dependencies: [],
     platform: "any",
@@ -767,7 +776,8 @@ export const featureCatalog = Schema.decodeUnknownSync(featureCatalogSchema, {
       shippedPaths: ["SKILL.md"],
     },
     title: "Sync agent skills",
-    summary: "Synchronize canonical skills through receipt-backed native formats and prove parity across detected supported agents.",
+    summary:
+      "Synchronize canonical skills through receipt-backed native formats and prove parity across detected supported agents.",
     selectedByDefault: false,
     dependencies: [],
     platform: "any",
@@ -782,7 +792,8 @@ export const featureCatalog = Schema.decodeUnknownSync(featureCatalogSchema, {
       shippedPaths: ["SKILL.md"],
     },
     title: "Environment config contract",
-    summary: "Consolidate environment reads into fail-loud schema boundaries without leaking secrets across trust zones.",
+    summary:
+      "Consolidate environment reads into fail-loud schema boundaries without leaking secrets across trust zones.",
     selectedByDefault: false,
     dependencies: [],
     platform: "any",
@@ -797,7 +808,8 @@ export const featureCatalog = Schema.decodeUnknownSync(featureCatalogSchema, {
       shippedPaths: ["SKILL.md"],
     },
     title: "MCP OAuth onboarding",
-    summary: "Install an MCP at the intended scope, complete OAuth, reload the agent, and prove it with a harmless tool call.",
+    summary:
+      "Install an MCP at the intended scope, complete OAuth, reload the agent, and prove it with a harmless tool call.",
     selectedByDefault: false,
     dependencies: [],
     platform: "any",
@@ -812,7 +824,8 @@ export const featureCatalog = Schema.decodeUnknownSync(featureCatalogSchema, {
       shippedPaths: ["SKILL.md"],
     },
     title: "RTL UI audit",
-    summary: "Audit and verify real right-to-left layout, bidi content, directional assets, interaction, and accessibility.",
+    summary:
+      "Audit and verify real right-to-left layout, bidi content, directional assets, interaction, and accessibility.",
     selectedByDefault: false,
     dependencies: [],
     platform: "any",
@@ -827,7 +840,8 @@ export const featureCatalog = Schema.decodeUnknownSync(featureCatalogSchema, {
       shippedPaths: ["SKILL.md"],
     },
     title: "Deploy and prove",
-    summary: "Deploy or publish an immutable source identity and prove the provider, live runtime, and changed behavior serve it.",
+    summary:
+      "Deploy or publish an immutable source identity and prove the provider, live runtime, and changed behavior serve it.",
     selectedByDefault: false,
     dependencies: [],
     platform: "any",
@@ -842,7 +856,8 @@ export const featureCatalog = Schema.decodeUnknownSync(featureCatalogSchema, {
       shippedPaths: ["SKILL.md"],
     },
     title: "Coordinate worktrees",
-    summary: "Safely reconcile overlapping branches and worktrees with backups, intent-aware integration, and reachability proof.",
+    summary:
+      "Safely reconcile overlapping branches and worktrees with backups, intent-aware integration, and reachability proof.",
     selectedByDefault: false,
     dependencies: ["organized-commits"],
     platform: "any",
@@ -857,7 +872,8 @@ export const featureCatalog = Schema.decodeUnknownSync(featureCatalogSchema, {
       shippedPaths: ["SKILL.md"],
     },
     title: "Capture workflow",
-    summary: "Turn a proven task into the smallest reusable skill, script, template, test, or runbook and replay it cleanly.",
+    summary:
+      "Turn a proven task into the smallest reusable skill, script, template, test, or runbook and replay it cleanly.",
     selectedByDefault: false,
     dependencies: [],
     platform: "any",
@@ -872,7 +888,8 @@ export const featureCatalog = Schema.decodeUnknownSync(featureCatalogSchema, {
       shippedPaths: ["SKILL.md"],
     },
     title: "Finish agent sessions",
-    summary: "Reconcile interrupted work across agent histories with current repositories, then finish or honestly classify every task.",
+    summary:
+      "Reconcile interrupted work across agent histories with current repositories, then finish or honestly classify every task.",
     selectedByDefault: false,
     dependencies: ["finish-and-ship", "agent-session-auditor"],
     platform: "any",
@@ -893,7 +910,9 @@ export class UnknownFeatureError extends Schema.TaggedError<UnknownFeatureError>
 export const findFeature = (id: string): Option.Option<FeatureDefinition> =>
   Option.fromNullable(featureCatalog.find((feature) => feature.id === id));
 
-export const selectedFeatureIds = featureCatalog.filter((feature) => feature.selectedByDefault).map((feature) => feature.id);
+export const selectedFeatureIds = featureCatalog
+  .filter((feature) => feature.selectedByDefault)
+  .map((feature) => feature.id);
 
 export const resolveFeatureSelection = (
   requestedIds: ReadonlyArray<string>,

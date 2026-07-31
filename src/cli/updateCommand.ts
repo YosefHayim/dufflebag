@@ -8,7 +8,14 @@ import { Effect } from "effect";
 
 import { update } from "../install/update.js";
 import { captureHostEvidence, destinationForScope } from "./hostEvidence.js";
-import { featuresOption, globalOption, parseFeatureIds, projectOption, resolveScope, yesOption } from "./scopeOptions.js";
+import {
+  featuresOption,
+  globalOption,
+  parseFeatureIds,
+  projectOption,
+  resolveScope,
+  yesOption,
+} from "./scopeOptions.js";
 import { stagePackage } from "./stagePackage.js";
 import * as TerminalUI from "./TerminalUI.js";
 

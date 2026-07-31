@@ -4,12 +4,19 @@ import { nextVoiceFeatures, normalizeVoiceId } from "./voiceCommand.js";
 
 describe("nextVoiceFeatures", () => {
   it("adds voice once in catalog order without losing existing features", () => {
-    expect(nextVoiceFeatures(["dedup-guard", "context-guard"], true)).toEqual(["context-guard", "speak-response", "dedup-guard"]);
+    expect(nextVoiceFeatures(["dedup-guard", "context-guard"], true)).toEqual([
+      "context-guard",
+      "speak-response",
+      "dedup-guard",
+    ]);
     expect(nextVoiceFeatures(["context-guard", "speak-response"], true)).toEqual(["context-guard", "speak-response"]);
   });
 
   it("removes only voice when disabled", () => {
-    expect(nextVoiceFeatures(["context-guard", "speak-response", "dedup-guard"], false)).toEqual(["context-guard", "dedup-guard"]);
+    expect(nextVoiceFeatures(["context-guard", "speak-response", "dedup-guard"], false)).toEqual([
+      "context-guard",
+      "dedup-guard",
+    ]);
   });
 });
 

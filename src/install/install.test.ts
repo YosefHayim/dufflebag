@@ -14,7 +14,13 @@ const stageContextGuardRuntime = (stagedRoot: string) =>
   Effect.gen(function* () {
     const fileSystem = yield* FileSystem.FileSystem;
     const path = yield* Path.Path;
-    const hooks = ["contextGuard.js", "ctxWatchSpawn.js", "ctxLoopCtl.js", "idleCompactHook.js", "idleCompactWatch.js"] as const;
+    const hooks = [
+      "contextGuard.js",
+      "ctxWatchSpawn.js",
+      "ctxLoopCtl.js",
+      "idleCompactHook.js",
+      "idleCompactWatch.js",
+    ] as const;
 
     // Stage every registration entrypoint used by context-guard.
     for (const name of hooks) {
@@ -69,10 +75,14 @@ layer(NodeContext.layer)("install", (it) => {
           agents: ["claude-code"],
         });
         expect(result.platformRequirements).toEqual([{ featureId: "context-guard", platform: "any" }]);
-        expect(yield* fileSystem.readFileString(path.join(root, ".claude/dufflebag/runtime/contextGuard/hooks/contextGuard.js"))).toBe(
-          "export {};\n",
+        expect(
+          yield* fileSystem.readFileString(
+            path.join(root, ".claude/dufflebag/runtime/contextGuard/hooks/contextGuard.js"),
+          ),
+        ).toBe("export {};\n");
+        expect(JSON.parse(yield* fileSystem.readFileString(path.join(root, ".claude/dufflebag/config.json")))).toEqual(
+          defaultBagConfig,
         );
-        expect(JSON.parse(yield* fileSystem.readFileString(path.join(root, ".claude/dufflebag/config.json")))).toEqual(defaultBagConfig);
 
         const settings = yield* fileSystem.readFileString(settingsPath);
         expect(settings).toContain('"theme": "dark"');
@@ -185,8 +195,12 @@ layer(NodeContext.layer)("install", (it) => {
       Effect.gen(function* () {
         const fileSystem = yield* FileSystem.FileSystem;
         const path = yield* Path.Path;
-        const root = yield* fileSystem.makeTempDirectoryScoped({ prefix: "dufflebag-install-receipt-correlation-root-" });
-        const stagedRoot = yield* fileSystem.makeTempDirectoryScoped({ prefix: "dufflebag-install-receipt-correlation-stage-" });
+        const root = yield* fileSystem.makeTempDirectoryScoped({
+          prefix: "dufflebag-install-receipt-correlation-root-",
+        });
+        const stagedRoot = yield* fileSystem.makeTempDirectoryScoped({
+          prefix: "dufflebag-install-receipt-correlation-stage-",
+        });
         const victimPath = path.join(root, "victim.txt");
         const victimBytes = textEncoder.encode("user-owned\n");
 
@@ -274,11 +288,14 @@ layer(NodeContext.layer)("install", (it) => {
         expect(instructions.match(/<!-- dufflebag:skills start -->/g)).toHaveLength(1);
         expect(instructions).toContain("## autorun");
         expect(yield* fileSystem.readFileString(path.join(root, ".aider.conf.yml"))).toContain("AGENTS.md");
-        expect(JSON.parse(yield* fileSystem.readFileString(path.join(root, ".continue/config.json"))).rules).toEqual(["AGENTS.md"]);
+        expect(JSON.parse(yield* fileSystem.readFileString(path.join(root, ".continue/config.json"))).rules).toEqual([
+          "AGENTS.md",
+        ]);
 
         const receipt = JSON.parse(yield* fileSystem.readFileString(path.join(root, ".claude/dufflebag/receipt.json")));
         const instructionArtifacts = receipt.artifacts.filter(
-          (artifact: { kind: { _tag: string }; path: string }) => artifact.kind._tag === "instruction" && artifact.path === "AGENTS.md",
+          (artifact: { kind: { _tag: string }; path: string }) =>
+            artifact.kind._tag === "instruction" && artifact.path === "AGENTS.md",
         );
 
         expect(instructionArtifacts).toHaveLength(1);
@@ -317,9 +334,11 @@ layer(NodeContext.layer)("install", (it) => {
           agents: { _tag: "selected", ids: ["cursor"] },
         });
 
-        expect(yield* fileSystem.readFileString(path.join(root, ".claude/dufflebag/runtime/contextGuard/hooks/ctxLoopCtl.js"))).toBe(
-          "export {};\n",
-        );
+        expect(
+          yield* fileSystem.readFileString(
+            path.join(root, ".claude/dufflebag/runtime/contextGuard/hooks/ctxLoopCtl.js"),
+          ),
+        ).toBe("export {};\n");
         expect(yield* fileSystem.readFileString(path.join(root, ".cursor/rules/autorun.mdc"))).toContain(
           ".claude/dufflebag/runtime/contextGuard/hooks/ctxLoopCtl.js",
         );
@@ -386,7 +405,9 @@ layer(NodeContext.layer)("install", (it) => {
           configuration: { _tag: "automatic" },
         });
 
-        expect(JSON.parse(yield* fileSystem.readFileString(path.join(root, ".claude/dufflebag/config.json")))).toMatchObject({
+        expect(
+          JSON.parse(yield* fileSystem.readFileString(path.join(root, ".claude/dufflebag/config.json"))),
+        ).toMatchObject({
           speechVoice: "Daniel",
         });
         const settings = JSON.parse(yield* fileSystem.readFileString(settingsPath));
@@ -395,7 +416,9 @@ layer(NodeContext.layer)("install", (it) => {
         expect(settings.hooks.PreToolUse).toBeDefined();
 
         const receipt = JSON.parse(yield* fileSystem.readFileString(path.join(root, ".claude/dufflebag/receipt.json")));
-        const settingsArtifacts = receipt.artifacts.filter((artifact: { kind: { _tag: string } }) => artifact.kind._tag === "settings");
+        const settingsArtifacts = receipt.artifacts.filter(
+          (artifact: { kind: { _tag: string } }) => artifact.kind._tag === "settings",
+        );
         expect(settingsArtifacts).toHaveLength(1);
         expect(settingsArtifacts[0].ownership.values).toContainEqual(
           expect.objectContaining({ pointer: "/env/dufflebagSpeechVoice", installed: { _tag: "missing" } }),
@@ -425,10 +448,15 @@ layer(NodeContext.layer)("install", (it) => {
           configuration: { _tag: "automatic" },
         };
         yield* install(request);
-        yield* fileSystem.writeFileString(globalConfigPath, `${JSON.stringify({ ...globalConfig, speechVoice: "Moira" }, null, 2)}\n`);
+        yield* fileSystem.writeFileString(
+          globalConfigPath,
+          `${JSON.stringify({ ...globalConfig, speechVoice: "Moira" }, null, 2)}\n`,
+        );
         yield* install(request);
 
-        expect(JSON.parse(yield* fileSystem.readFileString(path.join(projectRoot, ".claude/dufflebag/config.json")))).toEqual(globalConfig);
+        expect(
+          JSON.parse(yield* fileSystem.readFileString(path.join(projectRoot, ".claude/dufflebag/config.json"))),
+        ).toEqual(globalConfig);
       }),
     ),
   );
@@ -439,12 +467,17 @@ layer(NodeContext.layer)("install", (it) => {
         const fileSystem = yield* FileSystem.FileSystem;
         const path = yield* Path.Path;
         const root = yield* fileSystem.makeTempDirectoryScoped({ prefix: "dufflebag-install-cleanup-only-root-" });
-        const stagedRoot = yield* fileSystem.makeTempDirectoryScoped({ prefix: "dufflebag-install-cleanup-only-stage-" });
+        const stagedRoot = yield* fileSystem.makeTempDirectoryScoped({
+          prefix: "dufflebag-install-cleanup-only-stage-",
+        });
         const settingsPath = path.join(root, ".claude/settings.json");
 
         yield* stageContextGuardRuntime(stagedRoot);
         yield* fileSystem.makeDirectory(path.dirname(settingsPath), { recursive: true });
-        yield* fileSystem.writeFileString(settingsPath, '{\n  "env": { "keep": "yes", "dufflebagDebugEnabled": "true" }\n}\n');
+        yield* fileSystem.writeFileString(
+          settingsPath,
+          '{\n  "env": { "keep": "yes", "dufflebagDebugEnabled": "true" }\n}\n',
+        );
 
         yield* install({
           ...installRequest({ root, stagedRoot }),
@@ -454,7 +487,9 @@ layer(NodeContext.layer)("install", (it) => {
 
         expect(JSON.parse(yield* fileSystem.readFileString(settingsPath))).toEqual({ env: { keep: "yes" } });
         const receipt = JSON.parse(yield* fileSystem.readFileString(path.join(root, ".claude/dufflebag/receipt.json")));
-        const settingsArtifact = receipt.artifacts.find((artifact: { kind: { _tag: string } }) => artifact.kind._tag === "settings");
+        const settingsArtifact = receipt.artifacts.find(
+          (artifact: { kind: { _tag: string } }) => artifact.kind._tag === "settings",
+        );
         expect(settingsArtifact.ownership.values).toContainEqual(
           expect.objectContaining({ pointer: "/env/dufflebagDebugEnabled", installed: { _tag: "missing" } }),
         );
@@ -468,7 +503,9 @@ layer(NodeContext.layer)("install", (it) => {
         const fileSystem = yield* FileSystem.FileSystem;
         const path = yield* Path.Path;
         const root = yield* fileSystem.makeTempDirectoryScoped({ prefix: "dufflebag-install-invalid-legacy-root-" });
-        const stagedRoot = yield* fileSystem.makeTempDirectoryScoped({ prefix: "dufflebag-install-invalid-legacy-stage-" });
+        const stagedRoot = yield* fileSystem.makeTempDirectoryScoped({
+          prefix: "dufflebag-install-invalid-legacy-stage-",
+        });
         const settingsPath = path.join(root, ".claude/settings.json");
         const originalSettings = '{\n  "env": { "dufflebagDebugEnabled": "yes" }\n}\n';
 

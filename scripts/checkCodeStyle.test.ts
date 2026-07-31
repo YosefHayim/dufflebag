@@ -6,8 +6,8 @@ import { checkCodeStyle } from "./checkCodeStyle.js";
 
 type MachineRule = {
   id: string;
-  summary: string;
-  enforcement: "ast" | "biome" | "importGraph" | "manual" | "path";
+  statement: string;
+  verify: string;
 };
 
 type ProtectedPath = {
@@ -21,147 +21,143 @@ const PROTECTED_PATHS = [
   "src/skills/makeATrailer/scripts/assembleCut.mjs",
 ];
 
-const ASSEMBLE_CUT_EXEMPTIONS = [
-  "function.arrow-only",
-  "function.input-shape",
-  "comment.loop-intent",
-];
+const ASSEMBLE_CUT_EXEMPTIONS = ["function.arrow-only", "function.input-shape", "comment.loop-intent"];
 
 const MACHINE_RULES: ReadonlyArray<MachineRule> = [
   {
     id: "function.arrow-only",
-    summary: "Named functions use arrow constants.",
-    enforcement: "ast",
+    statement: "Named functions use arrow constants.",
+    verify: "pnpm style",
   },
   {
     id: "function.input-shape",
-    summary: "Function inputs stay cohesive and positional booleans are forbidden.",
-    enforcement: "ast",
+    statement: "Function inputs stay cohesive and positional booleans are forbidden.",
+    verify: "pnpm style",
   },
   {
     id: "comment.loop-intent",
-    summary: "Every explicit loop has an immediately preceding intent comment.",
-    enforcement: "ast",
+    statement: "Every explicit loop has an immediately preceding intent comment.",
+    verify: "pnpm style",
   },
   {
     id: "function.effect-generator",
-    summary: "Anonymous generators appear only as the direct Effect.gen callback.",
-    enforcement: "ast",
+    statement: "Anonymous generators appear only as the direct Effect.gen callback.",
+    verify: "pnpm style",
   },
   {
     id: "class.tagged-error-only",
-    summary: "Schema.TaggedError is the only class form.",
-    enforcement: "ast",
+    statement: "Schema.TaggedError is the only class form.",
+    verify: "pnpm style",
   },
   {
     id: "type.no-assertion",
-    summary: "Authored TypeScript assertions are forbidden.",
-    enforcement: "ast",
+    statement: "Authored TypeScript assertions are forbidden.",
+    verify: "pnpm style",
   },
   {
     id: "comment.index-proof",
-    summary: "Indexed non-null access has an immediately preceding proof comment.",
-    enforcement: "ast",
+    statement: "Indexed non-null access has an immediately preceding proof comment.",
+    verify: "pnpm style",
   },
   {
     id: "type.no-interface",
-    summary: "Interfaces are reserved for declaration-file augmentation.",
-    enforcement: "ast",
+    statement: "Interfaces are reserved for declaration-file augmentation.",
+    verify: "pnpm style",
   },
   {
     id: "type.no-enum",
-    summary: "Enums are forbidden.",
-    enforcement: "ast",
+    statement: "Enums are forbidden.",
+    verify: "pnpm style",
   },
   {
     id: "type.no-conditional",
-    summary: "Authored conditional and infer type machinery is forbidden.",
-    enforcement: "ast",
+    statement: "Authored conditional and infer type machinery is forbidden.",
+    verify: "pnpm style",
   },
   {
     id: "type.no-suppression",
-    summary: "TypeScript suppression directives are forbidden.",
-    enforcement: "ast",
+    statement: "TypeScript suppression directives are forbidden.",
+    verify: "pnpm style",
   },
   {
     id: "function.blank-line",
-    summary: "Function declarations are separated by one blank line.",
-    enforcement: "ast",
+    statement: "Function declarations are separated by one blank line.",
+    verify: "pnpm style",
   },
   {
     id: "function.nesting",
-    summary: "Function control flow nests no more than two levels.",
-    enforcement: "ast",
+    statement: "Function control flow nests no more than two levels.",
+    verify: "pnpm style",
   },
   {
     id: "comment.pipeline-contract",
-    summary: "Ordered multi-phase pipelines have a contract and numbered phases.",
-    enforcement: "manual",
+    statement: "Ordered multi-phase pipelines have a contract and numbered phases.",
+    verify: "judgment",
   },
   {
     id: "type.schema-owned-runtime",
-    summary: "Exported runtime object types derive from Effect Schema.",
-    enforcement: "ast",
+    statement: "Exported runtime object types derive from Effect Schema.",
+    verify: "pnpm style",
   },
   {
     id: "barrel.direct-wildcard",
-    summary: "Barrels contain direct wildcard exports only.",
-    enforcement: "ast",
+    statement: "Barrels contain direct wildcard exports only.",
+    verify: "pnpm style",
   },
   {
     id: "name.domain-specific",
-    summary: "Identifiers avoid vague generic role names.",
-    enforcement: "ast",
+    statement: "Identifiers avoid vague generic role names.",
+    verify: "pnpm style",
   },
   {
     id: "path.no-generic-bucket",
-    summary: "Generic bucket filenames are forbidden.",
-    enforcement: "path",
+    statement: "Generic bucket filenames are forbidden.",
+    verify: "pnpm style",
   },
   {
     id: "path.source-directory-case",
-    summary: "Authored source directories use camelCase.",
-    enforcement: "path",
+    statement: "Authored source directories use camelCase.",
+    verify: "pnpm style",
   },
   {
     id: "path.capability-layout",
-    summary: "Source paths expose named capabilities, not generic technical layers.",
-    enforcement: "path",
+    statement: "Source paths expose named capabilities, not generic technical layers.",
+    verify: "pnpm style",
   },
   {
     id: "mutation.no-input",
-    summary: "Function inputs are never mutated.",
-    enforcement: "ast",
+    statement: "Function inputs are never mutated.",
+    verify: "pnpm style",
   },
   {
     id: "collection.no-builder-reduce",
-    summary: "Reduce is not used to build arrays or objects.",
-    enforcement: "ast",
+    statement: "Reduce is not used to build arrays or objects.",
+    verify: "pnpm style",
   },
   {
     id: "effect.no-promise-all",
-    summary: "Main application effects do not use Promise.all.",
-    enforcement: "ast",
+    statement: "Main application effects do not use Promise.all.",
+    verify: "pnpm style",
   },
   {
     id: "effect.runtime-edge",
-    summary: "Effect.run calls exist only at src/cli/main.ts.",
-    enforcement: "ast",
+    statement: "Effect.run calls exist only at src/cli/main.ts.",
+    verify: "pnpm style",
   },
   {
     id: "presentation.terminal-ui",
-    summary: "Main application presentation does not call console methods.",
-    enforcement: "ast",
+    statement: "Main application presentation does not call console methods.",
+    verify: "pnpm style",
   },
   {
     id: "import.application-boundary",
-    summary: "Application modules do not import the installed hook runtime.",
-    enforcement: "importGraph",
+    statement: "Application modules do not import the installed hook runtime.",
+    verify: "pnpm style",
   },
   {
     id: "import.hook-runtime",
-    summary: "Installed hook graphs import only node modules and their runtime island.",
-    enforcement: "importGraph",
+    statement: "Installed hook graphs import only node modules and their runtime island.",
+    verify: "pnpm style",
   },
 ];
 
@@ -173,8 +169,41 @@ const createRepository = (): string => {
   return repositoryRoot;
 };
 
+const RULES_BY_ID = new Map(MACHINE_RULES.map((rule) => [rule.id, rule]));
+
+const ruleCard = (ruleId: string): string => {
+  const rule = RULES_BY_ID.get(ruleId);
+  const verify = rule?.verify === "judgment" ? "judgment" : `\`${rule?.verify ?? "pnpm style"}\``;
+
+  return [
+    `### ${ruleId}`,
+    `[rule:${ruleId}] · verify: ${verify}`,
+    "",
+    rule?.statement ?? "An unmirrored rule statement.",
+    "",
+    "```ts",
+    "// ✓ good",
+    "const value = 1;",
+    "",
+    "// ✗ bad",
+    "var value = 1;",
+    "```",
+    "",
+    "Why: one reason.",
+  ].join("\n");
+};
+
 const writeGuide = (repositoryRoot: string, ruleIds: ReadonlyArray<string>): void => {
-  const guide = ruleIds.map((ruleId) => `## Rule [rule:${ruleId}]`).join("\n\n");
+  const sections = ["## Canonical example", "## Golden path", "## Exemplars", "## Never"];
+  const guide = [
+    "# Style",
+    "",
+    "## Rules",
+    "",
+    ...ruleIds.map(ruleCard),
+    "",
+    ...sections.flatMap((section) => [section, ""]),
+  ].join("\n");
   writeFileSync(join(repositoryRoot, "CODE-STYLE.md"), `${guide}\n`);
 };
 
@@ -246,7 +275,10 @@ describe("code-style contract configuration", () => {
 
   it("fails when a machine rule has no documented ID", () => {
     const repositoryRoot = createRepository();
-    writeGuide(repositoryRoot, MACHINE_RULES.slice(1).map((rule) => rule.id));
+    writeGuide(
+      repositoryRoot,
+      MACHINE_RULES.slice(1).map((rule) => rule.id),
+    );
     writeConfiguration(repositoryRoot);
 
     expect(() => checkCodeStyle(repositoryRoot)).toThrow(/function\.arrow-only/u);
@@ -366,8 +398,7 @@ describe("function and class forms", () => {
     },
     {
       name: "a named generator",
-      source:
-        'import { Effect } from "effect";\nexport const install = Effect.gen(function* installWorkflow() {});\n',
+      source: 'import { Effect } from "effect";\nexport const install = Effect.gen(function* installWorkflow() {});\n',
       line: 2,
     },
     {
@@ -408,8 +439,7 @@ describe("function and class forms", () => {
     },
     {
       name: "a similarly named Schema member",
-      source:
-        'export class InstallError extends Schema.TaggedErrorAlias<InstallError>()("InstallError", {}) {}\n',
+      source: 'export class InstallError extends Schema.TaggedErrorAlias<InstallError>()("InstallError", {}) {}\n',
     },
   ])("rejects $name", ({ source }) => {
     const report = checkSource("src/install/example.ts", source);
@@ -470,15 +500,15 @@ describe("function inputs", () => {
     },
     {
       name: "a rest parameter",
-      source: "export const combine = (...parts: string[]) => parts.join(\"\");\n",
+      source: 'export const combine = (...parts: string[]) => parts.join("");\n',
     },
     {
       name: "a positional boolean",
-      source: "export const render = (value: string, enabled: boolean) => (enabled ? value : \"\");\n",
+      source: 'export const render = (value: string, enabled: boolean) => (enabled ? value : "");\n',
     },
     {
       name: "an inferred positional boolean default",
-      source: "export const render = (value: string, enabled = false) => (enabled ? value : \"\");\n",
+      source: 'export const render = (value: string, enabled = false) => (enabled ? value : "");\n',
     },
   ])("rejects $name", ({ source }) => {
     const report = checkSource("src/install/example.ts", source);
@@ -610,7 +640,7 @@ describe("forbidden type declarations and directives", () => {
   it("allows interface augmentation in a declaration file", () => {
     const report = checkSource(
       "src/types/environment.d.ts",
-      'declare global { interface ProcessEnv { DUFFLEBAG_HOME?: string } }\nexport {};\n',
+      "declare global { interface ProcessEnv { DUFFLEBAG_HOME?: string } }\nexport {};\n",
     );
 
     expect(report.violations).toEqual([]);
@@ -646,10 +676,7 @@ describe("forbidden type declarations and directives", () => {
   });
 
   it.each(["@ts-ignore", "@ts-expect-error", "@ts-nocheck"])("rejects %s", (directive) => {
-    const report = checkSource(
-      "src/config/example.ts",
-      `// ${directive}\nexport const value: string = input;\n`,
-    );
+    const report = checkSource("src/config/example.ts", `// ${directive}\nexport const value: string = input;\n`);
 
     expect(report.violations).toEqual([
       {
@@ -669,10 +696,7 @@ describe("forbidden type declarations and directives", () => {
     "/* istanbul ignore next */",
     "/* v8 ignore next */",
   ])("rejects tool suppression %s", (directive) => {
-    const report = checkSource(
-      "src/config/example.ts",
-      `${directive}\nexport const value: string = input;\n`,
-    );
+    const report = checkSource("src/config/example.ts", `${directive}\nexport const value: string = input;\n`);
 
     expect(report.violations).toEqual([
       {
@@ -741,15 +765,11 @@ describe("readability structure", () => {
 
     expect(report.violations).toEqual([]);
   });
-
 });
 
 describe("schema-owned object types", () => {
   it("rejects an exported handwritten object type in application source", () => {
-    const report = checkSource(
-      "src/catalog/featureCatalog.ts",
-      "export type FeatureDefinition = { id: string };\n",
-    );
+    const report = checkSource("src/catalog/featureCatalog.ts", "export type FeatureDefinition = { id: string };\n");
 
     expect(report.violations).toEqual([
       {
@@ -883,7 +903,7 @@ describe("mutation, collections, runtime, and presentation", () => {
   it("rejects mutation of an input property", () => {
     const report = checkSource(
       "src/install/example.ts",
-      "export const normalize = (request: Request) => {\n  request.scope = \"global\";\n  return request;\n};\n",
+      'export const normalize = (request: Request) => {\n  request.scope = "global";\n  return request;\n};\n',
     );
 
     expect(report.violations).toEqual([
@@ -899,8 +919,7 @@ describe("mutation, collections, runtime, and presentation", () => {
   it.each([
     {
       name: "a mutating method",
-      source:
-        'export const append = (request: { items: string[] }) => { request.items.push("next"); };\n',
+      source: 'export const append = (request: { items: string[] }) => { request.items.push("next"); };\n',
     },
     {
       name: "a postfix increment",
@@ -908,13 +927,11 @@ describe("mutation, collections, runtime, and presentation", () => {
     },
     {
       name: "a delete expression",
-      source:
-        "export const clear = (request: { cache?: string }) => { delete request.cache; };\n",
+      source: "export const clear = (request: { cache?: string }) => { delete request.cache; };\n",
     },
     {
       name: "a destructured input binding",
-      source:
-        'export const append = ({ items }: { items: string[] }) => { items.push("next"); };\n',
+      source: 'export const append = ({ items }: { items: string[] }) => { items.push("next"); };\n',
     },
     {
       name: "an outer input captured by a nested callback",
@@ -937,7 +954,7 @@ describe("mutation, collections, runtime, and presentation", () => {
   it("accepts mutation of a locally owned collection", () => {
     const report = checkSource(
       "src/install/example.ts",
-      "export const collect = () => {\n  const items: string[] = [];\n  items.push(\"value\");\n  return items;\n};\n",
+      'export const collect = () => {\n  const items: string[] = [];\n  items.push("value");\n  return items;\n};\n',
     );
 
     expect(report.violations).toEqual([]);
@@ -1066,7 +1083,8 @@ describe("application and installed-hook import graphs", () => {
     {
       name: "a third-party import",
       files: {
-        "src/skills/contextGuard/hooks/contextGuard.ts": 'import { Effect } from "effect";\nexport const run = Effect.void;\n',
+        "src/skills/contextGuard/hooks/contextGuard.ts":
+          'import { Effect } from "effect";\nexport const run = Effect.void;\n',
       },
       file: "src/skills/contextGuard/hooks/contextGuard.ts",
       line: 1,
@@ -1085,8 +1103,7 @@ describe("application and installed-hook import graphs", () => {
       name: "an application re-export",
       files: {
         "src/install/artifactPlan.ts": "export const artifactPlan = {};\n",
-        "src/skills/contextGuard/hooks/contextGuard.ts":
-          'export * from "../../../install/artifactPlan.js";\n',
+        "src/skills/contextGuard/hooks/contextGuard.ts": 'export * from "../../../install/artifactPlan.js";\n',
       },
       file: "src/skills/contextGuard/hooks/contextGuard.ts",
       line: 1,
@@ -1094,8 +1111,7 @@ describe("application and installed-hook import graphs", () => {
     {
       name: "a dynamic third-party import",
       files: {
-        "src/skills/contextGuard/hooks/contextGuard.ts":
-          'export const run = () => import("effect");\n',
+        "src/skills/contextGuard/hooks/contextGuard.ts": 'export const run = () => import("effect");\n',
       },
       file: "src/skills/contextGuard/hooks/contextGuard.ts",
       line: 1,
@@ -1103,8 +1119,7 @@ describe("application and installed-hook import graphs", () => {
     {
       name: "a transitive third-party import",
       files: {
-        "src/skills/contextGuard/hooks/contextGuard.ts":
-          'export { run } from "../runtime/bridge.js";\n',
+        "src/skills/contextGuard/hooks/contextGuard.ts": 'export { run } from "../runtime/bridge.js";\n',
         "src/skills/contextGuard/runtime/bridge.ts":
           'import { Effect } from "effect";\nexport const run = Effect.void;\n',
       },
@@ -1127,7 +1142,8 @@ describe("application and installed-hook import graphs", () => {
   it("rejects an application import of the hook runtime", () => {
     const report = checkSources({
       "src/runtime/readConfig.ts": "export const readConfig = () => ({});\n",
-      "src/install/install.ts": 'import { readConfig } from "../runtime/readConfig.js";\nexport const install = readConfig;\n',
+      "src/install/install.ts":
+        'import { readConfig } from "../runtime/readConfig.js";\nexport const install = readConfig;\n',
     });
 
     expect(report.violations).toEqual([
@@ -1168,7 +1184,9 @@ describe("scan boundaries and protected baseline", () => {
       ".agents/skills/generated.ts",
       ".cursor/rules/generated.ts",
       ".devin/instructions/generated.ts",
-    ].forEach((path) => writeSource(repositoryRoot, path, "export function forbidden() {}\n"));
+    ].forEach((path) => {
+      writeSource(repositoryRoot, path, "export function forbidden() {}\n");
+    });
 
     expect(checkCodeStyle(repositoryRoot).violations).toEqual([]);
   });
@@ -1184,35 +1202,47 @@ describe("scan boundaries and protected baseline", () => {
 });
 
 describe("committed contract artifacts", () => {
-  it("keep guide and machine rule IDs in a strict ordered bijection", () => {
+  it("keep card and machine rule IDs in a strict ordered bijection", () => {
     const repositoryRoot = join(import.meta.dirname, "..");
     const guide = readFileSync(join(repositoryRoot, "CODE-STYLE.md"), "utf8");
-    const configuration = JSON.parse(
-      readFileSync(join(repositoryRoot, "code-style.rules.json"), "utf8"),
-    );
-    const guideIds = [...guide.matchAll(/\[rule:([a-z0-9.-]+)\]/gu)].map((match) => match[1]);
+    const configuration = JSON.parse(readFileSync(join(repositoryRoot, "code-style.rules.json"), "utf8"));
+    // Read IDs from card metadata lines only, so Never-section cross-references are not counted.
+    const cardIds = [...guide.matchAll(/^\[rule:([a-z0-9.-]+)\] · verify: /gmu)].map((match) => match[1]);
     const machineIds = configuration.rules.map((rule: MachineRule) => rule.id);
 
-    expect(guideIds).toEqual(machineIds);
-    expect(new Set(guideIds).size).toBe(guideIds.length);
+    expect(cardIds).toEqual(machineIds);
+    expect(new Set(cardIds).size).toBe(cardIds.length);
     expect(
       configuration.rules.every(
         (rule: MachineRule) =>
-          Object.keys(rule).sort().join(",") === "enforcement,id,summary" && rule.summary.length > 0,
+          Object.keys(rule).sort().join(",") === "id,statement,verify" && rule.statement.length > 0,
       ),
     ).toBe(true);
   });
 
-  it("makes FeatureDefinition schema-first with property-owned descriptions and checks", () => {
+  it("keeps every Never entry pointed at a real rule", () => {
     const guide = readFileSync(join(import.meta.dirname, "..", "CODE-STYLE.md"), "utf8");
+    const configuration = JSON.parse(readFileSync(join(import.meta.dirname, "..", "code-style.rules.json"), "utf8"));
+    const machineIds: ReadonlyArray<string> = configuration.rules.map((rule: MachineRule) => rule.id);
+    const neverSection = guide.slice(guide.indexOf("\n## Never"));
+    const referenced = [...neverSection.matchAll(/\[rule:([a-z0-9.-]+)\]/gu)].flatMap((match) => match[1] ?? []);
 
-    expect(guide).toContain("export const featureDefinitionSchema = Schema.Struct({");
-    expect(guide).toContain("id: Schema.NonEmptyTrimmedString.pipe(");
-    expect(guide).toContain("sourceDirectory: Schema.NonEmptyTrimmedString.pipe(");
-    expect(guide).toContain("Schema.Schema.Type<typeof featureDefinitionSchema>");
-    expect(guide).toContain('description: "Stable public feature ID."');
-    expect(guide).toContain("Schema.pattern(");
-    expect(guide).not.toMatch(/interface\s+Feature(?:Definition)?\b/u);
-    expect(guide).not.toMatch(/type\s+FeatureDefinition\s*=\s*\{/u);
+    expect(referenced.length).toBeGreaterThan(0);
+    expect(referenced.filter((ruleId) => !machineIds.includes(ruleId))).toEqual([]);
+  });
+
+  it("makes FeatureDefinition schema-first, showing the handwritten shape only as the rejected case", () => {
+    const guide = readFileSync(join(import.meta.dirname, "..", "CODE-STYLE.md"), "utf8");
+    const card = guide.slice(guide.indexOf("[rule:type.schema-owned-runtime]"));
+    const [chosen = "", rejected = ""] = card.slice(0, card.indexOf("\n```\n")).split("// ✗");
+
+    expect(chosen).toContain("export const featureDefinitionSchema = Schema.Struct({");
+    expect(chosen).toContain("id: Schema.NonEmptyTrimmedString.pipe(");
+    expect(chosen).toContain("Schema.Schema.Type<typeof featureDefinitionSchema>");
+    expect(chosen).toContain('description: "Stable public feature ID."');
+    expect(chosen).toContain("Schema.pattern(");
+    expect(chosen).not.toMatch(/interface\s+Feature(?:Definition)?\b/u);
+    expect(chosen).not.toMatch(/type\s+FeatureDefinition\s*=\s*\{/u);
+    expect(rejected).toMatch(/type\s+FeatureDefinition\s*=\s*\{/u);
   });
 });

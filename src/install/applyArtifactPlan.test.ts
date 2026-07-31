@@ -110,7 +110,12 @@ const createMixedPlan = (root: string): ArtifactPlan => {
     root,
     operations: [
       { _tag: "write", artifact: writeArtifact, bytes: installedBytes, expectedCurrent: expectedMissing },
-      { _tag: "restore", artifact: restoreArtifact, bytes: originalBytes, expectedCurrent: expectedFile(installedBytes) },
+      {
+        _tag: "restore",
+        artifact: restoreArtifact,
+        bytes: originalBytes,
+        expectedCurrent: expectedFile(installedBytes),
+      },
       {
         _tag: "remove",
         artifact: removeArtifact,
@@ -266,7 +271,9 @@ layer(NodeContext.layer)("applyArtifactPlan", (it) => {
         yield* applyArtifactPlan(plan);
 
         expect([...(yield* fileSystem.readFile(artifactPath))]).toEqual([...installedBytes]);
-        expect(yield* decodeArtifactReceiptJson(yield* fileSystem.readFileString(receiptPath))).toEqual(plan.receipt.receipt);
+        expect(yield* decodeArtifactReceiptJson(yield* fileSystem.readFileString(receiptPath))).toEqual(
+          plan.receipt.receipt,
+        );
       }),
     ),
   );
@@ -280,7 +287,9 @@ layer(NodeContext.layer)("applyArtifactPlan", (it) => {
         const receiptPath = path.join(root, ".dufflebag/receipt.json");
         const priorReceiptBytes = new TextEncoder().encode("receipt inspected during planning");
         const changedReceiptBytes = new TextEncoder().encode("receipt changed after planning");
-        const serializedPlan = unwrapPlan(JSON.parse(JSON.stringify(createReceiptRemovalPlan(root, expectedFile(priorReceiptBytes)))));
+        const serializedPlan = unwrapPlan(
+          JSON.parse(JSON.stringify(createReceiptRemovalPlan(root, expectedFile(priorReceiptBytes)))),
+        );
 
         yield* fileSystem.makeDirectory(path.dirname(receiptPath), { recursive: true });
         yield* fileSystem.writeFile(receiptPath, changedReceiptBytes);
@@ -439,7 +448,9 @@ layer(NodeContext.layer)("applyArtifactPlan", (it) => {
         yield* applyArtifactPlan(plan);
 
         expect([...(yield* fileSystem.readFile(artifactPath))]).toEqual([...installedBytes]);
-        expect(yield* decodeArtifactReceiptJson(yield* fileSystem.readFileString(receiptPath))).toEqual(plan.receipt.receipt);
+        expect(yield* decodeArtifactReceiptJson(yield* fileSystem.readFileString(receiptPath))).toEqual(
+          plan.receipt.receipt,
+        );
       }),
     ),
   );
@@ -561,7 +572,9 @@ const transactionOrderFileSystemLayer = Layer.effect(
           .copyFile(oldPath, newPath)
           .pipe(
             Effect.zipRight(
-              portablePath(oldPath).includes("/snapshots/") ? appendEvent(oldPath, `restore:${path.basename(newPath)}`) : Effect.void,
+              portablePath(oldPath).includes("/snapshots/")
+                ? appendEvent(oldPath, `restore:${path.basename(newPath)}`)
+                : Effect.void,
             ),
           ),
       rename: (oldPath, newPath) =>
@@ -575,7 +588,9 @@ const transactionOrderFileSystemLayer = Layer.effect(
                 description: "Injected ordered commit failure.",
               }),
             )
-          : fileSystem.rename(oldPath, newPath).pipe(Effect.zipRight(appendEvent(oldPath, `commit:${path.basename(newPath)}`))),
+          : fileSystem
+              .rename(oldPath, newPath)
+              .pipe(Effect.zipRight(appendEvent(oldPath, `commit:${path.basename(newPath)}`))),
     });
   }),
 ).pipe(Layer.provide(Layer.merge(NodeFileSystem.layer, NodePath.layer)));
@@ -625,7 +640,13 @@ layer(transactionOrderLayer)("applyArtifactPlan transaction order", (it) => {
         const events = (yield* fileSystem.readFileString(path.join(root, ".transaction-order.log"))).trim().split("\n");
 
         expect(Exit.isFailure(result)).toBe(true);
-        expect(events).toEqual(["commit:first.txt", "commit:second.txt", "restore:fail.txt", "restore:second.txt", "restore:first.txt"]);
+        expect(events).toEqual([
+          "commit:first.txt",
+          "commit:second.txt",
+          "restore:fail.txt",
+          "restore:second.txt",
+          "restore:first.txt",
+        ]);
       }),
     ),
   );
@@ -1038,7 +1059,9 @@ layer(Layer.empty)("applyArtifactPlan competing writers", (it) => {
           expect(results.filter(Exit.isSuccess)).toHaveLength(1);
           expect(results.filter(Exit.isFailure)).toHaveLength(1);
           expect([...(yield* fileSystem.readFile(artifactPath))]).toEqual([...installedBytes]);
-          expect(yield* decodeArtifactReceiptJson(yield* fileSystem.readFileString(receiptPath))).toEqual(plan.receipt.receipt);
+          expect(yield* decodeArtifactReceiptJson(yield* fileSystem.readFileString(receiptPath))).toEqual(
+            plan.receipt.receipt,
+          );
           expect(yield* fileSystem.exists(recoveryPath)).toBe(false);
 
           const rootEntries = yield* fileSystem.readDirectory(root);
@@ -1067,7 +1090,10 @@ const byteChangeFileSystemLayer = Layer.effect(
             const transactionRoot = path.dirname(path.dirname(filePath));
             const root = path.dirname(transactionRoot);
 
-            return fileSystem.writeFile(path.join(root, "changed.txt"), new TextEncoder().encode("changed after capture"));
+            return fileSystem.writeFile(
+              path.join(root, "changed.txt"),
+              new TextEncoder().encode("changed after capture"),
+            );
           }),
         ),
     });
@@ -1175,7 +1201,10 @@ const rollbackParentContentFileSystemLayer = Layer.effect(
       rename: (oldPath, newPath) =>
         portablePath(newPath).endsWith("/fail.txt")
           ? Effect.zipRight(
-              fileSystem.writeFile(path.join(path.dirname(newPath), "created/nested/external.txt"), externallyChangedBytes),
+              fileSystem.writeFile(
+                path.join(path.dirname(newPath), "created/nested/external.txt"),
+                externallyChangedBytes,
+              ),
               Effect.fail(
                 new SystemError({
                   reason: "PermissionDenied",

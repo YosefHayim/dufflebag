@@ -200,7 +200,9 @@ describe("agentCatalog", () => {
     expect(Option.map(findAgent("grok"), (agent) => agent.nativeHooks)).toEqual(
       Option.some({ _tag: "grokJson", configPath: ".grok/hooks/dufflebag.json", compactCommand: "/compact" }),
     );
-    expect(Option.map(findAgent("kimi-code"), (agent) => agent.nativeHooks)).toEqual(Option.some({ _tag: "unsupported" }));
+    expect(Option.map(findAgent("kimi-code"), (agent) => agent.nativeHooks)).toEqual(
+      Option.some({ _tag: "unsupported" }),
+    );
   });
 
   it("stores Aider and Continue behavior in referenceFormat data", () => {

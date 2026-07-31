@@ -47,7 +47,9 @@ const parseFrontmatter = (file: string): { frontmatter: Frontmatter | null; body
 const skillRoot = path.dirname(fileURLToPath(import.meta.url));
 
 const installedSkills = installedSkillsFor(featureCatalog.map((feature) => feature.id)).map((skill) => {
-  const feature = featureCatalog.find((candidate) => candidate.installedSkill._tag === "skill" && candidate.installedSkill.id === skill.id);
+  const feature = featureCatalog.find(
+    (candidate) => candidate.installedSkill._tag === "skill" && candidate.installedSkill.id === skill.id,
+  );
   if (feature === undefined) {
     throw new Error(`Installed skill ${skill.id} is missing a catalog feature.`);
   }
@@ -97,7 +99,10 @@ const expectValidSkillFrontmatter = (skillMd: string, expectedName: string): voi
 };
 
 describe("shipped skills", () => {
-  it.each(installedSkills)("$skillId has valid Kimi/Kiro frontmatter under $sourceDirectory", ({ skillId, sourceDirectory }) => {
+  it.each(installedSkills)("$skillId has valid Kimi/Kiro frontmatter under $sourceDirectory", ({
+    skillId,
+    sourceDirectory,
+  }) => {
     expectValidSkillFrontmatter(path.join(skillRoot, sourceDirectory, "SKILL.md"), skillId);
   });
 });
@@ -119,7 +124,10 @@ describe("local skill sources", () => {
 });
 
 describe("repeated workflow skills", () => {
-  it.each(repeatedWorkflowSkills)("$skillId declares searchable triggers and operational gates", ({ skillId, sourceDirectory }) => {
+  it.each(repeatedWorkflowSkills)("$skillId declares searchable triggers and operational gates", ({
+    skillId,
+    sourceDirectory,
+  }) => {
     const skillMd = path.join(skillRoot, sourceDirectory, "SKILL.md");
     expect(existsSync(skillMd)).toBe(true);
 

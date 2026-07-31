@@ -9,13 +9,24 @@ import { Effect } from "effect";
 import { featureCatalog, selectedFeatureIds } from "../catalog/featureCatalog.js";
 import { install } from "../install/install.js";
 import { captureHostEvidence, destinationForScope } from "./hostEvidence.js";
-import { featuresOption, globalOption, parseFeatureIds, projectOption, resolveScope, yesOption } from "./scopeOptions.js";
+import {
+  featuresOption,
+  globalOption,
+  parseFeatureIds,
+  projectOption,
+  resolveScope,
+  yesOption,
+} from "./scopeOptions.js";
 import { stagePackage } from "./stagePackage.js";
 import * as TerminalUI from "./TerminalUI.js";
 
 type FeatureChoice = { _tag: "selected"; ids: ReadonlyArray<string> } | { _tag: "defaults" };
 
-const resolveFeatureChoice = (input: { featureIds: ReadonlyArray<string> | undefined; interactive: boolean; assumeYes: boolean }) =>
+const resolveFeatureChoice = (input: {
+  featureIds: ReadonlyArray<string> | undefined;
+  interactive: boolean;
+  assumeYes: boolean;
+}) =>
   Effect.gen(function* () {
     if (input.featureIds !== undefined) {
       const choice: FeatureChoice = { _tag: "selected", ids: input.featureIds };

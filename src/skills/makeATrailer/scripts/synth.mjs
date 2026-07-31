@@ -15,10 +15,42 @@ const SR = 44100;
 
 /** Chord progressions (semitone offsets from the root) per mood, plus a root MIDI note. */
 const MOODS = {
-  epic: { root: 45, chords: [[0, 7, 12], [-4, 3, 8], [-7, 0, 5], [-2, 5, 10]] },
-  warm: { root: 48, chords: [[0, 4, 7], [-3, 2, 9], [-5, 0, 4], [2, 5, 9]] },
-  tense: { root: 43, chords: [[0, 6, 10], [0, 5, 11], [-2, 4, 10], [-1, 6, 9]] },
-  playful: { root: 52, chords: [[0, 4, 7], [5, 9, 12], [-3, 4, 7], [2, 7, 11]] },
+  epic: {
+    root: 45,
+    chords: [
+      [0, 7, 12],
+      [-4, 3, 8],
+      [-7, 0, 5],
+      [-2, 5, 10],
+    ],
+  },
+  warm: {
+    root: 48,
+    chords: [
+      [0, 4, 7],
+      [-3, 2, 9],
+      [-5, 0, 4],
+      [2, 5, 9],
+    ],
+  },
+  tense: {
+    root: 43,
+    chords: [
+      [0, 6, 10],
+      [0, 5, 11],
+      [-2, 4, 10],
+      [-1, 6, 9],
+    ],
+  },
+  playful: {
+    root: 52,
+    chords: [
+      [0, 4, 7],
+      [5, 9, 12],
+      [-3, 4, 7],
+      [2, 7, 11],
+    ],
+  },
 };
 
 /** Small deterministic PRNG so a given --seed is reproducible. */

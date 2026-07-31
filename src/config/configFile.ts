@@ -166,7 +166,10 @@ const presentConfigFileSnapshotSchema = Schema.TaggedStruct("present", {
     description: "Exact managed configuration bytes and their decoded value.",
   });
 
-export const configFileSnapshotSchema = Schema.Union(missingConfigFileSnapshotSchema, presentConfigFileSnapshotSchema).annotations({
+export const configFileSnapshotSchema = Schema.Union(
+  missingConfigFileSnapshotSchema,
+  presentConfigFileSnapshotSchema,
+).annotations({
   description: "Missing or present managed configuration captured by one filesystem read.",
 });
 

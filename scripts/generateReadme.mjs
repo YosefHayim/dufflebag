@@ -28,9 +28,7 @@ import { fileURLToPath } from "node:url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
 
-const SKILL_ROOTS = [
-  { root: path.join(ROOT, "src/skills"), label: "dufflebag source" },
-];
+const SKILL_ROOTS = [{ root: path.join(ROOT, "src/skills"), label: "dufflebag source" }];
 
 /**
  * Shipped skills that are NOT dufflebag-original — bundled for convenience but
@@ -62,10 +60,11 @@ function parseFeatures() {
   const starts = [];
   // e.g. `id: "context-guard",\n  sourceDirectory:` → capture "context-guard"
   const startRegex = /id:\s*"([a-z][a-z0-9-]*)",\s*\n\s*sourceDirectory:/g;
-  let match;
+  let match = startRegex.exec(featuresSource);
 
-  while ((match = startRegex.exec(featuresSource)) !== null) {
+  while (match !== null) {
     starts.push({ id: match[1], index: match.index });
+    match = startRegex.exec(featuresSource);
   }
 
   return starts.map((start, index) => {
@@ -80,7 +79,7 @@ function parseFeatures() {
         .match(/summary:\s*\n?\s*"((?:\\.|[^"\\])*)"/s)?.[1]
         ?.replace(/\\n/g, " ") // e.g. "line1\\nline2" → "line1 line2"
         ?.replace(/"\s*\+\s*"/g, "") ?? // e.g. `"a" + "b"` fragments → "ab"
-        "";
+      "";
     // e.g. `platform: "macos"` → "macos"
     const platform = block.match(/platform:\s*"([^"]+)"/)?.[1] ?? "any";
 
@@ -174,7 +173,9 @@ function parseSkills() {
   for (const { root, label } of SKILL_ROOTS) {
     for (const skill of scanSkillRoot(root, label)) {
       if (!skill.description) {
-        console.warn(`⚠️  Skipping ${skill.name}: no description or fallback prose in ${path.join(root, skill.dirName, "SKILL.md")}`);
+        console.warn(
+          `⚠️  Skipping ${skill.name}: no description or fallback prose in ${path.join(root, skill.dirName, "SKILL.md")}`,
+        );
         continue;
       }
 
@@ -199,10 +200,7 @@ function parseSkills() {
 // ─── Generate the sections ──────────────────────────────────────────────────
 
 function generateFeaturesTable(features) {
-  const lines = [
-    "| Feature | What it does | Runs on |",
-    "| --- | --- | --- |",
-  ];
+  const lines = ["| Feature | What it does | Runs on |", "| --- | --- | --- |"];
   for (const f of features) {
     if (COMMUNITY_SKILLS[f.id]) continue; // credited in the community table instead
     lines.push(`| **${f.id}** | ${f.summary} | ${f.platform} |`);

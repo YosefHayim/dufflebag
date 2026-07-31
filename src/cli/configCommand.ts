@@ -43,7 +43,10 @@ const hardCapOption = Options.integer("hard-cap").pipe(
   Options.withDescription("Hard upper limit for an autorun cycle budget"),
 );
 
-const pollOption = Options.integer("poll").pipe(Options.optional, Options.withDescription("Seconds between autorun daemon observations"));
+const pollOption = Options.integer("poll").pipe(
+  Options.optional,
+  Options.withDescription("Seconds between autorun daemon observations"),
+);
 
 const idleOption = Options.integer("idle").pipe(
   Options.optional,
