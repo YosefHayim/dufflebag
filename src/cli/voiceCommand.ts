@@ -64,6 +64,10 @@ const sourceOption = Options.choice("source", ["claude-code", "codex", "grok", "
 );
 
 const textArgument = Args.text({ name: "text" }).pipe(Args.withDescription("Complete Markdown response to read aloud"));
+const promptArgument = Args.text({ name: "prompt" }).pipe(Args.withDescription("Draft prompt to refine locally"));
+const speakRefinementOption = Options.boolean("speak").pipe(
+  Options.withDescription("Read the refined prompt aloud with synchronized highlighting"),
+);
 const devinArguments = Args.text({ name: "devin-argument" }).pipe(
   Args.repeated,
   Args.withDescription("Arguments passed to Devin; put -- before Devin flags"),
@@ -171,7 +175,10 @@ const onCommand = CliCommand.make(
       yield* runVoice(script, ["stop"], "Previous voice worker");
       yield* runVoice(script, ["start"], "Voice worker");
       yield* TerminalUI.success(`Voice is on (${location.scope}).`);
-      yield* TerminalUI.info("Hold Control to dictate at the active caret; release it to stop.");
+      yield* TerminalUI.info("Tap Control to stop narration; hold it to dictate; release it to finish.");
+      if (currentConfig.promptRefinementMode === "review") {
+        yield* TerminalUI.info("Double-tap Control to refine the copied prompt, then press ⌘V to paste it.");
+      }
 
       if (Option.isSome(args.example)) {
         const source = Option.getOrElse(args.agent, () => "example");
@@ -251,7 +258,7 @@ const statusCommand = CliCommand.make(
         PlatformCommand.make("uv", "run", "--frozen", "--script", script, "status"),
       );
       yield* TerminalUI.note(`feature  on\nscope    ${location.scope}\nworker   ${status.trim()}`, "Voice");
-      yield* TerminalUI.outro("Hold Control to dictate; release it to stop.");
+      yield* TerminalUI.outro("Tap Control to stop narration; hold it to dictate; release it to finish.");
     }).pipe(Effect.catchAll((error) => TerminalUI.presentError(error))),
 ).pipe(CliCommand.withDescription("Show install, worker, and dictation state"));
 
@@ -271,6 +278,27 @@ const exampleCommand = CliCommand.make(
       yield* runVoice(script, ["example", "--text", args.text, "--source", args.source], "Voice example");
     }).pipe(Effect.catchAll((error) => TerminalUI.presentError(error))),
 ).pipe(CliCommand.withDescription("Read one complete Markdown response aloud"));
+
+const refineCommand = CliCommand.make(
+  "refine",
+  {
+    prompt: promptArgument,
+    speak: speakRefinementOption,
+    project: projectOption,
+    global: globalOption,
+  },
+  (args) =>
+    Effect.gen(function* () {
+      yield* requireUv;
+      const location = yield* voiceLocation(args);
+      const script = yield* requireInstalledVoice(location.destination.root);
+      yield* runVoice(
+        script,
+        ["refine", "--text", args.prompt, ...(args.speak ? ["--speak"] : [])],
+        "Prompt refinement",
+      );
+    }).pipe(Effect.catchAll((error) => TerminalUI.presentError(error))),
+).pipe(CliCommand.withDescription("Refine one prompt with Apple's local on-device model"));
 
 const devinCommand = CliCommand.make(
   "devin",
@@ -305,5 +333,5 @@ const devinCommand = CliCommand.make(
 
 export const voiceCommand = CliCommand.make("voice").pipe(
   CliCommand.withDescription("Natural local response narration and caret dictation"),
-  CliCommand.withSubcommands([onCommand, offCommand, statusCommand, exampleCommand, devinCommand]),
+  CliCommand.withSubcommands([onCommand, offCommand, statusCommand, exampleCommand, refineCommand, devinCommand]),
 );

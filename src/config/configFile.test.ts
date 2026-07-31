@@ -50,6 +50,9 @@ layer(NodeContext.layer)("configFile", (it) => {
         const configPath = path.join(root, "config.json");
         const {
           idleAutoCompact: _idleRemoved,
+          speechResponseMode: _speechResponseModeRemoved,
+          speechReadAlong: _speechReadAlongRemoved,
+          promptRefinementMode: _promptRefinementModeRemoved,
           dictationReplacements: _dictationRemoved,
           ...oldConfig
         } = defaultBagConfig;

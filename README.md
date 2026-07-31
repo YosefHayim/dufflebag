@@ -84,9 +84,18 @@ dufflebag voice devin -- <devin arguments>
 
 Markdown is translated into speech instead of read as punctuation: tables name
 their columns and cells, links stay understandable, and code blocks are announced
-and read in full. Nothing is truncated.
+and read in full. Nothing is truncated. While narration plays, a bottom-center
+read-along keeps nearby words visible and fits a blue background to the word being
+spoken. Turn it off with `dufflebag config --read-along off`.
 
-Hold Control for 350 ms to dictate locally into the active caret. A small
+Inside Cmux, each response is bound to its originating workspace and surface. A
+background response remains silent until that surface is focused and Cmux is the
+frontmost app; older unread responses from the same surface coalesce into the
+latest one. Use `--speech-mode immediate` for the old global behavior or
+`--speech-mode off` to suppress narration without uninstalling voice.
+
+Tap Control to stop narration. Hold Control for 120 ms to dictate locally into
+the active caret. A small
 bottom-center pill moves through **Starting microphone**, **Listening**, and
 **Finishing**; release Control to finish the phrase. Dufflebag keeps a short
 release tail so the final word is not clipped. Say punctuation and structure
@@ -105,13 +114,28 @@ Add machine-specific corrections without an LLM:
 dufflebag config --dictation-words "Joseph=Yosef;type script=TypeScript"
 ```
 
+On macOS 26+, prompt refinement can use Apple's on-device Foundation Models
+framework. Enable review mode, copy a draft, then double-tap Control. Dufflebag
+preserves code, commands, paths, URLs, and quoted literals; copies only the
+validated refined draft; and reads it with the same active-word highlight. Press
+Command-V to paste and review it—the feature never submits for you.
+
+```bash
+dufflebag config --prompt-refinement review
+dufflebag voice refine "please make this request precise" --speak
+```
+
+Apple Intelligence must be enabled and its local model ready. If it is not,
+the original clipboard remains untouched and the overlay reports why refinement
+is unavailable. Disable the gesture with `dufflebag config --prompt-refinement off`.
+
 ```bash
 dufflebag voice status
 dufflebag voice example "Release status: Devin is ready."
 dufflebag voice off
 ```
 
-Voice supports macOS, Windows, and Linux and requires only
+Narration and dictation support macOS, Windows, and Linux and require only
 [`uv`](https://docs.astral.sh/uv/). `dufflebag voice on` uses the adjacent lockfile
 to prepare a compatible Python, pinned packages, and both local speech models
 before starting the worker. Later runs reuse uv and model caches; narration and
@@ -125,8 +149,9 @@ permissions when your OS asks. Linux desktop and Wayland security policy can
 restrict global key capture or caret typing. If Tkinter or a graphical desktop
 is unavailable, dictation continues without the visual pill.
 
-The installed runtime stays small in source: one zero-dependency hook, one
-PEP 723 Python worker, and its generated uv lockfile.
+The installed runtime has one zero-dependency queue hook, one PEP 723 voice
+entrypoint, and its generated uv lockfile. Apple prompt refinement is a
+macOS-only extension; speech remains local and cross-platform.
 
 Idle auto-compact is off by default. On macOS with Ghostty 1.3+, verified native
 hooks for Claude Code, Codex, and Grok bind each session to its exact terminal.
@@ -142,7 +167,7 @@ Override one launched agent without changing persistent config, for example
 | --- | --- | --- |
 | **context-guard** | Guard long sessions near their context cap and optionally compact idle Claude Code, Codex, or Grok sessions in their exact Ghostty terminal. | 🟢 any OS |
 | **autonomous-loop** | A skill that arms the context-guard SessionStart daemon to auto-/compact and resume hands-free once context nears the guardrail and a fresh handoff exists. macOS + Ghostty only (it types into your terminal window). Hook runtime lives under context-guard. | 🔴 macOS + Ghostty |
-| **speak-response** | Read complete Claude, Codex, Grok, and Devin responses naturally, including Markdown structure, with local cross-platform speech and dictation. | 🟢 any OS |
+| **speak-response** | Read complete agent responses with local speech, push-to-talk dictation, Cmux focus gating, active-word highlighting, and optional on-device prompt refinement on macOS. | 🟢 any OS |
 | **dedup-guard** | Block a Write/Edit that pastes a function body or interface/type shape already defined elsewhere in the repo — DRY enforced at the moment of the write. Uses the repo's own TypeScript; deny by default (tune with dufflebagDedupEnforcement). Also wires Cursor (warn) + an AGENTS.md rule for Codex. | 🟢 any OS |
 | **png-to-code** | A skill that turns a PNG design (illustration, logo, UI mockup) into SVG/HTML/CSS that measurably converges to a 1:1 match — a decompose → reuse-or-build → render → screenshot-diff → refine loop, plus a rig-first doctrine for animation. Pure skill (no hooks); its diff harness needs Node + Playwright. | 🟢 any OS |
 | **github-repo-metadata** | A skill that writes and audits GitHub repository About metadata: concise descriptions, homepage/demo links, and topics/tags grounded in official GitHub guidance. Pure skill (no hooks). | 🟢 any OS |

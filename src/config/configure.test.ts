@@ -227,7 +227,7 @@ describe("planManagedConfig", () => {
     );
 
     expect(plan.config).toEqual(config);
-    expect(expectCleanup(plan).values).toHaveLength(13);
+    expect(expectCleanup(plan).values).toHaveLength(16);
   });
 
   it.each([

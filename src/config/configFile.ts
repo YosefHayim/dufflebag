@@ -49,7 +49,13 @@ const decodeManagedConfigFile = Schema.decodeUnknownEither(managedConfigFileSche
   onExcessProperty: "error",
 });
 
-const additiveConfigFields = ["idleAutoCompact", "dictationReplacements"] as const;
+const additiveConfigFields = [
+  "idleAutoCompact",
+  "speechResponseMode",
+  "speechReadAlong",
+  "promptRefinementMode",
+  "dictationReplacements",
+] as const;
 
 const decodeManagedConfigValue = (value: unknown) => {
   const current = decodeManagedConfigFile(value);

@@ -7,6 +7,8 @@
  */
 
 export type DedupMode = "deny" | "warn" | "off";
+export type SpeechResponseMode = "auto" | "focused" | "immediate" | "off";
+export type PromptRefinementMode = "off" | "review";
 
 export type BagConfig = {
   readonly contextWarnFraction: number;
@@ -18,6 +20,9 @@ export type BagConfig = {
   readonly idleAutoCompact: string;
   readonly speechVoice: string;
   readonly speechWordsPerMinute: number;
+  readonly speechResponseMode: SpeechResponseMode;
+  readonly speechReadAlong: boolean;
+  readonly promptRefinementMode: PromptRefinementMode;
   readonly dictationReplacements: string;
   readonly dedupEnforcement: DedupMode;
   readonly dedupSkipDirectories: string;
@@ -38,6 +43,9 @@ export const ENV_KEYS = {
   idleAutoCompact: "dufflebagIdleAutoCompact",
   speechVoice: "dufflebagSpeechVoice",
   speechWordsPerMinute: "dufflebagSpeechWordsPerMinute",
+  speechResponseMode: "dufflebagSpeechResponseMode",
+  speechReadAlong: "dufflebagSpeechReadAlong",
+  promptRefinementMode: "dufflebagPromptRefinementMode",
   dictationReplacements: "dufflebagDictationReplacements",
   dedupEnforcement: "dufflebagDedupEnforcement",
   dedupSkipDirectories: "dufflebagDedupSkipDirectories",
@@ -61,6 +69,9 @@ export const DEFAULTS: BagConfig = {
   idleAutoCompact: "off",
   speechVoice: "F4",
   speechWordsPerMinute: 230,
+  speechResponseMode: "auto",
+  speechReadAlong: true,
+  promptRefinementMode: "off",
   dictationReplacements: "",
   dedupEnforcement: "deny",
   dedupSkipDirectories: "",
@@ -99,6 +110,22 @@ const dedupModeFromEnv = (raw: string | undefined): DedupMode => {
   }
 };
 
+const speechResponseModeFromEnv = (raw: string | undefined): SpeechResponseMode => {
+  switch ((raw ?? "").trim().toLowerCase()) {
+    case "focused":
+      return "focused";
+    case "immediate":
+      return "immediate";
+    case "off":
+      return "off";
+    default:
+      return "auto";
+  }
+};
+
+const promptRefinementModeFromEnv = (raw: string | undefined): PromptRefinementMode =>
+  (raw ?? "").trim().toLowerCase() === "review" ? "review" : "off";
+
 /** Read effective config from an environment map; unknown or empty values fall back to defaults. */
 export const readConfig = (env: NodeJS.Dict<string> = process.env): BagConfig => ({
   contextWarnFraction: numberFromEnv(env[ENV_KEYS.contextWarnFraction], DEFAULTS.contextWarnFraction),
@@ -116,6 +143,9 @@ export const readConfig = (env: NodeJS.Dict<string> = process.env): BagConfig =>
   idleAutoCompact: env[ENV_KEYS.idleAutoCompact] ?? DEFAULTS.idleAutoCompact,
   speechVoice: env[ENV_KEYS.speechVoice] ?? DEFAULTS.speechVoice,
   speechWordsPerMinute: numberFromEnv(env[ENV_KEYS.speechWordsPerMinute], DEFAULTS.speechWordsPerMinute),
+  speechResponseMode: speechResponseModeFromEnv(env[ENV_KEYS.speechResponseMode]),
+  speechReadAlong: booleanFromEnv(env[ENV_KEYS.speechReadAlong], DEFAULTS.speechReadAlong),
+  promptRefinementMode: promptRefinementModeFromEnv(env[ENV_KEYS.promptRefinementMode]),
   dictationReplacements: env[ENV_KEYS.dictationReplacements] ?? DEFAULTS.dictationReplacements,
   dedupEnforcement: dedupModeFromEnv(env[ENV_KEYS.dedupEnforcement]),
   dedupSkipDirectories: env[ENV_KEYS.dedupSkipDirectories] ?? DEFAULTS.dedupSkipDirectories,
@@ -136,6 +166,9 @@ export const configToEnvMap = (config: BagConfig): Record<string, string> => ({
   [ENV_KEYS.idleAutoCompact]: config.idleAutoCompact,
   [ENV_KEYS.speechVoice]: config.speechVoice,
   [ENV_KEYS.speechWordsPerMinute]: String(config.speechWordsPerMinute),
+  [ENV_KEYS.speechResponseMode]: config.speechResponseMode,
+  [ENV_KEYS.speechReadAlong]: config.speechReadAlong ? "true" : "false",
+  [ENV_KEYS.promptRefinementMode]: config.promptRefinementMode,
   [ENV_KEYS.dictationReplacements]: config.dictationReplacements,
   [ENV_KEYS.dedupEnforcement]: config.dedupEnforcement,
   [ENV_KEYS.dedupSkipDirectories]: config.dedupSkipDirectories,

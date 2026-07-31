@@ -293,7 +293,7 @@ describe("featureCatalog", () => {
         id: "speak-response",
         platform: "any",
         sourceEntrypoint: "hooks/speakResponse.ts",
-        shippedPaths: ["voice.py", "voice.py.lock"],
+        shippedPaths: ["cmux_focus.py", "prompt_refinement.py", "voice.py", "voice.py.lock"],
         registrations: [
           {
             event: "Stop",

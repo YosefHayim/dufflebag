@@ -68,6 +68,27 @@ const ttsRateOption = Options.integer("tts-rate").pipe(
   Options.withDescription("Speech response rate in words per minute"),
 );
 
+const speechModes: ReadonlyArray<"auto" | "focused" | "immediate" | "off"> = ["auto", "focused", "immediate", "off"];
+
+const speechModeOption = Options.choice("speech-mode", speechModes).pipe(
+  Options.optional,
+  Options.withDescription("Narration policy: Cmux-aware auto, focused, immediate, or off"),
+);
+
+const onOffValues: ReadonlyArray<"on" | "off"> = ["on", "off"];
+
+const readAlongOption = Options.choice("read-along", onOffValues).pipe(
+  Options.optional,
+  Options.withDescription("Show or hide synchronized active-word narration highlighting"),
+);
+
+const promptRefinementModes: ReadonlyArray<"off" | "review"> = ["off", "review"];
+
+const promptRefinementOption = Options.choice("prompt-refinement", promptRefinementModes).pipe(
+  Options.optional,
+  Options.withDescription("Enable local clipboard prompt refinement on a Control double-tap"),
+);
+
 const dictationWordsOption = Options.text("dictation-words").pipe(
   Options.optional,
   Options.withDescription("Speech replacements, for example Joseph=Yosef;type script=TypeScript"),
@@ -101,6 +122,9 @@ const buildConfigPatch = (args: {
   autoCompactIdle: Option.Option<string>;
   ttsVoice: Option.Option<string>;
   ttsRate: Option.Option<number>;
+  speechMode: Option.Option<"auto" | "focused" | "immediate" | "off">;
+  readAlong: Option.Option<"on" | "off">;
+  promptRefinement: Option.Option<"off" | "review">;
   dictationWords: Option.Option<string>;
   dedupMode: Option.Option<"deny" | "warn" | "off">;
   dedupSkip: Option.Option<string>;
@@ -115,6 +139,13 @@ const buildConfigPatch = (args: {
   assignOptional(patch, "idleAutoCompact", args.autoCompactIdle);
   assignOptional(patch, "speechVoice", args.ttsVoice);
   assignOptional(patch, "speechWordsPerMinute", args.ttsRate);
+  assignOptional(patch, "speechResponseMode", args.speechMode);
+  assignOptional(
+    patch,
+    "speechReadAlong",
+    Option.map(args.readAlong, (value) => value === "on"),
+  );
+  assignOptional(patch, "promptRefinementMode", args.promptRefinement);
   assignOptional(patch, "dictationReplacements", args.dictationWords);
   assignOptional(patch, "dedupEnforcement", args.dedupMode);
   assignOptional(patch, "dedupSkipDirectories", args.dedupSkip);
@@ -131,6 +162,9 @@ const CONFIG_LABELS: Record<keyof typeof defaultBagConfig, string> = {
   idleAutoCompact: "idle auto-compact (off|duration)",
   speechVoice: "speech voice",
   speechWordsPerMinute: "speech rate (wpm)",
+  speechResponseMode: "speech response mode",
+  speechReadAlong: "speech read-along",
+  promptRefinementMode: "prompt refinement",
   dictationReplacements: "dictation replacements",
   dedupEnforcement: "dedup enforcement (deny|warn|off)",
   dedupSkipDirectories: "dedup skip directories",
@@ -153,6 +187,9 @@ export const configCommand = Command.make(
     autoCompactIdle: autoCompactIdleOption,
     ttsVoice: ttsVoiceOption,
     ttsRate: ttsRateOption,
+    speechMode: speechModeOption,
+    readAlong: readAlongOption,
+    promptRefinement: promptRefinementOption,
     dictationWords: dictationWordsOption,
     dedupMode: dedupModeOption,
     dedupSkip: dedupSkipOption,
@@ -184,6 +221,9 @@ export const configCommand = Command.make(
         "idleAutoCompact",
         "speechVoice",
         "speechWordsPerMinute",
+        "speechResponseMode",
+        "speechReadAlong",
+        "promptRefinementMode",
         "dictationReplacements",
         "dedupEnforcement",
         "dedupSkipDirectories",

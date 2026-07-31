@@ -36,6 +36,9 @@ describe("bagConfigSchema", () => {
       idleAutoCompact: "off",
       speechVoice: "F4",
       speechWordsPerMinute: 230,
+      speechResponseMode: "auto",
+      speechReadAlong: true,
+      promptRefinementMode: "off",
       dictationReplacements: "",
       dedupEnforcement: "deny",
       dedupSkipDirectories: "",
@@ -54,6 +57,9 @@ describe("bagConfigSchema", () => {
     expectDescription(bagConfigSchema.from.fields.idleAutoCompact);
     expectDescription(bagConfigSchema.from.fields.speechVoice);
     expectDescription(bagConfigSchema.from.fields.speechWordsPerMinute);
+    expectDescription(bagConfigSchema.from.fields.speechResponseMode);
+    expectDescription(bagConfigSchema.from.fields.speechReadAlong);
+    expectDescription(bagConfigSchema.from.fields.promptRefinementMode);
     expectDescription(bagConfigSchema.from.fields.dictationReplacements);
     expectDescription(bagConfigSchema.from.fields.dedupEnforcement);
     expectDescription(bagConfigSchema.from.fields.dedupSkipDirectories);
@@ -78,6 +84,9 @@ describe("bagConfigSchema", () => {
     "idleAutoCompact",
     "speechVoice",
     "speechWordsPerMinute",
+    "speechResponseMode",
+    "speechReadAlong",
+    "promptRefinementMode",
     "dictationReplacements",
     "dedupEnforcement",
     "dedupSkipDirectories",
@@ -167,12 +176,16 @@ describe("bagConfigSchema", () => {
     expect(
       decodeBagConfig({
         speechVoice: "  Ava  ",
+        speechResponseMode: " focused ",
+        promptRefinementMode: " review ",
         dictationReplacements: "  Joseph=Yosef; type script=TypeScript  ",
         dedupEnforcement: " warn ",
         dedupSkipDirectories: "  templates, fixtures  ",
       }),
     ).toMatchObject({
       speechVoice: "Ava",
+      speechResponseMode: "focused",
+      promptRefinementMode: "review",
       dictationReplacements: "Joseph=Yosef; type script=TypeScript",
       dedupEnforcement: "warn",
       dedupSkipDirectories: "templates, fixtures",
@@ -182,6 +195,8 @@ describe("bagConfigSchema", () => {
 
   it("does not case-fold dedup enforcement", () => {
     expect(() => decodeBagConfig({ dedupEnforcement: "DENY" })).toThrow();
+    expect(() => decodeBagConfig({ speechResponseMode: "AUTO" })).toThrow();
+    expect(() => decodeBagConfig({ promptRefinementMode: "REVIEW" })).toThrow();
   });
 });
 
@@ -250,12 +265,18 @@ describe("legacyBagConfigEnvironmentSchema", () => {
     expect(
       decodeLegacyBagConfig({
         dufflebagSpeechVoice: "  Ava  ",
+        dufflebagSpeechResponseMode: " focused ",
+        dufflebagSpeechReadAlong: " false ",
+        dufflebagPromptRefinementMode: " review ",
         dufflebagDictationReplacements: "  Joseph=Yosef  ",
         dufflebagDedupEnforcement: " off ",
         dufflebagDedupSkipDirectories: "  templates, fixtures  ",
       }),
     ).toMatchObject({
       speechVoice: "Ava",
+      speechResponseMode: "focused",
+      speechReadAlong: false,
+      promptRefinementMode: "review",
       dictationReplacements: "Joseph=Yosef",
       dedupEnforcement: "off",
       dedupSkipDirectories: "templates, fixtures",
@@ -290,6 +311,6 @@ describe("bagConfigJsonSchema", () => {
     const json = Schema.encodeSync(bagConfigJsonSchema)(defaultBagConfig);
 
     expect(JSON.parse(json)).toEqual(defaultBagConfig);
-    expect(Object.keys(JSON.parse(json))).toHaveLength(13);
+    expect(Object.keys(JSON.parse(json))).toHaveLength(16);
   });
 });

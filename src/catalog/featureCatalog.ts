@@ -335,14 +335,14 @@ export const featureCatalog = Schema.decodeUnknownSync(featureCatalogSchema, {
     installedSkill: { _tag: "none" },
     title: "Speak responses (TTS)",
     summary:
-      "Read complete Claude, Codex, Grok, and Devin responses naturally, including Markdown structure, with local cross-platform speech and dictation.",
+      "Read complete agent responses with local speech, push-to-talk dictation, Cmux focus gating, active-word highlighting, and optional on-device prompt refinement on macOS.",
     selectedByDefault: false,
     dependencies: [],
     platform: "any",
     runtime: {
       _tag: "hook",
       sourceEntrypoint: "hooks/speakResponse.ts",
-      shippedPaths: ["voice.py", "voice.py.lock"],
+      shippedPaths: ["cmux_focus.py", "prompt_refinement.py", "voice.py", "voice.py.lock"],
       registrations: [
         {
           event: "Stop",
