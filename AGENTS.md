@@ -20,13 +20,15 @@ Read these before changing code. This file is a routing digest — open the link
 | [`CONTEXT.md`](CONTEXT.md) | Runtime and operational boundaries |
 | [`LANGUAGE.md`](LANGUAGE.md) | Domain terms |
 | [`CODE-STYLE.md`](CODE-STYLE.md) | Prescriptive style SSOT for this repo |
-| [`code-style.rules.json`](code-style.rules.json) | Rule id → enforcement channel |
+| [`code-style.rules.json`](code-style.rules.json) | Machine mirror: rule id → one-sentence statement + the command that verifies it |
 | `docs/adr/current/` | Architectural decisions (do not rewrite historical bodies) |
 | `src/skills/<sourceDirectory>/` | Authored feature docs and feature-local runtime |
 
 Public feature and installed-skill IDs are decoded catalog data and can differ from the authored camelCase directory name.
 
-**Style layers:** workspace philosophy at `~/Desktop/Code/code-style.md` (Uncle Bob distillation) → this repo’s [`CODE-STYLE.md`](CODE-STYLE.md) **wins on mechanism**. Philosophy still binds on intent (small functions, honest names, dependency direction, tests as courage). Do not restate style rules here.
+**Style layers:** workspace philosophy ships as [`templates/mdFiles/CODE-STYLE.md`](templates/mdFiles/CODE-STYLE.md) (Uncle Bob distillation) → this repo’s [`CODE-STYLE.md`](CODE-STYLE.md) **wins on mechanism**. Philosophy still binds on intent (small functions, honest names, dependency direction, tests as courage). Do not restate style rules here.
+
+**Rule cards:** every rule in `CODE-STYLE.md` is one card — heading, `[rule:<id>] · verify: <command>`, a **one-sentence** assertion, a ✓/✗ example, a `Why:` line. The assertion must match the mirror's `statement` byte for byte. `scripts/checkStyleGuide.ts` fails `pnpm verify` when a card drifts, so add rules by following [`CODE-STYLE.md`](CODE-STYLE.md) → Recipes → "Adding a rule to this document".
 
 ## Repo layout
 
@@ -40,7 +42,7 @@ Public feature and installed-skill IDs are decoded catalog data and can differ f
 | `src/skills/<sourceDirectory>/` | Authored skill content and feature-local dependency-free runtime |
 | `src/doctor.ts` | Structured installation diagnostics |
 | `src/scaffoldWorkflows.ts` | Workflow-template scaffolding capability |
-| `scripts/` | Outer-ring tooling only: package build (`assembleHooks`, `generateReadme`), style contract (`checkCodeStyle`), never imported by `src/` |
+| `scripts/` | Outer-ring tooling only: package build (`assembleHooks`, `generateReadme`), style contract (`checkCodeStyle` + `reportCodeStyle`), style-guide format (`checkStyleGuide` + `reportStyleGuide`), never imported by `src/` |
 | `templates/` | Files intentionally copied into another repository |
 | `docs/adr/current/` | Current architectural decisions |
 | `.husky/pre-commit` | README regeneration before commits |
@@ -67,6 +69,13 @@ Run the narrow suite for the changed capability, then the repository gate:
 pnpm test
 pnpm typecheck
 pnpm verify
+```
+
+Style contract, reported but not yet gating while the tree migrates (`pnpm verify` stays green without it):
+
+```bash
+pnpm style              # AST, path, and import-graph rules over the maintained tree
+pnpm style:guide .      # rule-card format of CODE-STYLE.md; accepts any repo path
 ```
 
 For png-to-code script changes:
