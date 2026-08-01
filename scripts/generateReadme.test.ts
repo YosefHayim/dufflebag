@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 
-function autoSection(startMarker: string, endMarker: string): string {
+const autoSection = (startMarker: string, endMarker: string): string => {
   const readme = readFileSync(path.resolve("README.md"), "utf8");
   const startIndex = readme.indexOf(startMarker);
   const endIndex = readme.indexOf(endMarker);
@@ -11,7 +11,7 @@ function autoSection(startMarker: string, endMarker: string): string {
   expect(endIndex).toBeGreaterThan(startIndex);
 
   return readme.slice(startIndex + startMarker.length, endIndex);
-}
+};
 
 describe("README generation", () => {
   it("lists dufflebag-owned skills in the catalog, minus community and user-global skills", () => {

@@ -529,27 +529,35 @@ const desiredStateSchema = Schema.Struct({
   ]),
 );
 
-const jsonContainerAcquisitionIssues = (
-  previous: JsonValuesOwnership,
-  desired: JsonValuesOwnership,
-  artifactIndex: number,
-) =>
-  desired.createdContainers.flatMap((container, containerIndex) => {
-    if (previous.createdContainers.includes(container)) {
+const jsonContainerAcquisitionIssues = (input: {
+  previous: JsonValuesOwnership;
+  desired: JsonValuesOwnership;
+  artifactIndex: number;
+}) =>
+  input.desired.createdContainers.flatMap((container, containerIndex) => {
+    if (input.previous.createdContainers.includes(container)) {
       return [];
     }
 
-    const ownsNewDescendant = desired.values.some(
+    const ownsNewDescendant = input.desired.values.some(
       (value) =>
         value.pointer.startsWith(`${container}/`) &&
-        !previous.values.some((previousValue) => previousValue.pointer === value.pointer),
+        !input.previous.values.some((previousValue) => previousValue.pointer === value.pointer),
     );
 
     return ownsNewDescendant
       ? []
       : [
           {
-            path: ["desired", "receipt", "artifacts", artifactIndex, "ownership", "createdContainers", containerIndex],
+            path: [
+              "desired",
+              "receipt",
+              "artifacts",
+              input.artifactIndex,
+              "ownership",
+              "createdContainers",
+              containerIndex,
+            ],
             message: `Created JSON container ${container} requires a newly owned descendant pointer.`,
           },
         ];
@@ -627,7 +635,11 @@ export const updatePlanInputSchema = Schema.Struct({
         const previousArtifact = previousArtifacts.find((candidate) => candidate.path === artifact.path);
 
         return previousArtifact?.ownership._tag === "jsonValues" && artifact.ownership._tag === "jsonValues"
-          ? jsonContainerAcquisitionIssues(previousArtifact.ownership, artifact.ownership, index)
+          ? jsonContainerAcquisitionIssues({
+              previous: previousArtifact.ownership,
+              desired: artifact.ownership,
+              artifactIndex: index,
+            })
           : [];
       }),
       ...input.desired.receipt.artifacts.flatMap((artifact, index) => {

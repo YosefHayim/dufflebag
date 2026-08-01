@@ -267,9 +267,9 @@ const hasExportModifier = (node: ts.Node & { modifiers?: ts.NodeArray<ts.Modifie
  * this repository runs; `skillPayload` is content authored for *other* repos,
  * so it answers to Biome and its own harness rather than our Effect-era rules.
  */
-type CodeCategory = "application" | "hookIsland" | "skillPayload" | "tooling";
+export type CodeCategory = "application" | "hookIsland" | "skillPayload" | "tooling";
 
-const codeCategory = (file: string): CodeCategory => {
+export const codeCategory = (file: string): CodeCategory => {
   // e.g. "scripts/assembleHooks.mjs" — outer-ring maintainer tooling.
   if (file.startsWith("scripts/")) {
     return "tooling";
@@ -409,11 +409,11 @@ const isBuilderReduce = (node: ts.CallExpression): boolean => {
   );
 };
 
-const isNamedPropertyCall = (node: ts.CallExpression, owner: string, property: string): boolean =>
-  ts.isPropertyAccessExpression(node.expression) &&
-  ts.isIdentifier(node.expression.expression) &&
-  node.expression.expression.text === owner &&
-  node.expression.name.text === property;
+const isNamedPropertyCall = (request: { node: ts.CallExpression; owner: string; property: string }): boolean =>
+  ts.isPropertyAccessExpression(request.node.expression) &&
+  ts.isIdentifier(request.node.expression.expression) &&
+  request.node.expression.expression.text === request.owner &&
+  request.node.expression.name.text === request.property;
 
 const isEffectRunCall = (node: ts.CallExpression): boolean =>
   ts.isPropertyAccessExpression(node.expression) &&
@@ -485,7 +485,8 @@ const sourceCandidates = (target: string): ReadonlyArray<string> => {
   return [target, `${target}.ts`, `${target}.tsx`];
 };
 
-const resolvesToPureBarrel = (repositoryRoot: string, file: string, specifier: string): boolean => {
+const resolvesToPureBarrel = (request: { repositoryRoot: string; file: string; specifier: string }): boolean => {
+  const { repositoryRoot, file, specifier } = request;
   const target = resolvedImportPath(file, specifier);
   const candidate = target
     ? sourceCandidates(target).find((path) => existsSync(join(repositoryRoot, path)))
@@ -548,13 +549,14 @@ const hookImportAllowed = (input: { file: string; specifier: string; typeOnly: b
   return Boolean(featureRoot && target.startsWith(`${featureRoot}/`));
 };
 
-const inspectSourceFile = (
-  repositoryRoot: string,
-  file: string,
-  protectedPaths: ReadonlyArray<ProtectedPathConfiguration>,
-  program: ts.Program,
-  typeChecker: ts.TypeChecker,
-): ReadonlyArray<CodeStyleViolation> => {
+const inspectSourceFile = (request: {
+  repositoryRoot: string;
+  file: string;
+  protectedPaths: ReadonlyArray<ProtectedPathConfiguration>;
+  program: ts.Program;
+  typeChecker: ts.TypeChecker;
+}): ReadonlyArray<CodeStyleViolation> => {
+  const { repositoryRoot, file, protectedPaths, program, typeChecker } = request;
   const sourceFile = program.getSourceFile(join(repositoryRoot, file)) ?? failConfiguration(`could not parse ${file}`);
   const sourceText = sourceFile.text;
   const violations: Array<CodeStyleViolation> = [];
@@ -569,7 +571,7 @@ const inspectSourceFile = (
     violations.push({ ruleId, file, line, message });
   };
 
-  const addLineViolation = (ruleId: string, line: number, message: string): void => {
+  const addLineViolation = ({ ruleId, line, message }: { ruleId: string; line: number; message: string }): void => {
     if (!protectedEntry?.codeRuleExemptions.includes(ruleId)) {
       violations.push({ ruleId, file, line, message });
     }
@@ -580,18 +582,30 @@ const inspectSourceFile = (
     const basename = file.split("/").at(-1) ?? "";
     // e.g. "utils.ts", "helpers.mts", "common.tsx" — forbidden generic buckets
     if (/^(?:types|helpers|utils|common|misc)\.[cm]?[jt]sx?$/u.test(basename)) {
-      addLineViolation("path.no-generic-bucket", 1, "Use a filename that names the domain job.");
+      addLineViolation({
+        ruleId: "path.no-generic-bucket",
+        line: 1,
+        message: "Use a filename that names the domain job.",
+      });
     }
 
     const sourceDirectories = file.split("/").slice(1, -1);
     // e.g. "dedupGuard" ok; "dedup-guard" or "DedupGuard" not
     if (sourceDirectories.some((directory) => !/^[a-z][a-zA-Z0-9]*$/u.test(directory))) {
-      addLineViolation("path.source-directory-case", 1, "Authored source directories must use camelCase.");
+      addLineViolation({
+        ruleId: "path.source-directory-case",
+        line: 1,
+        message: "Authored source directories must use camelCase.",
+      });
     }
 
     // e.g. "src/core/...", "src/commands/...", "src/payload/..." — retired layout
     if (/^src\/(?:core|commands|payload)(?:\/|$)/u.test(file)) {
-      addLineViolation("path.capability-layout", 1, "Move this source into the capability that owns it.");
+      addLineViolation({
+        ruleId: "path.capability-layout",
+        line: 1,
+        message: "Move this source into the capability that owns it.",
+      });
     }
   }
 
@@ -787,7 +801,7 @@ const inspectSourceFile = (
         Boolean(exportSpecifier) &&
         // e.g. "./index.js" or "pkg/index.ts" — barrel chaining forbidden
         !/(?:^|\/)index\.(?:js|mjs|cjs|ts|mts|cts)$/u.test(exportSpecifier ?? "") &&
-        !resolvesToPureBarrel(repositoryRoot, file, exportSpecifier ?? "");
+        !resolvesToPureBarrel({ repositoryRoot, file, specifier: exportSpecifier ?? "" });
       if (!directWildcard) {
         addViolation({
           ruleId: "barrel.direct-wildcard",
@@ -837,7 +851,7 @@ const inspectSourceFile = (
     }
 
     if (ts.isCallExpression(node) && isApplicationFile(file)) {
-      if (isNamedPropertyCall(node, "Promise", "all")) {
+      if (isNamedPropertyCall({ node, owner: "Promise", property: "all" })) {
         addViolation({
           ruleId: "effect.no-promise-all",
           sourceFile,
@@ -869,7 +883,11 @@ const inspectSourceFile = (
   };
 
   suppressionCommentLines(sourceFile).forEach((line) => {
-    addLineViolation("type.no-suppression", line, "Remove the tool suppression and fix the boundary instead.");
+    addLineViolation({
+      ruleId: "type.no-suppression",
+      line,
+      message: "Remove the tool suppression and fix the boundary instead.",
+    });
   });
 
   inspectStatementSpacing(sourceFile);
@@ -917,7 +935,9 @@ export const checkCodeStyle = (repositoryRoot: string): CodeStyleReport => {
   });
   const typeChecker = program.getTypeChecker();
   const violations = files
-    .flatMap((file) => inspectSourceFile(repositoryRoot, file, configuration.protectedPaths, program, typeChecker))
+    .flatMap((file) =>
+      inspectSourceFile({ repositoryRoot, file, protectedPaths: configuration.protectedPaths, program, typeChecker }),
+    )
     .concat(misplacedRuntimeFiles(repositoryRoot))
     .sort(compareViolations);
 

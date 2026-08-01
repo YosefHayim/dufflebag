@@ -105,6 +105,7 @@ const ruleCardRanges = (request: {
 };
 
 const firstContentIndex = (request: { lines: ReadonlyArray<string>; from: number; to: number }) => {
+  // Stop at the first non-blank line so the caller learns where the slot's content starts.
   for (let index = request.from; index < request.to; index += 1) {
     if ((request.lines[index] ?? "").trim().length > 0) {
       return index;

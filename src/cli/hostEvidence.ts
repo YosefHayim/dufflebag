@@ -7,7 +7,7 @@
 import { Command, FileSystem, Path } from "@effect/platform";
 import { Effect, Schema } from "effect";
 
-import { type AgentEvidence, agentCatalog, agentEvidenceSchema } from "../catalog/agentCatalog.js";
+import { agentCatalog, agentEvidenceSchema } from "../catalog/agentCatalog.js";
 import { doctorPlatformSchema } from "../doctor.js";
 
 export class HostEvidenceError extends Schema.TaggedError<HostEvidenceError>()("HostEvidenceError", {
@@ -22,15 +22,28 @@ export class HostEvidenceError extends Schema.TaggedError<HostEvidenceError>()("
 
 export type DoctorPlatform = Schema.Schema.Type<typeof doctorPlatformSchema>;
 
-export type HostRoots = {
-  readonly homeRoot: string;
-  readonly projectRoot: string;
-};
+export const hostRootsSchema = Schema.Struct({
+  homeRoot: Schema.String.annotations({
+    description: "Absolute home root that owns global-scope artifacts.",
+  }),
+  projectRoot: Schema.String.annotations({
+    description: "Absolute current-project root that owns project-scope artifacts.",
+  }),
+}).annotations({
+  description: "Filesystem roots resolved once at the CLI edge.",
+});
 
-export type HostEvidence = HostRoots & {
-  readonly platform: DoctorPlatform;
-  readonly agentEvidence: AgentEvidence;
-};
+export type HostRoots = Schema.Schema.Type<typeof hostRootsSchema>;
+
+export const hostEvidenceSchema = Schema.Struct({
+  ...hostRootsSchema.fields,
+  platform: doctorPlatformSchema,
+  agentEvidence: agentEvidenceSchema,
+}).annotations({
+  description: "Complete host observation handed to capabilities so they never probe the environment.",
+});
+
+export type HostEvidence = Schema.Schema.Type<typeof hostEvidenceSchema>;
 
 const uniqueSorted = (values: ReadonlyArray<string>): ReadonlyArray<string> => [...new Set(values)].sort();
 
@@ -56,41 +69,55 @@ const ghosttyAvailable = Effect.gen(function* () {
   return yield* commandAvailable("ghostty");
 });
 
-const captureAgentEvidence = (homeRoot: string) =>
+const presentHomePaths = (detection: { homeRoot: string; homePaths: ReadonlyArray<string> }) =>
   Effect.gen(function* () {
     const fileSystem = yield* FileSystem.FileSystem;
     const path = yield* Path.Path;
-    const homePaths: Array<string> = [];
-    const absolutePaths: Array<string> = [];
-    const commands: Array<string> = [];
+    return yield* Effect.filter(detection.homePaths, (homePath) =>
+      fileSystem.exists(path.join(detection.homeRoot, homePath)),
+    );
+  });
 
-    // Observe every catalog-declared detection alternative exactly once.
-    for (const agent of agentCatalog) {
-      for (const homePath of agent.detection.homePaths) {
-        if (yield* fileSystem.exists(path.join(homeRoot, homePath))) {
-          homePaths.push(homePath);
-        }
-      }
+const presentAbsolutePaths = (absolutePaths: ReadonlyArray<string>) =>
+  Effect.gen(function* () {
+    const fileSystem = yield* FileSystem.FileSystem;
+    return yield* Effect.filter(absolutePaths, (absolutePath) => fileSystem.exists(absolutePath));
+  });
 
-      for (const absolutePath of agent.detection.absolutePaths) {
-        if (yield* fileSystem.exists(absolutePath)) {
-          absolutePaths.push(absolutePath);
-        }
-      }
+const availableCommands = (commandNames: ReadonlyArray<string>) =>
+  Effect.filter(commandNames, (commandName) => commandAvailable(commandName));
 
-      for (const commandName of agent.detection.commands) {
-        if (yield* commandAvailable(commandName)) {
-          commands.push(commandName);
-        }
-      }
-    }
+// Observe every catalog-declared detection alternative for one agent exactly once.
+const observeAgentDetection = (detection: {
+  homeRoot: string;
+  homePaths: ReadonlyArray<string>;
+  absolutePaths: ReadonlyArray<string>;
+  commands: ReadonlyArray<string>;
+}) =>
+  Effect.gen(function* () {
+    const homePaths = yield* presentHomePaths({ homeRoot: detection.homeRoot, homePaths: detection.homePaths });
+    const absolutePaths = yield* presentAbsolutePaths(detection.absolutePaths);
+    const commands = yield* availableCommands(detection.commands);
+    return { homePaths, absolutePaths, commands };
+  });
+
+const captureAgentEvidence = (homeRoot: string) =>
+  Effect.gen(function* () {
+    const observations = yield* Effect.forEach(agentCatalog, (agent) =>
+      observeAgentDetection({
+        homeRoot,
+        homePaths: agent.detection.homePaths,
+        absolutePaths: agent.detection.absolutePaths,
+        commands: agent.detection.commands,
+      }),
+    );
 
     return yield* Schema.decodeUnknown(agentEvidenceSchema, {
       onExcessProperty: "error",
     })({
-      homePaths: uniqueSorted(homePaths),
-      absolutePaths: uniqueSorted(absolutePaths),
-      commands: uniqueSorted(commands),
+      homePaths: uniqueSorted(observations.flatMap((observation) => observation.homePaths)),
+      absolutePaths: uniqueSorted(observations.flatMap((observation) => observation.absolutePaths)),
+      commands: uniqueSorted(observations.flatMap((observation) => observation.commands)),
     }).pipe(
       Effect.mapError(
         (error) =>

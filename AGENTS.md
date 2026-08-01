@@ -60,7 +60,7 @@ A feature is payload **or** runtime, never both. Put executable code under `src/
 
 Hard rules agents must hold every turn. Full prescription: [`CODE-STYLE.md`](CODE-STYLE.md) and `docs/adr/current/`.
 
-- **Verify gate** — `pnpm verify` = `biome ci` + typecheck + test + build. Biome is linter and formatter (double quotes). One root `tsconfig`; the png harness under `src/skills/pngToCode/scripts/` is the single sanctioned exception.
+- **Verify gate** — `pnpm verify` = `biome ci` + typecheck + `style` + `style:guide` + test + build. Biome is linter and formatter (double quotes). One root `tsconfig`; the png harness under `src/skills/pngToCode/scripts/` is the single sanctioned exception.
 - **Effect / Schema** — capabilities return Effect; only `src/cli/main.ts` starts the runtime. Runtime, persisted, catalog, CLI, and agent-format data begin as Effect Schema. Application failures use `Schema.TaggedError`. No hand-rolled `isX` / `parseX` pairs for literals and numbers.
 - **Hook island** — installed hooks stay dependency-free plain Node (`node:*`, `src/runtime/**`, own feature runtime only), **fail-open**. Application code never imports installed hook code.
 - **Ownership** — inspect → plan → validate → apply → write receipt last. A receipt is the only deletion authority. Catalog-closed shipping: the feature catalog owns exact shipped paths.
@@ -78,12 +78,14 @@ pnpm typecheck
 pnpm verify
 ```
 
-Style contract, reported but not yet gating while the tree migrates (`pnpm verify` stays green without it):
+Both style commands are part of `pnpm verify`, so they gate:
 
 ```bash
 pnpm style              # AST, path, and import-graph rules over the maintained tree
 pnpm style:guide .      # rule-card format of CODE-STYLE.md; accepts any repo path
 ```
+
+`pnpm style` fails on the **gated** categories — application, tooling, and payload placement — which are clean and must stay that way. It also prints the `src/hookIsland/` findings under a "reported but not gated" heading: that tree predates the current style, and converting a `function` declaration to an arrow constant changes hoisting in fail-open code, so it is migrated deliberately rather than by codemod ([ADR 0017](docs/adr/current/0017-payload-and-runtime-are-separate-trees.md)).
 
 For png-to-code script changes:
 

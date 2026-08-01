@@ -56,12 +56,13 @@ const featuresSource = readFileSync(featuresPath, "utf8");
  * `sourceDirectory:` — that pairing uniquely identifies top-level features
  * (installed-skill nested ids never carry a sourceDirectory).
  */
-function parseFeatures() {
+const parseFeatures = () => {
   const starts = [];
   // e.g. `id: "context-guard",\n  sourceDirectory:` → capture "context-guard"
   const startRegex = /id:\s*"([a-z][a-z0-9-]*)",\s*\n\s*sourceDirectory:/g;
   let match = startRegex.exec(featuresSource);
 
+  // Drive the global regex to exhaustion so every entry's start offset is recorded.
   while (match !== null) {
     starts.push({ id: match[1], index: match.index });
     match = startRegex.exec(featuresSource);
@@ -94,7 +95,7 @@ function parseFeatures() {
 
     return { id: start.id, title, summary, platform: platformEmoji };
   });
-}
+};
 
 // ─── Extract skills from SKILL.md frontmatter ───────────────────────────────
 
@@ -102,12 +103,13 @@ function parseFeatures() {
  * Parse a minimal YAML frontmatter block into a key/value map.
  * Only handles single-line scalar values; that is all this generator needs.
  */
-function parseFrontmatter(content) {
+const parseFrontmatter = (content) => {
   // e.g. "---\nname: foo\n---\n# body" → capture "name: foo"
   const fmMatch = content.match(/^---\n([\s\S]*?)\n---/);
   if (!fmMatch) return {};
 
   const map = {};
+  // Fold the scalar lines into one lookup so callers can read fields by name.
   for (const line of fmMatch[1].split("\n")) {
     const colonIdx = line.indexOf(":");
     if (colonIdx === -1) continue;
@@ -118,16 +120,17 @@ function parseFrontmatter(content) {
     if (key && value) map[key] = value;
   }
   return map;
-}
+};
 
 /**
  * Fallback description for SKILL.md files without frontmatter.
  * Strips the optional frontmatter and the H1 title, then returns the first
  * non-empty prose line (truncated if it runs long).
  */
-function fallbackDescription(content) {
+const fallbackDescription = (content) => {
   // e.g. strip YAML frontmatter then the first "# Title" heading line
   const body = content.replace(/^---\n[\s\S]*?\n---/, "").replace(/^#\s+.*$/m, "");
+  // Stop at the first prose line; blanks, headings, and fences are not descriptions.
   for (const line of body.split("\n")) {
     const trimmed = line.trim();
     if (!trimmed || trimmed.startsWith("#") || trimmed.startsWith("```")) continue;
@@ -137,9 +140,9 @@ function fallbackDescription(content) {
     return plain;
   }
   return "";
-}
+};
 
-function scanSkillRoot(root, label) {
+const scanSkillRoot = (root, label) => {
   if (!existsSync(root)) return [];
 
   const skills = [];
@@ -150,6 +153,7 @@ function scanSkillRoot(root, label) {
     .map((entry) => path.join(root, entry.name, "SKILL.md"))
     .filter((file) => existsSync(file))
     .sort();
+  // Read each SKILL.md in the sorted order above so the generated tables stay stable.
   for (const skillMd of skillFiles) {
     const dirName = path.basename(path.dirname(skillMd));
     const content = readFileSync(skillMd, "utf8");
@@ -158,6 +162,7 @@ function scanSkillRoot(root, label) {
 
     skills.push({
       dirName,
+      root,
       name: fm.name ?? dirName,
       description,
       trigger: fm.trigger ?? "",
@@ -165,50 +170,59 @@ function scanSkillRoot(root, label) {
     });
   }
   return skills;
-}
+};
 
-function parseSkills() {
+/** Keep only skills that carry prose, naming the file of each one dropped. */
+const keepDescribedSkill = (skill) => {
+  if (skill.description) return true;
+
+  console.warn(
+    `⚠️  Skipping ${skill.name}: no description or fallback prose in ${path.join(skill.root, skill.dirName, "SKILL.md")}`,
+  );
+  return false;
+};
+
+/** The catalog row contributed by the first root that supplies a skill. */
+const firstSkillRow = (skill) => ({
+  name: skill.name,
+  description: skill.description,
+  trigger: skill.trigger,
+  labels: [skill.label],
+});
+
+/** A later root only adds its label and fills a trigger the first root lacked. */
+const mergedSkillRow = (existing, skill) => ({
+  ...existing,
+  trigger: skill.trigger && !existing.trigger ? skill.trigger : existing.trigger,
+  labels: [...existing.labels, skill.label],
+});
+
+const parseSkills = () => {
+  const described = SKILL_ROOTS.flatMap(({ root, label }) => scanSkillRoot(root, label)).filter(keepDescribedSkill);
   const byName = new Map();
 
-  for (const { root, label } of SKILL_ROOTS) {
-    for (const skill of scanSkillRoot(root, label)) {
-      if (!skill.description) {
-        console.warn(
-          `⚠️  Skipping ${skill.name}: no description or fallback prose in ${path.join(root, skill.dirName, "SKILL.md")}`,
-        );
-        continue;
-      }
-
-      const existing = byName.get(skill.name);
-      if (!existing) {
-        byName.set(skill.name, {
-          name: skill.name,
-          description: skill.description,
-          trigger: skill.trigger,
-          labels: [label],
-        });
-      } else {
-        existing.labels.push(label);
-        if (skill.trigger && !existing.trigger) existing.trigger = skill.trigger;
-      }
-    }
+  // Merge duplicates across roots: the first root's prose wins, later roots only add labels.
+  for (const skill of described) {
+    const existing = byName.get(skill.name);
+    byName.set(skill.name, existing ? mergedSkillRow(existing, skill) : firstSkillRow(skill));
   }
 
   return [...byName.values()].sort((a, b) => a.name.localeCompare(b.name));
-}
+};
 
 // ─── Generate the sections ──────────────────────────────────────────────────
 
-function generateFeaturesTable(features) {
+const generateFeaturesTable = (features) => {
   const lines = ["| Feature | What it does | Runs on |", "| --- | --- | --- |"];
+  // Preserve catalog order in the rendered table; community skills are credited elsewhere.
   for (const f of features) {
     if (COMMUNITY_SKILLS[f.id]) continue; // credited in the community table instead
     lines.push(`| **${f.id}** | ${f.summary} | ${f.platform} |`);
   }
   return lines.join("\n");
-}
+};
 
-function generateCommunitySection(skills) {
+const generateCommunitySection = (skills) => {
   const community = skills.filter((s) => COMMUNITY_SKILLS[s.name]);
 
   const lines = [
@@ -218,6 +232,7 @@ function generateCommunitySection(skills) {
     "| --- | --- | --- |",
   ];
 
+  // One credited row per community skill, in the same sorted order as the scan.
   for (const s of community) {
     const { author, url } = COMMUNITY_SKILLS[s.name];
     lines.push(`| **${s.name}** | ${s.description} | [${author}](${url}) |`);
@@ -228,11 +243,11 @@ function generateCommunitySection(skills) {
     "> `grill-me-code-style` and `grill-me-code-style-with-docs` are dufflebag-original skills that build on Matt Pocock's grilling pattern — they stay in the owned catalog above.",
   );
   return lines.join("\n");
-}
+};
 
 // ─── Replace between markers ────────────────────────────────────────────────
 
-function replaceSection(readme, startMarker, endMarker, content) {
+const replaceSection = ({ readme, startMarker, endMarker, content }) => {
   const startIdx = readme.indexOf(startMarker);
   const endIdx = readme.indexOf(endMarker);
 
@@ -245,7 +260,7 @@ function replaceSection(readme, startMarker, endMarker, content) {
   const before = readme.slice(0, startIdx + startMarker.length);
   const after = readme.slice(endIdx);
   return `${before}\n${content}\n${after}`;
-}
+};
 
 // ─── Main ───────────────────────────────────────────────────────────────────
 
@@ -257,20 +272,20 @@ console.log(`Found ${features.length} features, ${skills.length} skills`);
 let readme = readFileSync(path.join(ROOT, "README.md"), "utf8");
 
 // Replace features table
-readme = replaceSection(
+readme = replaceSection({
   readme,
-  "<!-- AUTO:FEATURES:START -->",
-  "<!-- AUTO:FEATURES:END -->",
-  generateFeaturesTable(features),
-);
+  startMarker: "<!-- AUTO:FEATURES:START -->",
+  endMarker: "<!-- AUTO:FEATURES:END -->",
+  content: generateFeaturesTable(features),
+});
 
 // Replace community-skills section
-readme = replaceSection(
+readme = replaceSection({
   readme,
-  "<!-- AUTO:SKILLS:START -->",
-  "<!-- AUTO:SKILLS:END -->",
-  generateCommunitySection(skills),
-);
+  startMarker: "<!-- AUTO:SKILLS:START -->",
+  endMarker: "<!-- AUTO:SKILLS:END -->",
+  content: generateCommunitySection(skills),
+});
 
 writeFileSync(path.join(ROOT, "README.md"), readme);
 console.log("✅ README.md updated");

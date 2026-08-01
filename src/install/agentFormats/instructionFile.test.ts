@@ -155,9 +155,9 @@ describe("planInstructionFile", () => {
   it("restores user AGENTS.md bytes from the legacy Codex instruction target", () => {
     const original = encode("User instructions.\n");
     const installed = expectWrite(unwrap(planInstructionFile(request({ currentBytes: original }))));
-    const legacyCodexArtifact = {
+    const legacyCodexArtifact: ReceiptEntry = {
       ...installed.artifact,
-      owner: { _tag: "agent" as const, agentIds: ["codex"] as const },
+      owner: { _tag: "agent", agentIds: ["codex"] },
     };
 
     const restored = expectRestore(

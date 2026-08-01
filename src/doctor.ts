@@ -30,14 +30,16 @@ import { installationDestinationSchema, receiptPath, stagedPackageSchema } from 
 const loopStateRelativePath = ".claude/.ctx-loop-state";
 
 /** Autorun fields frozen into the detached daemon at spawn. */
-const daemonConfigKeys = [
+const daemonConfigKeySchema = Schema.Literal(
   "contextWarnFraction",
   "contextBlockFraction",
   "autorunDefaultCycleCount",
   "autorunMaxCycleCount",
   "autorunPollIntervalSeconds",
   "autorunIdleThresholdSeconds",
-] as const;
+);
+
+const daemonConfigKeys = daemonConfigKeySchema.literals;
 
 export const doctorPlatformSchema = Schema.Struct({
   operatingSystem: Schema.Literal(
@@ -206,7 +208,7 @@ const doctorDiscrepancySchema = Schema.Union(
     sessionId: Schema.NonEmptyTrimmedString.annotations({
       description: "Live daemon session whose frozen config differs from managed config.",
     }),
-    key: Schema.Literal(...daemonConfigKeys).annotations({
+    key: daemonConfigKeySchema.annotations({
       description: "Autorun config field that differs between managed config and the daemon.",
     }),
     managedValue: Schema.Number.annotations({
@@ -371,7 +373,7 @@ const createDaemonDiagnostics = (request: DoctorRequest) =>
   Effect.gen(function* () {
     // Project installs still share the user-home loop state; only global destinations own it.
     if (request.destination._tag !== "global") {
-      return [] as Array<DoctorDaemon>;
+      return [];
     }
 
     const fileSystem = yield* FileSystem.FileSystem;
@@ -414,34 +416,44 @@ const createDaemonDiagnostics = (request: DoctorRequest) =>
     return daemons;
   });
 
-const appendDaemonDiscrepancies = (
-  discrepancies: Array<DoctorDiscrepancy>,
-  daemons: ReadonlyArray<DoctorDaemon>,
-  managed: ManagedConfigFile | undefined,
-): void => {
-  // Compare each live daemon against managed config (or flag a missing snapshot).
-  for (const daemon of daemons) {
-    if (daemon.snapshot._tag === "missing") {
-      discrepancies.push({ _tag: "daemonConfigSnapshotMissing", sessionId: daemon.sessionId });
-      continue;
-    }
-    if (managed === undefined) continue;
-
-    // Diff only autorun fields the detached process freezes at spawn.
-    for (const key of daemonConfigKeys) {
-      const managedValue = managed[key];
-      const daemonValue = daemon.snapshot.config[key];
-      if (managedValue === daemonValue) continue;
-      discrepancies.push({
+const daemonConfigMismatches = (input: {
+  sessionId: string;
+  frozenConfig: ManagedConfigFile;
+  managedConfig: ManagedConfigFile;
+}): ReadonlyArray<DoctorDiscrepancy> =>
+  // Diff only autorun fields the detached process freezes at spawn.
+  daemonConfigKeys
+    .filter((key) => input.managedConfig[key] !== input.frozenConfig[key])
+    .map(
+      (key): DoctorDiscrepancy => ({
         _tag: "daemonConfigMismatch",
-        sessionId: daemon.sessionId,
+        sessionId: input.sessionId,
         key,
-        managedValue,
-        daemonValue,
-      });
+        managedValue: input.managedConfig[key],
+        daemonValue: input.frozenConfig[key],
+      }),
+    );
+
+const daemonDiscrepancies = (
+  daemons: ReadonlyArray<DoctorDaemon>,
+  managedConfig: ManagedConfigFile | undefined,
+): ReadonlyArray<DoctorDiscrepancy> =>
+  // Compare each live daemon against managed config (or flag a missing snapshot).
+  daemons.flatMap((daemon): ReadonlyArray<DoctorDiscrepancy> => {
+    if (daemon.snapshot._tag === "missing") {
+      return [{ _tag: "daemonConfigSnapshotMissing", sessionId: daemon.sessionId }];
     }
-  }
-};
+
+    if (managedConfig === undefined) {
+      return [];
+    }
+
+    return daemonConfigMismatches({
+      sessionId: daemon.sessionId,
+      frozenConfig: daemon.snapshot.config,
+      managedConfig,
+    });
+  });
 
 // Inspect strict persisted state and compare it with catalog-derived host observations without changing disk state.
 export const doctor = (input: unknown) =>
@@ -516,10 +528,8 @@ export const doctor = (input: unknown) =>
       }
     });
 
-    appendDaemonDiscrepancies(
-      discrepancies,
-      daemonDiagnostics,
-      configSnapshot._tag === "present" ? configSnapshot.config : undefined,
+    discrepancies.push(
+      ...daemonDiscrepancies(daemonDiagnostics, configSnapshot._tag === "present" ? configSnapshot.config : undefined),
     );
 
     const config =

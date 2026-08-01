@@ -106,11 +106,11 @@ const dedupSkipOption = Options.text("dedup-skip").pipe(
   Options.withDescription("Comma-separated directories excluded from duplicate-code enforcement"),
 );
 
-const assignOptional = <Value>(target: Record<string, unknown>, key: string, value: Option.Option<Value>): void => {
-  if (Option.isSome(value)) {
-    target[key] = value.value;
-  }
-};
+const suppliedPatchEntry = <Value>(supplied: {
+  configKey: string;
+  chosen: Option.Option<Value>;
+}): ReadonlyArray<readonly [string, unknown]> =>
+  Option.isSome(supplied.chosen) ? [[supplied.configKey, supplied.chosen.value]] : [];
 
 const buildConfigPatch = (args: {
   warn: Option.Option<number>;
@@ -128,29 +128,27 @@ const buildConfigPatch = (args: {
   dictationWords: Option.Option<string>;
   dedupMode: Option.Option<"deny" | "warn" | "off">;
   dedupSkip: Option.Option<string>;
-}): Record<string, unknown> => {
-  const patch: Record<string, unknown> = {};
-  assignOptional(patch, "contextWarnFraction", args.warn);
-  assignOptional(patch, "contextBlockFraction", args.block);
-  assignOptional(patch, "autorunDefaultCycleCount", args.budget);
-  assignOptional(patch, "autorunMaxCycleCount", args.hardCap);
-  assignOptional(patch, "autorunPollIntervalSeconds", args.poll);
-  assignOptional(patch, "autorunIdleThresholdSeconds", args.idle);
-  assignOptional(patch, "idleAutoCompact", args.autoCompactIdle);
-  assignOptional(patch, "speechVoice", args.ttsVoice);
-  assignOptional(patch, "speechWordsPerMinute", args.ttsRate);
-  assignOptional(patch, "speechResponseMode", args.speechMode);
-  assignOptional(
-    patch,
-    "speechReadAlong",
-    Option.map(args.readAlong, (value) => value === "on"),
-  );
-  assignOptional(patch, "promptRefinementMode", args.promptRefinement);
-  assignOptional(patch, "dictationReplacements", args.dictationWords);
-  assignOptional(patch, "dedupEnforcement", args.dedupMode);
-  assignOptional(patch, "dedupSkipDirectories", args.dedupSkip);
-  return patch;
-};
+}): Record<string, unknown> =>
+  Object.fromEntries([
+    ...suppliedPatchEntry({ configKey: "contextWarnFraction", chosen: args.warn }),
+    ...suppliedPatchEntry({ configKey: "contextBlockFraction", chosen: args.block }),
+    ...suppliedPatchEntry({ configKey: "autorunDefaultCycleCount", chosen: args.budget }),
+    ...suppliedPatchEntry({ configKey: "autorunMaxCycleCount", chosen: args.hardCap }),
+    ...suppliedPatchEntry({ configKey: "autorunPollIntervalSeconds", chosen: args.poll }),
+    ...suppliedPatchEntry({ configKey: "autorunIdleThresholdSeconds", chosen: args.idle }),
+    ...suppliedPatchEntry({ configKey: "idleAutoCompact", chosen: args.autoCompactIdle }),
+    ...suppliedPatchEntry({ configKey: "speechVoice", chosen: args.ttsVoice }),
+    ...suppliedPatchEntry({ configKey: "speechWordsPerMinute", chosen: args.ttsRate }),
+    ...suppliedPatchEntry({ configKey: "speechResponseMode", chosen: args.speechMode }),
+    ...suppliedPatchEntry({
+      configKey: "speechReadAlong",
+      chosen: Option.map(args.readAlong, (readAlong) => readAlong === "on"),
+    }),
+    ...suppliedPatchEntry({ configKey: "promptRefinementMode", chosen: args.promptRefinement }),
+    ...suppliedPatchEntry({ configKey: "dictationReplacements", chosen: args.dictationWords }),
+    ...suppliedPatchEntry({ configKey: "dedupEnforcement", chosen: args.dedupMode }),
+    ...suppliedPatchEntry({ configKey: "dedupSkipDirectories", chosen: args.dedupSkip }),
+  ]);
 
 const CONFIG_LABELS: Record<keyof typeof defaultBagConfig, string> = {
   contextWarnFraction: "context warn (nudge /handoff)",

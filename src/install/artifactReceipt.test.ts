@@ -159,7 +159,6 @@ const completeReceiptInput = {
 const decodeReceipt = Schema.decodeUnknownSync(artifactReceiptSchema, {
   onExcessProperty: "error",
 });
-const decodeReceiptJson = (input: unknown) => Effect.runSync(decodeArtifactReceiptJson(input));
 const decodeEntry = Schema.decodeUnknownSync(receiptEntrySchema, {
   onExcessProperty: "error",
 });
@@ -264,66 +263,74 @@ describe("artifactReceiptSchema", () => {
     expect(() => decodeReceipt(receiptWithArtifacts([receiptEntry]))).toThrow(/itself|receipt/i);
   });
 
-  it("round-trips every receipt field through the JSON codec", () => {
-    const receipt = decodeReceipt(completeReceiptInput);
-    const json = Schema.encodeSync(artifactReceiptJsonSchema)(receipt);
-    const encoded = JSON.parse(json);
+  it.effect("round-trips every receipt field through the JSON codec", () =>
+    Effect.gen(function* () {
+      const receipt = decodeReceipt(completeReceiptInput);
+      const json = Schema.encodeSync(artifactReceiptJsonSchema)(receipt);
+      const encoded = JSON.parse(json);
 
-    expect(Object.keys(encoded)).toEqual(["version", "scope", "features", "artifacts"]);
-    expect(encoded.artifacts[0].ownership.previous.bytes).toBe("AQID");
-    expect(decodeReceiptJson(json)).toEqual(receipt);
-  });
+      expect(Object.keys(encoded)).toEqual(["version", "scope", "features", "artifacts"]);
+      expect(encoded.artifacts[0].ownership.previous.bytes).toBe("AQID");
+      expect(yield* decodeArtifactReceiptJson(json)).toEqual(receipt);
+    }),
+  );
 
-  it("preserves host-file existence for member-level ownership through receipt JSON", () => {
-    const receipt = decodeReceipt(
-      receiptWithArtifacts([
-        {
-          owner: sharedAgentOwner,
-          path: "AGENTS.md",
-          kind: { _tag: "instruction" },
-          ownership: { ...managedBlockOwnership, filePreviouslyPresent: true },
-        },
-        {
-          owner: agentOwner,
-          path: ".continue/config.json",
-          kind: { _tag: "configReference" },
-          ownership: {
-            ...jsonValuesOwnership,
-            filePreviouslyPresent: false,
-            values: jsonValuesOwnership.values.map((value) => ({ ...value, previous: missingPreviousJson })),
+  it.effect("preserves host-file existence for member-level ownership through receipt JSON", () =>
+    Effect.gen(function* () {
+      const receipt = decodeReceipt(
+        receiptWithArtifacts([
+          {
+            owner: sharedAgentOwner,
+            path: "AGENTS.md",
+            kind: { _tag: "instruction" },
+            ownership: { ...managedBlockOwnership, filePreviouslyPresent: true },
           },
-        },
-        {
-          owner: agentOwner,
-          path: ".aider.conf.yml",
-          kind: { _tag: "configReference" },
-          ownership: { ...yamlSequenceOwnership, filePreviouslyPresent: true },
-        },
-      ]),
-    );
-    const roundTrip = decodeReceiptJson(Schema.encodeSync(artifactReceiptJsonSchema)(receipt));
+          {
+            owner: agentOwner,
+            path: ".continue/config.json",
+            kind: { _tag: "configReference" },
+            ownership: {
+              ...jsonValuesOwnership,
+              filePreviouslyPresent: false,
+              values: jsonValuesOwnership.values.map((value) => ({ ...value, previous: missingPreviousJson })),
+            },
+          },
+          {
+            owner: agentOwner,
+            path: ".aider.conf.yml",
+            kind: { _tag: "configReference" },
+            ownership: { ...yamlSequenceOwnership, filePreviouslyPresent: true },
+          },
+        ]),
+      );
+      const roundTrip = yield* decodeArtifactReceiptJson(Schema.encodeSync(artifactReceiptJsonSchema)(receipt));
 
-    expect(roundTrip.artifacts[0]?.ownership).toMatchObject({
-      _tag: "managedBlock",
-      filePreviouslyPresent: true,
-    });
-    expect(roundTrip.artifacts[1]?.ownership).toMatchObject({
-      _tag: "jsonValues",
-      filePreviouslyPresent: false,
-    });
-    expect(roundTrip.artifacts[2]?.ownership).toMatchObject({
-      _tag: "yamlSequenceValue",
-      filePreviouslyPresent: true,
-    });
-  });
+      expect(roundTrip.artifacts[0]?.ownership).toMatchObject({
+        _tag: "managedBlock",
+        filePreviouslyPresent: true,
+      });
+      expect(roundTrip.artifacts[1]?.ownership).toMatchObject({
+        _tag: "jsonValues",
+        filePreviouslyPresent: false,
+      });
+      expect(roundTrip.artifacts[2]?.ownership).toMatchObject({
+        _tag: "yamlSequenceValue",
+        filePreviouslyPresent: true,
+      });
+    }),
+  );
 
-  it.each([
+  it.effect.each([
     { ...completeReceiptInput, unexpected: true },
     { ...completeReceiptInput, detectedAgents: ["codex"] },
-  ])("rejects receipt-level excess or detection evidence", (input) => {
-    expect(() => decodeReceipt(input)).toThrow();
-    expect(() => decodeReceiptJson(JSON.stringify(input))).toThrow();
-  });
+  ])("rejects receipt-level excess or detection evidence", (input) =>
+    Effect.gen(function* () {
+      expect(() => decodeReceipt(input)).toThrow();
+      const decodedJson = yield* Effect.either(decodeArtifactReceiptJson(JSON.stringify(input)));
+
+      expect(decodedJson._tag).toBe("Left");
+    }),
+  );
 
   it("rejects excess properties at every nested receipt boundary", () => {
     expect(() => decodeOwner({ _tag: "application", extra: true })).toThrow();
@@ -506,43 +513,45 @@ describe("artifactReceiptSchema", () => {
     ).toThrow(/container|ancestor|unique/i);
   });
 
-  it("round-trips members acquired after a receipt first created their host files", () => {
-    const receipt = decodeReceipt(
-      receiptWithArtifacts([
-        {
-          owner: agentOwner,
-          path: ".continue/config.json",
-          kind: { _tag: "configReference" },
-          ownership: {
-            ...jsonValuesOwnership,
-            filePreviouslyPresent: false,
+  it.effect("round-trips members acquired after a receipt first created their host files", () =>
+    Effect.gen(function* () {
+      const receipt = decodeReceipt(
+        receiptWithArtifacts([
+          {
+            owner: agentOwner,
+            path: ".continue/config.json",
+            kind: { _tag: "configReference" },
+            ownership: {
+              ...jsonValuesOwnership,
+              filePreviouslyPresent: false,
+            },
           },
-        },
-        {
-          owner: agentOwner,
-          path: ".aider.conf.yml",
-          kind: { _tag: "configReference" },
-          ownership: {
-            ...yamlSequenceOwnership,
-            filePreviouslyPresent: false,
-            previouslyPresent: true,
+          {
+            owner: agentOwner,
+            path: ".aider.conf.yml",
+            kind: { _tag: "configReference" },
+            ownership: {
+              ...yamlSequenceOwnership,
+              filePreviouslyPresent: false,
+              previouslyPresent: true,
+            },
           },
-        },
-      ]),
-    );
-    const roundTrip = decodeReceiptJson(Schema.encodeSync(artifactReceiptJsonSchema)(receipt));
+        ]),
+      );
+      const roundTrip = yield* decodeArtifactReceiptJson(Schema.encodeSync(artifactReceiptJsonSchema)(receipt));
 
-    expect(roundTrip.artifacts[0]?.ownership).toMatchObject({
-      _tag: "jsonValues",
-      filePreviouslyPresent: false,
-      values: [{ previous: { _tag: "missing" } }, { previous: { _tag: "value", value: false } }],
-    });
-    expect(roundTrip.artifacts[1]?.ownership).toMatchObject({
-      _tag: "yamlSequenceValue",
-      filePreviouslyPresent: false,
-      previouslyPresent: true,
-    });
-  });
+      expect(roundTrip.artifacts[0]?.ownership).toMatchObject({
+        _tag: "jsonValues",
+        filePreviouslyPresent: false,
+        values: [{ previous: { _tag: "missing" } }, { previous: { _tag: "value", value: false } }],
+      });
+      expect(roundTrip.artifacts[1]?.ownership).toMatchObject({
+        _tag: "yamlSequenceValue",
+        filePreviouslyPresent: false,
+        previouslyPresent: true,
+      });
+    }),
+  );
 
   it("allows missing owned members when the host file previously existed", () => {
     expect(

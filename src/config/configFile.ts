@@ -49,18 +49,21 @@ const decodeManagedConfigFile = Schema.decodeUnknownEither(managedConfigFileSche
   onExcessProperty: "error",
 });
 
-const additiveConfigFields = [
+const additiveConfigFieldSchema = Schema.Literal(
   "idleAutoCompact",
   "speechResponseMode",
   "speechReadAlong",
   "promptRefinementMode",
   "dictationReplacements",
-] as const;
+);
+
+const additiveConfigFields = additiveConfigFieldSchema.literals;
 
 const decodeManagedConfigValue = (value: unknown) => {
   const current = decodeManagedConfigFile(value);
   if (Either.isRight(current) || !Predicate.isRecord(value)) return current;
   const migrated = { ...value };
+  // Backfill each field added after this config file was last written, so an older file still decodes.
   for (const field of additiveConfigFields) {
     if (!Object.hasOwn(migrated, field)) migrated[field] = defaultBagConfig[field];
   }

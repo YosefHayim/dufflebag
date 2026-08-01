@@ -31,7 +31,7 @@
     "lint:fix": "biome check --write .",
     "format": "biome format --write .",
     "check:ci": "biome ci .",
-    "verify": "biome ci . && tsc --noEmit && vitest run && pnpm build",
+    "verify": "biome ci . && tsc --noEmit && pnpm style && pnpm style:guide . && vitest run && pnpm build",
     "prepublishOnly": "npm run build",
     "generate-readme": "node scripts/generateReadme.mjs"
   },
