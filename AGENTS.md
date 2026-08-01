@@ -22,7 +22,8 @@ Read these before changing code. This file is a routing digest — open the link
 | [`CODE-STYLE.md`](CODE-STYLE.md) | Prescriptive style SSOT for this repo |
 | [`code-style.rules.json`](code-style.rules.json) | Machine mirror: rule id → one-sentence statement + the command that verifies it |
 | `docs/adr/current/` | Architectural decisions (do not rewrite historical bodies) |
-| `src/skills/<sourceDirectory>/` | Authored feature docs and feature-local runtime |
+| `src/skills/<sourceDirectory>/` | Authored skill payload, shipped verbatim |
+| `src/hookIsland/<sourceDirectory>/` | Feature-local executable hook runtime |
 
 Public feature and installed-skill IDs are decoded catalog data and can differ from the authored camelCase directory name.
 
@@ -39,15 +40,21 @@ Public feature and installed-skill IDs are decoded catalog data and can differ f
 | `src/config/` | Schema-owned managed configuration and migration |
 | `src/install/` | Artifact planning, transactional application, receipts, and agent formats |
 | `src/runtime/` | Dependency-free transport shared by installed hooks |
-| `src/skills/<sourceDirectory>/` | Authored skill content and feature-local dependency-free runtime |
+| `src/skills/<sourceDirectory>/` | Authored skill payload copied verbatim into an installed skill directory (`SKILL.md`, `reference/`, `scripts/`, `templates/`) |
+| `src/hookIsland/<sourceDirectory>/` | Feature-local dependency-free runtime (`hooks/`, `lib/`, `command/`) compiled and installed to `.claude/dufflebag/runtime/` |
 | `src/doctor.ts` | Structured installation diagnostics |
 | `src/scaffoldWorkflows.ts` | Workflow-template scaffolding capability |
 | `scripts/` | Outer-ring tooling only: package build (`assembleHooks`, `generateReadme`), style contract (`checkCodeStyle` + `reportCodeStyle`), style-guide format (`checkStyleGuide` + `reportStyleGuide`), never imported by `src/` |
 | `templates/` | Files intentionally copied into another repository |
+| `biome-rules/` | Grit plugins Biome loads via `biome.json` |
+| `statuslines/` | Agent status-line presets installed by their own shell script (not receipt-owned) |
+| `public/` | README image assets; referenced by absolute URL so npm renders them |
 | `docs/adr/current/` | Current architectural decisions |
 | `.husky/pre-commit` | README regeneration before commits |
 
 Capability layout is current ([ADR 0016](docs/adr/current/0016-capability-layout-replaces-core.md)). Do not reintroduce `src/core/`, `src/commands/`, or `src/payload/`.
+
+A feature is payload **or** runtime, never both. Put executable code under `src/hookIsland/`; put anything copied verbatim into a user's skill directory under `src/skills/`. `pnpm style` governs application, hook-island, and tooling code; skill payload answers to Biome and its own harness because it is authored for other repositories.
 
 ## Working contract
 

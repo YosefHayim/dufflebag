@@ -63,13 +63,27 @@ Why: bucket files collect unrelated code forever, because nothing in the name sa
 Authored source directories use camelCase.
 
 ```ts
-// ✓ src/skills/dedupGuard/hooks/dedupGuard.js — public ID stays hyphenated data
+// ✓ src/hookIsland/dedupGuard/hooks/dedupGuard.js — public ID stays hyphenated data
 export const featureId = "dedup-guard";
 
-// ✗ src/skills/dedup-guard/... or src/skills/DedupGuard/...
+// ✗ src/hookIsland/dedup-guard/... or src/skills/DedupGuard/...
 ```
 
 Why: the public hyphenated ID is decoded catalog data; letting it dictate directory names makes the authored tree inconsistent with UI files, which are PascalCase.
+
+### Payload and runtime live in different trees
+[rule:path.payload-runtime-split] · verify: `pnpm style`
+
+Executable feature runtime lives under `src/hookIsland/`, never under `src/skills/`.
+
+```ts
+// ✓ src/hookIsland/contextGuard/hooks/ctxWatch.ts — compiled, assembled, installed
+// ✓ src/skills/pngToCode/scripts/src/bin/pixelDiff.ts — copied verbatim into the skill
+
+// ✗ src/skills/contextGuard/hooks/ctxWatch.ts — runtime hiding in the payload tree
+```
+
+Why: the two trees ship by different mechanisms and answer to different rules, so mixing them is what let application rules be applied to standalone scripts and let an entry hook importing its own `lib/` look like an island breach.
 
 ### No wrapper layers
 [rule:architecture.no-wrapper-layer] · verify: judgment
@@ -563,30 +577,33 @@ Why: the official service is already the abstraction; a second one owns no polic
 An installed hook imports only `node:*` builtins, shared `src/runtime/**`, and its own feature runtime.
 
 ```ts
-// ✓ src/skills/dedupGuard/hooks/dedupGuard.js
+// ✓ src/hookIsland/dedupGuard/hooks/dedupGuard.js
 import { readFileSync } from "node:fs";
 import { readTransport } from "../../../runtime/transport.js";
+import { buildIndex } from "../lib/dupIndex.js";
 
 // ✗ Effect, third-party packages, CLI, catalog, or install code
 import { Effect } from "effect";
 ```
 
-Why: installed hooks run inside the user's agent with no install step of ours, so any import beyond this set is a runtime failure on their machine. Hooks also fail open.
+Why: installed hooks run inside the user's agent with no install step of ours, so any import beyond this set is a runtime failure on their machine. Hooks also fail open. Co-located tests never ship, and a type-only import of a bare package is erased before emit, so neither can break the island.
 
-### Application cannot import hook code
+### Application enters the island only at a command surface
 [rule:import.application-boundary] · verify: `pnpm style`
 
-Application code never imports installed hook-runtime modules.
+Application code reaches the hook island only through a feature `command/` module.
 
 ```ts
 // ✓ shared transport parsing lives under src/runtime and is imported by both sides
 import { parseTransportLine } from "../runtime/transport.js";
+// ✓ a CLI command wrapping the island's own runnable surface
+import { dedupCheck } from "../hookIsland/dedupGuard/command/dedupCheck.js";
 
-// ✗ reaching into an installed hook from a capability
-import { readDedupState } from "../skills/dedupGuard/hooks/dedupGuard.js";
+// ✗ reaching into an installed hook or its feature library from a capability
+import { readDedupState } from "../hookIsland/dedupGuard/hooks/dedupGuard.js";
 ```
 
-Why: the hook island is shipped code with different constraints; importing it back into the application couples our orchestration to files the user's agent owns at runtime.
+Why: hooks and their libraries are shipped code the user's agent owns at runtime, so importing them back couples our orchestration to them; a `command/` module is the one surface built to be called from both sides, which is why it stays dependency-free.
 
 ### TerminalUI owns application output
 [rule:presentation.terminal-ui] · verify: `pnpm style`

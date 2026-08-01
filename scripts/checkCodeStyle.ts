@@ -290,6 +290,10 @@ const codeCategory = (file: string): CodeCategory => {
 
 const isTestFile = (file: string): boolean => file.endsWith(".test.ts");
 
+// e.g. "src/hookIsland/dedupGuard/command/dedupCheck.ts" — the one island
+// surface built to be called by the CLI as well as by the user's own CI.
+const isIslandCommandSurface = (file: string): boolean => /^src\/hookIsland\/[^/]+\/command\//u.test(file);
+
 const isHookRuntimeFile = (file: string): boolean => codeCategory(file) === "hookIsland";
 
 const isApplicationFile = (file: string): boolean => codeCategory(file) === "application";
@@ -632,7 +636,7 @@ const inspectSourceFile = (
 
     if (moduleSpecifier && isApplicationFile(file)) {
       const target = resolvedImportPath(file, moduleSpecifier);
-      if (target && isHookRuntimeFile(target)) {
+      if (target && isHookRuntimeFile(target) && !isIslandCommandSurface(target)) {
         addViolation({
           ruleId: "import.application-boundary",
           sourceFile,
@@ -876,6 +880,24 @@ const inspectSourceFile = (
 const compareViolations = (left: CodeStyleViolation, right: CodeStyleViolation): number =>
   left.file.localeCompare(right.file) || left.line - right.line || left.ruleId.localeCompare(right.ruleId);
 
+/**
+ * The payload tree is excluded from the per-file scan, so runtime hiding there
+ * would otherwise be invisible. Report it from the directory shape instead.
+ */
+const misplacedRuntimeFiles = (repositoryRoot: string): ReadonlyArray<CodeStyleViolation> =>
+  globSync("src/skills/*/{hooks,lib,command}/**/*.{ts,tsx,mts,cts}", {
+    cwd: repositoryRoot,
+    nodir: true,
+    ignore: ["**/node_modules/**", "**/dist/**"],
+  })
+    .sort()
+    .map((file) => ({
+      ruleId: "path.payload-runtime-split",
+      file,
+      line: 1,
+      message: "Move executable feature runtime under src/hookIsland/.",
+    }));
+
 export const checkCodeStyle = (repositoryRoot: string): CodeStyleReport => {
   const configuration = readConfiguration(repositoryRoot);
   validateStyleGuide(repositoryRoot, configuration.rules);
@@ -896,6 +918,7 @@ export const checkCodeStyle = (repositoryRoot: string): CodeStyleReport => {
   const typeChecker = program.getTypeChecker();
   const violations = files
     .flatMap((file) => inspectSourceFile(repositoryRoot, file, configuration.protectedPaths, program, typeChecker))
+    .concat(misplacedRuntimeFiles(repositoryRoot))
     .sort(compareViolations);
 
   return {
