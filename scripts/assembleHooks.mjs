@@ -44,9 +44,10 @@ const IMPORT_REWRITES = [
 const flatten = (code) => IMPORT_REWRITES.reduce((out, [from, to]) => out.replaceAll(from, to), code);
 
 /** Copy every `.js` in `fromDir` into `toDir`, optionally transforming its text. */
-function copyJs(fromDir, toDir, transform) {
+const copyJs = ({ fromDir, toDir, transform }) => {
   if (!existsSync(fromDir)) return 0;
   let n = 0;
+  // Walk the directory entry by entry so the returned count covers only the `.js` files written.
   for (const name of readdirSync(fromDir)) {
     if (!name.endsWith(".js")) continue;
     const code = readFileSync(path.join(fromDir, name), "utf8");
@@ -54,9 +55,9 @@ function copyJs(fromDir, toDir, transform) {
     n++;
   }
   return n;
-}
+};
 
-function main() {
+const main = () => {
   if (!existsSync(DIST_ISLAND)) {
     throw new Error("dist/src/hookIsland is missing — run `tsc` before assembling the hook payload.");
   }
@@ -70,14 +71,14 @@ function main() {
   let hooks = 0;
   // Each feature contributes its entry hooks (rewritten, flat) and feature libs.
   for (const feature of readdirSync(DIST_ISLAND)) {
-    hooks += copyJs(path.join(DIST_ISLAND, feature, "hooks"), OUT_HOOKS, flatten);
-    copyJs(path.join(DIST_ISLAND, feature, "lib"), OUT_LIB);
+    hooks += copyJs({ fromDir: path.join(DIST_ISLAND, feature, "hooks"), toDir: OUT_HOOKS, transform: flatten });
+    copyJs({ fromDir: path.join(DIST_ISLAND, feature, "lib"), toDir: OUT_LIB });
   }
   // The shared zero-dep kernel (config SSOT + io) sits alongside the feature libs.
-  copyJs(PAYLOAD_DIR, OUT_LIB);
+  copyJs({ fromDir: PAYLOAD_DIR, toDir: OUT_LIB });
 
   const libs = readdirSync(OUT_LIB).filter((n) => n.endsWith(".js")).length;
   console.log(`assembled dist/hooks: ${hooks} hook(s) + ${libs} lib(s)`);
-}
+};
 
 main();

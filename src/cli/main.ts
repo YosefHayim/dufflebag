@@ -24,27 +24,35 @@ import { uninstallCommand } from "./uninstallCommand.js";
 import { updateCommand } from "./updateCommand.js";
 import { voiceCommand } from "./voiceCommand.js";
 
+// An unreadable or malformed package.json is indistinguishable from an absent
+// one here: both mean "keep walking up", so both surface as undefined.
+const declaredPackageVersion = (directory: string): string | undefined => {
+  try {
+    const parsed: unknown = JSON.parse(readFileSync(join(directory, "package.json"), "utf8"));
+    return typeof parsed === "object" && parsed !== null && "version" in parsed && typeof parsed.version === "string"
+      ? parsed.version
+      : "0.0.0";
+  } catch {
+    return undefined;
+  }
+};
+
 const readPackageVersion = (): string => {
   let directory = dirname(fileURLToPath(import.meta.url));
 
   // Walk toward the filesystem root until package.json is found.
   while (true) {
-    try {
-      const raw = readFileSync(join(directory, "package.json"), "utf8");
-      const parsed: unknown = JSON.parse(raw);
-      if (typeof parsed === "object" && parsed !== null && "version" in parsed && typeof parsed.version === "string") {
-        return parsed.version;
-      }
-
-      return "0.0.0";
-    } catch {
-      const parent = dirname(directory);
-      if (parent === directory) {
-        return "0.0.0";
-      }
-
-      directory = parent;
+    const declared = declaredPackageVersion(directory);
+    if (declared !== undefined) {
+      return declared;
     }
+
+    const parent = dirname(directory);
+    if (parent === directory) {
+      return "0.0.0";
+    }
+
+    directory = parent;
   }
 };
 

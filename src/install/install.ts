@@ -492,8 +492,19 @@ const stagedRuntimeEntrypoint = (sourceEntrypoint: string): string => `${sourceE
 const installedRuntimeFile = (sourceDirectory: string, filePath: string): string =>
   `${runtimePath}/${sourceDirectory}/${filePath}`;
 
-const runtimeCommand = (root: string, sourceDirectory: string, sourceEntrypoint: string, path: Path.Path): string =>
-  `node "${path.join(root, installedRuntimeFile(sourceDirectory, stagedRuntimeEntrypoint(sourceEntrypoint)))}"`;
+const runtimeCommand = (input: {
+  root: string;
+  sourceDirectory: string;
+  sourceEntrypoint: string;
+  path: Path.Path;
+}): string => {
+  const installedEntrypoint = installedRuntimeFile(
+    input.sourceDirectory,
+    stagedRuntimeEntrypoint(input.sourceEntrypoint),
+  );
+
+  return `node "${input.path.join(input.root, installedEntrypoint)}"`;
+};
 
 const registrationSourceEntrypoint = (
   feature: (typeof featureCatalog)[number],
@@ -535,7 +546,12 @@ const desiredHookGroups = (input: {
     feature.runtime.registrations.forEach((registration) => {
       const entrypoint = registrationSourceEntrypoint(feature, registration);
       const executable = input.agent.detection.commands[0] ?? input.agent.id;
-      const runtime = runtimeCommand(input.root, feature.sourceDirectory, entrypoint, input.path);
+      const runtime = runtimeCommand({
+        root: input.root,
+        sourceDirectory: feature.sourceDirectory,
+        sourceEntrypoint: entrypoint,
+        path: input.path,
+      });
       const command =
         feature.id === "speak-response"
           ? `${runtime} --dufflebag-agent-id ${input.agent.id}`
@@ -1108,12 +1124,12 @@ const readStagedFiles = (directory: string) =>
     const files = yield* Effect.forEach(entries, (entry) =>
       Effect.gen(function* () {
         const sourcePath = path.join(directory, entry);
-        const info = yield* fileSystem.stat(sourcePath);
-        if (info.type === "Directory") {
+        const stagedEntry = yield* fileSystem.stat(sourcePath);
+        if (stagedEntry.type === "Directory") {
           return Option.none<StagedRuntimeFile>();
         }
 
-        if (info.type !== "File") {
+        if (stagedEntry.type !== "File") {
           return yield* new InstallError({ issue: `Staged path ${sourcePath} must be a regular file.` });
         }
 
@@ -1160,7 +1176,12 @@ const createRuntimeWrites = (input: {
             const artifactPath = installedRuntimeFile(feature.sourceDirectory, file.path);
             const snapshot = yield* readFileSnapshot(path.join(input.request.destination.root, artifactPath));
             const previous = yield* effectFromEither(
-              previousWholeFile(input.previousReceipt, artifactPath, snapshot, file.bytes),
+              previousWholeFile({
+                receipt: input.previousReceipt,
+                artifactPath,
+                snapshot,
+                desiredBytes: file.bytes,
+              }),
             );
 
             return yield* effectFromEither(
@@ -1261,29 +1282,30 @@ const inspectedSnapshot = (
 // A receipted file whose current bytes are exactly the bytes this install is about to write is
 // adopted instead of refused: an external skill sync can reproduce our own content, and rewriting
 // identical bytes can destroy nothing. Callers that cannot name their desired bytes stay strict.
-const previousWholeFile = (
-  receipt: ArtifactReceipt | undefined,
-  artifactPath: string,
-  snapshot: FileSnapshot,
-  desiredBytes?: Uint8Array,
-): Either.Either<PreviousFileValue, InstallError> => {
-  const artifact = previousReceiptArtifact(receipt, artifactPath);
+const previousWholeFile = (input: {
+  receipt: ArtifactReceipt | undefined;
+  artifactPath: string;
+  snapshot: FileSnapshot;
+  desiredBytes?: Uint8Array;
+}): Either.Either<PreviousFileValue, InstallError> => {
+  const artifact = previousReceiptArtifact(input.receipt, input.artifactPath);
   if (artifact === undefined) {
-    return Either.right(previousFile(snapshot));
+    return Either.right(previousFile(input.snapshot));
   }
 
   if (artifact.ownership._tag !== "wholeFile") {
     return Either.left(
-      new InstallError({ issue: `Receipted whole-file artifact ${artifactPath} has incompatible ownership.` }),
+      new InstallError({ issue: `Receipted whole-file artifact ${input.artifactPath} has incompatible ownership.` }),
     );
   }
 
+  const snapshot = input.snapshot;
   const installedContent = snapshot._tag === "file" && hashBytes(snapshot.bytes) === artifact.ownership.installedHash;
   const desiredContent =
-    snapshot._tag === "file" && desiredBytes !== undefined && bytesEqual(snapshot.bytes, desiredBytes);
+    snapshot._tag === "file" && input.desiredBytes !== undefined && bytesEqual(snapshot.bytes, input.desiredBytes);
   if (!installedContent && !desiredContent) {
     return Either.left(
-      new InstallError({ issue: `Receipted whole-file artifact ${artifactPath} changed after installation.` }),
+      new InstallError({ issue: `Receipted whole-file artifact ${input.artifactPath} changed after installation.` }),
     );
   }
 
@@ -1363,7 +1385,12 @@ const createSkillDirectoryWrites = (input: {
     const inspected = yield* inspectArtifacts(input.request.destination.root, [...desired.keys()]);
     const previousFiles = yield* Effect.forEach(inspected, (artifact) =>
       effectFromEither(
-        previousWholeFile(input.previousReceipt, artifact.path, artifact.snapshot, desired.get(artifact.path)),
+        previousWholeFile({
+          receipt: input.previousReceipt,
+          artifactPath: artifact.path,
+          snapshot: artifact.snapshot,
+          desiredBytes: desired.get(artifact.path),
+        }),
       ).pipe(Effect.map((previous) => ({ path: artifact.path, previous }))),
     );
     const plan = yield* effectFromEither(
@@ -1401,9 +1428,13 @@ const createRuleFileWrites = (input: {
     );
     const inspected = yield* inspectArtifacts(input.request.destination.root, paths);
     const previousFiles = yield* Effect.forEach(inspected, (artifact) =>
-      effectFromEither(previousWholeFile(input.previousReceipt, artifact.path, artifact.snapshot)).pipe(
-        Effect.map((previous) => ({ path: artifact.path, previous })),
-      ),
+      effectFromEither(
+        previousWholeFile({
+          receipt: input.previousReceipt,
+          artifactPath: artifact.path,
+          snapshot: artifact.snapshot,
+        }),
+      ).pipe(Effect.map((previous) => ({ path: artifact.path, previous }))),
     );
     const plan = yield* effectFromEither(
       mapFormatError(
@@ -1876,7 +1907,11 @@ const createManagedConfigPlan = (input: {
   previousReceipt: ArtifactReceipt | undefined;
 }): Either.Either<ManagedConfigPlan, InstallError> => {
   const snapshot = configSnapshotFile(input.snapshot);
-  const previous = previousWholeFile(input.previousReceipt, managedConfigPath, snapshot);
+  const previous = previousWholeFile({
+    receipt: input.previousReceipt,
+    artifactPath: managedConfigPath,
+    snapshot,
+  });
   if (Either.isLeft(previous)) {
     return Either.left(previous.left);
   }

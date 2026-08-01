@@ -109,7 +109,7 @@ export const installCommand = Command.make(
           : `Already current: ${result.features.join(", ")} (${result.scope})`,
       );
       if (result.agents.length > 0) {
-        yield* TerminalUI.info(`Agents: ${result.agents.join(", ")}`);
+        yield* TerminalUI.detail(`Agents: ${result.agents.join(", ")}`);
       }
       yield* TerminalUI.outro("Done.");
     }).pipe(Effect.catchAll((error) => TerminalUI.presentError(error))),

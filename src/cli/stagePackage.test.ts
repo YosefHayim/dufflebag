@@ -15,6 +15,7 @@ const compiledSkillsRoot = path.join(packageRoot, "dist", "src", "skills");
 
 describe("stagePackage", () => {
   it("keeps authored source directories camelCase and catalog-aligned", () => {
+    // Assert the casing contract on every catalog entry, not just a sample.
     for (const feature of featureCatalog) {
       expect(feature.sourceDirectory).toMatch(/^[a-z][a-zA-Z0-9]*$/);
     }
@@ -41,6 +42,7 @@ describe("stagePackage", () => {
         expect(existsSync(path.join(contextGuardRoot, "lib/io.js"))).toBe(true);
 
         const voiceRoot = path.join(staged.root, "runtime/speakResponse");
+        // Every authored voice asset must reach the staged tree byte-for-byte.
         for (const asset of ["cmux_focus.py", "prompt_refinement.py", "voice.py", "voice.py.lock"]) {
           expect(readFileSync(path.join(voiceRoot, asset))).toEqual(
             readFileSync(path.join(packageRoot, "src/hookIsland/speakResponse", asset)),

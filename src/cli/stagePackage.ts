@@ -116,13 +116,13 @@ const copyTree = (input: {
       return;
     }
 
-    const info = yield* fileSystem.stat(input.source);
-    if (info.type === "File") {
+    const sourceStat = yield* fileSystem.stat(input.source);
+    if (sourceStat.type === "File") {
       yield* copyFile(input);
       return;
     }
 
-    if (info.type !== "Directory") {
+    if (sourceStat.type !== "Directory") {
       return;
     }
 
@@ -206,6 +206,7 @@ const stageRuntimeFeature = (input: {
       });
     }
 
+    // Stage every catalog-declared runtime asset authored beside the compiled island.
     for (const shippedPath of input.shippedPaths) {
       const source = path.join(authoredFeatureRoot, shippedPath);
       if (!(yield* fileSystem.exists(source))) {

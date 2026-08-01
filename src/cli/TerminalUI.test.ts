@@ -11,7 +11,7 @@ describe("TerminalUI", () => {
       yield* TerminalUI.step("working");
       yield* TerminalUI.success("ok");
       yield* TerminalUI.warn("careful");
-      yield* TerminalUI.info("note");
+      yield* TerminalUI.detail("note");
       yield* TerminalUI.fail("problem");
       yield* TerminalUI.note("line one\nline two", "Details");
       yield* TerminalUI.outro("done");

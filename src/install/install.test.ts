@@ -14,13 +14,7 @@ const stageContextGuardRuntime = (stagedRoot: string) =>
   Effect.gen(function* () {
     const fileSystem = yield* FileSystem.FileSystem;
     const path = yield* Path.Path;
-    const hooks = [
-      "contextGuard.js",
-      "ctxWatchSpawn.js",
-      "ctxLoopCtl.js",
-      "idleCompactHook.js",
-      "idleCompactWatch.js",
-    ] as const;
+    const hooks = ["contextGuard.js", "ctxWatchSpawn.js", "ctxLoopCtl.js", "idleCompactHook.js", "idleCompactWatch.js"];
 
     // Stage every registration entrypoint used by context-guard.
     for (const name of hooks) {

@@ -207,10 +207,10 @@ const writeGuide = (repositoryRoot: string, ruleIds: ReadonlyArray<string>): voi
   writeFileSync(join(repositoryRoot, "CODE-STYLE.md"), `${guide}\n`);
 };
 
-const writeConfiguration = (
-  repositoryRoot: string,
-  rules: ReadonlyArray<MachineRule> = MACHINE_RULES,
-  protectedPaths: ReadonlyArray<ProtectedPath> = [
+const writeConfiguration = ({
+  repositoryRoot,
+  rules = MACHINE_RULES,
+  protectedPaths = [
     { path: PROTECTED_PATHS[0] ?? "", codeRuleExemptions: [] },
     { path: PROTECTED_PATHS[1] ?? "", codeRuleExemptions: [] },
     {
@@ -218,7 +218,11 @@ const writeConfiguration = (
       codeRuleExemptions: ASSEMBLE_CUT_EXEMPTIONS,
     },
   ],
-): void => {
+}: {
+  repositoryRoot: string;
+  rules?: ReadonlyArray<MachineRule>;
+  protectedPaths?: ReadonlyArray<ProtectedPath>;
+}): void => {
   writeFileSync(
     join(repositoryRoot, "code-style.rules.json"),
     `${JSON.stringify({ rules, protectedPaths }, null, 2)}\n`,
@@ -230,10 +234,18 @@ const writeValidContract = (repositoryRoot: string): void => {
     repositoryRoot,
     MACHINE_RULES.map((rule) => rule.id),
   );
-  writeConfiguration(repositoryRoot);
+  writeConfiguration({ repositoryRoot });
 };
 
-const writeSource = (repositoryRoot: string, path: string, source: string): void => {
+const writeSource = ({
+  repositoryRoot,
+  path,
+  source,
+}: {
+  repositoryRoot: string;
+  path: string;
+  source: string;
+}): void => {
   const file = join(repositoryRoot, path);
   mkdirSync(dirname(file), { recursive: true });
   writeFileSync(file, source);
@@ -242,7 +254,7 @@ const writeSource = (repositoryRoot: string, path: string, source: string): void
 const checkSource = (path: string, source: string) => {
   const repositoryRoot = createRepository();
   writeValidContract(repositoryRoot);
-  writeSource(repositoryRoot, path, source);
+  writeSource({ repositoryRoot, path, source });
   return checkCodeStyle(repositoryRoot);
 };
 
@@ -251,7 +263,7 @@ const checkSources = (files: Readonly<Record<string, string | undefined>>) => {
   writeValidContract(repositoryRoot);
   Object.entries(files).forEach(([path, source]) => {
     if (source !== undefined) {
-      writeSource(repositoryRoot, path, source);
+      writeSource({ repositoryRoot, path, source });
     }
   });
   return checkCodeStyle(repositoryRoot);
@@ -268,7 +280,7 @@ describe("code-style contract configuration", () => {
   it("fails when a documented rule has no machine entry", () => {
     const repositoryRoot = createRepository();
     writeGuide(repositoryRoot, [...MACHINE_RULES.map((rule) => rule.id), "type.no-interface"]);
-    writeConfiguration(repositoryRoot);
+    writeConfiguration({ repositoryRoot });
 
     expect(() => checkCodeStyle(repositoryRoot)).toThrow(/type\.no-interface/u);
   });
@@ -279,7 +291,7 @@ describe("code-style contract configuration", () => {
       repositoryRoot,
       MACHINE_RULES.slice(1).map((rule) => rule.id),
     );
-    writeConfiguration(repositoryRoot);
+    writeConfiguration({ repositoryRoot });
 
     expect(() => checkCodeStyle(repositoryRoot)).toThrow(/function\.arrow-only/u);
   });
@@ -337,7 +349,7 @@ describe("code-style contract configuration", () => {
         codeRuleExemptions: ASSEMBLE_CUT_EXEMPTIONS,
       },
     ];
-    writeConfiguration(repositoryRoot, MACHINE_RULES, mutate(validProtectedPaths));
+    writeConfiguration({ repositoryRoot, rules: MACHINE_RULES, protectedPaths: mutate(validProtectedPaths) });
 
     expect(() => checkCodeStyle(repositoryRoot)).toThrow(/protected|exemption/u);
   });
@@ -1185,7 +1197,7 @@ describe("scan boundaries and protected baseline", () => {
       ".cursor/rules/generated.ts",
       ".devin/instructions/generated.ts",
     ].forEach((path) => {
-      writeSource(repositoryRoot, path, "export function forbidden() {}\n");
+      writeSource({ repositoryRoot, path, source: "export function forbidden() {}\n" });
     });
 
     expect(checkCodeStyle(repositoryRoot).violations).toEqual([]);

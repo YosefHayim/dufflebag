@@ -16,6 +16,7 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".."
 const SHARED_LEGS = ["biome.yml", "typecheck.yml", "test.yml", "build.yml", "report-failure.yml"];
 
 describe("templates/workflows stay in sync with .github/workflows", () => {
+  // Register one independently named case per shared leg, so a drifted file is reported by name.
   for (const name of SHARED_LEGS) {
     it(`${name} is byte-identical in both locations`, () => {
       const active = readFileSync(path.join(repoRoot, ".github", "workflows", name), "utf8");

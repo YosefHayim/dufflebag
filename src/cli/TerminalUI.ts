@@ -26,7 +26,7 @@ export const warn = (message: string) => writeLine(`  ! ${message}`);
 
 export const fail = (message: string) => writeLine(`  ✗ ${message}`);
 
-export const info = (message: string) => writeLine(`  · ${message}`);
+export const detail = (message: string) => writeLine(`  · ${message}`);
 
 export const note = (message: string, title?: string) =>
   Effect.gen(function* () {

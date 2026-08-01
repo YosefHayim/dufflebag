@@ -40,5 +40,5 @@ A feature is either payload or runtime, never both: `src/skills/` holds only wha
 - Idle compaction is off by default, requires macOS + Ghostty 1.3+, and targets a stable terminal ID claimed by the session itself.
 - A provider-specific `DUFFLEBAG_<AGENT_ID>_AUTO_COMPACT` process override wins over persistent `idleAutoCompact` config.
 - Authored skill directories use **camelCase**; public feature IDs and installed skill IDs remain **kebab-case** data.
-- One strict style bar across maintained TypeScript, documented in root `CODE-STYLE.md`. Biome is enforced now;
-  `scripts/checkCodeStyle.ts` remains the explicit migration target until its maintained-tree findings are resolved.
+- One strict style bar across maintained TypeScript, documented in root `CODE-STYLE.md`. Biome and `scripts/checkCodeStyle.ts`
+  both gate through `pnpm verify`; the `src/hookIsland/` tree is reported but not yet gated while its idiom is migrated.

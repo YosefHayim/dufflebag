@@ -172,7 +172,7 @@ export const runMenu = Effect.gen(function* () {
       yield* runUpdate;
       break;
     case "config":
-      yield* TerminalUI.info(
+      yield* TerminalUI.detail(
         "Use `dufflebag config` with flags to change tunables, or bare `dufflebag config` to show values.",
       );
       break;
