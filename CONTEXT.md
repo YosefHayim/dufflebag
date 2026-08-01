@@ -20,7 +20,8 @@ Application code is grouped by capability, not by technical layer:
 - `src/config/` — managed configuration schema, file IO, and planning
 - `src/install/` — artifact plans, receipts, transactional apply, lifecycle
 - `src/runtime/` — dependency-free hook kernel (`config` + `io`)
-- `src/skills/<sourceDirectory>/` — authored skills (camelCase directories) and feature-local hooks
+- `src/skills/<sourceDirectory>/` — authored skill payload only (camelCase directories), shipped verbatim
+- `src/hookIsland/<sourceDirectory>/` — feature-local executable hook runtime (`hooks/`, `lib/`, `command/`)
 - `src/doctor.ts` / `src/scaffoldWorkflows.ts` — doctor and workflow scaffolding capabilities
 - `scripts/` — outer-ring maintainer tooling (build, README generation, style contract); never imported by product code
 - `templates/` — copyable workflows and markdown guides
@@ -28,6 +29,8 @@ Application code is grouped by capability, not by technical layer:
 - `dist/staged/` — catalog-closed staged package for install/update/doctor
 
 `src/core/`, `src/commands/`, `src/payload/`, and `src/scripts/` are **not** part of the current tree (see ADR 0016; tooling lives under root `scripts/`).
+
+A feature is either payload or runtime, never both: `src/skills/` holds only what is copied verbatim into an installed skill directory, and `src/hookIsland/` holds only code this repository compiles and installs elsewhere. The split is what lets the style contract apply one rule set per kind of code.
 
 ## Key constraints
 

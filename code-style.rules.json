@@ -18,6 +18,11 @@
       "verify": "pnpm style"
     },
     {
+      "id": "path.payload-runtime-split",
+      "statement": "Executable feature runtime lives under `src/hookIsland/`, never under `src/skills/`.",
+      "verify": "pnpm style"
+    },
+    {
       "id": "architecture.no-wrapper-layer",
       "statement": "A repository-owned layer exists only when it owns policy the official service does not.",
       "verify": "judgment"
@@ -149,7 +154,7 @@
     },
     {
       "id": "import.application-boundary",
-      "statement": "Application code never imports installed hook-runtime modules.",
+      "statement": "Application code reaches the hook island only through a feature `command/` module.",
       "verify": "pnpm style"
     },
     {

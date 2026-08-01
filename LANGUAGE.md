@@ -6,8 +6,10 @@ Names-only glossary: human↔agent bridge for the domain vocabulary used in code
 |---|---|---|
 | **bag** / **bag-owned** | Anything the installer manages, identified by the `/dufflebag/` path marker or receipt ownership. | "owned", "managed" (without marker context) |
 | **feature** | An installable unit such as `context-guard`, `dedup-guard`, `autonomous-loop`, `speak-response`, or `png-to-code` (public kebab-case IDs). | "plugin", "extension" |
-| **sourceDirectory** | Authored camelCase directory under `src/skills/` (e.g. `contextGuard`, `pngToCode`). Distinct from the public feature ID. | "skill folder name" when used as public ID |
+| **sourceDirectory** | Authored camelCase directory naming a feature under `src/skills/` (payload) or `src/hookIsland/` (runtime) — e.g. `contextGuard`, `pngToCode`. Distinct from the public feature ID. | "skill folder name" when used as public ID |
 | **skill** | Agent instruction set under `src/skills/<sourceDirectory>/`. Installed directory names stay kebab-case data. | "prompt", "instruction file" |
+| **skill payload** | Authored content under `src/skills/` copied verbatim into an installed skill directory, including its `scripts/` and `templates/`. Outside the `pnpm style` contract. | "skill code" |
+| **hook island** | Executable dependency-free runtime under `src/hookIsland/<sourceDirectory>/` plus the shared `src/runtime/` kernel. Compiled, assembled flat, installed to `.claude/dufflebag/runtime/`. | "skills", "payload" |
 | **hook** | Zero-dependency runtime script that runs on an agent hook event. Must be **fail-open**. | "callback", "handler" (imprecise) |
 | **runtime** | Dependency-free hook kernel under `src/runtime/` and the flat `dist/hooks/` output. | "payload" (legacy), "bundle", "binary" |
 | **catalog** | The allowlist in `src/catalog/featureCatalog.ts` that declares every feature and what it ships. | "registry", "manifest", "`FEATURES`" alone |
@@ -24,10 +26,10 @@ Names-only glossary: human↔agent bridge for the domain vocabulary used in code
 | **png-to-code** | PNG → measured pixel-perfect code skill (SVG/HTML/CSS) with screenshot-diff harness. | "image-to-code" |
 | **scaffold-workflows** | CLI command that copies the reusable workflow set into another repo. | "scaffold-ci" (legacy name), "ci-setup" |
 | **fail-open** | Hooks must exit successfully on any error so a guard bug never blocks the user. | "graceful degrade" |
-| **capability layout** | Folders group by product capability (`cli`, `catalog`, `config`, `install`, `runtime`, `skills`). | "src/core layers", pure-core/imperative-shell folders |
+| **capability layout** | Folders group by product capability (`cli`, `catalog`, `config`, `install`, `runtime`, `skills`, `hookIsland`). | "src/core layers", pure-core/imperative-shell folders |
 | **biome** | Linter and formatter; `biome ci` is the lint half of the gate. | "linter", "prettier" (only half) |
 | **co-located tests** | `foo.test.ts` beside `foo.ts`. | "test/ dir" |
-| **vertical per feature** | Each feature owns one `src/skills/<sourceDirectory>/` folder. | "horizontal layers" |
+| **vertical per feature** | Each feature owns one folder named for its `sourceDirectory` — under `src/skills/` when it ships payload, under `src/hookIsland/` when it ships runtime. | "horizontal layers" |
 | **single command per tool surface** | One `autorun` skill with verbs instead of multiple thin skills. | "one skill per verb" |
 | **SSOT** | Single source of truth; app config schema lives in `src/config/bagConfigSchema.ts`; hook defaults in `src/runtime/config.ts`. | "source of truth" (ok, but acronym is used) |
 | **clean break** | No back-compat shims on renames/pivots. | "migration", "deprecation" |
