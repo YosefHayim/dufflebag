@@ -43,7 +43,7 @@ describe("stagePackage", () => {
         const voiceRoot = path.join(staged.root, "runtime/speakResponse");
         for (const asset of ["cmux_focus.py", "prompt_refinement.py", "voice.py", "voice.py.lock"]) {
           expect(readFileSync(path.join(voiceRoot, asset))).toEqual(
-            readFileSync(path.join(packageRoot, "src/skills/speakResponse", asset)),
+            readFileSync(path.join(packageRoot, "src/hookIsland/speakResponse", asset)),
           );
         }
         expect(existsSync(path.join(voiceRoot, "lib/config.js"))).toBe(false);

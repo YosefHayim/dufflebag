@@ -36,7 +36,8 @@ type ValidateCardRequest = {
 const REQUIRED_SECTIONS = ["Rules", "Canonical example", "Golden path", "Exemplars", "Never"];
 
 // e.g. "[rule:function.arrow-only] · verify: `pnpm style`" or "… · verify: judgment"
-const METADATA_PATTERN = /^\[rule:([a-z][a-z0-9]*(?:[.-][a-z0-9]+)*)\] · verify: (?:`([^`]+)`|judgment)$/u;
+// Segments allow "-" and "_" so a repository can keep its existing IDs rather than rename them.
+const METADATA_PATTERN = /^\[rule:([a-z][a-z0-9]*(?:[._-][a-z0-9]+)*)\] · verify: (?:`([^`]+)`|judgment)$/u;
 
 const FORMAT_RULE = "format.rule-card";
 

@@ -347,6 +347,43 @@ const probeNarrationCancellation = (): unknown => {
   return JSON.parse(output);
 };
 
+const probeSynthesisOptions = (): unknown => {
+  const source = [
+    "import importlib.util",
+    "import json",
+    "import pathlib",
+    "import sys",
+    "import tempfile",
+    "import types",
+    "script_path = pathlib.Path(sys.argv[1])",
+    "spec = importlib.util.spec_from_file_location('dufflebag_voice', script_path)",
+    "module = importlib.util.module_from_spec(spec)",
+    "spec.loader.exec_module(module)",
+    "state_home = pathlib.Path(tempfile.mkdtemp(prefix='dufflebag-synthesis-options-'))",
+    "module.voice_state_home = lambda: state_home",
+    "module.render_speech = lambda _text: 'only chunk'",
+    "module.chunk_speech = lambda _text: ['only chunk']",
+    "module.voice_settings = lambda: ('F4', 1.0)",
+    "module.publish_read_along = lambda *_args: None",
+    "options = {}",
+    "class Engine:",
+    "    sample_rate = 10",
+    "    def synthesize(self, _text, **kwargs): options.update(kwargs); return types.SimpleNamespace(squeeze=lambda: [0]), None",
+    "module.tts_runtime = lambda: (Engine(), object())",
+    "sys.modules['sounddevice'] = types.SimpleNamespace(play=lambda *_args: None, stop=lambda: None, wait=lambda: None)",
+    "module.speak_markdown('ignored')",
+    "print(json.dumps({'total_steps': options.get('total_steps')}))",
+  ].join("\n");
+
+  const output = execFileSync(pythonExecutable, ["-c", source, voiceScript], {
+    encoding: "utf8",
+    env: pythonEnvironment,
+    timeout: 10_000,
+  });
+
+  return JSON.parse(output);
+};
+
 const probeFocusedQueue = (): unknown => {
   const source = [
     "import importlib.util",
@@ -485,6 +522,10 @@ describe("voice speech document", () => {
       calls: ["synth:first", "play", "stop", "stop"],
       outcome: "cancelled",
     });
+  });
+
+  it("never synthesizes below the step count that keeps speech free of impulse artifacts", () => {
+    expect(probeSynthesisOptions()).toEqual({ total_steps: 8 });
   });
 });
 

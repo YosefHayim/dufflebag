@@ -341,7 +341,8 @@ const validateSkillDirectoryPlan = (input: unknown): Either.Either<SkillDirector
     (error) => new SkillDirectoryPlanError({ issue: formatParseError(error) }),
   );
 
-const renderSkillBytes = (bytes: Uint8Array, ctl: string): Uint8Array => {
+/** Render one staged skill file exactly as this format writes it, substituting the control command. */
+export const renderSkillBytes = (bytes: Uint8Array, ctl: string): Uint8Array => {
   const text = Either.try({
     try: () => textDecoder.decode(bytes),
     catch: () => undefined,

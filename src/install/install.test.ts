@@ -190,6 +190,86 @@ layer(NodeContext.layer)("install", (it) => {
     ),
   );
 
+  it.effect("adopts a receipted skill file an external sync rewrote with the exact desired bytes", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const fileSystem = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const root = yield* fileSystem.makeTempDirectoryScoped({ prefix: "dufflebag-install-adopt-root-" });
+        const stagedRoot = yield* fileSystem.makeTempDirectoryScoped({ prefix: "dufflebag-install-adopt-stage-" });
+        const stagedSkill = path.join(stagedRoot, "skills/autorun/SKILL.md");
+        const installedSkill = path.join(root, ".claude/skills/autorun/SKILL.md");
+        const request = {
+          ...installRequest({ root, stagedRoot }),
+          features: { _tag: "selected", ids: ["autonomous-loop"] },
+          agents: { _tag: "selected", ids: ["claude-code"] },
+        };
+
+        yield* stageContextGuardRuntime(stagedRoot);
+        yield* fileSystem.makeDirectory(path.dirname(stagedSkill), { recursive: true });
+        yield* fileSystem.writeFileString(stagedSkill, "---\nname: autorun\n---\nRun @@CTL@@ when armed.\n");
+        yield* install(request);
+
+        // Ship a newer skill, then let an external sync write that same rendered content first.
+        yield* fileSystem.writeFileString(stagedSkill, "---\nname: autorun\n---\nRun @@CTL@@ after every handoff.\n");
+        const synced = (yield* fileSystem.readFileString(installedSkill)).replace(
+          "when armed.",
+          "after every handoff.",
+        );
+        yield* fileSystem.writeFileString(installedSkill, synced);
+
+        const result = yield* install(request);
+
+        expect(result._tag).toBe("installed");
+        expect(yield* fileSystem.readFileString(installedSkill)).toBe(synced);
+
+        // The refreshed receipt must describe the adopted bytes, so the next install stays clean.
+        const receipt = JSON.parse(yield* fileSystem.readFileString(path.join(root, ".claude/dufflebag/receipt.json")));
+        const entry = receipt.artifacts.find(
+          (artifact: { path: string }) => artifact.path === ".claude/skills/autorun/SKILL.md",
+        );
+        expect(entry.ownership.installedHash).toBe(
+          createHash("sha256")
+            .update(yield* fileSystem.readFile(installedSkill))
+            .digest("hex"),
+        );
+        expect((yield* Effect.exit(install(request)))._tag).toBe("Success");
+      }),
+    ),
+  );
+
+  it.effect("still refuses a receipted skill file rewritten with content it would not write", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const fileSystem = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const root = yield* fileSystem.makeTempDirectoryScoped({ prefix: "dufflebag-install-foreign-root-" });
+        const stagedRoot = yield* fileSystem.makeTempDirectoryScoped({ prefix: "dufflebag-install-foreign-stage-" });
+        const stagedSkill = path.join(stagedRoot, "skills/autorun/SKILL.md");
+        const installedSkill = path.join(root, ".claude/skills/autorun/SKILL.md");
+        const request = {
+          ...installRequest({ root, stagedRoot }),
+          features: { _tag: "selected", ids: ["autonomous-loop"] },
+          agents: { _tag: "selected", ids: ["claude-code"] },
+        };
+
+        yield* stageContextGuardRuntime(stagedRoot);
+        yield* fileSystem.makeDirectory(path.dirname(stagedSkill), { recursive: true });
+        yield* fileSystem.writeFileString(stagedSkill, "---\nname: autorun\n---\nRun @@CTL@@ when armed.\n");
+        yield* install(request);
+
+        yield* fileSystem.writeFileString(installedSkill, "---\nname: autorun\n---\nMy own hand-written notes.\n");
+
+        const exit = yield* Effect.exit(install(request));
+
+        expect(exit._tag).toBe("Failure");
+        expect(yield* fileSystem.readFileString(installedSkill)).toBe(
+          "---\nname: autorun\n---\nMy own hand-written notes.\n",
+        );
+      }),
+    ),
+  );
+
   it.effect("rejects receipt authority that does not match its source bytes", () =>
     Effect.scoped(
       Effect.gen(function* () {

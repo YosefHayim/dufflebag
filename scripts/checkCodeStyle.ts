@@ -188,11 +188,13 @@ const isSchemaTaggedErrorClass = (node: ts.ClassDeclaration | ts.ClassExpression
   return heritageTypes.length === 1 && isDirectSchemaTaggedError(heritageTypes[0]?.expression ?? node);
 };
 
+// Shipped skill payload (`src/skills/**`) is authored for other repositories and
+// is deliberately outside this contract; Biome still formats and lints it.
 const relativeSourceFiles = (repositoryRoot: string): ReadonlyArray<string> =>
   globSync(["src/**/*.{ts,tsx,js,mjs,mts,cts}", "scripts/**/*.{ts,tsx,js,mjs,mts,cts}"], {
     cwd: repositoryRoot,
     nodir: true,
-    ignore: ["**/node_modules/**", "**/dist/**", ".agents/**", ".cursor/**", ".devin/**"],
+    ignore: ["**/node_modules/**", "**/dist/**", ".agents/**", ".cursor/**", ".devin/**", "src/skills/**"],
   }).sort();
 
 const hasImmediatelyPrecedingComment = (sourceFile: ts.SourceFile, node: ts.Node): boolean => {
@@ -260,12 +262,37 @@ const nestingDepth = (node: ts.Node): number => {
 const hasExportModifier = (node: ts.Node & { modifiers?: ts.NodeArray<ts.ModifierLike> }): boolean =>
   Boolean(node.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword));
 
-const isHookRuntimeFile = (file: string): boolean =>
-  // e.g. "src/skills/dedupGuard/hooks/dedupGuard.ts" or ".../runtime/io.ts"
-  file.startsWith("src/runtime/") || /^src\/skills\/[^/]+\/(?:hooks|runtime)\//u.test(file);
+/**
+ * The four kinds of code in this repository. The style contract governs code
+ * this repository runs; `skillPayload` is content authored for *other* repos,
+ * so it answers to Biome and its own harness rather than our Effect-era rules.
+ */
+type CodeCategory = "application" | "hookIsland" | "skillPayload" | "tooling";
 
-const isApplicationFile = (file: string): boolean =>
-  file.startsWith("src/") && !isHookRuntimeFile(file) && !file.startsWith("src/skills/pngToCode/scripts/");
+const codeCategory = (file: string): CodeCategory => {
+  // e.g. "scripts/assembleHooks.mjs" — outer-ring maintainer tooling.
+  if (file.startsWith("scripts/")) {
+    return "tooling";
+  }
+
+  // e.g. "src/runtime/io.ts" or "src/hookIsland/dedupGuard/lib/dupIndex.ts".
+  if (file.startsWith("src/runtime/") || file.startsWith("src/hookIsland/")) {
+    return "hookIsland";
+  }
+
+  // e.g. "src/skills/pngToCode/scripts/src/bin/pixelDiff.ts" — shipped verbatim.
+  if (file.startsWith("src/skills/")) {
+    return "skillPayload";
+  }
+
+  return "application";
+};
+
+const isTestFile = (file: string): boolean => file.endsWith(".test.ts");
+
+const isHookRuntimeFile = (file: string): boolean => codeCategory(file) === "hookIsland";
+
+const isApplicationFile = (file: string): boolean => codeCategory(file) === "application";
 
 const assignedRootIdentifier = (expression: ts.Expression): ts.Identifier | undefined => {
   if (ts.isIdentifier(expression)) {
@@ -395,6 +422,12 @@ const isConsoleCall = (node: ts.CallExpression): boolean =>
   ts.isIdentifier(node.expression.expression) &&
   node.expression.expression.text === "console";
 
+// A type-only import is erased before the hook ever runs, so it cannot break
+// the dependency-free island the way a value import would.
+const isTypeOnlyImport = (node: ts.Node): boolean =>
+  (ts.isImportDeclaration(node) && Boolean(node.importClause?.isTypeOnly)) ||
+  (ts.isExportDeclaration(node) && node.isTypeOnly);
+
 const moduleSpecifierFor = (node: ts.Node): string | undefined => {
   if ((ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) && node.moduleSpecifier) {
     return ts.isStringLiteralLike(node.moduleSpecifier) ? node.moduleSpecifier.text : undefined;
@@ -483,29 +516,32 @@ const suppressionCommentLines = (sourceFile: ts.SourceFile): ReadonlyArray<numbe
 };
 
 const featureRuntimeRoot = (file: string): string | undefined => {
-  // e.g. "src/skills/dedupGuard/hooks/x.ts" → "src/skills/dedupGuard"
-  const match = /^(src\/skills\/[^/]+)\/(?:hooks|runtime)\//u.exec(file);
+  // e.g. "src/hookIsland/dedupGuard/hooks/x.ts" → "src/hookIsland/dedupGuard"
+  const match = /^(src\/hookIsland\/[^/]+)\//u.exec(file);
   return match?.[1];
 };
 
-const hookImportAllowed = (file: string, specifier: string): boolean => {
-  if (specifier.startsWith("node:")) {
+const hookImportAllowed = (input: { file: string; specifier: string; typeOnly: boolean }): boolean => {
+  if (input.specifier.startsWith("node:")) {
     return true;
   }
 
-  const target = resolvedImportPath(file, specifier);
+  const target = resolvedImportPath(input.file, input.specifier);
   if (!target) {
-    return false;
+    // A bare package specifier that is erased before emit adds no runtime
+    // dependency, so `import type * as TS from "typescript"` is safe; the same
+    // import as a value would break the island.
+    return input.typeOnly;
   }
 
   if (target.startsWith("src/runtime/")) {
     return true;
   }
 
-  const featureRoot = featureRuntimeRoot(file);
-  return Boolean(
-    featureRoot && (target.startsWith(`${featureRoot}/hooks/`) || target.startsWith(`${featureRoot}/runtime/`)),
-  );
+  // "Its own feature runtime" is the whole feature directory: an entry hook
+  // legitimately imports its sibling `lib/` and `command/` modules.
+  const featureRoot = featureRuntimeRoot(input.file);
+  return Boolean(featureRoot && target.startsWith(`${featureRoot}/`));
 };
 
 const inspectSourceFile = (
@@ -578,7 +614,14 @@ const inspectSourceFile = (
 
   const visit = (node: ts.Node): void => {
     const moduleSpecifier = moduleSpecifierFor(node);
-    if (moduleSpecifier && isHookRuntimeFile(file) && !hookImportAllowed(file, moduleSpecifier)) {
+    // Co-located tests never ship: tsc excludes them, the tarball excludes them,
+    // and assembleHooks only copies compiled entry hooks.
+    const shipsWithTheIsland = isHookRuntimeFile(file) && !isTestFile(file);
+    if (
+      moduleSpecifier &&
+      shipsWithTheIsland &&
+      !hookImportAllowed({ file, specifier: moduleSpecifier, typeOnly: isTypeOnlyImport(node) })
+    ) {
       addViolation({
         ruleId: "import.hook-runtime",
         sourceFile,
