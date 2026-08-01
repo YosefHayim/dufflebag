@@ -792,8 +792,8 @@ describe("schema-owned object types", () => {
 
   it.each([
     "src/runtime/hookInput.ts",
-    "src/skills/contextGuard/hooks/hookInput.ts",
-    "src/skills/contextGuard/runtime/runtimeState.ts",
+    "src/hookIsland/contextGuard/hooks/hookInput.ts",
+    "src/hookIsland/contextGuard/runtime/runtimeState.ts",
   ])("allows a small structural transport type in the dependency-free runtime at %s", (path) => {
     const report = checkSource(path, "export type HookInput = { sessionId: string };\n");
 
@@ -1071,9 +1071,9 @@ describe("application and installed-hook import graphs", () => {
   it("allows node imports plus shared and feature-local runtime imports", () => {
     const report = checkSources({
       "src/runtime/readConfig.ts": 'import { readFileSync } from "node:fs";\nexport const read = readFileSync;\n',
-      "src/skills/contextGuard/hooks/contextGuard.ts":
+      "src/hookIsland/contextGuard/hooks/contextGuard.ts":
         'import { read } from "../../../runtime/readConfig.js";\nimport { decide } from "../runtime/decide.js";\nexport const run = () => decide(read);\n',
-      "src/skills/contextGuard/runtime/decide.ts": "export const decide = (value: unknown) => value;\n",
+      "src/hookIsland/contextGuard/runtime/decide.ts": "export const decide = (value: unknown) => value;\n",
     });
 
     expect(report.violations).toEqual([]);
@@ -1083,47 +1083,47 @@ describe("application and installed-hook import graphs", () => {
     {
       name: "a third-party import",
       files: {
-        "src/skills/contextGuard/hooks/contextGuard.ts":
+        "src/hookIsland/contextGuard/hooks/contextGuard.ts":
           'import { Effect } from "effect";\nexport const run = Effect.void;\n',
       },
-      file: "src/skills/contextGuard/hooks/contextGuard.ts",
+      file: "src/hookIsland/contextGuard/hooks/contextGuard.ts",
       line: 1,
     },
     {
       name: "a type-only application import",
       files: {
         "src/install/artifactPlan.ts": "export type ArtifactPlan = string;\n",
-        "src/skills/contextGuard/hooks/contextGuard.ts":
+        "src/hookIsland/contextGuard/hooks/contextGuard.ts":
           'import type { ArtifactPlan } from "../../../install/artifactPlan.js";\nexport const run = () => undefined;\n',
       },
-      file: "src/skills/contextGuard/hooks/contextGuard.ts",
+      file: "src/hookIsland/contextGuard/hooks/contextGuard.ts",
       line: 1,
     },
     {
       name: "an application re-export",
       files: {
         "src/install/artifactPlan.ts": "export const artifactPlan = {};\n",
-        "src/skills/contextGuard/hooks/contextGuard.ts": 'export * from "../../../install/artifactPlan.js";\n',
+        "src/hookIsland/contextGuard/hooks/contextGuard.ts": 'export * from "../../../install/artifactPlan.js";\n',
       },
-      file: "src/skills/contextGuard/hooks/contextGuard.ts",
+      file: "src/hookIsland/contextGuard/hooks/contextGuard.ts",
       line: 1,
     },
     {
       name: "a dynamic third-party import",
       files: {
-        "src/skills/contextGuard/hooks/contextGuard.ts": 'export const run = () => import("effect");\n',
+        "src/hookIsland/contextGuard/hooks/contextGuard.ts": 'export const run = () => import("effect");\n',
       },
-      file: "src/skills/contextGuard/hooks/contextGuard.ts",
+      file: "src/hookIsland/contextGuard/hooks/contextGuard.ts",
       line: 1,
     },
     {
       name: "a transitive third-party import",
       files: {
-        "src/skills/contextGuard/hooks/contextGuard.ts": 'export { run } from "../runtime/bridge.js";\n',
-        "src/skills/contextGuard/runtime/bridge.ts":
+        "src/hookIsland/contextGuard/hooks/contextGuard.ts": 'export { run } from "../runtime/bridge.js";\n',
+        "src/hookIsland/contextGuard/runtime/bridge.ts":
           'import { Effect } from "effect";\nexport const run = Effect.void;\n',
       },
-      file: "src/skills/contextGuard/runtime/bridge.ts",
+      file: "src/hookIsland/contextGuard/runtime/bridge.ts",
       line: 1,
     },
   ])("rejects $name from the hook graph", ({ files, file, line }) => {

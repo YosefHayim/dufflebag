@@ -29,7 +29,7 @@ import { findDuplicateJsonProperty } from "../config/jsonDocument.js";
 import { planConfigReference } from "./agentFormats/configReference.js";
 import { planInstructionFile } from "./agentFormats/instructionFile.js";
 import { planRuleFiles } from "./agentFormats/ruleFile.js";
-import { planSkillDirectory } from "./agentFormats/skillDirectory.js";
+import { planSkillDirectory, renderSkillBytes } from "./agentFormats/skillDirectory.js";
 import { applyArtifactPlan } from "./applyArtifactPlan.js";
 import {
   type ArtifactExpectedCurrent,
@@ -1159,7 +1159,9 @@ const createRuntimeWrites = (input: {
           Effect.gen(function* () {
             const artifactPath = installedRuntimeFile(feature.sourceDirectory, file.path);
             const snapshot = yield* readFileSnapshot(path.join(input.request.destination.root, artifactPath));
-            const previous = yield* effectFromEither(previousWholeFile(input.previousReceipt, artifactPath, snapshot));
+            const previous = yield* effectFromEither(
+              previousWholeFile(input.previousReceipt, artifactPath, snapshot, file.bytes),
+            );
 
             return yield* effectFromEither(
               validateArtifactOperation({
@@ -1256,10 +1258,14 @@ const inspectedSnapshot = (
     : Either.right(found.snapshot);
 };
 
+// A receipted file whose current bytes are exactly the bytes this install is about to write is
+// adopted instead of refused: an external skill sync can reproduce our own content, and rewriting
+// identical bytes can destroy nothing. Callers that cannot name their desired bytes stay strict.
 const previousWholeFile = (
   receipt: ArtifactReceipt | undefined,
   artifactPath: string,
   snapshot: FileSnapshot,
+  desiredBytes?: Uint8Array,
 ): Either.Either<PreviousFileValue, InstallError> => {
   const artifact = previousReceiptArtifact(receipt, artifactPath);
   if (artifact === undefined) {
@@ -1272,7 +1278,10 @@ const previousWholeFile = (
     );
   }
 
-  if (snapshot._tag !== "file" || hashBytes(snapshot.bytes) !== artifact.ownership.installedHash) {
+  const installedContent = snapshot._tag === "file" && hashBytes(snapshot.bytes) === artifact.ownership.installedHash;
+  const desiredContent =
+    snapshot._tag === "file" && desiredBytes !== undefined && bytesEqual(snapshot.bytes, desiredBytes);
+  if (!installedContent && !desiredContent) {
     return Either.left(
       new InstallError({ issue: `Receipted whole-file artifact ${artifactPath} changed after installation.` }),
     );
@@ -1343,14 +1352,19 @@ const createSkillDirectoryWrites = (input: {
     }
 
     const target = input.agent.target;
-    const paths = input.stagedSkills.flatMap((skill) =>
-      skill.sourceFiles.map((file) => `${target.path}/${skill.installedSkill.id}/${file.path}`),
-    );
-    const inspected = yield* inspectArtifacts(input.request.destination.root, paths);
-    const previousFiles = yield* Effect.forEach(inspected, (artifact) =>
-      effectFromEither(previousWholeFile(input.previousReceipt, artifact.path, artifact.snapshot)).pipe(
-        Effect.map((previous) => ({ path: artifact.path, previous })),
+    const desired = new Map(
+      input.stagedSkills.flatMap((skill) =>
+        skill.sourceFiles.map((file): [string, Uint8Array] => [
+          `${target.path}/${skill.installedSkill.id}/${file.path}`,
+          renderSkillBytes(file.bytes, input.ctl),
+        ]),
       ),
+    );
+    const inspected = yield* inspectArtifacts(input.request.destination.root, [...desired.keys()]);
+    const previousFiles = yield* Effect.forEach(inspected, (artifact) =>
+      effectFromEither(
+        previousWholeFile(input.previousReceipt, artifact.path, artifact.snapshot, desired.get(artifact.path)),
+      ).pipe(Effect.map((previous) => ({ path: artifact.path, previous }))),
     );
     const plan = yield* effectFromEither(
       mapFormatError(

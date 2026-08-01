@@ -9,10 +9,12 @@
   "files": [
     "dist",
     "src/skills",
+    "src/hookIsland",
     "templates",
     "README.md",
     "LICENSE",
-    "!src/skills/**/*.test.ts"
+    "!src/skills/**/*.test.ts",
+    "!src/hookIsland/**/*.test.ts"
   ],
   "scripts": {
     "dev": "pnpm cli",

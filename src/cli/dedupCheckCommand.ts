@@ -8,7 +8,7 @@
 import { Args, Command, Options } from "@effect/cli";
 import { Effect, Option } from "effect";
 
-import { dedupCheck } from "../skills/dedupGuard/command/dedupCheck.js";
+import { dedupCheck } from "../hookIsland/dedupGuard/command/dedupCheck.js";
 import * as TerminalUI from "./TerminalUI.js";
 
 const targetPathArg = Args.directory({ name: "path", exists: "either" }).pipe(

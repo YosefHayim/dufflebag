@@ -1432,7 +1432,9 @@ def speak_markdown(markdown: str, origin: Any = None, *, respect_focus: bool = F
             audio, _ = engine.synthesize(
                 chunk.strip(),
                 voice_style=style,
-                total_steps=4,
+                # Below the model's default 8 steps the flow solver leaves impulse artifacts
+                # (~38 full-scale sample discontinuities per utterance at 4) that sound like crunches.
+                total_steps=8,
                 speed=speed,
                 max_chunk_length=300,
                 silence_duration=0.24,

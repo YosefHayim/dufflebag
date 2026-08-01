@@ -208,6 +208,15 @@ describe("rule-card format", () => {
     expect(messagesFor(guide)).toContain("Rule function.invented has no entry in code-style.rules.json.");
   });
 
+  it("accepts an existing snake_case ID rather than forcing a rename", () => {
+    const rules: ReadonlyArray<StyleGuideRule> = [
+      { id: "python.no_lambda", statement: "Something asserted.", verify: "judgment" },
+    ];
+    const guide = guideWith([card({ id: "python.no_lambda", verify: "judgment", assertion: "Something asserted." })]);
+
+    expect(checkStyleGuide({ guide, rules })).toEqual([]);
+  });
+
   it("ignores headings that appear inside example code", () => {
     const guide = guideWith(validCards).replace("// ✓ good", "// ✓ good\n### not a card\n## not a section");
 

@@ -3,8 +3,8 @@
  * assembleHooks — gather the vertical per-feature hook sources into the single
  * flat, self-contained `dist/hooks/` payload the installer copies wholesale.
  *
- * Sources are vertical (`src/skills/<feature>/hooks/*`, `src/skills/<feature>/lib/*`) and
- * the shared zero-dep kernel lives in `src/runtime/*`; the *output* is flat
+ * Sources are vertical (`src/hookIsland/<feature>/hooks/*`, `src/hookIsland/<feature>/lib/*`)
+ * and the shared zero-dep kernel lives in `src/runtime/*`; the *output* is flat
  * (ADR 0008: source structure ≠ output structure). Entry hooks land at
  * `dist/hooks/*.js`, their kernel + feature libs at `dist/hooks/lib/*.js`, and
  * each entry hook's cross-dir import specifiers are rewritten to the flat
@@ -22,7 +22,7 @@ import { fileURLToPath } from "node:url";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const CLI_ENTRY = path.join(ROOT, "dist", "src", "cli", "main.js");
-const DIST_SKILLS = path.join(ROOT, "dist", "src", "skills");
+const DIST_ISLAND = path.join(ROOT, "dist", "src", "hookIsland");
 const PAYLOAD_DIR = path.join(ROOT, "dist", "src", "runtime");
 const OUT_HOOKS = path.join(ROOT, "dist", "hooks");
 const OUT_LIB = path.join(OUT_HOOKS, "lib");
@@ -57,8 +57,8 @@ function copyJs(fromDir, toDir, transform) {
 }
 
 function main() {
-  if (!existsSync(DIST_SKILLS)) {
-    throw new Error("dist/src/skills is missing — run `tsc` before assembling the hook payload.");
+  if (!existsSync(DIST_ISLAND)) {
+    throw new Error("dist/src/hookIsland is missing — run `tsc` before assembling the hook payload.");
   }
   if (!existsSync(CLI_ENTRY)) {
     throw new Error("dist/src/cli/main.js is missing — run `tsc` before finalizing the build.");
@@ -69,9 +69,9 @@ function main() {
 
   let hooks = 0;
   // Each feature contributes its entry hooks (rewritten, flat) and feature libs.
-  for (const feature of readdirSync(DIST_SKILLS)) {
-    hooks += copyJs(path.join(DIST_SKILLS, feature, "hooks"), OUT_HOOKS, flatten);
-    copyJs(path.join(DIST_SKILLS, feature, "lib"), OUT_LIB);
+  for (const feature of readdirSync(DIST_ISLAND)) {
+    hooks += copyJs(path.join(DIST_ISLAND, feature, "hooks"), OUT_HOOKS, flatten);
+    copyJs(path.join(DIST_ISLAND, feature, "lib"), OUT_LIB);
   }
   // The shared zero-dep kernel (config SSOT + io) sits alongside the feature libs.
   copyJs(PAYLOAD_DIR, OUT_LIB);

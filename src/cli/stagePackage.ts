@@ -1,11 +1,12 @@
 /**
  * Build a staged package root for install, update, and doctor.
  *
- * Catalog `sourceDirectory` values are camelCase and match authored skill
- * directories under `src/skills/`. Compiled hooks live under
- * `dist/src/skills/<sourceDirectory>/`; this stages them into
- * `dist/staged/runtime/<sourceDirectory>/` and catalog skill allowlists into
- * `dist/staged/skills/<id>/`.
+ * Catalog `sourceDirectory` values are camelCase and name two different
+ * authored trees: skill payload under `src/skills/<sourceDirectory>/` and
+ * executable hook-island runtime under `src/hookIsland/<sourceDirectory>/`.
+ * Compiled island code lives under `dist/src/hookIsland/<sourceDirectory>/`;
+ * this stages it into `dist/staged/runtime/<sourceDirectory>/` and catalog
+ * skill allowlists into `dist/staged/skills/<id>/`.
  */
 
 import { FileSystem, Path } from "@effect/platform";
@@ -173,9 +174,9 @@ const stageRuntimeFeature = (input: {
   Effect.gen(function* () {
     const fileSystem = yield* FileSystem.FileSystem;
     const path = yield* Path.Path;
-    const compiledFeatureRoot = path.join(input.packageRoot, "dist", "src", "skills", input.sourceDirectory);
+    const compiledFeatureRoot = path.join(input.packageRoot, "dist", "src", "hookIsland", input.sourceDirectory);
     const compiledSharedRuntimeRoot = path.join(input.packageRoot, "dist", "src", "runtime");
-    const authoredFeatureRoot = path.join(input.packageRoot, "src", "skills", input.sourceDirectory);
+    const authoredFeatureRoot = path.join(input.packageRoot, "src", "hookIsland", input.sourceDirectory);
     const stagedFeatureRoot = path.join(input.stagedRoot, "runtime", input.sourceDirectory);
     const compiledExists = yield* fileSystem.exists(compiledFeatureRoot);
     if (!compiledExists) {
@@ -258,10 +259,10 @@ export const stagePackage = Effect.gen(function* () {
   const fileSystem = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
   const packageRoot = yield* resolvePackageRoot;
-  const compiledSkillsRoot = path.join(packageRoot, "dist", "src", "skills");
-  if (!(yield* fileSystem.exists(compiledSkillsRoot))) {
+  const compiledIslandRoot = path.join(packageRoot, "dist", "src", "hookIsland");
+  if (!(yield* fileSystem.exists(compiledIslandRoot))) {
     return yield* new StagePackageError({
-      issue: `Compiled skills missing at ${compiledSkillsRoot}. Run \`pnpm build\` before install, update, or doctor.`,
+      issue: `Compiled hook island missing at ${compiledIslandRoot}. Run \`pnpm build\` before install, update, or doctor.`,
     });
   }
 
