@@ -24,7 +24,7 @@ Names-only glossary: human↔agent bridge for the domain vocabulary used in code
 | **autonomous-loop / `autorun`** | Skill that arms the context-guard SessionStart daemon for hands-free compact/resume (`stop`/`exit` verbs). Hook runtime is owned by **context-guard**. | "auto-compact", "daemon" (alone) |
 | **speak-response** | Stop hook that speaks Claude prose via macOS `say`. | "TTS", "voice" |
 | **png-to-code** | PNG → measured pixel-perfect code skill (SVG/HTML/CSS) with screenshot-diff harness. | "image-to-code" |
-| **scaffold-workflows** | CLI command that copies the reusable workflow set into another repo. | "scaffold-ci" (legacy name), "ci-setup" |
+| **scaffold-workflows** | CLI command that copies the owned single-gate CI/publish set into another repo. | "scaffold-ci" (legacy name), "ci-setup" |
 | **fail-open** | Hooks must exit successfully on any error so a guard bug never blocks the user. | "graceful degrade" |
 | **capability layout** | Folders group by product capability (`cli`, `catalog`, `config`, `install`, `runtime`, `skills`, `hookIsland`). | "src/core layers", pure-core/imperative-shell folders |
 | **biome** | Linter and formatter; `biome ci` is the lint half of the gate. | "linter", "prettier" (only half) |
@@ -33,4 +33,4 @@ Names-only glossary: human↔agent bridge for the domain vocabulary used in code
 | **single command per tool surface** | One `autorun` skill with verbs instead of multiple thin skills. | "one skill per verb" |
 | **SSOT** | Single source of truth; app config schema lives in `src/config/bagConfigSchema.ts`; hook defaults in `src/runtime/config.ts`. | "source of truth" (ok, but acronym is used) |
 | **clean break** | No back-compat shims on renames/pivots. | "migration", "deprecation" |
-| **verify** | The one aggregate gate: `biome ci && typecheck && test && build`. | "qa", "validate" |
+| **verify** | The one aggregate script that owns every repository check required by CI. | "qa", "validate" |

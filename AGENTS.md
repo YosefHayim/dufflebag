@@ -4,7 +4,7 @@ Entrypoint for coding agents and maintainers. `CLAUDE.md` and `GEMINI.md` are sy
 
 ## What this is
 
-**dufflebag** is a TypeScript CLI that installs, updates, uninstalls, diagnoses, configures, and scaffolds an owned set of agent skills, dependency-free hooks, agent configuration, and reusable CI/publish workflow templates.
+**dufflebag** is a TypeScript CLI that installs, updates, uninstalls, diagnoses, configures, and scaffolds an owned set of agent skills, dependency-free hooks, agent configuration, and copyable single-gate CI/publish workflow templates.
 
 ```bash
 npx ys-dufflebag install --features png-to-code

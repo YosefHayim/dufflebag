@@ -1,7 +1,7 @@
 {
   "name": "ys-dufflebag",
   "version": "0.13.2",
-  "description": "TypeScript CLI that installs and surgically updates coding-agent skills, native hooks, managed configuration, and reusable workflows for Claude Code, Codex, Grok, Kimi, Kiro, and more.",
+  "description": "TypeScript CLI that installs and surgically updates coding-agent skills, native hooks, managed configuration, and copyable workflows for Claude Code, Codex, Grok, Kimi, Kiro, and more.",
   "type": "module",
   "bin": {
     "dufflebag": "dist/src/cli/main.js"
@@ -31,7 +31,7 @@
     "lint:fix": "biome check --write .",
     "format": "biome format --write .",
     "check:ci": "biome ci .",
-    "verify": "biome ci . && tsc --noEmit && pnpm style && pnpm style:guide . && vitest run && pnpm build",
+    "verify": "biome ci . && tsc --noEmit && pnpm style && pnpm style:guide . && pnpm build && vitest run",
     "prepublishOnly": "npm run build",
     "generate-readme": "node scripts/generateReadme.mjs"
   },
@@ -64,7 +64,7 @@
     "url": "git+https://github.com/YosefHayim/dufflebag.git"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
   "packageManager": "pnpm@11.18.0",
   "dependencies": {

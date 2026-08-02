@@ -157,7 +157,7 @@ export const runMenu = Effect.gen(function* () {
       { title: "Update", value: "update", description: "refresh hook code" },
       { title: "Configure", value: "config", description: "show managed config" },
       { title: "Doctor", value: "doctor", description: "read-only health check" },
-      { title: "Scaffold CI", value: "scaffold-ci", description: "copy workflow set" },
+      { title: "Scaffold CI", value: "scaffold-ci", description: "copy single-gate workflows" },
       { title: "Uninstall", value: "uninstall", description: "remove installation" },
       { title: "Exit", value: "exit", description: "close the bag" },
     ],

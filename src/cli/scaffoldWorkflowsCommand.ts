@@ -74,4 +74,4 @@ export const scaffoldWorkflowsCommand = Command.make(
         "Next: register the npm trusted publisher (repo + publish.yml) — see the publish.yml header.",
       );
     }).pipe(Effect.catchAll((error) => TerminalUI.presentError(error))),
-).pipe(Command.withDescription("Copy the CI + publish workflow set into a repo (each repo owns its CI)"));
+).pipe(Command.withDescription("Copy the single-gate CI + publish workflow set into a repo"));

@@ -1,9 +1,8 @@
 /**
- * The single-purpose reusable legs are shipped twice — as dufflebag's own active
- * CI (`.github/workflows/`) and as the copy-templates `scaffold-ci` stamps into
- * other repos (`templates/workflows/`). They MUST stay byte-identical; this fails
- * the moment one is edited without the other. `ci.yml` (own trigger vs opt-in
- * e2e leg), `e2e.yml`, and `publish.yml` legitimately differ and are excluded.
+ * Failure reporting is shipped twice: as dufflebag's active reusable workflow
+ * and as the copy-template `scaffold-ci` stamps into other repositories. The CI
+ * and publish workflows legitimately differ because dufflebag's own voice tests
+ * need Python and uv, while the generic templates remain Node-only.
  */
 
 import { readFileSync } from "node:fs";
@@ -13,11 +12,11 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const SHARED_LEGS = ["biome.yml", "typecheck.yml", "test.yml", "build.yml", "report-failure.yml"];
+const SHARED_WORKFLOWS = ["report-failure.yml"];
 
 describe("templates/workflows stay in sync with .github/workflows", () => {
-  // Register one independently named case per shared leg, so a drifted file is reported by name.
-  for (const name of SHARED_LEGS) {
+  // Register one independently named case per shared workflow, so drift is reported by name.
+  for (const name of SHARED_WORKFLOWS) {
     it(`${name} is byte-identical in both locations`, () => {
       const active = readFileSync(path.join(repoRoot, ".github", "workflows", name), "utf8");
       const template = readFileSync(path.join(repoRoot, "templates", "workflows", name), "utf8");

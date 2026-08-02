@@ -60,7 +60,7 @@ const VERSION = readPackageVersion();
 
 const dufflebag = Command.make("dufflebag").pipe(
   Command.withDescription(
-    "Install a personal bag of AI coding-agent skills, hooks, natural voice, and reusable workflows.",
+    "Install a personal bag of AI coding-agent skills, hooks, natural voice, and copyable workflows.",
   ),
   Command.withSubcommands([
     installCommand,

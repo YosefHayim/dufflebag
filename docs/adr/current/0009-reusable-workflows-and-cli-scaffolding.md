@@ -1,6 +1,6 @@
 # 0009 — CI + publish copied per repo by the CLI
 
-- **Status:** Accepted (2026-07-01) — revised the same day from a *reference* model to a *copy* model (see below). **Dir renamed `workflow-templates/` → `templates/workflows/` by [0013](0013-style-refresh-colocated-tests-single-command-autorun-templates.md)** (2026-07-02); the copy-model decision below is unchanged — read `workflow-templates/` as `templates/workflows/` throughout.
+- **Status:** Superseded in part by [0018 — Single-job CI template](0018-single-job-ci-template.md) (2026-08-02). The per-repository copy model and local `publish.yml` remain accepted; the single-purpose CI decomposition is historical. Originally accepted 2026-07-01 and revised the same day from a *reference* model to a *copy* model. **Dir renamed `workflow-templates/` → `templates/workflows/` by [0013](0013-style-refresh-colocated-tests-single-command-autorun-templates.md)** (2026-07-02).
 - **Scope:** `.github/workflows/**`, `templates/workflows/**` (was `workflow-templates/**`), the `scaffold-ci` CLI command
 - **Related:** [0005 — CI failure opens an issue with the captured error](0005-ci-failure-opens-issue-with-captured-error.md), [0006 — Lean dependency stance](0006-lean-dependency-stance.md)
 
