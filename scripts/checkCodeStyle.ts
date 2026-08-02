@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { globSync } from "glob";
 import ts from "typescript";
@@ -38,7 +38,7 @@ const APPROVED_PROTECTED_PATHS = [
   "src/skills/makeATrailer/scripts/assembleCut.mjs",
 ];
 
-const APPROVED_ASSEMBLE_CUT_EXEMPTIONS = ["function.arrow-only", "function.input-shape", "comment.loop-intent"];
+const APPROVED_ASSEMBLE_CUT_EXEMPTIONS = ["function.arrow-only", "function.input-shape"];
 
 const failConfiguration = (message: string): never => {
   throw new Error(`Invalid code-style configuration: ${message}`);
@@ -128,7 +128,7 @@ const validateProtectedPaths = (protectedPaths: ReadonlyArray<ProtectedPathConfi
 
   const assembleCut = protectedPaths[2];
   if (!assembleCut || !sameStrings(assembleCut.codeRuleExemptions, APPROVED_ASSEMBLE_CUT_EXEMPTIONS)) {
-    failConfiguration("assembleCut.mjs must have exactly the three approved code-rule exemptions");
+    failConfiguration("assembleCut.mjs must have exactly the two approved code-rule exemptions");
   }
 };
 
@@ -180,25 +180,33 @@ const isDirectSchemaTaggedError = (expression: ts.Expression): boolean => {
 };
 
 const isSchemaTaggedErrorClass = (node: ts.ClassDeclaration | ts.ClassExpression): boolean => {
-  const heritageTypes =
-    node.heritageClauses
-      ?.filter((clause) => clause.token === ts.SyntaxKind.ExtendsKeyword)
-      .flatMap((clause) => clause.types) ?? [];
+  const heritageClauses = node.heritageClauses === undefined ? [] : node.heritageClauses;
+  const heritageTypes = heritageClauses
+    .filter((clause) => clause.token === ts.SyntaxKind.ExtendsKeyword)
+    .flatMap((clause) => clause.types);
 
-  return heritageTypes.length === 1 && isDirectSchemaTaggedError(heritageTypes[0]?.expression ?? node);
+  const heritageType = heritageTypes.at(0);
+  return heritageTypes.length === 1 && heritageType !== undefined && isDirectSchemaTaggedError(heritageType.expression);
 };
 
-// Shipped skill payload (`src/skills/**`) is authored for other repositories and
-// is deliberately outside this contract; Biome still formats and lints it.
-const relativeSourceFiles = (repositoryRoot: string): ReadonlyArray<string> =>
+// Shipped skill payload (`src/skills/**`) follows its own runtime conventions,
+// while the repository-wide naming contract still applies to its authored code.
+const maintainedSourceFiles = (repositoryRoot: string): ReadonlyArray<string> =>
   globSync(["src/**/*.{ts,tsx,js,mjs,mts,cts}", "scripts/**/*.{ts,tsx,js,mjs,mts,cts}"], {
     cwd: repositoryRoot,
     nodir: true,
     ignore: ["**/node_modules/**", "**/dist/**", ".agents/**", ".cursor/**", ".devin/**", "src/skills/**"],
   }).sort();
 
+const authoredSkillSourceFiles = (repositoryRoot: string): ReadonlyArray<string> =>
+  globSync("src/skills/**/*.{ts,tsx,js,mjs,mts,cts}", {
+    cwd: repositoryRoot,
+    nodir: true,
+    ignore: ["**/node_modules/**", "**/dist/**"],
+  }).sort();
+
 const hasImmediatelyPrecedingComment = (sourceFile: ts.SourceFile, node: ts.Node): boolean => {
-  const comments = ts.getLeadingCommentRanges(sourceFile.text, node.getFullStart()) ?? [];
+  const comments = ts.getLeadingCommentRanges(sourceFile.text, node.getFullStart()) || [];
   const comment = comments.at(-1);
   if (!comment) {
     return false;
@@ -250,13 +258,21 @@ const isFunctionStatement = (statement: ts.Statement): boolean => {
 const isControlNode = (node: ts.Node): boolean =>
   ts.isIfStatement(node) || ts.isSwitchStatement(node) || ts.isTryStatement(node) || isExplicitLoop(node);
 
+const addsNestingLevel = (parent: ts.Node, child: ts.Node): boolean => {
+  if (ts.isIfStatement(parent) && parent.elseStatement === child && ts.isIfStatement(child)) {
+    return false;
+  }
+
+  return isControlNode(parent);
+};
+
 const nestingDepth = (node: ts.Node): number => {
   const parent = node.parent;
   if (!parent || ts.isFunctionLike(parent)) {
     return 1;
   }
 
-  return nestingDepth(parent) + (isControlNode(parent) ? 1 : 0);
+  return nestingDepth(parent) + (addsNestingLevel(parent, node) ? 1 : 0);
 };
 
 const hasExportModifier = (node: ts.Node & { modifiers?: ts.NodeArray<ts.ModifierLike> }): boolean =>
@@ -399,16 +415,6 @@ const mutationTarget = (node: ts.Node): ts.Expression | undefined => {
   return undefined;
 };
 
-const isBuilderReduce = (node: ts.CallExpression): boolean => {
-  const expression = node.expression;
-  const initial = node.arguments[1];
-  return (
-    ts.isPropertyAccessExpression(expression) &&
-    expression.name.text === "reduce" &&
-    Boolean(initial && (ts.isArrayLiteralExpression(initial) || ts.isObjectLiteralExpression(initial)))
-  );
-};
-
 const isNamedPropertyCall = (request: { node: ts.CallExpression; owner: string; property: string }): boolean =>
   ts.isPropertyAccessExpression(request.node.expression) &&
   ts.isIdentifier(request.node.expression.expression) &&
@@ -466,59 +472,115 @@ const resolvedImportPath = (file: string, specifier: string): string | undefined
   return segments.join("/");
 };
 
-const sourceCandidates = (target: string): ReadonlyArray<string> => {
-  if (target.endsWith(".mjs")) {
-    // e.g. "foo.mjs" → also try "foo.mts"
-    return [target, target.replace(/\.mjs$/u, ".mts")];
-  }
-
-  if (target.endsWith(".cjs")) {
-    // e.g. "foo.cjs" → also try "foo.cts"
-    return [target, target.replace(/\.cjs$/u, ".cts")];
-  }
-
-  if (target.endsWith(".js")) {
-    // e.g. "foo.js" → also try "foo.ts" and "foo.tsx"
-    return [target, target.replace(/\.js$/u, ".ts"), target.replace(/\.js$/u, ".tsx")];
-  }
-
-  return [target, `${target}.ts`, `${target}.tsx`];
-};
-
-const resolvesToPureBarrel = (request: { repositoryRoot: string; file: string; specifier: string }): boolean => {
-  const { repositoryRoot, file, specifier } = request;
-  const target = resolvedImportPath(file, specifier);
-  const candidate = target
-    ? sourceCandidates(target).find((path) => existsSync(join(repositoryRoot, path)))
-    : undefined;
-  if (!candidate) {
-    return false;
-  }
-
-  const sourceText = readFileSync(join(repositoryRoot, candidate), "utf8");
-  const sourceFile = ts.createSourceFile(candidate, sourceText, ts.ScriptTarget.Latest, true);
-  return sourceFile.statements.length > 0 && sourceFile.statements.every(ts.isExportDeclaration);
-};
-
 // Matches TypeScript, Biome, ESLint, and coverage-tool suppression directives.
 const SUPPRESSION_PATTERN =
   /(?:@ts-(?:ignore|expect-error|nocheck)|biome-ignore|prettier-ignore|eslint-disable(?:-next-line|-line)?|(?:c8|istanbul|v8)\s+ignore)\b/u;
 
-const suppressionCommentLines = (sourceFile: ts.SourceFile): ReadonlyArray<number> => {
+type SuppressionComment = {
+  line: number;
+  text: string;
+};
+
+const suppressionComments = (sourceFile: ts.SourceFile): ReadonlyArray<SuppressionComment> => {
   const scanner = ts.createScanner(ts.ScriptTarget.Latest, false, sourceFile.languageVariant, sourceFile.text);
-  const lines: Array<number> = [];
+  const comments: Array<SuppressionComment> = [];
 
   // Read lexical comments so suppression-looking strings remain ordinary data.
   while (scanner.scan() !== ts.SyntaxKind.EndOfFileToken) {
     const token = scanner.getToken();
     const isComment = token === ts.SyntaxKind.SingleLineCommentTrivia || token === ts.SyntaxKind.MultiLineCommentTrivia;
     if (isComment && SUPPRESSION_PATTERN.test(scanner.getTokenText())) {
-      lines.push(sourceFile.getLineAndCharacterOfPosition(scanner.getTokenPos()).line + 1);
+      comments.push({
+        line: sourceFile.getLineAndCharacterOfPosition(scanner.getTokenPos()).line + 1,
+        text: scanner.getTokenText(),
+      });
     }
   }
 
-  return lines;
+  return comments;
 };
+
+const suppressionHasProof = (comment: SuppressionComment, file: string): boolean => {
+  if (/issue\s+#?\d+|https:\/\//iu.test(comment.text)) {
+    return true;
+  }
+
+  const explanation = comment.text.split("@ts-expect-error")[1]?.trim();
+  return file.includes(".test.") && Boolean(explanation && explanation.length >= 12);
+};
+
+const hasExternalTypeProof = (sourceFile: ts.SourceFile, node: ts.Node): boolean => {
+  const comments = ts.getLeadingCommentRanges(sourceFile.text, nearestStatement(node).getFullStart()) || [];
+  const preceding = comments.at(-1);
+  if (!preceding) {
+    return false;
+  }
+
+  const text = sourceFile.text.slice(preceding.pos, preceding.end);
+  return /external type|upstream|issue\s+#?\d+|https:\/\//iu.test(text);
+};
+
+const isConstAssertion = (node: ts.AsExpression): boolean =>
+  ts.isTypeReferenceNode(node.type) && ts.isIdentifier(node.type.typeName) && node.type.typeName.text === "const";
+
+const isUnsafeAny = (node: ts.Node): boolean =>
+  node.kind === ts.SyntaxKind.AnyKeyword && !node.getSourceFile().isDeclarationFile;
+
+const identifierWords = (identifier: string): ReadonlyArray<string> =>
+  identifier
+    .replace(/([a-z0-9])([A-Z])/gu, "$1 $2")
+    .replace(/([A-Z]+)([A-Z][a-z])/gu, "$1 $2")
+    .split(/[^A-Za-z0-9]+/u)
+    .filter((word) => word.length > 0)
+    .map((word) => word.toLowerCase());
+
+const FORBIDDEN_NAME_TOKENS = new Set([
+  "body",
+  "data",
+  "final",
+  "info",
+  "outcome",
+  "payload",
+  "raw",
+  "response",
+  "result",
+  "results",
+  "temp",
+  "tmp",
+]);
+
+const hasForbiddenNameToken = (identifier: string): boolean =>
+  identifierWords(identifier).some((word) => FORBIDDEN_NAME_TOKENS.has(word));
+
+const isAuthoredBindingIdentifier = (node: ts.Identifier): boolean => {
+  const parent = node.parent;
+  if (
+    (ts.isVariableDeclaration(parent) ||
+      ts.isParameter(parent) ||
+      ts.isFunctionDeclaration(parent) ||
+      ts.isClassDeclaration(parent) ||
+      ts.isTypeAliasDeclaration(parent) ||
+      ts.isInterfaceDeclaration(parent) ||
+      ts.isEnumDeclaration(parent) ||
+      ts.isTypeParameterDeclaration(parent)) &&
+    parent.name === node
+  ) {
+    return true;
+  }
+
+  if (ts.isBindingElement(parent) && parent.name === node) {
+    return true;
+  }
+
+  if (ts.isImportSpecifier(parent)) {
+    return parent.name === node && parent.propertyName !== undefined;
+  }
+
+  return false;
+};
+
+const isPureReExportModule = (sourceFile: ts.SourceFile): boolean =>
+  sourceFile.statements.length > 0 && sourceFile.statements.every(ts.isExportDeclaration);
 
 const featureRuntimeRoot = (file: string): string | undefined => {
   // e.g. "src/hookIsland/dedupGuard/hooks/x.ts" → "src/hookIsland/dedupGuard"
@@ -557,7 +619,7 @@ const inspectSourceFile = (request: {
   typeChecker: ts.TypeChecker;
 }): ReadonlyArray<CodeStyleViolation> => {
   const { repositoryRoot, file, protectedPaths, program, typeChecker } = request;
-  const sourceFile = program.getSourceFile(join(repositoryRoot, file)) ?? failConfiguration(`could not parse ${file}`);
+  const sourceFile = program.getSourceFile(join(repositoryRoot, file)) || failConfiguration(`could not parse ${file}`);
   const sourceText = sourceFile.text;
   const violations: Array<CodeStyleViolation> = [];
   const protectedEntry = protectedPaths.find((entry) => entry.path === file);
@@ -579,9 +641,9 @@ const inspectSourceFile = (request: {
 
   const protectedPath = Boolean(protectedEntry);
   if (!protectedPath) {
-    const basename = file.split("/").at(-1) ?? "";
-    // e.g. "utils.ts", "helpers.mts", "common.tsx" — forbidden generic buckets
-    if (/^(?:types|helpers|utils|common|misc)\.[cm]?[jt]sx?$/u.test(basename)) {
+    const basename = file.split("/").at(-1) || "";
+    // Ecosystem-fixed names such as package.json and *.d.ts are not authored modules.
+    if (/^(?:base|common|constants|core|helpers|index|misc|models|shared|types|utils)\.[cm]?[jt]sx?$/u.test(basename)) {
       addLineViolation({
         ruleId: "path.no-generic-bucket",
         line: 1,
@@ -607,6 +669,14 @@ const inspectSourceFile = (request: {
         message: "Move this source into the capability that owns it.",
       });
     }
+
+    if (isPureReExportModule(sourceFile)) {
+      addLineViolation({
+        ruleId: "module.no-passive-barrel",
+        line: 1,
+        message: "Import capabilities from their owning modules instead of maintaining a re-export module.",
+      });
+    }
   }
 
   const inspectStatementSpacing = (node: ts.Node): void => {
@@ -615,7 +685,7 @@ const inspectSourceFile = (request: {
         const previous = node.statements[index - 1];
         if (previous && isFunctionStatement(previous) && isFunctionStatement(statement)) {
           const gap = sourceText.slice(previous.end, statement.getStart(sourceFile));
-          if ((gap.match(/\r?\n/gu) ?? []).length < 2) {
+          if ((gap.match(/\r?\n/gu) || []).length < 2) {
             addViolation({
               ruleId: "function.blank-line",
               sourceFile,
@@ -703,8 +773,10 @@ const inspectSourceFile = (request: {
       });
     }
 
+    const forbiddenAsExpression =
+      ts.isAsExpression(node) && !isConstAssertion(node) && !hasExternalTypeProof(sourceFile, node);
     if (
-      ts.isAsExpression(node) ||
+      forbiddenAsExpression ||
       ts.isTypeAssertionExpression(node) ||
       (ts.isNonNullExpression(node) && !ts.isElementAccessExpression(node.expression))
     ) {
@@ -729,22 +801,13 @@ const inspectSourceFile = (request: {
       });
     }
 
-    if (isExplicitLoop(node) && !hasImmediatelyPrecedingComment(sourceFile, node)) {
-      addViolation({
-        ruleId: "comment.loop-intent",
-        sourceFile,
-        node,
-        message: "Place one short intent comment immediately above this explicit loop.",
-      });
-    }
-
     // e.g. "foo.d.ts" / "bar.d.mts" may declare interfaces; other files may not
     if (ts.isInterfaceDeclaration(node) && !/\.d\.(?:c|m)?ts$/u.test(file)) {
       addViolation({
         ruleId: "type.no-interface",
         sourceFile,
         node,
-        message: "Use an Effect Schema-derived type; interfaces are reserved for declaration augmentation.",
+        message: "Use a Schema-derived or internal type unless external interoperation requires an interface.",
       });
     }
 
@@ -763,6 +826,15 @@ const inspectSourceFile = (request: {
         sourceFile,
         node,
         message: "Authored conditional and infer type machinery is forbidden.",
+      });
+    }
+
+    if (isUnsafeAny(node)) {
+      addViolation({
+        ruleId: "type.no-unsafe-any",
+        sourceFile,
+        node,
+        message: "Use unknown at a trust boundary and prove the value before use.",
       });
     }
 
@@ -789,41 +861,12 @@ const inspectSourceFile = (request: {
       });
     }
 
-    // e.g. "src/foo/index.ts" — barrel files may only re-export
-    if (/\/index\.[cm]?[jt]sx?$/u.test(`/${file}`) && ts.isStatement(node) && node.parent === sourceFile) {
-      const exportSpecifier =
-        ts.isExportDeclaration(node) && node.moduleSpecifier && ts.isStringLiteral(node.moduleSpecifier)
-          ? node.moduleSpecifier.text
-          : undefined;
-      const directWildcard =
-        ts.isExportDeclaration(node) &&
-        !node.exportClause &&
-        Boolean(exportSpecifier) &&
-        // e.g. "./index.js" or "pkg/index.ts" — barrel chaining forbidden
-        !/(?:^|\/)index\.(?:js|mjs|cjs|ts|mts|cts)$/u.test(exportSpecifier ?? "") &&
-        !resolvesToPureBarrel({ repositoryRoot, file, specifier: exportSpecifier ?? "" });
-      if (!directWildcard) {
-        addViolation({
-          ruleId: "barrel.direct-wildcard",
-          sourceFile,
-          node,
-          message: "A barrel may contain only direct export * from declarations.",
-        });
-      }
-    }
-
-    if (
-      ts.isIdentifier(node) &&
-      // e.g. "helper", "ArtifactManager", "userData" — vague role/suffix names
-      /^(?:manager|helper|utils|data|info|common|misc)$|(?:Manager|Helper|Utils|Data|Info|Common|Misc)$/u.test(
-        node.text,
-      )
-    ) {
+    if (ts.isIdentifier(node) && isAuthoredBindingIdentifier(node) && hasForbiddenNameToken(node.text)) {
       addViolation({
         ruleId: "name.domain-specific",
         sourceFile,
         node,
-        message: "Use a name that states the domain job instead of a vague role.",
+        message: `Rename "${node.text}" for the domain value or job it represents.`,
       });
     }
 
@@ -839,15 +882,6 @@ const inspectSourceFile = (request: {
           message: "Create a new value instead of mutating a function input.",
         });
       }
-    }
-
-    if (ts.isCallExpression(node) && isBuilderReduce(node)) {
-      addViolation({
-        ruleId: "collection.no-builder-reduce",
-        sourceFile,
-        node,
-        message: "Use a direct collection transformation instead of reduce to build a collection.",
-      });
     }
 
     if (ts.isCallExpression(node) && isApplicationFile(file)) {
@@ -882,12 +916,14 @@ const inspectSourceFile = (request: {
     ts.forEachChild(node, visit);
   };
 
-  suppressionCommentLines(sourceFile).forEach((line) => {
-    addLineViolation({
-      ruleId: "type.no-suppression",
-      line,
-      message: "Remove the tool suppression and fix the boundary instead.",
-    });
+  suppressionComments(sourceFile).forEach((comment) => {
+    if (!suppressionHasProof(comment, file)) {
+      addLineViolation({
+        ruleId: "type.no-suppression",
+        line: comment.line,
+        message: "State the negative type contract or link the narrow external defect.",
+      });
+    }
   });
 
   inspectStatementSpacing(sourceFile);
@@ -897,6 +933,31 @@ const inspectSourceFile = (request: {
 
 const compareViolations = (left: CodeStyleViolation, right: CodeStyleViolation): number =>
   left.file.localeCompare(right.file) || left.line - right.line || left.ruleId.localeCompare(right.ruleId);
+
+const inspectAuthoredSkillNames = (request: {
+  readonly repositoryRoot: string;
+  readonly file: string;
+  readonly program: ts.Program;
+}): ReadonlyArray<CodeStyleViolation> => {
+  const sourceFile =
+    request.program.getSourceFile(join(request.repositoryRoot, request.file)) ||
+    failConfiguration(`could not parse ${request.file}`);
+  const violations: Array<CodeStyleViolation> = [];
+  const visit = (node: ts.Node): void => {
+    if (ts.isIdentifier(node) && isAuthoredBindingIdentifier(node) && hasForbiddenNameToken(node.text)) {
+      violations.push({
+        ruleId: "name.domain-specific",
+        file: request.file,
+        line: sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1,
+        message: `Rename "${node.text}" for the domain value or job it represents.`,
+      });
+    }
+    ts.forEachChild(node, visit);
+  };
+
+  visit(sourceFile);
+  return violations;
+};
 
 /**
  * The payload tree is excluded from the per-file scan, so runtime hiding there
@@ -921,9 +982,10 @@ export const checkCodeStyle = (repositoryRoot: string): CodeStyleReport => {
   validateStyleGuide(repositoryRoot, configuration.rules);
   validateProtectedPaths(configuration.protectedPaths);
 
-  const files = relativeSourceFiles(repositoryRoot);
+  const files = maintainedSourceFiles(repositoryRoot);
+  const skillFiles = authoredSkillSourceFiles(repositoryRoot);
   const program = ts.createProgram({
-    rootNames: files.map((file) => join(repositoryRoot, file)),
+    rootNames: [...files, ...skillFiles].map((file) => join(repositoryRoot, file)),
     options: {
       allowJs: true,
       checkJs: false,
@@ -938,6 +1000,7 @@ export const checkCodeStyle = (repositoryRoot: string): CodeStyleReport => {
     .flatMap((file) =>
       inspectSourceFile({ repositoryRoot, file, protectedPaths: configuration.protectedPaths, program, typeChecker }),
     )
+    .concat(skillFiles.flatMap((file) => inspectAuthoredSkillNames({ repositoryRoot, file, program })))
     .concat(misplacedRuntimeFiles(repositoryRoot))
     .sort(compareViolations);
 

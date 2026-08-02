@@ -21,7 +21,7 @@ const PROTECTED_PATHS = [
   "src/skills/makeATrailer/scripts/assembleCut.mjs",
 ];
 
-const ASSEMBLE_CUT_EXEMPTIONS = ["function.arrow-only", "function.input-shape", "comment.loop-intent"];
+const ASSEMBLE_CUT_EXEMPTIONS = ["function.arrow-only", "function.input-shape"];
 
 const MACHINE_RULES: ReadonlyArray<MachineRule> = [
   {
@@ -170,16 +170,19 @@ const createRepository = (): string => {
 };
 
 const RULES_BY_ID = new Map(MACHINE_RULES.map((rule) => [rule.id, rule]));
+const [projectProtectedPath = "", contextProtectedPath = "", assembleProtectedPath = ""] = PROTECTED_PATHS;
 
 const ruleCard = (ruleId: string): string => {
   const rule = RULES_BY_ID.get(ruleId);
-  const verify = rule?.verify === "judgment" ? "judgment" : `\`${rule?.verify ?? "pnpm style"}\``;
+  const verifyCommand = rule === undefined ? "pnpm style" : rule.verify;
+  const verify = verifyCommand === "judgment" ? "judgment" : `\`${verifyCommand}\``;
+  const statement = rule === undefined ? "An unmirrored rule statement." : rule.statement;
 
   return [
     `### ${ruleId}`,
     `[rule:${ruleId}] · verify: ${verify}`,
     "",
-    rule?.statement ?? "An unmirrored rule statement.",
+    statement,
     "",
     "```ts",
     "// ✓ good",
@@ -211,10 +214,10 @@ const writeConfiguration = ({
   repositoryRoot,
   rules = MACHINE_RULES,
   protectedPaths = [
-    { path: PROTECTED_PATHS[0] ?? "", codeRuleExemptions: [] },
-    { path: PROTECTED_PATHS[1] ?? "", codeRuleExemptions: [] },
+    { path: projectProtectedPath, codeRuleExemptions: [] },
+    { path: contextProtectedPath, codeRuleExemptions: [] },
     {
-      path: PROTECTED_PATHS[2] ?? "",
+      path: assembleProtectedPath,
       codeRuleExemptions: ASSEMBLE_CUT_EXEMPTIONS,
     },
   ],
@@ -321,7 +324,7 @@ describe("code-style contract configuration", () => {
     {
       name: "an exemption on protected Markdown",
       mutate: (protectedPaths: ReadonlyArray<ProtectedPath>): ReadonlyArray<ProtectedPath> => [
-        { path: PROTECTED_PATHS[0] ?? "", codeRuleExemptions: ["function.arrow-only"] },
+        { path: projectProtectedPath, codeRuleExemptions: ["function.arrow-only"] },
         ...protectedPaths.slice(1),
       ],
     },
@@ -330,7 +333,7 @@ describe("code-style contract configuration", () => {
       mutate: (protectedPaths: ReadonlyArray<ProtectedPath>): ReadonlyArray<ProtectedPath> => [
         ...protectedPaths.slice(0, 2),
         {
-          path: PROTECTED_PATHS[2] ?? "",
+          path: assembleProtectedPath,
           codeRuleExemptions: [...ASSEMBLE_CUT_EXEMPTIONS, "type.no-interface"],
         },
       ],
@@ -342,10 +345,10 @@ describe("code-style contract configuration", () => {
       MACHINE_RULES.map((rule) => rule.id),
     );
     const validProtectedPaths: ReadonlyArray<ProtectedPath> = [
-      { path: PROTECTED_PATHS[0] ?? "", codeRuleExemptions: [] },
-      { path: PROTECTED_PATHS[1] ?? "", codeRuleExemptions: [] },
+      { path: projectProtectedPath, codeRuleExemptions: [] },
+      { path: contextProtectedPath, codeRuleExemptions: [] },
       {
-        path: PROTECTED_PATHS[2] ?? "",
+        path: assembleProtectedPath,
         codeRuleExemptions: ASSEMBLE_CUT_EXEMPTIONS,
       },
     ];
@@ -546,7 +549,7 @@ describe("function inputs", () => {
 });
 
 describe("loop and indexed-access comments", () => {
-  it("reports every explicit loop form without an immediately preceding intent comment", () => {
+  it("accepts explicit loops without ceremonial intent comments", () => {
     const report = checkSource(
       "src/install/example.ts",
       [
@@ -561,14 +564,7 @@ describe("loop and indexed-access comments", () => {
       ].join("\n"),
     );
 
-    expect(report.violations).toEqual(
-      [2, 3, 4, 5, 6].map((line) => ({
-        ruleId: "comment.loop-intent",
-        file: "src/install/example.ts",
-        line,
-        message: expect.any(String),
-      })),
-    );
+    expect(report.violations).toEqual([]);
   });
 
   it("accepts an intent comment with no blank gap", () => {
@@ -580,20 +576,13 @@ describe("loop and indexed-access comments", () => {
     expect(report.violations).toEqual([]);
   });
 
-  it("rejects a loop comment separated by a blank line", () => {
+  it("does not attach semantic meaning to comment proximity above a loop", () => {
     const report = checkSource(
       "src/install/example.ts",
       "export const scan = () => {\n  // Preserve catalog order.\n\n  for (const item of items) { consume(item); }\n};\n",
     );
 
-    expect(report.violations).toEqual([
-      {
-        ruleId: "comment.loop-intent",
-        file: "src/install/example.ts",
-        line: 4,
-        message: expect.any(String),
-      },
-    ]);
+    expect(report.violations).toEqual([]);
   });
 
   it("requires proof immediately above indexed non-null access", () => {
@@ -830,28 +819,36 @@ describe("schema-owned object types", () => {
 });
 
 describe("barrels, names, and paths", () => {
-  it("accepts a direct wildcard barrel", () => {
+  it("rejects an index-named wildcard barrel for both ownership failures", () => {
     const report = checkSource("src/catalog/index.ts", 'export * from "./featureCatalog.js";\n');
 
-    expect(report.violations).toEqual([]);
+    expect(report.violations.map((violation) => violation.ruleId)).toEqual([
+      "module.no-passive-barrel",
+      "path.no-generic-bucket",
+    ]);
   });
 
   it.each([
     { name: "a selective export", source: 'export { featureCatalog } from "./featureCatalog.js";\n' },
     { name: "an aliased namespace export", source: 'export * as catalog from "./featureCatalog.js";\n' },
-    { name: "logic", source: "export const catalog = [];\n" },
     { name: "a chained index export", source: 'export * from "./catalog/index.js";\n' },
-  ])("rejects $name in a barrel", ({ source }) => {
-    const report = checkSource("src/index.ts", source);
+  ])("rejects $name in a passive export module", ({ source }) => {
+    const report = checkSource("src/catalog/catalogExports.ts", source);
 
     expect(report.violations).toEqual([
       {
-        ruleId: "barrel.direct-wildcard",
-        file: "src/index.ts",
+        ruleId: "module.no-passive-barrel",
+        file: "src/catalog/catalogExports.ts",
         line: 1,
         message: expect.any(String),
       },
     ]);
+  });
+
+  it("accepts a module that owns behavior", () => {
+    const report = checkSource("src/catalog/catalogSelection.ts", "export const featureCatalog = [];\n");
+
+    expect(report.violations).toEqual([]);
   });
 
   it("rejects a barrel chain hidden behind a regular module filename", () => {
@@ -861,18 +858,15 @@ describe("barrels, names, and paths", () => {
       "src/catalog/featureCatalog.ts": "export const featureCatalog = [];\n",
     });
 
-    expect(report.violations).toEqual([
-      {
-        ruleId: "barrel.direct-wildcard",
-        file: "src/index.ts",
-        line: 1,
-        message: expect.any(String),
-      },
+    expect(report.violations.map((violation) => violation.ruleId)).toEqual([
+      "module.no-passive-barrel",
+      "module.no-passive-barrel",
+      "path.no-generic-bucket",
     ]);
   });
 
-  it("rejects a vague role identifier", () => {
-    const report = checkSource("src/install/example.ts", "export const artifactManager = {};\n");
+  it("rejects a forbidden generic token inside a compound identifier", () => {
+    const report = checkSource("src/install/example.ts", "export const artifactResult = {};\n");
 
     expect(report.violations).toEqual([
       {
@@ -999,20 +993,13 @@ describe("mutation, collections, runtime, and presentation", () => {
     expect(report.violations).toEqual([]);
   });
 
-  it("rejects reduce used to build an array", () => {
+  it("leaves collection selection to judgment while still checking names", () => {
     const report = checkSource(
       "src/install/example.ts",
-      "export const collect = (items: string[]) => items.reduce((result, item) => [...result, item], []);\n",
+      "export const collect = (items: string[]) => items.reduce((collectedItems, item) => [...collectedItems, item], []);\n",
     );
 
-    expect(report.violations).toEqual([
-      {
-        ruleId: "collection.no-builder-reduce",
-        file: "src/install/example.ts",
-        line: 1,
-        message: expect.any(String),
-      },
-    ]);
+    expect(report.violations).toEqual([]);
   });
 
   it("accepts reduce for a scalar calculation", () => {
@@ -1038,7 +1025,7 @@ describe("mutation, collections, runtime, and presentation", () => {
   });
 
   it("rejects Effect.run calls outside the main runtime edge", () => {
-    const report = checkSource("src/install/example.ts", "export const result = Effect.runPromise(program);\n");
+    const report = checkSource("src/install/example.ts", "export const execution = Effect.runPromise(program);\n");
 
     expect(report.violations).toEqual([
       {
@@ -1051,7 +1038,7 @@ describe("mutation, collections, runtime, and presentation", () => {
   });
 
   it("accepts Effect.run at src/cli/main.ts", () => {
-    const report = checkSource("src/cli/main.ts", "export const result = Effect.runPromise(program);\n");
+    const report = checkSource("src/cli/main.ts", "export const execution = Effect.runPromise(program);\n");
 
     expect(report.violations).toEqual([]);
   });
@@ -1072,7 +1059,7 @@ describe("mutation, collections, runtime, and presentation", () => {
   it("excludes root tooling from application Effect and presentation boundaries", () => {
     const report = checkSource(
       "scripts/example.ts",
-      'console.log("checking");\nexport const result = Promise.all(tasks);\nEffect.runPromise(program);\n',
+      'console.log("checking");\nexport const executions = Promise.all(tasks);\nEffect.runPromise(program);\n',
     );
 
     expect(report.violations).toEqual([]);
@@ -1112,10 +1099,11 @@ describe("application and installed-hook import graphs", () => {
       line: 1,
     },
     {
-      name: "an application re-export",
+      name: "an application value import",
       files: {
         "src/install/artifactPlan.ts": "export const artifactPlan = {};\n",
-        "src/hookIsland/contextGuard/hooks/contextGuard.ts": 'export * from "../../../install/artifactPlan.js";\n',
+        "src/hookIsland/contextGuard/hooks/contextGuard.ts":
+          'import { artifactPlan } from "../../../install/artifactPlan.js";\nexport const invoke = () => artifactPlan;\n',
       },
       file: "src/hookIsland/contextGuard/hooks/contextGuard.ts",
       line: 1,
@@ -1131,7 +1119,8 @@ describe("application and installed-hook import graphs", () => {
     {
       name: "a transitive third-party import",
       files: {
-        "src/hookIsland/contextGuard/hooks/contextGuard.ts": 'export { run } from "../runtime/bridge.js";\n',
+        "src/hookIsland/contextGuard/hooks/contextGuard.ts":
+          'import { run } from "../runtime/bridge.js";\nexport const invoke = () => run;\n',
         "src/hookIsland/contextGuard/runtime/bridge.ts":
           'import { Effect } from "effect";\nexport const run = Effect.void;\n',
       },
@@ -1168,11 +1157,13 @@ describe("application and installed-hook import graphs", () => {
     ]);
   });
 
-  it("detects a transitive application re-export into the hook runtime", () => {
+  it("detects a transitive application import into the hook runtime", () => {
     const report = checkSources({
       "src/runtime/readConfig.ts": "export const readConfig = () => ({});\n",
-      "src/install/runtimeBridge.ts": 'export * from "../runtime/readConfig.js";\n',
-      "src/install/install.ts": 'export * from "./runtimeBridge.js";\n',
+      "src/install/runtimeBridge.ts":
+        'import { readConfig } from "../runtime/readConfig.js";\nexport const readManagedConfig = () => readConfig();\n',
+      "src/install/install.ts":
+        'import { readManagedConfig } from "./runtimeBridge.js";\nexport const install = () => readManagedConfig();\n',
     });
 
     expect(report.violations).toEqual([
@@ -1211,6 +1202,22 @@ describe("scan boundaries and protected baseline", () => {
 
     expect(report.violations).toEqual([]);
   });
+
+  it("enforces domain-specific bindings inside authored skill scripts", () => {
+    const report = checkSource(
+      "src/skills/exampleSkill/scripts/inspect.mjs",
+      "export const rawResult = readArtifact();\n",
+    );
+
+    expect(report.violations).toEqual([
+      {
+        ruleId: "name.domain-specific",
+        file: "src/skills/exampleSkill/scripts/inspect.mjs",
+        line: 1,
+        message: expect.any(String),
+      },
+    ]);
+  });
 });
 
 describe("committed contract artifacts", () => {
@@ -1237,7 +1244,7 @@ describe("committed contract artifacts", () => {
     const configuration = JSON.parse(readFileSync(join(import.meta.dirname, "..", "code-style.rules.json"), "utf8"));
     const machineIds: ReadonlyArray<string> = configuration.rules.map((rule: MachineRule) => rule.id);
     const neverSection = guide.slice(guide.indexOf("\n## Never"));
-    const referenced = [...neverSection.matchAll(/\[rule:([a-z0-9.-]+)\]/gu)].flatMap((match) => match[1] ?? []);
+    const referenced = [...neverSection.matchAll(/\[rule:([a-z0-9.-]+)\]/gu)].flatMap((match) => match[1] || []);
 
     expect(referenced.length).toBeGreaterThan(0);
     expect(referenced.filter((ruleId) => !machineIds.includes(ruleId))).toEqual([]);

@@ -22,16 +22,16 @@ import { join } from "node:path";
 export function emptyManifest(meta = {}) {
   return {
     version: 1,
-    project: meta.project ?? "",
-    createdAt: meta.createdAt ?? new Date().toISOString(),
+    project: meta.project || "",
+    createdAt: meta.createdAt || new Date().toISOString(),
     format: {
       aspect: "9:16",
       fps: 30,
       width: 1080,
       height: 1920,
-      targetSeconds: meta.targetSeconds ?? 24,
+      targetSeconds: meta.targetSeconds || 24,
     },
-    creativeMode: meta.creativeMode ?? "hybrid",
+    creativeMode: meta.creativeMode || "hybrid",
     conversation: null,
     style: { bibleImage: null, refs: [] },
     audio: { voPath: null, musicPath: null, voice: null, voProvider: null, musicProvider: null },
@@ -141,10 +141,10 @@ function main() {
         .map((s) => s.id)
         .join(" ")}\n`,
     );
-  else if (cmd === "add-scene") save(dir, addScene(m, JSON.parse(f.json ?? "{}")));
+  else if (cmd === "add-scene") save(dir, addScene(m, JSON.parse(f.json || "{}")));
   else if (cmd === "set") {
     if (!f.id || !f.key) throw new Error("set needs --id and --key (and --value)");
-    save(dir, patchScene(m, f.id, { [f.key]: coerce(f.value ?? "") }));
+    save(dir, patchScene(m, f.id, { [f.key]: coerce(f.value || "") }));
     process.stdout.write(`Set ${f.id}.${f.key} = ${f.value}\n`);
   } else throw new Error(`Unknown command: ${cmd}`);
 }

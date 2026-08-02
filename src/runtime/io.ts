@@ -13,7 +13,7 @@ import { writeSync } from "node:fs";
 export const allow = (): never => process.exit(0);
 
 /** Write a JSON payload to stdout synchronously, then exit 0. */
-export const emit = (payload: unknown): never => {
-  writeSync(1, JSON.stringify(payload));
+export const emit = (transportMessage: unknown): never => {
+  writeSync(1, JSON.stringify(transportMessage));
   process.exit(0);
 };

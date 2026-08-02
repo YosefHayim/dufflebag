@@ -76,7 +76,7 @@ const createWritePlan = (request: WritePlanRequest): ArtifactPlan => {
         owner: applicationOwner,
       },
       receipt,
-      expectedCurrent: request.receiptExpectedCurrent ?? expectedMissing,
+      expectedCurrent: request.receiptExpectedCurrent || expectedMissing,
     },
   });
 };
@@ -164,11 +164,11 @@ layer(NodeContext.layer)("applyArtifactPlan", (it) => {
     Effect.gen(function* () {
       const path = yield* Path.Path;
       const foreignRoot = path.isAbsolute("C:/workspace") ? "/workspace" : "C:/workspace";
-      const result = yield* Effect.exit(
+      const artifactApplication = yield* Effect.exit(
         applyArtifactPlan(createWritePlan({ root: foreignRoot, expectedByPath: { "settings.json": expectedMissing } })),
       );
 
-      expect(Exit.isFailure(result)).toBe(true);
+      expect(Exit.isFailure(artifactApplication)).toBe(true);
     }),
   );
 
@@ -211,9 +211,9 @@ layer(NodeContext.layer)("applyArtifactPlan", (it) => {
         yield* fileSystem.makeDirectory(path.dirname(receiptPath), { recursive: true });
         yield* fileSystem.writeFile(receiptPath, appearedReceiptBytes);
 
-        const result = yield* Effect.exit(applyArtifactPlan(plan));
+        const artifactApplication = yield* Effect.exit(applyArtifactPlan(plan));
 
-        expect(Exit.isFailure(result)).toBe(true);
+        expect(Exit.isFailure(artifactApplication)).toBe(true);
         expect(yield* fileSystem.exists(artifactPath)).toBe(false);
         expect([...(yield* fileSystem.readFile(receiptPath))]).toEqual([...appearedReceiptBytes]);
       }),
@@ -241,9 +241,9 @@ layer(NodeContext.layer)("applyArtifactPlan", (it) => {
         });
         yield* fileSystem.writeFile(receiptPath, changedReceiptBytes);
 
-        const result = yield* Effect.exit(applyArtifactPlan(plan));
+        const artifactApplication = yield* Effect.exit(applyArtifactPlan(plan));
 
-        expect(Exit.isFailure(result)).toBe(true);
+        expect(Exit.isFailure(artifactApplication)).toBe(true);
         expect(yield* fileSystem.exists(artifactPath)).toBe(false);
         expect([...(yield* fileSystem.readFile(receiptPath))]).toEqual([...changedReceiptBytes]);
       }),
@@ -294,9 +294,9 @@ layer(NodeContext.layer)("applyArtifactPlan", (it) => {
         yield* fileSystem.makeDirectory(path.dirname(receiptPath), { recursive: true });
         yield* fileSystem.writeFile(receiptPath, changedReceiptBytes);
 
-        const result = yield* Effect.exit(applyArtifactPlan(serializedPlan));
+        const artifactApplication = yield* Effect.exit(applyArtifactPlan(serializedPlan));
 
-        expect(Exit.isFailure(result)).toBe(true);
+        expect(Exit.isFailure(artifactApplication)).toBe(true);
         expect([...(yield* fileSystem.readFile(receiptPath))]).toEqual([...changedReceiptBytes]);
       }),
     ),
@@ -323,9 +323,9 @@ layer(NodeContext.layer)("applyArtifactPlan", (it) => {
         yield* fileSystem.writeFile(artifactPath, appearedBytes);
         yield* fileSystem.writeFile(receiptPath, priorReceiptBytes);
 
-        const result = yield* Effect.exit(applyArtifactPlan(plan));
+        const artifactApplication = yield* Effect.exit(applyArtifactPlan(plan));
 
-        expect(Exit.isFailure(result)).toBe(true);
+        expect(Exit.isFailure(artifactApplication)).toBe(true);
         expect([...(yield* fileSystem.readFile(stableArtifactPath))]).toEqual([...originalBytes]);
         expect([...(yield* fileSystem.readFile(artifactPath))]).toEqual([...appearedBytes]);
         expect([...(yield* fileSystem.readFile(receiptPath))]).toEqual([...priorReceiptBytes]);
@@ -354,9 +354,9 @@ layer(NodeContext.layer)("applyArtifactPlan", (it) => {
         const plan = createWritePlan({ root, expectedByPath: { "settings.json": expectedFile(originalBytes) } });
         yield* fileSystem.writeFile(artifactPath, changedBytes);
 
-        const result = yield* Effect.exit(applyArtifactPlan(plan));
+        const artifactApplication = yield* Effect.exit(applyArtifactPlan(plan));
 
-        expect(Exit.isFailure(result)).toBe(true);
+        expect(Exit.isFailure(artifactApplication)).toBe(true);
         expect([...(yield* fileSystem.readFile(artifactPath))]).toEqual([...changedBytes]);
         expect([...(yield* fileSystem.readFile(receiptPath))]).toEqual([...priorReceiptBytes]);
 
@@ -423,9 +423,9 @@ layer(NodeContext.layer)("applyArtifactPlan", (it) => {
         yield* fileSystem.writeFile(stablePath, originalBytes);
         yield* fileSystem.writeFile(stablePath, externallyChangedBytes);
 
-        const result = yield* Effect.exit(applyArtifactPlan(plan));
+        const artifactApplication = yield* Effect.exit(applyArtifactPlan(plan));
 
-        expect(Exit.isFailure(result)).toBe(true);
+        expect(Exit.isFailure(artifactApplication)).toBe(true);
         expect([...(yield* fileSystem.readFile(stablePath))]).toEqual([...externallyChangedBytes]);
         expect(yield* fileSystem.exists(changedPath)).toBe(false);
         expect(yield* fileSystem.exists(receiptPath)).toBe(false);
@@ -468,9 +468,9 @@ layer(NodeContext.layer)("applyArtifactPlan", (it) => {
         yield* fileSystem.makeDirectory(path.dirname(recoveryPath), { recursive: true });
         yield* fileSystem.writeFileString(recoveryPath, "pending recovery");
 
-        const result = yield* Effect.exit(applyArtifactPlan(plan));
+        const artifactApplication = yield* Effect.exit(applyArtifactPlan(plan));
 
-        expect(Exit.isFailure(result)).toBe(true);
+        expect(Exit.isFailure(artifactApplication)).toBe(true);
         expect(yield* fileSystem.exists(artifactPath)).toBe(false);
         expect(yield* fileSystem.readFileString(recoveryPath)).toBe("pending recovery");
 
@@ -493,9 +493,9 @@ layer(NodeContext.layer)("applyArtifactPlan", (it) => {
 
         yield* fileSystem.symlink(outside, path.join(root, "link"));
 
-        const result = yield* Effect.exit(applyArtifactPlan(plan));
+        const artifactApplication = yield* Effect.exit(applyArtifactPlan(plan));
 
-        expect(Exit.isFailure(result)).toBe(true);
+        expect(Exit.isFailure(artifactApplication)).toBe(true);
         expect(yield* fileSystem.exists(escapedPath)).toBe(false);
         expect(yield* fileSystem.exists(receiptPath)).toBe(false);
 
@@ -636,10 +636,10 @@ layer(transactionOrderLayer)("applyArtifactPlan transaction order", (it) => {
         yield* fileSystem.writeFile(path.join(root, "second.txt"), secondOriginalBytes);
         yield* fileSystem.writeFile(path.join(root, "fail.txt"), originalBytes);
 
-        const result = yield* Effect.exit(applyArtifactPlan(plan));
+        const artifactApplication = yield* Effect.exit(applyArtifactPlan(plan));
         const events = (yield* fileSystem.readFileString(path.join(root, ".transaction-order.log"))).trim().split("\n");
 
-        expect(Exit.isFailure(result)).toBe(true);
+        expect(Exit.isFailure(artifactApplication)).toBe(true);
         expect(events).toEqual([
           "commit:first.txt",
           "commit:second.txt",
@@ -703,11 +703,11 @@ layer(NodeContext.layer)("applyArtifactPlan interruption", (it) => {
           const interruptionFiber = yield* Effect.fork(Fiber.interrupt(applyFiber));
           yield* Effect.yieldNow();
           yield* Deferred.succeed(releaseCommit, undefined);
-          const result = yield* Fiber.join(interruptionFiber);
+          const artifactApplication = yield* Fiber.join(interruptionFiber);
 
-          expect(Exit.isFailure(result)).toBe(true);
-          if (Exit.isFailure(result)) {
-            expect(Cause.isInterruptedOnly(result.cause)).toBe(true);
+          expect(Exit.isFailure(artifactApplication)).toBe(true);
+          if (Exit.isFailure(artifactApplication)) {
+            expect(Cause.isInterruptedOnly(artifactApplication.cause)).toBe(true);
           }
           expect(yield* fileSystem.exists(firstPath)).toBe(false);
           expect(yield* fileSystem.exists(secondPath)).toBe(false);
@@ -749,11 +749,11 @@ layer(NodeContext.layer)("applyArtifactPlan interruption", (it) => {
           const interruptionFiber = yield* Effect.fork(Fiber.interrupt(applyFiber));
           yield* Effect.yieldNow();
           yield* Deferred.succeed(releaseCommit, undefined);
-          const result = yield* Fiber.join(interruptionFiber);
+          const artifactApplication = yield* Fiber.join(interruptionFiber);
 
-          expect(Exit.isFailure(result)).toBe(true);
-          if (Exit.isFailure(result)) {
-            expect(Cause.isInterruptedOnly(result.cause)).toBe(true);
+          expect(Exit.isFailure(artifactApplication)).toBe(true);
+          if (Exit.isFailure(artifactApplication)) {
+            expect(Cause.isInterruptedOnly(artifactApplication.cause)).toBe(true);
           }
           expect(yield* fileSystem.exists(artifactPath)).toBe(false);
           expect(yield* fileSystem.exists(receiptPath)).toBe(false);
@@ -825,9 +825,9 @@ layer(symlinkSwapLayer)("applyArtifactPlan symlink swap", (it) => {
         yield* fileSystem.makeDirectory(outside);
         yield* Effect.addFinalizer(() => fileSystem.remove(outside, { recursive: true, force: true }));
 
-        const result = yield* Effect.exit(applyArtifactPlan(plan));
+        const artifactApplication = yield* Effect.exit(applyArtifactPlan(plan));
 
-        expect(Exit.isFailure(result)).toBe(true);
+        expect(Exit.isFailure(artifactApplication)).toBe(true);
         expect(yield* fileSystem.exists(firstPath)).toBe(false);
         expect(yield* fileSystem.exists(escapedPath)).toBe(false);
         expect(yield* fileSystem.exists(receiptPath)).toBe(false);
@@ -883,9 +883,9 @@ layer(recoveryParentSwapLayer)("applyArtifactPlan recovery parent swap", (it) =>
         yield* fileSystem.makeDirectory(outside);
         yield* Effect.addFinalizer(() => fileSystem.remove(outside, { recursive: true, force: true }));
 
-        const result = yield* Effect.exit(applyArtifactPlan(plan));
+        const artifactApplication = yield* Effect.exit(applyArtifactPlan(plan));
 
-        expect(Exit.isFailure(result)).toBe(true);
+        expect(Exit.isFailure(artifactApplication)).toBe(true);
         expect(yield* fileSystem.exists(artifactPath)).toBe(false);
         expect(yield* fileSystem.exists(outsideRecoveryPath)).toBe(false);
         expect(yield* fileSystem.exists(outsideReceiptPath)).toBe(false);
@@ -929,9 +929,9 @@ layer(markerFailureLayer)("applyArtifactPlan recovery marker failure", (it) => {
         const recoveryPath = path.join(root, ".dufflebag/recovery.json");
         const plan = createWritePlan({ root, expectedByPath: { "settings.json": expectedMissing } });
 
-        const result = yield* Effect.exit(applyArtifactPlan(plan));
+        const artifactApplication = yield* Effect.exit(applyArtifactPlan(plan));
 
-        expect(Exit.isFailure(result)).toBe(true);
+        expect(Exit.isFailure(artifactApplication)).toBe(true);
         expect(yield* fileSystem.exists(artifactPath)).toBe(false);
         expect(yield* fileSystem.exists(receiptPath)).toBe(false);
         expect(yield* fileSystem.exists(recoveryPath)).toBe(false);
@@ -970,11 +970,11 @@ layer(markerDefectLayer)("applyArtifactPlan post-link marker defect", (it) => {
         const recoveryPath = path.join(root, ".dufflebag/recovery.json");
         const plan = createWritePlan({ root, expectedByPath: { "settings.json": expectedMissing } });
 
-        const result = yield* Effect.exit(applyArtifactPlan(plan));
+        const artifactApplication = yield* Effect.exit(applyArtifactPlan(plan));
 
-        expect(Exit.isFailure(result)).toBe(true);
-        if (Exit.isFailure(result)) {
-          expect(Cause.pretty(result.cause)).toContain("Injected post-link defect");
+        expect(Exit.isFailure(artifactApplication)).toBe(true);
+        if (Exit.isFailure(artifactApplication)) {
+          expect(Cause.pretty(artifactApplication.cause)).toContain("Injected post-link defect");
         }
         expect(yield* fileSystem.exists(artifactPath)).toBe(false);
         expect(yield* fileSystem.exists(receiptPath)).toBe(false);
@@ -1044,20 +1044,20 @@ layer(Layer.empty)("applyArtifactPlan competing writers", (it) => {
 
           const firstWriter = yield* Effect.fork(Effect.exit(applyArtifactPlan(plan)));
           const secondWriter = yield* Effect.fork(Effect.exit(applyArtifactPlan(plan)));
-          const losingResult = yield* Effect.race(Fiber.join(firstWriter), Fiber.join(secondWriter));
+          const supersededClaim = yield* Effect.race(Fiber.join(firstWriter), Fiber.join(secondWriter));
 
           yield* Effect.gen(function* () {
-            expect(Exit.isFailure(losingResult)).toBe(true);
+            expect(Exit.isFailure(supersededClaim)).toBe(true);
             expect(yield* fileSystem.exists(recoveryPath)).toBe(true);
 
             const rootEntries = yield* fileSystem.readDirectory(root);
             expect(rootEntries.filter((entry) => entry.startsWith(".dufflebag-transaction-"))).toHaveLength(1);
           }).pipe(Effect.ensuring(Deferred.succeed(releaseWinner, undefined)));
 
-          const results = yield* Effect.all([Fiber.join(firstWriter), Fiber.join(secondWriter)]);
+          const duplicateFindings = yield* Effect.all([Fiber.join(firstWriter), Fiber.join(secondWriter)]);
 
-          expect(results.filter(Exit.isSuccess)).toHaveLength(1);
-          expect(results.filter(Exit.isFailure)).toHaveLength(1);
+          expect(duplicateFindings.filter(Exit.isSuccess)).toHaveLength(1);
+          expect(duplicateFindings.filter(Exit.isFailure)).toHaveLength(1);
           expect([...(yield* fileSystem.readFile(artifactPath))]).toEqual([...installedBytes]);
           expect(yield* decodeArtifactReceiptJson(yield* fileSystem.readFileString(receiptPath))).toEqual(
             plan.receipt.receipt,
@@ -1120,9 +1120,9 @@ layer(byteChangeLayer)("applyArtifactPlan target change", (it) => {
 
         yield* fileSystem.writeFile(changedPath, originalBytes);
 
-        const result = yield* Effect.exit(applyArtifactPlan(plan));
+        const artifactApplication = yield* Effect.exit(applyArtifactPlan(plan));
 
-        expect(Exit.isFailure(result)).toBe(true);
+        expect(Exit.isFailure(artifactApplication)).toBe(true);
         expect(yield* fileSystem.exists(firstPath)).toBe(false);
         expect([...(yield* fileSystem.readFile(changedPath))]).toEqual([...externallyChangedBytes]);
         expect(yield* fileSystem.exists(receiptPath)).toBe(false);
@@ -1175,9 +1175,9 @@ layer(commitFailureLayer)("applyArtifactPlan commit failure", (it) => {
 
         yield* fileSystem.writeFile(originalPath, originalBytes);
 
-        const result = yield* Effect.exit(applyArtifactPlan(plan));
+        const artifactApplication = yield* Effect.exit(applyArtifactPlan(plan));
 
-        expect(Exit.isFailure(result)).toBe(true);
+        expect(Exit.isFailure(artifactApplication)).toBe(true);
         expect([...(yield* fileSystem.readFile(originalPath))]).toEqual([...originalBytes]);
         expect(yield* fileSystem.exists(createdDirectory)).toBe(false);
         expect(yield* fileSystem.exists(path.join(root, "fail.txt"))).toBe(false);
@@ -1237,9 +1237,9 @@ layer(rollbackParentContentLayer)("applyArtifactPlan rollback parent content", (
           expectedByPath: { "created/nested/file.txt": expectedMissing, "fail.txt": expectedMissing },
         });
 
-        const result = yield* Effect.exit(applyArtifactPlan(plan));
+        const artifactApplication = yield* Effect.exit(applyArtifactPlan(plan));
 
-        expect(Exit.isFailure(result)).toBe(true);
+        expect(Exit.isFailure(artifactApplication)).toBe(true);
         expect([...(yield* fileSystem.readFile(externalPath))]).toEqual([...externallyChangedBytes]);
         expect(yield* fileSystem.exists(receiptPath)).toBe(false);
         expect(yield* fileSystem.exists(recoveryPath)).toBe(false);
@@ -1295,9 +1295,9 @@ layer(rollbackRaceLayer)("applyArtifactPlan rollback target change", (it) => {
           expectedByPath: { "first.txt": expectedMissing, "fail.txt": expectedMissing },
         });
 
-        const result = yield* Effect.exit(applyArtifactPlan(plan));
+        const artifactApplication = yield* Effect.exit(applyArtifactPlan(plan));
 
-        expect(Exit.isFailure(result)).toBe(true);
+        expect(Exit.isFailure(artifactApplication)).toBe(true);
         expect([...(yield* fileSystem.readFile(firstPath))]).toEqual([...externallyChangedBytes]);
         expect(yield* fileSystem.exists(receiptPath)).toBe(false);
 
@@ -1347,9 +1347,9 @@ layer(receiptFailureLayer)("applyArtifactPlan receipt failure", (it) => {
         yield* fileSystem.makeDirectory(path.dirname(receiptPath), { recursive: true });
         yield* fileSystem.writeFile(receiptPath, priorReceiptBytes);
 
-        const result = yield* Effect.exit(applyArtifactPlan(plan));
+        const artifactApplication = yield* Effect.exit(applyArtifactPlan(plan));
 
-        expect(Exit.isFailure(result)).toBe(true);
+        expect(Exit.isFailure(artifactApplication)).toBe(true);
         expect([...(yield* fileSystem.readFile(artifactPath))]).toEqual([...originalBytes]);
         expect([...(yield* fileSystem.readFile(receiptPath))]).toEqual([...priorReceiptBytes]);
 
@@ -1404,9 +1404,9 @@ layer(stageFailureLayer)("applyArtifactPlan stage failure", (it) => {
         yield* fileSystem.writeFile(firstPath, originalBytes);
         yield* fileSystem.writeFile(secondPath, secondOriginalBytes);
 
-        const result = yield* Effect.exit(applyArtifactPlan(plan));
+        const artifactApplication = yield* Effect.exit(applyArtifactPlan(plan));
 
-        expect(Exit.isFailure(result)).toBe(true);
+        expect(Exit.isFailure(artifactApplication)).toBe(true);
         expect([...(yield* fileSystem.readFile(firstPath))]).toEqual([...originalBytes]);
         expect([...(yield* fileSystem.readFile(secondPath))]).toEqual([...secondOriginalBytes]);
         expect(yield* fileSystem.exists(receiptPath)).toBe(false);
@@ -1462,9 +1462,9 @@ layer(snapshotFailureLayer)("applyArtifactPlan snapshot failure", (it) => {
         yield* fileSystem.writeFile(firstPath, originalBytes);
         yield* fileSystem.writeFile(failedPath, secondOriginalBytes);
 
-        const result = yield* Effect.exit(applyArtifactPlan(plan));
+        const artifactApplication = yield* Effect.exit(applyArtifactPlan(plan));
 
-        expect(Exit.isFailure(result)).toBe(true);
+        expect(Exit.isFailure(artifactApplication)).toBe(true);
         expect([...(yield* fileSystem.readFile(firstPath))]).toEqual([...originalBytes]);
         expect((yield* fileSystem.stat(failedPath)).type).toBe("File");
         expect(yield* fileSystem.exists(receiptPath)).toBe(false);
@@ -1511,9 +1511,9 @@ layer(cleanupFailureLayer)("applyArtifactPlan cleanup failure", (it) => {
         const recoveryPath = path.join(root, ".dufflebag/recovery.json");
         const plan = createWritePlan({ root, expectedByPath: { "settings.json": expectedMissing } });
 
-        const result = yield* Effect.exit(applyArtifactPlan(plan));
+        const artifactApplication = yield* Effect.exit(applyArtifactPlan(plan));
 
-        expect(Exit.isFailure(result)).toBe(true);
+        expect(Exit.isFailure(artifactApplication)).toBe(true);
         expect([...(yield* fileSystem.readFile(artifactPath))]).toEqual([...installedBytes]);
         expect(yield* fileSystem.exists(receiptPath)).toBe(true);
         expect(yield* fileSystem.exists(recoveryPath)).toBe(false);
@@ -1560,9 +1560,9 @@ layer(markerCleanupFailureLayer)("applyArtifactPlan marker cleanup failure", (it
         const recoveryPath = path.join(root, ".dufflebag/recovery.json");
         const plan = createWritePlan({ root, expectedByPath: { "settings.json": expectedMissing } });
 
-        const result = yield* Effect.exit(applyArtifactPlan(plan));
+        const artifactApplication = yield* Effect.exit(applyArtifactPlan(plan));
 
-        expect(Exit.isFailure(result)).toBe(true);
+        expect(Exit.isFailure(artifactApplication)).toBe(true);
         expect([...(yield* fileSystem.readFile(artifactPath))]).toEqual([...installedBytes]);
         expect(yield* fileSystem.exists(receiptPath)).toBe(true);
 
@@ -1608,9 +1608,9 @@ layer(markerChangeLayer)("applyArtifactPlan changed recovery marker", (it) => {
         const recoveryPath = path.join(root, ".dufflebag/recovery.json");
         const plan = createWritePlan({ root, expectedByPath: { "settings.json": expectedMissing } });
 
-        const result = yield* Effect.exit(applyArtifactPlan(plan));
+        const artifactApplication = yield* Effect.exit(applyArtifactPlan(plan));
 
-        expect(Exit.isFailure(result)).toBe(true);
+        expect(Exit.isFailure(artifactApplication)).toBe(true);
         expect(yield* fileSystem.exists(receiptPath)).toBe(true);
         expect(yield* fileSystem.readFileString(recoveryPath)).toBe("changed marker");
 
@@ -1673,12 +1673,12 @@ layer(rollbackFailureLayer)("applyArtifactPlan rollback failure", (it) => {
 
         yield* fileSystem.writeFile(originalPath, originalBytes);
 
-        const result = yield* Effect.exit(applyArtifactPlan(plan));
+        const artifactApplication = yield* Effect.exit(applyArtifactPlan(plan));
 
-        expect(Exit.isFailure(result)).toBe(true);
-        if (Exit.isFailure(result)) {
-          expect(Cause.pretty(result.cause)).toContain("Injected commit failure");
-          expect(Cause.pretty(result.cause)).toContain("Injected rollback failure");
+        expect(Exit.isFailure(artifactApplication)).toBe(true);
+        if (Exit.isFailure(artifactApplication)) {
+          expect(Cause.pretty(artifactApplication.cause)).toContain("Injected commit failure");
+          expect(Cause.pretty(artifactApplication.cause)).toContain("Injected rollback failure");
         }
         expect(yield* fileSystem.exists(originalPath)).toBe(false);
         expect(yield* fileSystem.exists(receiptPath)).toBe(false);

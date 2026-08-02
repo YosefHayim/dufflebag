@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /** List large face-region paths in a body SVG trace. */
 import fs from "node:fs";
-import { argString, parseArgs } from "../../src/lib/index.js";
+import { argString, parseArgs } from "../../src/lib/argv.js";
 
 const args = parseArgs(process.argv.slice(2));
 const svgPath = argString(args, "input") || "out/body2.svg";

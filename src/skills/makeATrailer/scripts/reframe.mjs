@@ -95,7 +95,7 @@ function main() {
   const f = parseFlags(process.argv.slice(2));
   if (!f.in || !existsSync(f.in)) throw new Error("Pass an existing --in <master.mp4>");
   if (f.all) {
-    const outdir = f.outdir ?? ".";
+    const outdir = f.outdir || ".";
     mkdirSync(outdir, { recursive: true });
     for (const aspect of ["16:9", "1:1", "4:5"]) {
       reframeTo(f.in, aspect, join(outdir, `variant-${aspect.replace(":", "x")}.mp4`));

@@ -182,8 +182,8 @@ const decodePlan = (input: unknown) =>
     onExcessProperty: "error",
   })(input);
 
-const unwrap = <Right, Left>(result: Either.Either<Right, Left>): Right =>
-  Either.getOrThrowWith(result, (error) => new Error(String(error)));
+const unwrap = <Right, Left>(artifactPlan: Either.Either<Right, Left>): Right =>
+  Either.getOrThrowWith(artifactPlan, (error) => new Error(String(error)));
 
 describe("artifactPlanSchema", () => {
   it("requires inspected receipt state for publish and remove operations", () => {
@@ -284,10 +284,10 @@ describe("artifactPlanSchema", () => {
       },
     },
   ])("rejects unknown keys on the $name", ({ input }) => {
-    const result = decodePlan(input);
+    const artifactPlan = decodePlan(input);
 
-    expect(Either.isLeft(result)).toBe(true);
-    expect(String(Option.getOrThrow(Either.getLeft(result)))).toContain("is unexpected");
+    expect(Either.isLeft(artifactPlan)).toBe(true);
+    expect(String(Option.getOrThrow(Either.getLeft(artifactPlan)))).toContain("is unexpected");
   });
 
   it.each([
@@ -296,13 +296,13 @@ describe("artifactPlanSchema", () => {
     ".claude/../outside",
     "nested\\windows",
   ])("rejects escaping or non-canonical relative path %s", (path) => {
-    const result = validateArtifactPlan({
+    const artifactPlan = validateArtifactPlan({
       ...completePlan,
       operations: [write({ ...runtimeArtifact, path })],
     });
 
-    expect(Either.isLeft(result)).toBe(true);
-    expect(String(Option.getOrThrow(Either.getLeft(result)))).toContain("path");
+    expect(Either.isLeft(artifactPlan)).toBe(true);
+    expect(String(Option.getOrThrow(Either.getLeft(artifactPlan)))).toContain("path");
   });
 
   it.each([
@@ -321,37 +321,37 @@ describe("artifactPlanSchema", () => {
     "/workspace//nested",
     "C:/workspace/../outside",
   ])("rejects non-canonical absolute root %s", (root) => {
-    const result = validateArtifactPlan({ ...completePlan, root });
+    const artifactPlan = validateArtifactPlan({ ...completePlan, root });
 
-    expect(Either.isLeft(result)).toBe(true);
-    expect(String(Option.getOrThrow(Either.getLeft(result)))).toContain("root");
+    expect(Either.isLeft(artifactPlan)).toBe(true);
+    expect(String(Option.getOrThrow(Either.getLeft(artifactPlan)))).toContain("root");
   });
 
   it("rejects duplicate targets with a property-addressed issue", () => {
-    const result = validateArtifactPlan({
+    const artifactPlan = validateArtifactPlan({
       ...completePlan,
       operations: [write(runtimeArtifact), write({ ...runtimeArtifact, kind: { _tag: "managedConfig" } })],
     });
 
-    expect(Either.isLeft(result)).toBe(true);
-    expect(String(Option.getOrThrow(Either.getLeft(result)))).toContain('["operations"][1]["artifact"]["path"]');
-    expect(String(Option.getOrThrow(Either.getLeft(result)))).toContain("unique");
+    expect(Either.isLeft(artifactPlan)).toBe(true);
+    expect(String(Option.getOrThrow(Either.getLeft(artifactPlan)))).toContain('["operations"][1]["artifact"]["path"]');
+    expect(String(Option.getOrThrow(Either.getLeft(artifactPlan)))).toContain("unique");
   });
 
   it("rejects parent and child targets with property-addressed issues", () => {
     const parent = { ...managedConfigArtifact, path: ".claude/dufflebag" };
     const child = { ...runtimeArtifact, path: ".claude/dufflebag/hooks/contextGuard.js" };
-    const result = validateArtifactPlan({ ...completePlan, operations: [write(parent), write(child)] });
+    const artifactPlan = validateArtifactPlan({ ...completePlan, operations: [write(parent), write(child)] });
 
-    expect(Either.isLeft(result)).toBe(true);
-    expect(String(Option.getOrThrow(Either.getLeft(result)))).toContain('["operations"][1]["artifact"]["path"]');
-    expect(String(Option.getOrThrow(Either.getLeft(result)))).toContain("conflicts with");
+    expect(Either.isLeft(artifactPlan)).toBe(true);
+    expect(String(Option.getOrThrow(Either.getLeft(artifactPlan)))).toContain('["operations"][1]["artifact"]["path"]');
+    expect(String(Option.getOrThrow(Either.getLeft(artifactPlan)))).toContain("conflicts with");
   });
 
   it("rejects case-folded target collisions on common macOS and Windows filesystems", () => {
     const first = { ...runtimeArtifact, path: ".Dufflebag/Hooks/contextGuard.js" };
     const second = { ...managedConfigArtifact, path: ".dufflebag/hooks/CONTEXTGUARD.JS" };
-    const result = validateArtifactPlan({
+    const artifactPlan = validateArtifactPlan({
       scope: "project",
       root: "/workspace",
       operations: [remove(first), remove(second)],
@@ -359,8 +359,8 @@ describe("artifactPlanSchema", () => {
       receipt: { _tag: "remove", target: receiptTarget, expectedCurrent: expectedMissing },
     });
 
-    expect(Either.isLeft(result)).toBe(true);
-    expect(String(Option.getOrThrow(Either.getLeft(result)))).toContain('["operations"][1]["artifact"]["path"]');
+    expect(Either.isLeft(artifactPlan)).toBe(true);
+    expect(String(Option.getOrThrow(Either.getLeft(artifactPlan)))).toContain('["operations"][1]["artifact"]["path"]');
   });
 
   it.each([
@@ -375,23 +375,23 @@ describe("artifactPlanSchema", () => {
       artifact: { ...settingsArtifact, ownership: instructionArtifact.ownership },
     },
   ])("rejects invalid ownership-kind combination: $name", ({ artifact }) => {
-    const result = validateArtifactPlan({ ...completePlan, operations: [write(artifact)] });
+    const artifactPlan = validateArtifactPlan({ ...completePlan, operations: [write(artifact)] });
 
-    expect(Either.isLeft(result)).toBe(true);
-    expect(String(Option.getOrThrow(Either.getLeft(result)))).toContain("incompatible");
+    expect(Either.isLeft(artifactPlan)).toBe(true);
+    expect(String(Option.getOrThrow(Either.getLeft(artifactPlan)))).toContain("incompatible");
   });
 
   it.each([
     { name: "empty agent ownership", owner: agentOwner([]) },
     { name: "duplicate agent ownership", owner: agentOwner(["codex", "codex"]) },
   ])("rejects $name", ({ owner }) => {
-    const result = validateArtifactPlan({
+    const artifactPlan = validateArtifactPlan({
       ...completePlan,
       operations: [write({ ...instructionArtifact, owner })],
     });
 
-    expect(Either.isLeft(result)).toBe(true);
-    expect(String(Option.getOrThrow(Either.getLeft(result)))).toContain("agentIds");
+    expect(Either.isLeft(artifactPlan)).toBe(true);
+    expect(String(Option.getOrThrow(Either.getLeft(artifactPlan)))).toContain("agentIds");
   });
 
   it("rejects receipt owner, kind, and scope inconsistencies", () => {
@@ -414,7 +414,7 @@ describe("artifactPlanSchema", () => {
   });
 
   it("requires the canonical receipt.json basename", () => {
-    const result = validateArtifactPlan({
+    const artifactPlan = validateArtifactPlan({
       ...completePlan,
       receipt: {
         ...completePlan.receipt,
@@ -422,8 +422,8 @@ describe("artifactPlanSchema", () => {
       },
     });
 
-    expect(Either.isLeft(result)).toBe(true);
-    expect(String(Option.getOrThrow(Either.getLeft(result)))).toContain("receipt.json");
+    expect(Either.isLeft(artifactPlan)).toBe(true);
+    expect(String(Option.getOrThrow(Either.getLeft(artifactPlan)))).toContain("receipt.json");
   });
 
   it.each([
@@ -431,7 +431,7 @@ describe("artifactPlanSchema", () => {
     { reservedPath: ".claude/dufflebag/recovery.json", label: "recovery" },
   ])("rejects an operation conflicting with the reserved $label path", ({ reservedPath }) => {
     const artifact = { ...runtimeArtifact, path: reservedPath };
-    const result = validateArtifactPlan({
+    const artifactPlan = validateArtifactPlan({
       scope: "project",
       root: "/workspace",
       operations: [remove(artifact)],
@@ -439,14 +439,14 @@ describe("artifactPlanSchema", () => {
       receipt: { _tag: "remove", target: receiptTarget, expectedCurrent: expectedMissing },
     });
 
-    expect(Either.isLeft(result)).toBe(true);
-    expect(String(Option.getOrThrow(Either.getLeft(result)))).toContain('["operations"][0]["artifact"]["path"]');
-    expect(String(Option.getOrThrow(Either.getLeft(result)))).toContain(reservedPath);
+    expect(Either.isLeft(artifactPlan)).toBe(true);
+    expect(String(Option.getOrThrow(Either.getLeft(artifactPlan)))).toContain('["operations"][0]["artifact"]["path"]');
+    expect(String(Option.getOrThrow(Either.getLeft(artifactPlan)))).toContain(reservedPath);
   });
 
   it("rejects a published artifact conflicting with the reserved recovery path", () => {
     const artifact = { ...runtimeArtifact, path: ".claude/dufflebag/recovery.json/snapshot" };
-    const result = validateArtifactPlan({
+    const artifactPlan = validateArtifactPlan({
       ...completePlan,
       operations: [write(artifact)],
       receipt: {
@@ -455,16 +455,16 @@ describe("artifactPlanSchema", () => {
       },
     });
 
-    expect(Either.isLeft(result)).toBe(true);
-    expect(String(Option.getOrThrow(Either.getLeft(result)))).toContain(
+    expect(Either.isLeft(artifactPlan)).toBe(true);
+    expect(String(Option.getOrThrow(Either.getLeft(artifactPlan)))).toContain(
       '["receipt"]["receipt"]["artifacts"][0]["path"]',
     );
-    expect(String(Option.getOrThrow(Either.getLeft(result)))).toContain("recovery.json");
+    expect(String(Option.getOrThrow(Either.getLeft(artifactPlan)))).toContain("recovery.json");
   });
 
   it("reserves receipt and recovery paths case-insensitively", () => {
     const artifact = { ...runtimeArtifact, path: ".CLAUDE/DUFFLEBAG/RECOVERY.JSON" };
-    const result = validateArtifactPlan({
+    const artifactPlan = validateArtifactPlan({
       scope: "project",
       root: "/workspace",
       operations: [remove(artifact)],
@@ -472,22 +472,22 @@ describe("artifactPlanSchema", () => {
       receipt: { _tag: "remove", target: receiptTarget, expectedCurrent: expectedMissing },
     });
 
-    expect(Either.isLeft(result)).toBe(true);
-    expect(String(Option.getOrThrow(Either.getLeft(result)))).toContain("recovery.json");
+    expect(Either.isLeft(artifactPlan)).toBe(true);
+    expect(String(Option.getOrThrow(Either.getLeft(artifactPlan)))).toContain("recovery.json");
   });
 
   it("represents receipt publication separately and last", () => {
-    const result = decodePlan({
+    const artifactPlan = decodePlan({
       ...completePlan,
       operations: [...completePlan.operations, completePlan.receipt],
     });
 
-    expect(Either.isLeft(result)).toBe(true);
+    expect(Either.isLeft(artifactPlan)).toBe(true);
     expect(completePlan.receipt._tag).toBe("receiptPublish");
   });
 
   it("accepts byte-backed restoration as a final action absent from the next receipt", () => {
-    const result = validateArtifactPlan({
+    const artifactPlan = validateArtifactPlan({
       scope: "project",
       root: "/workspace",
       operations: [restore(skillArtifact, previousSkillBytes)],
@@ -500,7 +500,7 @@ describe("artifactPlanSchema", () => {
       },
     });
 
-    expect(Either.isRight(result)).toBe(true);
+    expect(Either.isRight(artifactPlan)).toBe(true);
   });
 
   it("requires exact recorded prior bytes for a whole-file restoration", () => {
@@ -594,7 +594,7 @@ describe("artifactPlanSchema", () => {
       ...instructionArtifact,
       ownership: { ...instructionArtifact.ownership, filePreviouslyPresent: false },
     };
-    const result = validateArtifactPlan({
+    const artifactPlan = validateArtifactPlan({
       scope: "project",
       root: "/workspace",
       operations: [{ ...remove(absentPartialArtifact), unownedBytes: desiredBytes }],
@@ -602,12 +602,12 @@ describe("artifactPlanSchema", () => {
       receipt: { _tag: "remove", target: receiptTarget, expectedCurrent: expectedMissing },
     });
 
-    expect(Either.isLeft(result)).toBe(true);
-    expect(String(Option.getOrThrow(Either.getLeft(result)))).toContain("no unowned bytes remain");
+    expect(Either.isLeft(artifactPlan)).toBe(true);
+    expect(String(Option.getOrThrow(Either.getLeft(artifactPlan)))).toContain("no unowned bytes remain");
   });
 
   it("restores an originally present partial file even when its final bytes are empty", () => {
-    const result = validateArtifactPlan({
+    const artifactPlan = validateArtifactPlan({
       scope: "project",
       root: "/workspace",
       operations: [restore(instructionArtifact, new Uint8Array())],
@@ -615,7 +615,7 @@ describe("artifactPlanSchema", () => {
       receipt: { _tag: "remove", target: receiptTarget, expectedCurrent: expectedMissing },
     });
 
-    expect(Either.isRight(result)).toBe(true);
+    expect(Either.isRight(artifactPlan)).toBe(true);
   });
 
   it("requires restore and remove actions to be absent from a published receipt", () => {
@@ -653,7 +653,7 @@ describe("artifactPlanSchema", () => {
       ...runtimeArtifact,
       ownership: { ...runtimeArtifact.ownership, installedHash: newHash },
     };
-    const result = validateArtifactPlan({
+    const artifactPlan = validateArtifactPlan({
       scope: "project",
       root: "/workspace",
       operations: [write(mismatchedArtifact)],
@@ -666,12 +666,12 @@ describe("artifactPlanSchema", () => {
       },
     });
 
-    expect(Either.isLeft(result)).toBe(true);
-    expect(String(Option.getOrThrow(Either.getLeft(result)))).toContain("exactly match");
+    expect(Either.isLeft(artifactPlan)).toBe(true);
+    expect(String(Option.getOrThrow(Either.getLeft(artifactPlan)))).toContain("exactly match");
   });
 
   it("forbids normal desired writes in a receipt-removal plan", () => {
-    const result = validateArtifactPlan({
+    const artifactPlan = validateArtifactPlan({
       scope: "project",
       root: "/workspace",
       operations: [write(runtimeArtifact)],
@@ -679,13 +679,13 @@ describe("artifactPlanSchema", () => {
       receipt: { _tag: "remove", target: receiptTarget, expectedCurrent: expectedMissing },
     });
 
-    expect(Either.isLeft(result)).toBe(true);
+    expect(Either.isLeft(artifactPlan)).toBe(true);
   });
 });
 
 describe("createUpdatePlan", () => {
   it("rejects desired receipt artifacts that have no one-to-one desired write", () => {
-    const result = createUpdatePlan({
+    const artifactPlan = createUpdatePlan({
       root: "/workspace",
       previous: { _tag: "missing" },
       restorations: [],
@@ -697,8 +697,8 @@ describe("createUpdatePlan", () => {
       receiptExpectedCurrent: expectedMissing,
     });
 
-    expect(Either.isLeft(result)).toBe(true);
-    expect(String(Option.getOrThrow(Either.getLeft(result)))).toContain(
+    expect(Either.isLeft(artifactPlan)).toBe(true);
+    expect(String(Option.getOrThrow(Either.getLeft(artifactPlan)))).toContain(
       "Every desired receipt artifact must have exactly one desired write",
     );
   });
@@ -898,7 +898,7 @@ describe("createUpdatePlan", () => {
       ...desiredYaml,
       ownership: { ...desiredYaml.ownership, filePreviouslyPresent: true },
     };
-    const result = createUpdatePlan({
+    const artifactPlan = createUpdatePlan({
       root: "/workspace",
       previous: {
         _tag: "receipt",
@@ -912,7 +912,7 @@ describe("createUpdatePlan", () => {
       receiptTarget,
       receiptExpectedCurrent: { _tag: "file", sha256: oldHash },
     });
-    const plan = unwrap(result);
+    const plan = unwrap(artifactPlan);
 
     expect(plan.operations).toEqual([write(preservedYaml)]);
     expect(plan.receipt).toEqual({
@@ -1082,7 +1082,7 @@ describe("createUpdatePlan", () => {
         createdContainers: ["/hooks"],
       },
     };
-    const result = createUpdatePlan({
+    const artifactPlan = createUpdatePlan({
       root: "/workspace",
       previous: {
         _tag: "receipt",
@@ -1097,7 +1097,7 @@ describe("createUpdatePlan", () => {
       receiptExpectedCurrent: { _tag: "file", sha256: oldHash },
     });
 
-    expect(Either.isLeft(result)).toBe(true);
+    expect(Either.isLeft(artifactPlan)).toBe(true);
   });
 
   it("preserves an unchanged installed-missing JSON value without another write", () => {
@@ -1245,7 +1245,7 @@ describe("createUpdatePlan", () => {
         reference: "DUFFLEBAG.md",
       },
     };
-    const result = createUpdatePlan({
+    const artifactPlan = createUpdatePlan({
       root: "/workspace",
       previous: {
         _tag: "receipt",
@@ -1260,11 +1260,11 @@ describe("createUpdatePlan", () => {
       receiptExpectedCurrent: { _tag: "file", sha256: oldHash },
     });
 
-    expect(Either.isLeft(result)).toBe(true);
-    expect(String(Option.getOrThrow(Either.getLeft(result)))).toContain(
+    expect(Either.isLeft(artifactPlan)).toBe(true);
+    expect(String(Option.getOrThrow(Either.getLeft(artifactPlan)))).toContain(
       '["desired"]["receipt"]["artifacts"][0]["ownership"]["_tag"]',
     );
-    expect(String(Option.getOrThrow(Either.getLeft(result)))).toContain("remove the prior ownership first");
+    expect(String(Option.getOrThrow(Either.getLeft(artifactPlan)))).toContain("remove the prior ownership first");
   });
 
   it("rejects changing the artifact kind or owner at a retained path", () => {
@@ -1272,7 +1272,7 @@ describe("createUpdatePlan", () => {
       ...settingsArtifact,
       path: jsonReferenceArtifact.path,
     };
-    const result = createUpdatePlan({
+    const artifactPlan = createUpdatePlan({
       root: "/workspace",
       previous: {
         _tag: "receipt",
@@ -1287,9 +1287,9 @@ describe("createUpdatePlan", () => {
       receiptExpectedCurrent: { _tag: "file", sha256: oldHash },
     });
 
-    expect(Either.isLeft(result)).toBe(true);
-    expect(String(Option.getOrThrow(Either.getLeft(result)))).toContain('artifacts"][0]["kind"]');
-    expect(String(Option.getOrThrow(Either.getLeft(result)))).toContain("remove the prior ownership first");
+    expect(Either.isLeft(artifactPlan)).toBe(true);
+    expect(String(Option.getOrThrow(Either.getLeft(artifactPlan)))).toContain('artifacts"][0]["kind"]');
+    expect(String(Option.getOrThrow(Either.getLeft(artifactPlan)))).toContain("remove the prior ownership first");
   });
 });
 
@@ -1371,7 +1371,7 @@ describe("createUninstallPlan", () => {
 
   it("rejects detection evidence and proves it cannot authorize a remove", () => {
     const receipt = { ...desiredReceipt, artifacts: [runtimeArtifact] };
-    const result = createUninstallPlan({
+    const artifactPlan = createUninstallPlan({
       root: "/workspace",
       receipt,
       restorations: [remove(runtimeArtifact)],
@@ -1389,7 +1389,7 @@ describe("createUninstallPlan", () => {
       }),
     );
 
-    expect(Either.isLeft(result)).toBe(true);
+    expect(Either.isLeft(artifactPlan)).toBe(true);
     expect(plan.operations).toEqual([remove(runtimeArtifact)]);
   });
 });
@@ -1444,7 +1444,7 @@ describe("migrateLegacyManifest", () => {
     { name: "unknown legacy key", manifest: { ...legacyManifest, detectedAgents: ["cursor"] } },
     { name: "duplicate feature IDs", manifest: { ...legacyManifest, features: ["context-guard", "context-guard"] } },
   ])("rejects an invalid legacy manifest with $name", ({ manifest }) => {
-    const result = migrateLegacyManifest({
+    const artifactPlan = migrateLegacyManifest({
       root: "/workspace",
       manifest,
       knownArtifacts,
@@ -1452,6 +1452,6 @@ describe("migrateLegacyManifest", () => {
       receiptExpectedCurrent: expectedMissing,
     });
 
-    expect(Either.isLeft(result)).toBe(true);
+    expect(Either.isLeft(artifactPlan)).toBe(true);
   });
 });

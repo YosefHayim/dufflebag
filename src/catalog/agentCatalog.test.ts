@@ -229,10 +229,13 @@ describe("agentCatalogSchema", () => {
   it("accepts a complete definition and rejects duplicate IDs", () => {
     expect(Either.isRight(decodeDefinition(validAgentFixture))).toBe(true);
 
-    const result = decodeCatalog([validAgentFixture, { ...validAgentFixture, displayName: "Duplicate Agent" }]);
+    const agentCatalogCheck = decodeCatalog([
+      validAgentFixture,
+      { ...validAgentFixture, displayName: "Duplicate Agent" },
+    ]);
 
-    expect(Either.isLeft(result)).toBe(true);
-    expect(String(Option.getOrThrow(Either.getLeft(result)))).toContain("Agent IDs must be unique");
+    expect(Either.isLeft(agentCatalogCheck)).toBe(true);
+    expect(String(Option.getOrThrow(Either.getLeft(agentCatalogCheck)))).toContain("Agent IDs must be unique");
   });
 
   it.each([
@@ -273,10 +276,10 @@ describe("agentCatalogSchema", () => {
       decode: decodeTarget,
     },
   ])("rejects excess properties in $name", ({ input, decode }) => {
-    const result = decode(input);
+    const agentCatalogCheck = decode(input);
 
-    expect(Either.isLeft(result)).toBe(true);
-    expect(String(Option.getOrThrow(Either.getLeft(result)))).toContain("is unexpected");
+    expect(Either.isLeft(agentCatalogCheck)).toBe(true);
+    expect(String(Option.getOrThrow(Either.getLeft(agentCatalogCheck)))).toContain("is unexpected");
   });
 
   it("requires all three explicit detection arrays", () => {

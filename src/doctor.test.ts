@@ -41,7 +41,7 @@ layer(NodeContext.layer)("doctor", (it) => {
         const configPath = path.join(root, ".claude/dufflebag/config.json");
         const receiptPath = path.join(root, ".claude/dufflebag/receipt.json");
         const stagedContextGuardPath = path.join(stagedRoot, "runtime/contextGuard/hooks/contextGuard.js");
-        const installedBodyHash = "a".repeat(64);
+        const installedContentHash = "a".repeat(64);
         const receipt = {
           version: "0.9.0",
           scope: "global",
@@ -56,7 +56,7 @@ layer(NodeContext.layer)("doctor", (it) => {
                 filePreviouslyPresent: false,
                 startMarker: "<!-- dufflebag start -->",
                 endMarker: "<!-- dufflebag end -->",
-                installedBodyHash,
+                installedBodyHash: installedContentHash,
               },
             },
           ],

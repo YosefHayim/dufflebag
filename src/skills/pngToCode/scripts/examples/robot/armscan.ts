@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /** List SVG paths overlapping the arm region in a trace file. */
 import fs from "node:fs";
-import { argString, parseArgs } from "../../src/lib/index.js";
+import { argString, parseArgs } from "../../src/lib/argv.js";
 
 const args = parseArgs(process.argv.slice(2));
 const svgPath = argString(args, "input") || "out/trace1.svg";

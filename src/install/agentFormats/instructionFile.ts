@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-import { Either, ParseResult, Schema } from "effect";
+import { Either, Schema, ParseResult as SchemaParseIssue } from "effect";
 
 import { agentCatalog, agentIdSchema } from "../../catalog/agentCatalog.js";
 import { featureCatalog, installedSkillDefinitionSchema } from "../../catalog/featureCatalog.js";
@@ -42,7 +42,8 @@ export class InstructionFilePlanError extends Schema.TaggedError<InstructionFile
   }
 }
 
-const formatParseError = (error: ParseResult.ParseError): string => ParseResult.TreeFormatter.formatErrorSync(error);
+const formatParseError = (error: SchemaParseIssue.ParseError): string =>
+  SchemaParseIssue.TreeFormatter.formatErrorSync(error);
 
 const hashBytes = (bytes: Uint8Array): string => createHash("sha256").update(bytes).digest("hex");
 
@@ -51,16 +52,16 @@ const bytesEqual = (left: Uint8Array, right: Uint8Array): boolean =>
 
 const concatenateBytes = (values: ReadonlyArray<Uint8Array>): Uint8Array => {
   const length = values.reduce((total, value) => total + value.byteLength, 0);
-  const result = new Uint8Array(length);
+  const instructionMerge = new Uint8Array(length);
   let offset = 0;
 
   // Copy each owned byte segment into one deterministic result.
   for (const value of values) {
-    result.set(value, offset);
+    instructionMerge.set(value, offset);
     offset += value.byteLength;
   }
 
-  return result;
+  return instructionMerge;
 };
 
 const findByteIndexes = (input: { bytes: Uint8Array; pattern: Uint8Array }): ReadonlyArray<number> => {
@@ -149,8 +150,8 @@ const instructionSkillSchema = Schema.Struct({
 export type InstructionSkill = Schema.Schema.Type<typeof instructionSkillSchema>;
 
 const renderSkillSection = (skill: InstructionSkill, ctl: string) => {
-  const body = stripLeadingFrontmatter(skill.markdown).split(templateToken).join(ctl).trim();
-  if (body.length === 0) {
+  const documentText = stripLeadingFrontmatter(skill.markdown).split(templateToken).join(ctl).trim();
+  if (documentText.length === 0) {
     return Either.left(
       new InstructionFilePlanError({
         issue: `skill ${skill.installedSkill.id} has no markdown body after frontmatter.`,
@@ -158,7 +159,7 @@ const renderSkillSection = (skill: InstructionSkill, ctl: string) => {
     );
   }
 
-  if (body.includes(instructionBlockStartMarker) || body.includes(instructionBlockEndMarker)) {
+  if (documentText.includes(instructionBlockStartMarker) || documentText.includes(instructionBlockEndMarker)) {
     return Either.left(
       new InstructionFilePlanError({
         issue: `skill ${skill.installedSkill.id} contains a reserved managed block marker.`,
@@ -166,10 +167,10 @@ const renderSkillSection = (skill: InstructionSkill, ctl: string) => {
     );
   }
 
-  return Either.right(`## ${skill.installedSkill.id}\n\n${body}`);
+  return Either.right(`## ${skill.installedSkill.id}\n\n${documentText}`);
 };
 
-const renderManagedBody = (skills: ReadonlyArray<InstructionSkill>, ctl: string) => {
+const renderManagedSection = (skills: ReadonlyArray<InstructionSkill>, ctl: string) => {
   const sections = Either.all(skills.map((skill) => renderSkillSection(skill, ctl)));
 
   return Either.map(sections, (values) => textEncoder.encode(`\n${values.join("\n\n---\n\n")}\n`));
@@ -427,11 +428,9 @@ export type InstructionFileRequest = Schema.Schema.Type<typeof instructionFileRe
 
 const instructionOperationIssues = (operation: InstructionOperationFields) => {
   const ownership = operation.artifact.ownership;
+  const ownerMatchesPath = operation._tag === "write" ? agentIdsMatchPath : previousAgentIdsMatchPath;
   const issues: Array<{ path: ReadonlyArray<string>; message: string } | undefined> = [
-    (operation._tag === "write" ? agentIdsMatchPath : previousAgentIdsMatchPath)(
-      operation.artifact.owner.agentIds,
-      operation.artifact.path,
-    )
+    ownerMatchesPath(operation.artifact.owner.agentIds, operation.artifact.path)
       ? undefined
       : {
           path: ["artifact", "owner"],
@@ -457,8 +456,8 @@ const instructionOperationIssues = (operation: InstructionOperationFields) => {
     return issues;
   }
 
-  const body = operation.bytes.slice(block.right.bodyStart, block.right.bodyEnd);
-  if (hashBytes(body) !== ownership.installedBodyHash) {
+  const documentText = operation.bytes.slice(block.right.bodyStart, block.right.bodyEnd);
+  if (hashBytes(documentText) !== ownership.installedBodyHash) {
     issues.push({
       path: ["artifact", "ownership", "installedBodyHash"],
       message: "Instruction ownership hash must match the exact managed body bytes.",
@@ -499,8 +498,8 @@ const validateReceiptedBlock = (request: InstructionFileRequest, block: ManagedB
 
   const ownership = request.previousArtifact.artifact.ownership;
 
-  const currentBody = request.currentFile.bytes.slice(block.bodyStart, block.bodyEnd);
-  if (hashBytes(currentBody) !== ownership.installedBodyHash) {
+  const currentContent = request.currentFile.bytes.slice(block.bodyStart, block.bodyEnd);
+  if (hashBytes(currentContent) !== ownership.installedBodyHash) {
     return Either.left(new InstructionFilePlanError({ issue: "managed block changed inside its receipted body." }));
   }
 
@@ -537,19 +536,19 @@ const planInstructionWrite = (input: {
   desired: PresentInstruction;
   currentBlock: CurrentManagedBlock;
 }): Either.Either<InstructionFilePlan, InstructionFilePlanError> => {
-  const body = renderManagedBody(input.desired.skills, input.desired.ctl);
-  if (Either.isLeft(body)) {
-    return Either.left(body.left);
+  const documentText = renderManagedSection(input.desired.skills, input.desired.ctl);
+  if (Either.isLeft(documentText)) {
+    return Either.left(documentText.left);
   }
 
-  const blockBytes = concatenateBytes([startMarkerBytes, body.right, endMarkerBytes]);
+  const blockBytes = concatenateBytes([startMarkerBytes, documentText.right, endMarkerBytes]);
   if (input.request.currentFile._tag === "missing") {
     return validateInstructionPlan({
       _tag: "write",
       artifact: createInstructionArtifact({
         request: input.request,
         desired: input.desired,
-        installedBodyHash: hashBytes(body.right),
+        installedBodyHash: hashBytes(documentText.right),
         filePreviouslyPresent: false,
       }),
       bytes: concatenateBytes([blockBytes, lineFeedBytes]),
@@ -570,7 +569,7 @@ const planInstructionWrite = (input: {
       artifact: createInstructionArtifact({
         request: input.request,
         desired: input.desired,
-        installedBodyHash: hashBytes(body.right),
+        installedBodyHash: hashBytes(documentText.right),
         filePreviouslyPresent: true,
       }),
       bytes: appendedInstructionBytes(input.request.currentFile.bytes, blockBytes),
@@ -587,7 +586,7 @@ const planInstructionWrite = (input: {
     artifact: createInstructionArtifact({
       request: input.request,
       desired: input.desired,
-      installedBodyHash: hashBytes(body.right),
+      installedBodyHash: hashBytes(documentText.right),
       filePreviouslyPresent: ownership.right.filePreviouslyPresent,
     }),
     bytes: replaceManagedBlock({

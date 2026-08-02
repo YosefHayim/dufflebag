@@ -72,7 +72,7 @@ function usage() {
 function parseArgs(argv) {
   const args = {
     formFactor: "PHONE",
-    key: process.env.CRUX_API_KEY ?? process.env.PSI_API_KEY,
+    key: process.env.CRUX_API_KEY || process.env.PSI_API_KEY,
     origin: false,
     json: false,
     strict: false,
@@ -104,10 +104,10 @@ function ratingFromValue(value, good, poor) {
 
 /** Pull the p75 for one metric from a CrUX record, or null if absent. */
 function p75Of(metric, cruxMetrics) {
-  const raw = cruxMetrics?.[metric.key]?.percentiles?.p75;
-  if (raw === undefined || raw === null) return null;
+  const percentileText = cruxMetrics?.[metric.key]?.percentiles?.p75;
+  if (percentileText === undefined || percentileText === null) return null;
   // CrUX encodes CLS as a 2-decimal string ("0.08"); other metrics are integer ms.
-  return metric.cls ? Number.parseFloat(raw) : Number(raw);
+  return metric.cls ? Number.parseFloat(percentileText) : Number(percentileText);
 }
 
 function formatValue(metric, value) {
@@ -137,17 +137,19 @@ function evaluate(record, budgets, strict) {
   return { rows, passed };
 }
 
-function renderReport(result, meta) {
+function renderReport(assessment, meta) {
   const lines = [`Chrome UX Report — ${meta.url} (${meta.formFactor}, ${meta.level}-level)`];
   if (meta.period) lines.push(`Collection period: ${meta.period}`);
   lines.push("", "Real-user Core Web Vitals (p75):");
-  for (const row of result.rows) {
-    const flag = row.failed ? "  ✗ FAIL" : row.rating === "needs-improvement" ? "  ! warn" : "";
+  for (const row of assessment.rows) {
+    let flag = "";
+    if (row.failed) flag = "  ✗ FAIL";
+    else if (row.rating === "needs-improvement") flag = "  ! warn";
     lines.push(
       `  ${row.id.padEnd(5)} ${formatValue(row, row.value).padEnd(9)} ${row.rating.padEnd(18)} (budget ≤ ${formatValue(row, row.budget)})${flag}`,
     );
   }
-  lines.push("", `Verdict: ${result.passed ? "PASS" : "FAIL"}`);
+  lines.push("", `Verdict: ${assessment.passed ? "PASS" : "FAIL"}`);
   return lines.join("\n");
 }
 
@@ -155,8 +157,8 @@ function renderReport(result, meta) {
 
 async function loadBudgets(file) {
   if (!file) return DEFAULT_BUDGETS;
-  const raw = await readFile(file, "utf8");
-  return { ...DEFAULT_BUDGETS, ...JSON.parse(raw) };
+  const budgetText = await readFile(file, "utf8");
+  return { ...DEFAULT_BUDGETS, ...JSON.parse(budgetText) };
 }
 
 /**
@@ -164,18 +166,18 @@ async function loadBudgets(file) {
  * CrUX has no data for the key (404), and throws on any other error.
  */
 async function queryCrux(target, formFactor, key) {
-  const response = await fetch(`${CRUX_ENDPOINT}?key=${key ?? ""}`, {
+  const httpReply = await fetch(`${CRUX_ENDPOINT}?key=${key || ""}`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ ...target, formFactor }),
   });
-  const data = await response.json().catch(() => null);
-  if (response.status === 404) return { notFound: true };
-  if (!response.ok) {
-    const message = data?.error?.message ?? `${response.status} ${response.statusText}`;
+  const cruxDocument = await httpReply.json().catch(() => null);
+  if (httpReply.status === 404) return { notFound: true };
+  if (!httpReply.ok) {
+    const message = cruxDocument?.error?.message || `${httpReply.status} ${httpReply.statusText}`;
     throw new Error(`CrUX request failed: ${message}`);
   }
-  return { record: data?.record };
+  return { record: cruxDocument?.record };
 }
 
 async function main() {
@@ -189,20 +191,20 @@ async function main() {
   // Prefer the exact URL; fall back to the whole origin when the URL has no
   // CrUX record (the common case for a specific page on a smaller site).
   let level = args.origin ? "origin" : "url";
-  let result = await queryCrux(args.origin ? { origin: args.url } : { url: args.url }, args.formFactor, args.key);
-  if (result.notFound && !args.origin) {
+  let cruxLookup = await queryCrux(args.origin ? { origin: args.url } : { url: args.url }, args.formFactor, args.key);
+  if (cruxLookup.notFound && !args.origin) {
     level = "origin";
-    result = await queryCrux({ origin: args.url }, args.formFactor, args.key);
+    cruxLookup = await queryCrux({ origin: args.url }, args.formFactor, args.key);
   }
 
-  if (result.notFound) {
+  if (cruxLookup.notFound) {
     const message = `No CrUX field data for ${args.url} (${args.formFactor}) — not enough real-user traffic yet. Skipping field gate.`;
     console.log(args.json ? JSON.stringify({ url: args.url, noFieldData: true, message }) : message);
     return; // exit 0 — absence of data is not a breach
   }
 
-  const evaluated = evaluate(result.record, budgets, args.strict);
-  const period = result.record?.collectionPeriod;
+  const evaluated = evaluate(cruxLookup.record, budgets, args.strict);
+  const period = cruxLookup.record?.collectionPeriod;
   const meta = {
     url: args.url,
     formFactor: args.formFactor,

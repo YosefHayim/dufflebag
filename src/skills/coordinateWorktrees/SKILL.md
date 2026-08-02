@@ -1,6 +1,7 @@
 ---
 name: coordinate-worktrees
 description: Use when the user asks to coordinate, consolidate, merge, salvage, or land work from multiple branches or Git worktrees, especially when they are dirty, overlapping, stale, or being used by concurrent agents.
+type: flow
 ---
 
 # Coordinate Worktrees

@@ -21,40 +21,31 @@
 from __future__ import annotations
 
 import argparse
-from collections import deque
-from decimal import Decimal, ROUND_HALF_UP
 import hashlib
 import json
 import os
-from pathlib import Path
 import re
 import signal
 import subprocess
 import sys
 import threading
 import time
-from typing import Any
 import uuid
-
-SCRIPT_DIRECTORY = str(Path(__file__).resolve().parent)
-if SCRIPT_DIRECTORY not in sys.path:
-    sys.path.insert(0, SCRIPT_DIRECTORY)
+from collections import deque
+from contextlib import suppress
+from decimal import ROUND_HALF_UP, Decimal
+from pathlib import Path
+from typing import Any
 
 from cmux_focus import (
     CMUX_BUNDLE_IDENTIFIER,
     cached_cmux_identify,
-    clear_focus_cache,
-    cmux_identify,
     frontmost_bundle_identifier,
 )
 from prompt_refinement import (
-    prompt_literals,
     refine_prompt,
     refinement_availability,
-    refinement_unavailable_reason,
-    validate_refined_prompt,
 )
-
 
 LANGUAGE_NAMES = {
     "bash": "Bash",
@@ -120,8 +111,8 @@ DICTATION_SAMPLE_RATE = 16_000
 DICTATION_UPDATE_SECONDS = 0.5
 STT_MODEL = "small.en"
 HOTKEY_LABEL = "hold-control"
-PENDING_RESPONSE_TTL_SECONDS = 60 * 60
-SEEN_RESPONSE_TTL_SECONDS = 24 * 60 * 60
+PENDING_NARRATION_TTL_SECONDS = 60 * 60
+SEEN_NARRATION_TTL_SECONDS = 24 * 60 * 60
 CONTROL_HOLD_TRANSITIONS = {
     ("idle", "control_down"): ("waiting", "schedule"),
     ("waiting", "control_up"): ("idle", "tap"),
@@ -207,17 +198,17 @@ def sentence(text: str) -> str:
     return f"{clean}."
 
 
-def number_words(raw: str, *, ordinal: bool = False) -> str:
+def number_words(numeric_text: str, *, ordinal: bool = False) -> str:
     try:
         from num2words import num2words
 
-        compact = raw.replace(",", "")
+        compact = numeric_text.replace(",", "")
         mode = "ordinal" if ordinal else "cardinal"
         rendered = str(num2words(compact, lang="en", to=mode)).replace(",", "")
         rendered = re.sub(r"\band\s+", "", rendered)
-        return f"plus {rendered}" if raw.startswith("+") else rendered
+        return f"plus {rendered}" if numeric_text.startswith("+") else rendered
     except (ArithmeticError, ImportError, NotImplementedError, TypeError, ValueError):
-        return raw
+        return numeric_text
 
 
 def preserve_span(value: str, spans: dict[str, str]) -> str:
@@ -238,8 +229,8 @@ def restore_spans(text: str, spans: dict[str, str]) -> str:
     return restored
 
 
-def currency_words(raw: str) -> str:
-    value = Decimal(raw.replace(",", "")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+def currency_words(currency_text: str) -> str:
+    value = Decimal(currency_text.replace(",", "")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
     prefix = "minus " if value < 0 else ""
     absolute = abs(value)
     dollars = int(absolute)
@@ -265,11 +256,11 @@ def normalize_spoken_prose(text: str, spans: dict[str, str] | None = None) -> st
         return number_words(match.group("number"), ordinal=True)
 
     def quantity(match: re.Match[str]) -> str:
-        raw = match.group("number")
+        matched_number_text = match.group("number")
         try:
             singular, plural = UNIT_WORDS[match.group("unit")]
-            unit = singular if abs(Decimal(raw.replace(",", ""))) == 1 else plural
-            return f"{number_words(raw)} {unit}"
+            unit = singular if abs(Decimal(matched_number_text.replace(",", ""))) == 1 else plural
+            return f"{number_words(matched_number_text)} {unit}"
         except (ArithmeticError, KeyError, TypeError, ValueError):
             return match.group(0)
 
@@ -370,17 +361,17 @@ def code_speech(text: str) -> str:
 
 
 def split_table_row(line: str) -> list[str]:
-    body = line.strip()
-    if body.startswith("|"):
-        body = body[1:]
-    if body.endswith("|") and not body.endswith("\\|"):
-        body = body[:-1]
+    row_text = line.strip()
+    if row_text.startswith("|"):
+        row_text = row_text[1:]
+    if row_text.endswith("|") and not row_text.endswith("\\|"):
+        row_text = row_text[:-1]
 
     cells: list[str] = []
     current: list[str] = []
     escaped = False
     # Split only unescaped pipes so cell content is never silently discarded.
-    for character in body:
+    for character in row_text:
         if escaped:
             current.append(character)
             escaped = False
@@ -504,7 +495,9 @@ def stable_words(hypotheses: list[str]) -> list[str]:
     word_sets = [hypothesis.split() for hypothesis in hypotheses[-3:]]
     stable: list[str] = []
     # Stop at the first word that any of the three latest hypotheses changes.
-    for values in zip(*word_sets):
+    common_word_count = min(len(words) for words in word_sets)
+    for word_index in range(common_word_count):
+        values = [words[word_index] for words in word_sets]
         if len(set(values)) != 1:
             break
         stable.append(values[0])
@@ -653,9 +646,9 @@ def format_dictation(text: str, replacements: dict[str, str] | None = None) -> s
     return dictation_projection(text.split(), replacements=replacements)["text"]
 
 
-def devin_response(document: Any) -> dict[str, str]:
+def select_devin_narration(document: Any) -> dict[str, str]:
     if not isinstance(document, dict) or not isinstance(document.get("steps"), list):
-        return {"response": "", "response_id": ""}
+        return {"markdown": "", "turn_id": ""}
     steps = document["steps"]
     last_user_index = -1
     # A Devin export may contain many turns; only the latest user turn is current.
@@ -664,7 +657,7 @@ def devin_response(document: Any) -> dict[str, str]:
             last_user_index = index
 
     messages: list[str] = []
-    response_id = ""
+    turn_id = ""
     # Preserve every visible agent message emitted after that user turn.
     for step in steps[last_user_index + 1 :]:
         if not isinstance(step, dict) or step.get("source") != "agent" or not isinstance(step.get("message"), str):
@@ -674,8 +667,8 @@ def devin_response(document: Any) -> dict[str, str]:
             continue
         messages.append(message)
         if isinstance(step.get("step_id"), str):
-            response_id = step["step_id"]
-    return {"response": "\n\n".join(messages), "response_id": response_id}
+            turn_id = step["step_id"]
+    return {"markdown": "\n\n".join(messages), "turn_id": turn_id}
 
 
 def chunk_speech(text: str, max_chars: int = 800) -> list[str]:
@@ -768,7 +761,7 @@ def voice_status_report() -> dict[str, Any]:
         {
             "prompt_refinement": preferences["prompt_refinement"],
             "read_along": preferences["read_along"],
-            "response_mode": preferences["response_mode"],
+            "narration_mode": preferences["narration_mode"],
         }
     )
     if preferences["prompt_refinement"] == "review":
@@ -964,10 +957,8 @@ def create_tk_dictation_overlay() -> dict[str, Any] | None:
         root.withdraw()
         root.overrideredirect(True)
         root.attributes("-topmost", True)
-        try:
+        with suppress(tkinter.TclError):
             root.attributes("-alpha", 0.94)
-        except tkinter.TclError:
-            pass
         width = min(760, max(320, root.winfo_screenwidth() - 96))
         height = 68
         x = max(0, (root.winfo_screenwidth() - width) // 2)
@@ -1028,7 +1019,7 @@ def update_dictation_overlay(overlay: dict[str, Any] | None) -> None:
                 NSFontAttributeName,
                 NSForegroundColorAttributeName,
             )
-            from Foundation import NSDate, NSMutableAttributedString, NSMakeRange
+            from Foundation import NSDate, NSMakeRange, NSMutableAttributedString
 
             panel = overlay["panel"]
             if indicator["visible"] and indicator_changed:
@@ -1207,16 +1198,16 @@ def installed_config() -> dict[str, Any]:
 
 def voice_preferences(config: dict[str, Any] | None = None) -> dict[str, Any]:
     values = installed_config() if config is None else config
-    response_mode = values.get("speechResponseMode", "auto")
-    if response_mode not in {"auto", "focused", "immediate", "off"}:
-        response_mode = "auto"
+    narration_mode = values.get("speechResponseMode", "auto")
+    if narration_mode not in {"auto", "focused", "immediate", "off"}:
+        narration_mode = "auto"
     refinement_mode = values.get("promptRefinementMode", "off")
     if refinement_mode not in {"off", "review"}:
         refinement_mode = "off"
     return {
         "prompt_refinement": refinement_mode,
         "read_along": values.get("speechReadAlong", True) is not False,
-        "response_mode": response_mode,
+        "narration_mode": narration_mode,
     }
 
 
@@ -1228,7 +1219,7 @@ def envelope_eligible(
     preferences: dict[str, Any] | None = None,
 ) -> bool:
     settings = voice_preferences() if preferences is None else preferences
-    mode = settings["response_mode"]
+    mode = settings["narration_mode"]
     if mode == "off":
         return False
     origin = envelope.get("origin")
@@ -1247,11 +1238,11 @@ def envelope_eligible(
     )
 
 
-def parse_dictation_replacements(raw: Any) -> dict[str, str]:
-    if not isinstance(raw, str):
+def parse_dictation_replacements(replacement_text: Any) -> dict[str, str]:
+    if not isinstance(replacement_text, str):
         return {}
     replacements: dict[str, str] = {}
-    for entry in raw.split(";"):
+    for entry in replacement_text.split(";"):
         heard, separator, written = entry.partition("=")
         heard = heard.strip()
         written = written.strip()
@@ -1279,8 +1270,8 @@ def voice_settings() -> tuple[str, float]:
 def macos_clipboard_text() -> str:
     if sys.platform != "darwin":
         raise RuntimeError("Clipboard prompt refinement currently requires macOS")
-    result = subprocess.run(["pbpaste"], check=True, capture_output=True, text=True, timeout=2)
-    return result.stdout
+    clipboard_read = subprocess.run(["pbpaste"], check=True, capture_output=True, text=True, timeout=2)
+    return clipboard_read.stdout
 
 
 def write_macos_clipboard(text: str) -> None:
@@ -1337,11 +1328,11 @@ def stt_runtime() -> Any:
 def prepare_voice() -> dict[str, str]:
     tts_runtime()
     stt_runtime()
-    result = {"dictation": "ready", "narration": "ready"}
+    readiness = {"dictation": "ready", "narration": "ready"}
     if voice_preferences()["prompt_refinement"] == "review":
         available, reason = refinement_availability()
-        result["prompt_refinement"] = "ready" if available else f"unavailable: {reason}"
-    return result
+        readiness["prompt_refinement"] = "ready" if available else f"unavailable: {reason}"
+    return readiness
 
 
 def begin_audio_state(state: str) -> int:
@@ -1465,7 +1456,7 @@ def speak_markdown(markdown: str, origin: Any = None, *, respect_focus: bool = F
         finish_audio_state(generation, "narrating")
 
 
-def enqueue_response(markdown: str, source: str, response_id: str = "", origin: Any = None) -> Path:
+def enqueue_narration(markdown: str, source: str, agent_reply_id: str = "", origin: Any = None) -> Path:
     inbox = voice_state_home() / "inbox"
     inbox.mkdir(parents=True, exist_ok=True)
     path = inbox / f"{time.time_ns()}-{uuid.uuid4().hex}.json"
@@ -1475,7 +1466,7 @@ def enqueue_response(markdown: str, source: str, response_id: str = "", origin: 
             "markdown": markdown,
             "origin": origin if isinstance(origin, dict) else {"kind": "terminal"},
             "received_at": time.time(),
-            "response_id": response_id,
+            "agent_reply_id": agent_reply_id,
             "source": source,
         },
     )
@@ -1483,10 +1474,12 @@ def enqueue_response(markdown: str, source: str, response_id: str = "", origin: 
 
 
 def envelope_identity(envelope: dict[str, Any]) -> str:
-    response_id = envelope.get("response_id")
-    token = response_id.strip() if isinstance(response_id, str) and response_id.strip() else hashlib.sha256(
-        str(envelope.get("markdown", "")).encode("utf-8")
-    ).hexdigest()
+    agent_reply_id = envelope.get("agent_reply_id")
+    token = (
+        agent_reply_id.strip()
+        if isinstance(agent_reply_id, str) and agent_reply_id.strip()
+        else hashlib.sha256(str(envelope.get("markdown", "")).encode("utf-8")).hexdigest()
+    )
     surface = envelope_surface_identity(envelope) or "terminal"
     return f"{envelope.get('source', 'unknown')}:{surface}:{token}"
 
@@ -1500,7 +1493,7 @@ def envelope_surface_identity(envelope: dict[str, Any]) -> str:
     return f"{workspace}:{surface}" if isinstance(workspace, str) and isinstance(surface, str) else ""
 
 
-def seen_response_keys() -> dict[str, float]:
+def seen_narration_keys() -> dict[str, float]:
     document = read_json_file(voice_state_home() / "seen.json")
     if not isinstance(document, dict):
         return {}
@@ -1508,12 +1501,12 @@ def seen_response_keys() -> dict[str, float]:
     return {
         key: float(value)
         for key, value in document.items()
-        if isinstance(key, str) and isinstance(value, (int, float)) and now - float(value) <= SEEN_RESPONSE_TTL_SECONDS
+        if isinstance(key, str) and isinstance(value, (int, float)) and now - float(value) <= SEEN_NARRATION_TTL_SECONDS
     }
 
 
 def remember_envelope(envelope: dict[str, Any]) -> None:
-    seen = seen_response_keys()
+    seen = seen_narration_keys()
     seen[envelope_identity(envelope)] = time.time()
     atomic_json(voice_state_home() / "seen.json", seen)
 
@@ -1532,13 +1525,13 @@ def next_envelope() -> tuple[Path, dict[str, Any]] | None:
             path.unlink(missing_ok=True)
             continue
         received_at = value.get("received_at")
-        if isinstance(received_at, (int, float)) and time.time() - float(received_at) > PENDING_RESPONSE_TTL_SECONDS:
+        if isinstance(received_at, (int, float)) and time.time() - float(received_at) > PENDING_NARRATION_TTL_SECONDS:
             path.unlink(missing_ok=True)
             continue
         pending.append((path, value))
 
     settings = voice_preferences()
-    if settings["response_mode"] == "off":
+    if settings["narration_mode"] == "off":
         for path, _ in pending:
             path.unlink(missing_ok=True)
         return None
@@ -1550,14 +1543,16 @@ def next_envelope() -> tuple[Path, dict[str, Any]] | None:
         if surface_key:
             newest_surface[surface_key] = path
 
-    seen = seen_response_keys()
+    seen = seen_narration_keys()
     focused_by_socket: dict[str, dict[str, Any] | None] = {}
     frontmost = frontmost_bundle_identifier() if newest_surface else ""
     for path, value in pending:
         identity = envelope_identity(value)
         origin = value.get("origin")
         surface_key = envelope_surface_identity(value)
-        superseded = newest_identity[identity] != path or (surface_key != "" and newest_surface.get(surface_key) != path)
+        superseded = newest_identity[identity] != path or (
+            surface_key != "" and newest_surface.get(surface_key) != path
+        )
         if superseded or identity in seen:
             path.unlink(missing_ok=True)
             continue
@@ -1645,9 +1640,9 @@ def update_dictation_transcript(text: str, *, completed: bool) -> None:
         _dictation["typed_words"] = []
 
 
-def collect_dictation_audio(in_data: Any, _frames: int, _time_info: Any, _status: Any) -> None:
+def collect_dictation_audio(microphone_samples: Any, _frames: int, _timing: Any, _status: Any) -> None:
     with _dictation_audio_lock:
-        _dictation["audio_chunks"].append(in_data.copy())
+        _dictation["audio_chunks"].append(microphone_samples.copy())
 
 
 def dictation_audio_snapshot() -> Any:
@@ -1726,10 +1721,8 @@ def start_dictation(request_generation: int) -> None:
             ).start()
     except Exception as error:
         if capture is not None:
-            try:
+            with suppress(Exception):
                 capture.close()
-            except Exception:
-                pass
         with _dictation_control_lock:
             if _dictation["request_generation"] != request_generation:
                 return
@@ -1979,8 +1972,8 @@ def run_daemon() -> int:
                 continue
             path, value = envelope
             try:
-                outcome = speak_markdown(value["markdown"], value.get("origin"), respect_focus=True)
-                if outcome != "stopped":
+                narration_state = speak_markdown(value["markdown"], value.get("origin"), respect_focus=True)
+                if narration_state != "stopped":
                     remember_envelope(value)
                     path.unlink(missing_ok=True)
             except Exception as error:
@@ -2022,12 +2015,12 @@ def start_worker(quiet: bool = False) -> dict[str, Any]:
     # Wait only for the PID handshake, never for models or audio hardware.
     while time.monotonic() < deadline and not worker_status()["running"] and process.poll() is None:
         time.sleep(0.05)
-    result = worker_status()
-    if not result["running"]:
+    worker_state = worker_status()
+    if not worker_state["running"]:
         raise RuntimeError("Voice worker did not start")
     if not quiet:
-        print(json.dumps(result))
-    return result
+        print(json.dumps(worker_state))
+    return worker_state
 
 
 def stop_worker() -> dict[str, Any]:
@@ -2041,9 +2034,9 @@ def stop_worker() -> dict[str, Any]:
         time.sleep(0.05)
     if process_running(pid):
         os.kill(pid, signal.SIGTERM)
-    result = {"dictation": "inactive", "hotkey": HOTKEY_LABEL, "running": False}
-    print(json.dumps(result))
-    return result
+    stopped_state = {"dictation": "inactive", "hotkey": HOTKEY_LABEL, "running": False}
+    print(json.dumps(stopped_state))
+    return stopped_state
 
 
 def read_json_file(path: Path) -> Any:
@@ -2055,24 +2048,24 @@ def read_json_file(path: Path) -> Any:
 
 def watch_devin(path: Path) -> int:
     start_worker(quiet=True)
-    current = devin_response(read_json_file(path))
-    seen_response_id = current["response_id"]
+    current = select_devin_narration(read_json_file(path))
+    seen_turn_id = current["turn_id"]
     last_change = 0
-    pending_response_id = ""
+    pending_turn_id = ""
     # Devin rewrites ATIF after turns; debounce one stable export before queueing it.
     while True:
         document = read_json_file(path)
-        selected = devin_response(document)
-        response_id = selected["response_id"]
-        if response_id and response_id != seen_response_id and response_id != pending_response_id:
-            pending_response_id = response_id
+        selected = select_devin_narration(document)
+        turn_id = selected["turn_id"]
+        if turn_id and turn_id != seen_turn_id and turn_id != pending_turn_id:
+            pending_turn_id = turn_id
             last_change = time.monotonic()
-        if pending_response_id and time.monotonic() - last_change >= 0.8:
-            confirmed = devin_response(read_json_file(path))
-            if confirmed["response_id"] == pending_response_id and confirmed["response"]:
-                enqueue_response(confirmed["response"], "devin", confirmed["response_id"])
-                seen_response_id = confirmed["response_id"]
-            pending_response_id = ""
+        if pending_turn_id and time.monotonic() - last_change >= 0.8:
+            confirmed = select_devin_narration(read_json_file(path))
+            if confirmed["turn_id"] == pending_turn_id and confirmed["markdown"]:
+                enqueue_narration(confirmed["markdown"], "devin", confirmed["turn_id"])
+                seen_turn_id = confirmed["turn_id"]
+            pending_turn_id = ""
         time.sleep(0.2)
 
 
@@ -2081,9 +2074,9 @@ def argument_parser() -> argparse.ArgumentParser:
     commands = parser.add_subparsers(dest="command", required=True)
     render = commands.add_parser("render", help="render Markdown as a speech document")
     render.add_argument("--text", required=True)
-    example = commands.add_parser("example", help="play one response through Supertonic")
-    example.add_argument("--text", required=True)
-    example.add_argument("--source", default="example")
+    speak = commands.add_parser("speak", help="play one complete narration through Supertonic")
+    speak.add_argument("--text", required=True)
+    speak.add_argument("--source", default="manual")
     refine = commands.add_parser("refine", help="refine one prompt with Apple's on-device model")
     refine.add_argument("--speak", action="store_true")
     refine.add_argument("--text", required=True)
@@ -2104,7 +2097,7 @@ def main() -> int:
     if args.command == "render":
         print(render_speech(args.text))
         return 0
-    if args.command == "example":
+    if args.command == "speak":
         speak_markdown(args.text)
         return 0
     if args.command == "refine":

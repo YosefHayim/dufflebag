@@ -11,7 +11,7 @@ import { onCLS, onFCP, onINP, onLCP, onTTFB } from "web-vitals/attribution";
 const ENDPOINT = "/rum"; // <-- your collector endpoint (or swap report() for gtag)
 
 function report(metric) {
-  const body = JSON.stringify({
+  const measurementJson = JSON.stringify({
     name: metric.name, // "LCP" | "INP" | "CLS" | "FCP" | "TTFB"
     value: metric.value,
     rating: metric.rating, // "good" | "needs-improvement" | "poor"
@@ -20,13 +20,13 @@ function report(metric) {
     navigationType: metric.navigationType,
     // The element/interaction/shift behind the score (attribution build).
     target:
-      metric.attribution?.element ?? metric.attribution?.interactionTarget ?? metric.attribution?.largestShiftTarget,
+      metric.attribution?.element || metric.attribution?.interactionTarget || metric.attribution?.largestShiftTarget,
     url: location.pathname,
   });
 
   // sendBeacon survives the page-unload that ends a visit; fetch is the fallback.
-  if (navigator.sendBeacon) navigator.sendBeacon(ENDPOINT, body);
-  else fetch(ENDPOINT, { body, method: "POST", keepalive: true });
+  if (navigator.sendBeacon) navigator.sendBeacon(ENDPOINT, measurementJson);
+  else fetch(ENDPOINT, { body: measurementJson, method: "POST", keepalive: true });
 }
 
 onLCP(report);

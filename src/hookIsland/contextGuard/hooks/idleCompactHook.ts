@@ -38,7 +38,7 @@ const findAgentPid = (executable: string): number | null => {
     }
     const match = /^(\d+)\s+(.+)$/.exec(output);
     if (!match) return null;
-    if (commandContains(match[2] ?? "", executable)) return pid;
+    if (commandContains(match.at(2) || "", executable)) return pid;
     pid = Number(match[1]);
   }
   return null;
@@ -63,9 +63,13 @@ const providerMatches = (event: IdleCompactEvent): boolean => {
 };
 
 const startSession = (event: IdleCompactEvent): void => {
-  const idleSeconds = resolveAutoCompactSeconds(event.agentId, process.env, readConfig().idleAutoCompact);
+  const idleSeconds = resolveAutoCompactSeconds({
+    agentId: event.agentId,
+    env: process.env,
+    persistentValue: readConfig().idleAutoCompact,
+  });
   if (idleSeconds === null) return;
-  const executable = process.env.DUFFLEBAG_AGENT_COMMAND ?? commandForAgent(event.agentId);
+  const executable = process.env.DUFFLEBAG_AGENT_COMMAND || commandForAgent(event.agentId);
   const agentPid = findAgentPid(executable);
   if (agentPid === null) return;
   const terminalDevice = terminalDeviceForPid(agentPid);
@@ -81,7 +85,7 @@ const startSession = (event: IdleCompactEvent): void => {
     sessionId: event.sessionId,
     agentPid,
     terminalId: terminal.terminalId,
-    compactCommand: process.env.DUFFLEBAG_COMPACT_COMMAND ?? "/compact",
+    compactCommand: process.env.DUFFLEBAG_COMPACT_COMMAND || "/compact",
     idleSeconds,
     phase: "working",
     phaseStartedAtMs: event.occurredAtMs,
@@ -101,7 +105,7 @@ const main = (): void => {
   } catch {
     return;
   }
-  const event = normalizeIdleCompactEvent(input, process.env, Date.now());
+  const event = normalizeIdleCompactEvent({ input, environment: process.env, occurredAtMs: Date.now() });
   if (!event || !providerMatches(event)) return;
   if (event.event === "session-started") {
     startSession(event);

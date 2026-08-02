@@ -6,8 +6,13 @@ import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
-const voiceScript = path.join(path.dirname(fileURLToPath(import.meta.url)), "voice.py");
-const pythonEnvironment = { ...process.env, PYTHONDONTWRITEBYTECODE: "1" };
+const voiceDirectory = path.dirname(fileURLToPath(import.meta.url));
+const voiceScript = path.join(voiceDirectory, "voice.py");
+const promptRefinementScript = path.join(voiceDirectory, "prompt_refinement.py");
+const inheritedPythonPath = process.env.PYTHONPATH;
+const pythonModulePath =
+  inheritedPythonPath === undefined ? voiceDirectory : [voiceDirectory, inheritedPythonPath].join(path.delimiter);
+const pythonEnvironment = { ...process.env, PYTHONDONTWRITEBYTECODE: "1", PYTHONPATH: pythonModulePath };
 const pythonExecutable = process.platform === "win32" ? "python" : "python3";
 
 const runVoice = (args: ReadonlyArray<string>): string =>
@@ -17,7 +22,11 @@ const runVoice = (args: ReadonlyArray<string>): string =>
     timeout: 30_000,
   }).trim();
 
-const callVoiceFunction = (functionName: string, input: unknown): unknown => {
+const callPythonFunction = (request: {
+  readonly scriptPath: string;
+  readonly functionName: string;
+  readonly input: unknown;
+}): unknown => {
   const source = [
     "import importlib.util",
     "import json",
@@ -27,18 +36,28 @@ const callVoiceFunction = (functionName: string, input: unknown): unknown => {
     "spec = importlib.util.spec_from_file_location('dufflebag_voice', script_path)",
     "module = importlib.util.module_from_spec(spec)",
     "spec.loader.exec_module(module)",
-    "payload = json.loads(sys.argv[3])",
-    "print(json.dumps(getattr(module, sys.argv[2])(**payload)))",
+    "call_args = json.loads(sys.argv[3])",
+    "print(json.dumps(getattr(module, sys.argv[2])(**call_args)))",
   ].join("\n");
 
-  const output = execFileSync(pythonExecutable, ["-c", source, voiceScript, functionName, JSON.stringify(input)], {
-    encoding: "utf8",
-    env: pythonEnvironment,
-    timeout: 10_000,
-  });
+  const output = execFileSync(
+    pythonExecutable,
+    ["-c", source, request.scriptPath, request.functionName, JSON.stringify(request.input)],
+    {
+      encoding: "utf8",
+      env: pythonEnvironment,
+      timeout: 10_000,
+    },
+  );
 
   return JSON.parse(output);
 };
+
+const callVoiceFunction = (functionName: string, input: unknown): unknown =>
+  callPythonFunction({ scriptPath: voiceScript, functionName, input });
+
+const callPromptRefinementFunction = (functionName: string, input: unknown): unknown =>
+  callPythonFunction({ scriptPath: promptRefinementScript, functionName, input });
 
 const probeStaleDictationStart = (): unknown => {
   const source = [
@@ -105,7 +124,7 @@ const probeTranscriptFormatting = (): unknown => {
   return JSON.parse(output);
 };
 
-const probeDictationStop = (stale: boolean): unknown => {
+const probeDictationStop = (request: { readonly stale: boolean }): unknown => {
   const source = [
     "import importlib.util",
     "import json",
@@ -131,13 +150,30 @@ const probeDictationStop = (stale: boolean): unknown => {
     "print(json.dumps({'active': module._dictation['active'], 'calls': calls, 'elapsed': elapsed}))",
   ].join("\n");
 
-  const output = execFileSync(pythonExecutable, ["-c", source, voiceScript, stale ? "stale" : "current"], {
+  const output = execFileSync(pythonExecutable, ["-c", source, voiceScript, request.stale ? "stale" : "current"], {
     encoding: "utf8",
     env: pythonEnvironment,
     timeout: 10_000,
   });
 
   return JSON.parse(output);
+};
+
+const stringChunksFrom = (candidate: unknown): ReadonlyArray<string> | null => {
+  if (!Array.isArray(candidate)) return null;
+  if (!candidate.every((chunk) => typeof chunk === "string")) return null;
+  return candidate;
+};
+
+type DictationExecution = { readonly active: boolean; readonly calls: ReadonlyArray<string>; readonly elapsed: number };
+
+const dictationExecutionFrom = (candidate: unknown): DictationExecution | null => {
+  if (typeof candidate !== "object" || candidate === null) return null;
+  const active = Object.getOwnPropertyDescriptor(candidate, "active")?.value;
+  const calls = stringChunksFrom(Object.getOwnPropertyDescriptor(candidate, "calls")?.value);
+  const elapsed = Object.getOwnPropertyDescriptor(candidate, "elapsed")?.value;
+  if (typeof active !== "boolean" || calls === null || typeof elapsed !== "number") return null;
+  return { active, calls, elapsed };
 };
 
 const probeSttRuntime = (): unknown => {
@@ -334,8 +370,8 @@ const probeNarrationCancellation = (): unknown => {
     "module.tts_runtime = lambda: (Engine(), object())",
     "def play(_samples, _rate): calls.append('play'); module.cancel_narration()",
     "sys.modules['sounddevice'] = types.SimpleNamespace(play=play, stop=lambda: calls.append('stop'), wait=lambda: calls.append('wait'))",
-    "outcome = module.speak_markdown('ignored')",
-    "print(json.dumps({'calls': calls, 'outcome': outcome}))",
+    "application_status = module.speak_markdown('ignored')",
+    "print(json.dumps({'calls': calls, 'applicationStatus': application_status}))",
   ].join("\n");
 
   const output = execFileSync(pythonExecutable, ["-c", source, voiceScript], {
@@ -397,15 +433,15 @@ const probeFocusedQueue = (): unknown => {
     "spec.loader.exec_module(module)",
     "state_home = pathlib.Path(tempfile.mkdtemp(prefix='dufflebag-focused-queue-'))",
     "module.voice_state_home = lambda: state_home",
-    "module.voice_preferences = lambda *_args, **_kwargs: {'prompt_refinement': 'off', 'read_along': True, 'response_mode': 'auto'}",
+    "module.voice_preferences = lambda *_args, **_kwargs: {'prompt_refinement': 'off', 'read_along': True, 'narration_mode': 'auto'}",
     "module.frontmost_bundle_identifier = lambda: module.CMUX_BUNDLE_IDENTIFIER",
     "focus = {'surface_id': 'surface-b', 'workspace_id': 'workspace'}",
     "module.cached_cmux_identify = lambda _path: {'focused': dict(focus)}",
     "origin_a = {'kind': 'cmux', 'socket_path': '/tmp/cmux.sock', 'surface_id': 'surface-a', 'workspace_id': 'workspace'}",
     "origin_b = {'kind': 'cmux', 'socket_path': '/tmp/cmux.sock', 'surface_id': 'surface-b', 'workspace_id': 'workspace'}",
-    "first_a = module.enqueue_response('old a', 'codex', 'a1', origin_a)",
-    "second_a = module.enqueue_response('new a', 'codex', 'a2', origin_a)",
-    "module.enqueue_response('new b', 'codex', 'b1', origin_b)",
+    "first_a = module.enqueue_narration('old a', 'codex', 'a1', origin_a)",
+    "second_a = module.enqueue_narration('new a', 'codex', 'a2', origin_a)",
+    "module.enqueue_narration('new b', 'codex', 'b1', origin_b)",
     "selected_b = module.next_envelope()",
     "module.remember_envelope(selected_b[1])",
     "selected_b[0].unlink()",
@@ -500,11 +536,12 @@ describe("voice speech document", () => {
   it("chunks giant speech documents without dropping characters", () => {
     const text = "Alpha beta gamma. Delta epsilon zeta. Eta theta iota. Kappa lambda mu.";
 
-    const chunks = callVoiceFunction("chunk_speech", { text, max_chars: 24 });
+    const chunks = stringChunksFrom(callVoiceFunction("chunk_speech", { text, max_chars: 24 }));
 
-    expect(chunks).toBeInstanceOf(Array);
-    expect((chunks as Array<string>).join("")).toBe(text);
-    expect((chunks as Array<string>).every((chunk) => chunk.length <= 24)).toBe(true);
+    expect(chunks).not.toBeNull();
+    if (chunks === null) throw new Error("Expected speech chunks.");
+    expect(chunks.join("")).toBe(text);
+    expect(chunks.every((chunk) => chunk.length <= 24)).toBe(true);
   });
 
   it("maps playback progress to one active read-along word", () => {
@@ -520,7 +557,7 @@ describe("voice speech document", () => {
   it("cancels the complete narration generation before another chunk can restart", () => {
     expect(probeNarrationCancellation()).toEqual({
       calls: ["synth:first", "play", "stop", "stop"],
-      outcome: "cancelled",
+      applicationStatus: "cancelled",
     });
   });
 
@@ -543,7 +580,7 @@ describe("focused response queue", () => {
     const envelope = {
       origin: { kind: "cmux", socket_path: "/tmp/cmux.sock", surface_id: "surface", workspace_id: "workspace" },
     };
-    const preferences = { prompt_refinement: "off", read_along: true, response_mode: "auto" };
+    const preferences = { prompt_refinement: "off", read_along: true, narration_mode: "auto" };
     const focusedContext = { focused: { surface_id: "surface", workspace_id: "workspace" } };
 
     expect(
@@ -569,10 +606,12 @@ describe("prompt refinement safeguards", () => {
   it("preserves code, paths, URLs, and quoted literals", () => {
     const original = 'Please run `pnpm verify` for /tmp/app and keep "exact value" from https://example.com/docs';
 
-    expect(callVoiceFunction("validate_refined_prompt", { original, refined: `Precisely ${original}` })).toBe(
-      `Precisely ${original}`,
-    );
-    expect(() => callVoiceFunction("validate_refined_prompt", { original, refined: "Please verify it." })).toThrow();
+    expect(
+      callPromptRefinementFunction("validate_refined_prompt", { original, refined: `Precisely ${original}` }),
+    ).toBe(`Precisely ${original}`);
+    expect(() =>
+      callPromptRefinementFunction("validate_refined_prompt", { original, refined: "Please verify it." }),
+    ).toThrow();
   });
 });
 
@@ -608,7 +647,7 @@ describe("human dictation formatting", () => {
   it("parses a compact personal dictionary and ignores malformed entries", () => {
     expect(
       callVoiceFunction("parse_dictation_replacements", {
-        raw: " Joseph = Yosef ; type script = TypeScript ; broken ; =bad ; empty= ",
+        replacement_text: " Joseph = Yosef ; type script = TypeScript ; broken ; =bad ; empty= ",
       }),
     ).toEqual({ Joseph: "Yosef", "type script": "TypeScript" });
   });
@@ -768,24 +807,26 @@ describe("hold-Control push-to-talk", () => {
   });
 
   it("captures a short release tail before finalizing the transcript", () => {
-    const result = probeDictationStop(false) as { active: boolean; calls: Array<string>; elapsed: number };
+    const voiceExecution = dictationExecutionFrom(probeDictationStop({ stale: false }));
 
-    expect(result.elapsed).toBeGreaterThanOrEqual(0.28);
-    expect(result).toMatchObject({ active: false, calls: ["stopped", "closed", "transcribed", "inactive"] });
+    if (voiceExecution === null) throw new Error("Expected a decoded dictation execution.");
+    expect(voiceExecution.elapsed).toBeGreaterThanOrEqual(0.28);
+    expect(voiceExecution).toMatchObject({ active: false, calls: ["stopped", "closed", "transcribed", "inactive"] });
   });
 
   it("cancels an old release when Control is held again", () => {
-    const result = probeDictationStop(true) as { active: boolean; calls: Array<string>; elapsed: number };
+    const voiceExecution = dictationExecutionFrom(probeDictationStop({ stale: true }));
 
-    expect(result.elapsed).toBeLessThan(0.1);
-    expect(result).toMatchObject({ active: true, calls: [] });
+    if (voiceExecution === null) throw new Error("Expected a decoded dictation execution.");
+    expect(voiceExecution.elapsed).toBeLessThan(0.1);
+    expect(voiceExecution).toMatchObject({ active: true, calls: [] });
   });
 });
 
 describe("Devin ATIF response selection", () => {
   it("joins only agent messages after the latest user step", () => {
     expect(
-      callVoiceFunction("devin_response", {
+      callVoiceFunction("select_devin_narration", {
         document: {
           steps: [
             { step_id: "old-user", source: "user", message: "Earlier request" },
@@ -796,15 +837,15 @@ describe("Devin ATIF response selection", () => {
           ],
         },
       }),
-    ).toEqual({ response: "First part\n\nSecond part", response_id: "new-agent-2" });
+    ).toEqual({ markdown: "First part\n\nSecond part", turn_id: "new-agent-2" });
   });
 });
 
 describe("voice worker lifecycle", () => {
-  it("exposes the local worker, example, and Devin commands", () => {
+  it("exposes the local worker, speak, and Devin commands", () => {
     const help = runVoice(["--help"]);
 
-    expect(help).toContain("example");
+    expect(help).toContain("speak");
     expect(help).toContain("refine");
     expect(help).toContain("prepare");
     expect(help).toContain("start");
@@ -826,7 +867,7 @@ describe("voice worker lifecycle", () => {
       hotkey: "hold-control",
       prompt_refinement: "off",
       read_along: true,
-      response_mode: "auto",
+      narration_mode: "auto",
       running: false,
     });
   });

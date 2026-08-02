@@ -1,6 +1,7 @@
 ---
 name: rtl-ui-audit
 description: Use when the user asks to audit, fix, or verify Hebrew, Arabic, Persian, Urdu, or other right-to-left UI behavior, including layout mirroring, mixed-direction content, icons, forms, responsive screens, and accessibility.
+type: flow
 ---
 
 # RTL UI Audit

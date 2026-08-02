@@ -36,11 +36,13 @@ import {
 /** Inputs for {@link dedupCheck}, mapped 1:1 from the CLI flags. */
 export type DedupCheckOptions = {
   /** Repo path to scan; defaults to cwd. */
-  readonly path?: string;
+  readonly workspace?: string;
   /** Restrict findings to git-staged files. */
   readonly staged?: boolean;
   /** Restrict findings to files changed since this git ref (e.g. `main`). */
   readonly since?: string;
+  /** Presentation selected by the application adapter. */
+  readonly format?: "text" | "json";
 };
 
 /** Git-changed source files (staged or since a ref), as a repo-relative POSIX set, or null on git failure. */
@@ -58,28 +60,31 @@ const changedFiles = (repoRoot: string, opts: DedupCheckOptions): Set<string> | 
   }
 };
 
+const skipDirectoryTextFrom = (candidate: unknown): string | null => {
+  if (typeof candidate !== "object" || candidate === null) return null;
+  const skipDirectoryText = Object.getOwnPropertyDescriptor(candidate, "dedupSkipDirectories")?.value;
+  return typeof skipDirectoryText === "string" ? skipDirectoryText : null;
+};
+
+const readManagedSkipDirectories = (managedPath: string): ReadonlyArray<string> | null => {
+  if (!existsSync(managedPath)) return null;
+  try {
+    const candidate: unknown = JSON.parse(readFileSync(managedPath, "utf8"));
+    const skipDirectoryText = skipDirectoryTextFrom(candidate);
+    return skipDirectoryText === null ? null : parseSkipList(skipDirectoryText);
+  } catch {
+    return null;
+  }
+};
+
 /**
  * Prefer the project's managed config.json when present (install SSOT); otherwise
  * fall back to process.env / runtime defaults — same reader the live hooks use.
  */
 const resolveSkipDirectories = (repoRoot: string): ReadonlyArray<string> => {
   const managedPath = path.join(repoRoot, ".claude", "dufflebag", "config.json");
-  if (existsSync(managedPath)) {
-    try {
-      const parsed: unknown = JSON.parse(readFileSync(managedPath, "utf8"));
-      if (
-        typeof parsed === "object" &&
-        parsed !== null &&
-        "dedupSkipDirectories" in parsed &&
-        typeof parsed.dedupSkipDirectories === "string"
-      ) {
-        return parseSkipList(parsed.dedupSkipDirectories);
-      }
-    } catch {
-      // Fall through to env defaults when the file is unreadable or malformed.
-    }
-  }
-
+  const managedSkipDirectories = readManagedSkipDirectories(managedPath);
+  if (managedSkipDirectories !== null) return managedSkipDirectories;
   return parseSkipList(readConfig().dedupSkipDirectories);
 };
 
@@ -94,34 +99,74 @@ const renderCluster = (cluster: DupCluster): string => {
  * Scan a repo for duplicate function bodies / type shapes and report them,
  * setting a non-zero exit code when any are found so CI and pre-commit fail.
  */
-export const dedupCheck = (opts: DedupCheckOptions): void => {
-  const repoRoot = path.resolve(opts.path ?? process.cwd());
-  process.stdout.write(`dufflebag · dedup check\n  → repo: ${repoRoot}\n`);
+type ChangedFileRestriction = {
+  readonly restrict?: ReadonlySet<string>;
+  readonly warning?: string;
+};
+
+const changedFileRestriction = (request: {
+  readonly repoRoot: string;
+  readonly options: DedupCheckOptions;
+}): ChangedFileRestriction => {
+  if (!request.options.staged && !request.options.since) return {};
+  const changedSourcePaths = changedFiles(request.repoRoot, request.options);
+  if (changedSourcePaths === null) {
+    const gitSelection = request.options.staged ? "staged files" : `diff since ${request.options.since}`;
+    return { warning: `Couldn't read git ${gitSelection}; scanned the whole repo.` };
+  }
+  return {
+    restrict: new Set(
+      [...changedSourcePaths].map((file) => relFromAbs(request.repoRoot, path.join(request.repoRoot, file))),
+    ),
+  };
+};
+
+const restrictionLabel = (options: DedupCheckOptions): string => {
+  if (options.staged) return "staged";
+  if (options.since !== undefined) return `since:${options.since}`;
+  return "all";
+};
+
+export const dedupCheck = (options: DedupCheckOptions): void => {
+  const repoRoot = path.resolve(options.workspace === undefined ? process.cwd() : options.workspace);
+  const format = options.format === undefined ? "text" : options.format;
+  if (format === "text") process.stdout.write(`dufflebag · dedup\n  → workspace: ${repoRoot}\n`);
 
   const ts = loadTypeScript(repoRoot);
   if (!ts) {
-    process.stdout.write(
-      "  ! No `typescript` resolvable in this repo — nothing to check. (dedup-guard needs the repo's own TypeScript.)\n  Skipped.\n",
-    );
+    if (format === "json") {
+      process.stdout.write(
+        `${JSON.stringify({ _tag: "skipped", workspace: repoRoot, reason: "typescript-unavailable" })}\n`,
+      );
+    } else {
+      process.stdout.write(
+        "  ! No `typescript` resolvable in this repo — nothing to check. (dedup-guard needs the repo's own TypeScript.)\n  Skipped.\n",
+      );
+    }
     return;
   }
 
   const skipDirs = [...new Set([...resolveSkipDirectories(repoRoot)])];
 
-  let restrict: Set<string> | undefined;
-  if (opts.staged || opts.since) {
-    const changed = changedFiles(repoRoot, opts);
-    if (!changed) {
-      process.stdout.write(
-        `  ! Couldn't read git ${opts.staged ? "staged files" : `diff since ${opts.since}`} — scanning the whole repo instead.\n`,
-      );
-    } else {
-      restrict = new Set([...changed].map((file) => relFromAbs(repoRoot, path.join(repoRoot, file))));
-    }
-  }
+  const { restrict, warning } = changedFileRestriction({ repoRoot, options });
+  if (format === "text" && warning !== undefined) process.stdout.write(`  ! ${warning}\n`);
 
   const index = buildIndex({ repoRoot, skipDirs, ts });
   const clusters = scanForDuplicates(index, restrict);
+
+  if (format === "json") {
+    process.stdout.write(
+      `${JSON.stringify({
+        _tag: clusters.length === 0 ? "clean" : "duplicates",
+        workspace: repoRoot,
+        restriction: restrictionLabel(options),
+        gitWarning: warning,
+        duplicateGroups: clusters,
+      })}\n`,
+    );
+    if (clusters.length > 0) process.exitCode = 1;
+    return;
+  }
 
   if (clusters.length === 0) {
     process.stdout.write(`  ✓ No duplicate functions or types found${restrict ? " in the changed files" : ""}.\n`);

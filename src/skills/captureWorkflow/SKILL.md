@@ -1,6 +1,7 @@
 ---
 name: capture-workflow
 description: Use when the user says to reuse what we just did, make a completed workflow repeatable, save the process for next time, automate the successful steps, or turn recent work into a skill, script, template, test, or runbook.
+type: flow
 ---
 
 # Capture Workflow

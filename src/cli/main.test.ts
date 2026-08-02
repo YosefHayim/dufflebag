@@ -1,4 +1,4 @@
-import { execFile } from "node:child_process";
+import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -14,26 +14,26 @@ import { isBareArgv, VERSION } from "./main.js";
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const CLI_ENTRY = path.join(REPO_ROOT, "src/cli/main.ts");
 const CLI_TEST_TIMEOUT = 75_000;
-const runCli = (args: ReadonlyArray<string>) =>
-  new Promise<string>((resolve, reject) => {
-    execFile(
-      process.execPath,
-      ["--import", "tsx", CLI_ENTRY, ...args],
-      {
-        cwd: REPO_ROOT,
-        encoding: "utf8",
-        timeout: 60_000,
-        env: { ...process.env, FORCE_COLOR: "0" },
-      },
-      (error, stdout) => {
-        if (error !== null) {
-          reject(error);
-          return;
-        }
-        resolve(stdout);
-      },
-    );
+
+type CliExecution = {
+  readonly stdout: string;
+  readonly stderr: string;
+  readonly exitCode: number;
+};
+
+const runCli = (args: ReadonlyArray<string>): CliExecution => {
+  const invocation = spawnSync(process.execPath, ["--import", "tsx", CLI_ENTRY, ...args], {
+    cwd: REPO_ROOT,
+    encoding: "utf8",
+    timeout: 60_000,
+    env: { ...process.env, FORCE_COLOR: "0" },
   });
+  return {
+    stdout: invocation.stdout,
+    stderr: invocation.stderr,
+    exitCode: invocation.status === null ? 1 : invocation.status,
+  };
+};
 
 describe("isBareArgv", () => {
   it("detects bare invocations that should route to the menu or help", () => {
@@ -47,22 +47,31 @@ describe("CLI help", () => {
   it(
     "prints help for --help without hanging",
     async () => {
-      const output = await runCli(["--help"]);
+      const execution = await runCli(["--help"]);
 
-      expect(output.toLowerCase()).toContain("dufflebag");
-      expect(output.toLowerCase()).toMatch(/install|usage|commands/);
-      expect(output.toLowerCase()).toContain("voice");
+      expect(execution.exitCode).toBe(0);
+      expect(execution.stdout.toLowerCase()).toContain("dufflebag");
+      expect(execution.stdout.toLowerCase()).toMatch(/install|usage|commands/);
+      expect(execution.stdout).toContain("catalog");
+      expect(execution.stdout).toContain("workflow scaffold");
+      expect(execution.stdout).toContain("voice speak");
+      expect(execution.stdout).not.toContain("voice example");
+      expect(execution.stdout).not.toContain("--wizard");
+      expect(execution.stdout).not.toContain("--log-level");
+      expect(execution.stdout).not.toContain("--completions");
     },
     CLI_TEST_TIMEOUT,
   );
 
   it(
-    "documents the exact voice-on example option",
+    "documents the command-first voice surface without the retired example option",
     async () => {
-      const output = await runCli(["voice", "on", "--help"]);
+      const execution = await runCli(["voice", "--help"]);
 
-      expect(output).toContain("--example");
-      expect(output.toLowerCase()).toContain("devin");
+      expect(execution.exitCode).toBe(0);
+      expect(execution.stdout).toContain("speak");
+      expect(execution.stdout).toContain("--source claude-code | codex | grok | devin | manual");
+      expect(execution.stdout).not.toContain("--example");
     },
     CLI_TEST_TIMEOUT,
   );
@@ -70,9 +79,26 @@ describe("CLI help", () => {
   it(
     "prints version",
     async () => {
-      const output = await runCli(["--version"]);
+      const execution = await runCli(["-V"]);
 
-      expect(output).toContain(VERSION);
+      expect(execution.exitCode).toBe(0);
+      expect(execution.stdout).toContain(VERSION);
+    },
+    CLI_TEST_TIMEOUT,
+  );
+
+  it(
+    "documents positional feature IDs and global scope as the default",
+    async () => {
+      const execution = await runCli(["install", "--help"]);
+
+      expect(execution.exitCode).toBe(0);
+      expect(execution.stdout).toContain("<feature-id>...");
+      expect(execution.stdout).toContain("--scope global | project");
+      expect(execution.stdout).toContain("global home installation root (default)");
+      expect(execution.stdout).not.toContain("--features");
+      expect(execution.stdout).not.toContain("--global");
+      expect(execution.stdout).not.toContain("--project");
     },
     CLI_TEST_TIMEOUT,
   );
@@ -82,9 +108,33 @@ describe("non-TTY bare invocation", () => {
   it(
     "exits without hanging when stdin is not a TTY",
     async () => {
-      const output = await runCli([]);
+      const execution = await runCli([]);
 
-      expect(output.toLowerCase()).toMatch(/dufflebag|usage|help|commands/);
+      expect(execution.exitCode).toBe(0);
+      expect(execution.stdout.toLowerCase()).toMatch(/dufflebag|usage|help|commands/);
+    },
+    CLI_TEST_TIMEOUT,
+  );
+});
+
+describe("CLI exit codes", () => {
+  it(
+    "uses exit 2 when a non-interactive destructive command lacks --yes",
+    async () => {
+      const execution = await runCli(["uninstall"]);
+
+      expect(execution.exitCode).toBe(2);
+      expect(execution.stdout).toContain("Non-interactive uninstall requires --yes.");
+    },
+    CLI_TEST_TIMEOUT,
+  );
+
+  it(
+    "uses exit 2 for an invalid managed setting value",
+    async () => {
+      const execution = await runCli(["config", "set", "speech-read-along", "sometimes"]);
+
+      expect(execution.exitCode).toBe(2);
     },
     CLI_TEST_TIMEOUT,
   );

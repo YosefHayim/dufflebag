@@ -156,7 +156,7 @@ export const platformRequirementSchema = Schema.Struct({
   description: "Catalog-correlated host requirement surfaced without hidden environment probing.",
 });
 
-const installResultFieldsSchema = {
+const installSummaryFieldsSchema = {
   scope: Schema.Literal("global", "project").annotations({
     description: "Scope reconciled by this capability call.",
   }),
@@ -172,14 +172,14 @@ const installResultFieldsSchema = {
   interaction: interactionSchema,
 };
 
-export const installResultSchema = Schema.Union(
-  Schema.TaggedStruct("installed", installResultFieldsSchema),
-  Schema.TaggedStruct("unchanged", installResultFieldsSchema),
+export const installSummarySchema = Schema.Union(
+  Schema.TaggedStruct("installed", installSummaryFieldsSchema),
+  Schema.TaggedStruct("unchanged", installSummaryFieldsSchema),
 ).annotations({
   description: "Applied or already-current installation result.",
 });
 
-export type InstallResult = Schema.Schema.Type<typeof installResultSchema>;
+export type InstallSummary = Schema.Schema.Type<typeof installSummarySchema>;
 
 export class InstallError extends Schema.TaggedError<InstallError>()("InstallError", {
   issue: Schema.NonEmptyString.annotations({

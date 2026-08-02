@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-import { Either, ParseResult, Schema } from "effect";
+import { Either, Schema, ParseResult as SchemaParseIssue } from "effect";
 
 import { type WriteOperation, writeOperationSchema } from "../install/artifactPlan.js";
 import {
@@ -45,7 +45,8 @@ export class ConfigurePlanError extends Schema.TaggedError<ConfigurePlanError>()
   }
 }
 
-const formatParseError = (error: ParseResult.ParseError): string => ParseResult.TreeFormatter.formatErrorSync(error);
+const formatParseError = (error: SchemaParseIssue.ParseError): string =>
+  SchemaParseIssue.TreeFormatter.formatErrorSync(error);
 
 const formatUnknownError = (error: unknown): string => (error instanceof Error ? error.message : String(error));
 
@@ -63,7 +64,7 @@ const renderJsonValueHash = (value: unknown): string =>
 const legacyEnvironmentEntries = (environment: Readonly<Record<string, unknown>>) =>
   Object.entries(environment)
     .filter(([key]) => key.toLowerCase().startsWith("dufflebag"))
-    .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0));
+    .sort(([left], [right]) => left.localeCompare(right));
 
 export const hasLegacySettingsCandidate = (environment: Readonly<Record<string, unknown>>): boolean =>
   legacyEnvironmentEntries(environment).length > 0;

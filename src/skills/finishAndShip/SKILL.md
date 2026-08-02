@@ -1,6 +1,7 @@
 ---
 name: finish-and-ship
 description: Use when implementation is complete and the user asks to finish, ship, wrap up, commit and push, prepare a branch for handoff, or ensure nothing remains unfinished.
+type: flow
 ---
 
 # Finish and Ship

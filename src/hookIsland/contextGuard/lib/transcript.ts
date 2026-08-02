@@ -1,26 +1,15 @@
-/**
- * Transcript reading utilities shared by the guard, the control plane, and the
- * daemon. Self-contained (Node built-ins only) so it ships in the hook payload.
- *
- * Claude Code never hands hooks a token count, so occupancy is derived the same
- * way the original Python did: read the tail of the session JSONL, find the most
- * recent main-thread (non-sidechain) assistant line, and sum its usage —
- * `input_tokens + cache_creation_input_tokens + cache_read_input_tokens` —
- * because the cache fields dominate once prompt caching kicks in.
- */
+/** Dependency-free transcript discovery and token accounting for context-guard processes. */
 
 import { closeSync, existsSync, openSync, readdirSync, readFileSync, readSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import path from "node:path";
 
-const HOME = homedir();
-const PROJECTS_DIR = path.join(HOME, ".claude", "projects");
+const PROJECTS_DIRECTORY = path.join(homedir(), ".claude", "projects");
+const TRANSCRIPT_TAIL_BYTES = 256 * 1024;
+const DEFAULT_CONTEXT_WINDOW = 1_000_000;
+const HAIKU_CONTEXT_WINDOW = 200_000;
 
-/** Only ever read the last 256 KiB of a transcript. */
-const TAIL_BYTES = 256 * 1024;
-
-/** Model id substring → context window (tokens), longest key wins. */
-const MODEL_WINDOWS: Record<string, number> = {
+const MODEL_CONTEXT_WINDOWS: Readonly<Record<string, number>> = {
   "opus-4-8": 1_000_000,
   "opus-4-7": 1_000_000,
   "opus-4-6": 1_000_000,
@@ -28,162 +17,245 @@ const MODEL_WINDOWS: Record<string, number> = {
   "sonnet-4-5": 200_000,
   "haiku-4-5": 200_000,
 };
-const DEFAULT_WINDOW = 1_000_000;
-const HAIKU_WINDOW = 200_000;
 
-/** Hook stdin payload fields we care about. */
-export interface HookInput {
+export type HookInput = {
   transcript_path?: string;
   cwd?: string;
   session_id?: string;
   hook_event_name?: string;
   tool_name?: string;
   tool_input?: Record<string, unknown>;
-}
+};
 
-interface Usage {
-  input_tokens?: number;
-  cache_creation_input_tokens?: number;
-  cache_read_input_tokens?: number;
-  output_tokens?: number;
-}
-interface TranscriptLine {
-  isSidechain?: boolean;
-  message?: { usage?: Usage; model?: string };
-}
+type TokenUsage = {
+  inputTokens: number;
+  cacheCreationInputTokens: number;
+  cacheReadInputTokens: number;
+  outputTokens: number;
+};
 
-/** Context window for a model id, via the explicit map then haiku/default fallback. */
-export function windowFor(model: string | undefined): number {
-  if (model) {
-    for (const key of Object.keys(MODEL_WINDOWS).sort((a, b) => b.length - a.length)) {
-      if (model.includes(key)) return MODEL_WINDOWS[key]!;
-    }
-    if (model.includes("haiku")) return HAIKU_WINDOW;
+type TranscriptEntry = {
+  isSidechain: boolean;
+  model: string;
+  usage?: TokenUsage;
+};
+
+type TranscriptFile = {
+  path: string;
+  sessionId: string;
+  modifiedAt: number;
+};
+
+const isRecord = (candidate: unknown): candidate is Record<string, unknown> =>
+  typeof candidate === "object" && candidate !== null && !Array.isArray(candidate);
+
+const numberProperty = (record: Record<string, unknown>, property: string): number => {
+  const candidate = record[property];
+  return typeof candidate === "number" && Number.isFinite(candidate) ? candidate : 0;
+};
+
+const stringProperty = (record: Record<string, unknown>, property: string): string => {
+  const candidate = record[property];
+  return typeof candidate === "string" ? candidate : "";
+};
+
+const decodeTranscriptEntry = (candidate: unknown): TranscriptEntry | undefined => {
+  if (!isRecord(candidate)) {
+    return undefined;
   }
-  return DEFAULT_WINDOW;
-}
 
-/** Transcript path from stdin, else reconstructed from cwd + session_id (CC's slug scheme). */
-export function resolveTranscript(data: HookInput): string | null {
-  if (data.transcript_path && existsSync(data.transcript_path)) return data.transcript_path;
-  if (!data.cwd || !data.session_id) return null;
-  // e.g. "/Users/me/My App" → "-Users-me-My-App" (Claude Code project slug)
-  const slug = data.cwd.replace(/[^A-Za-z0-9]/g, "-");
-  const candidate = path.join(PROJECTS_DIR, slug, `${data.session_id}.jsonl`);
-  return existsSync(candidate) ? candidate : null;
-}
+  const messageCandidate = candidate.message;
+  if (!isRecord(messageCandidate)) {
+    return { isSidechain: candidate.isSidechain === true, model: "" };
+  }
 
-/** Read only the tail of a file as UTF-8 lines. */
-export function tailLines(file: string): string[] {
-  const size = statSync(file).size;
-  const start = size > TAIL_BYTES ? size - TAIL_BYTES : 0;
-  const length = size - start;
-  const buf = Buffer.allocUnsafe(length);
-  const fd = openSync(file, "r");
+  const usageCandidate = messageCandidate.usage;
+  if (!isRecord(usageCandidate)) {
+    return {
+      isSidechain: candidate.isSidechain === true,
+      model: stringProperty(messageCandidate, "model"),
+    };
+  }
+
+  return {
+    isSidechain: candidate.isSidechain === true,
+    model: stringProperty(messageCandidate, "model"),
+    usage: {
+      inputTokens: numberProperty(usageCandidate, "input_tokens"),
+      cacheCreationInputTokens: numberProperty(usageCandidate, "cache_creation_input_tokens"),
+      cacheReadInputTokens: numberProperty(usageCandidate, "cache_read_input_tokens"),
+      outputTokens: numberProperty(usageCandidate, "output_tokens"),
+    },
+  };
+};
+
+const inputTokenCount = (usage: TokenUsage): number =>
+  usage.inputTokens + usage.cacheCreationInputTokens + usage.cacheReadInputTokens;
+
+const transcriptEntryFromLine = (line: string): TranscriptEntry | undefined => {
+  if (!line.includes('"usage"')) {
+    return undefined;
+  }
+
   try {
-    readSync(fd, buf, 0, length, start);
-  } finally {
-    closeSync(fd);
+    const candidate: unknown = JSON.parse(line);
+    return decodeTranscriptEntry(candidate);
+  } catch {
+    return undefined;
   }
-  return buf.toString("utf8").split("\n");
-}
+};
 
-const usageOf = (u: Usage | undefined): number =>
-  (u?.input_tokens ?? 0) + (u?.cache_creation_input_tokens ?? 0) + (u?.cache_read_input_tokens ?? 0);
-
-/** (occupancyTokens, model) from the latest main-thread usage line, or nulls if none. */
-export function readOccupancy(transcriptPath: string): { occupancy: number | null; model: string } {
-  const lines = tailLines(transcriptPath);
-  for (let i = lines.length - 1; i >= 0; i--) {
-    const line = lines[i]!.trim();
-    if (!line?.includes('"usage"')) continue;
-    let entry: TranscriptLine;
-    try {
-      entry = JSON.parse(line) as TranscriptLine;
-    } catch {
+const inspectTranscriptDirectory = (
+  directory: string,
+): {
+  nestedDirectories: ReadonlyArray<string>;
+  transcriptFiles: ReadonlyArray<TranscriptFile>;
+} => {
+  const nestedDirectories: Array<string> = [];
+  const transcriptFiles: Array<TranscriptFile> = [];
+  for (const directoryEntry of readdirSync(directory, { withFileTypes: true })) {
+    const entryPath = path.join(directory, directoryEntry.name);
+    if (directoryEntry.isDirectory()) {
+      nestedDirectories.push(entryPath);
       continue;
     }
-    if (entry.isSidechain || !entry.message?.usage) continue;
-    const occupancy = usageOf(entry.message.usage);
-    if (occupancy > 0) return { occupancy, model: entry.message.model ?? "" };
+
+    if (directoryEntry.name.endsWith(".jsonl")) {
+      transcriptFiles.push({
+        path: entryPath,
+        sessionId: directoryEntry.name.slice(0, -".jsonl".length),
+        modifiedAt: statSync(entryPath).mtimeMs,
+      });
+    }
   }
+
+  return { nestedDirectories, transcriptFiles };
+};
+
+const projectTranscriptFiles = (): ReadonlyArray<TranscriptFile> => {
+  if (!existsSync(PROJECTS_DIRECTORY)) {
+    return [];
+  }
+
+  const pendingDirectories = [PROJECTS_DIRECTORY];
+  const transcriptFiles: Array<TranscriptFile> = [];
+  while (pendingDirectories.length > 0) {
+    const directory = pendingDirectories.pop();
+    if (directory === undefined) {
+      continue;
+    }
+
+    const inspection = inspectTranscriptDirectory(directory);
+    pendingDirectories.push(...inspection.nestedDirectories);
+    transcriptFiles.push(...inspection.transcriptFiles);
+  }
+
+  return transcriptFiles;
+};
+
+const newestTranscript = (transcriptFiles: ReadonlyArray<TranscriptFile>): TranscriptFile | undefined =>
+  [...transcriptFiles].sort((left, right) => right.modifiedAt - left.modifiedAt).at(0);
+
+export const windowFor = (model: string | undefined): number => {
+  if (model === undefined || model.length === 0) {
+    return DEFAULT_CONTEXT_WINDOW;
+  }
+
+  const modelKeys = Object.keys(MODEL_CONTEXT_WINDOWS).sort((left, right) => right.length - left.length);
+  for (const modelKey of modelKeys) {
+    const contextWindow = MODEL_CONTEXT_WINDOWS[modelKey];
+    if (model.includes(modelKey) && contextWindow !== undefined) {
+      return contextWindow;
+    }
+  }
+
+  return model.includes("haiku") ? HAIKU_CONTEXT_WINDOW : DEFAULT_CONTEXT_WINDOW;
+};
+
+export const resolveTranscript = (hookInput: HookInput): string | null => {
+  if (hookInput.transcript_path && existsSync(hookInput.transcript_path)) {
+    return hookInput.transcript_path;
+  }
+
+  if (!hookInput.cwd || !hookInput.session_id) {
+    return null;
+  }
+
+  const projectSlug = hookInput.cwd.replace(/[^A-Za-z0-9]/gu, "-");
+  const transcriptPath = path.join(PROJECTS_DIRECTORY, projectSlug, `${hookInput.session_id}.jsonl`);
+  return existsSync(transcriptPath) ? transcriptPath : null;
+};
+
+export const tailLines = (file: string): ReadonlyArray<string> => {
+  const fileSize = statSync(file).size;
+  const start = fileSize > TRANSCRIPT_TAIL_BYTES ? fileSize - TRANSCRIPT_TAIL_BYTES : 0;
+  const byteCount = fileSize - start;
+  const bytes = Buffer.allocUnsafe(byteCount);
+  const descriptor = openSync(file, "r");
+  try {
+    readSync(descriptor, bytes, 0, byteCount, start);
+  } finally {
+    closeSync(descriptor);
+  }
+  return bytes.toString("utf8").split("\n");
+};
+
+export const readOccupancy = (transcriptPath: string): { occupancy: number | null; model: string } => {
+  const lines = tailLines(transcriptPath);
+  for (let lineIndex = lines.length - 1; lineIndex >= 0; lineIndex -= 1) {
+    const line = lines.at(lineIndex);
+    if (line === undefined) {
+      continue;
+    }
+
+    const transcriptEntry = transcriptEntryFromLine(line.trim());
+    if (!transcriptEntry || transcriptEntry.isSidechain || !transcriptEntry.usage) {
+      continue;
+    }
+
+    const occupancy = inputTokenCount(transcriptEntry.usage);
+    if (occupancy > 0) {
+      return { occupancy, model: transcriptEntry.model };
+    }
+  }
+
   return { occupancy: null, model: "" };
-}
+};
 
-/** Newest-mtime transcript basename = the session a skill is running in. */
-export function resolveSessionId(): string | null {
-  if (!existsSync(PROJECTS_DIR)) return null;
-  const found: { sid: string; mtime: number }[] = [];
-  const walk = (dir: string): void => {
-    for (const entry of readdirSync(dir, { withFileTypes: true })) {
-      const full = path.join(dir, entry.name);
-      if (entry.isDirectory()) walk(full);
-      else if (entry.name.endsWith(".jsonl"))
-        found.push({ sid: entry.name.slice(0, -".jsonl".length), mtime: statSync(full).mtimeMs });
-    }
-  };
-  walk(PROJECTS_DIR);
-  return found.sort((a, b) => b.mtime - a.mtime)[0]?.sid ?? null;
-}
+export const resolveSessionId = (): string | null => {
+  const transcriptFile = newestTranscript(projectTranscriptFiles());
+  return transcriptFile === undefined ? null : transcriptFile.sessionId;
+};
 
-/** Absolute path to a session's transcript, searching the projects tree. */
-export function transcriptPath(sid: string): string | null {
-  if (!existsSync(PROJECTS_DIR)) return null;
-  let found: string | null = null;
-  const walk = (dir: string): void => {
-    if (found) return;
-    for (const entry of readdirSync(dir, { withFileTypes: true })) {
-      const full = path.join(dir, entry.name);
-      if (entry.isDirectory()) walk(full);
-      else if (entry.name === `${sid}.jsonl`) found = full;
-    }
-  };
-  walk(PROJECTS_DIR);
-  return found;
-}
+export const transcriptPath = (sessionId: string): string | null => {
+  const transcriptFile = projectTranscriptFiles().find((candidate) => candidate.sessionId === sessionId);
+  return transcriptFile === undefined ? null : transcriptFile.path;
+};
 
-/**
- * Daemon resolver: the newest-mtime transcript named for this session id, else
- * the newest transcript overall (so a renamed/relocated file still tracks).
- */
-export function resolveTranscriptForSid(sid: string): string | null {
-  if (!existsSync(PROJECTS_DIR)) return null;
-  const direct: { path: string; mtime: number }[] = [];
-  const all: { path: string; mtime: number }[] = [];
-  const walk = (dir: string): void => {
-    for (const entry of readdirSync(dir, { withFileTypes: true })) {
-      const full = path.join(dir, entry.name);
-      if (entry.isDirectory()) walk(full);
-      else if (entry.name.endsWith(".jsonl")) {
-        const record = { path: full, mtime: statSync(full).mtimeMs };
-        if (entry.name === `${sid}.jsonl`) direct.push(record);
-        all.push(record);
-      }
-    }
-  };
-  walk(PROJECTS_DIR);
-  const pool = direct.length > 0 ? direct : all;
-  const newest = pool.sort((a, b) => b.mtime - a.mtime)[0];
-  return newest?.path ?? null;
-}
+export const resolveTranscriptForSid = (sessionId: string): string | null => {
+  const transcriptFiles = projectTranscriptFiles();
+  const matchingFiles = transcriptFiles.filter((candidate) => candidate.sessionId === sessionId);
+  const transcriptFile = newestTranscript(matchingFiles.length > 0 ? matchingFiles : transcriptFiles);
+  return transcriptFile === undefined ? null : transcriptFile.path;
+};
 
-/** (inputInclCache, output) summed across the whole transcript for a session. */
-export function sumTokens(sid: string): { input: number; output: number } {
-  const file = transcriptPath(sid);
-  if (!file) return { input: 0, output: 0 };
+export const sumTokens = (sessionId: string): { input: number; output: number } => {
+  const file = transcriptPath(sessionId);
+  if (!file) {
+    return { input: 0, output: 0 };
+  }
+
   let input = 0;
   let output = 0;
   for (const line of readFileSync(file, "utf8").split("\n")) {
-    if (!line.includes('"usage"')) continue;
-    let entry: TranscriptLine;
-    try {
-      entry = JSON.parse(line) as TranscriptLine;
-    } catch {
+    const transcriptEntry = transcriptEntryFromLine(line);
+    if (!transcriptEntry || transcriptEntry.isSidechain || !transcriptEntry.usage) {
       continue;
     }
-    if (entry.isSidechain || !entry.message?.usage) continue;
-    input += usageOf(entry.message.usage);
-    output += entry.message.usage.output_tokens ?? 0;
+
+    input += inputTokenCount(transcriptEntry.usage);
+    output += transcriptEntry.usage.outputTokens;
   }
+
   return { input, output };
-}
+};

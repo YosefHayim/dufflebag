@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 /** Scale arm/body PNGs and stitch for mask quality check. */
 import { PNG } from "pngjs";
-import { argString, parseArgs } from "../../src/lib/index.js";
+import { argString, parseArgs } from "../../src/lib/argv.js";
 
 const args = parseArgs(process.argv.slice(2));
 const outDir = argString(args, "out-dir") || "out";

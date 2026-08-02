@@ -1,6 +1,4 @@
-/**
- * `dufflebag uninstall` — remove a receipt-authorized installation.
- */
+/** `dufflebag uninstall` — remove only artifacts authorized by the receipt. */
 
 import { Command } from "@effect/cli";
 import { Terminal } from "@effect/platform";
@@ -8,52 +6,62 @@ import { Effect } from "effect";
 
 import { uninstall } from "../install/uninstall.js";
 import { captureHostEvidence, destinationForScope } from "./hostEvidence.js";
-import { globalOption, projectOption, resolveScope, yesOption } from "./scopeOptions.js";
+import { CliUsageError, formatOption, scopeOption, yesOption } from "./scopeOptions.js";
 import * as TerminalUI from "./TerminalUI.js";
+
+const presentUninstallCancellation = (request: { readonly format: "text" | "json"; readonly scope: string }) =>
+  request.format === "json"
+    ? TerminalUI.json({ _tag: "cancelled", scope: request.scope })
+    : TerminalUI.outro("Cancelled — nothing was changed.");
 
 export const uninstallCommand = Command.make(
   "uninstall",
   {
-    project: projectOption,
-    global: globalOption,
+    scope: scopeOption,
     yes: yesOption,
+    format: formatOption,
   },
   (args) =>
     Effect.gen(function* () {
-      yield* TerminalUI.intro("uninstall");
-      const scope = yield* resolveScope(args);
-      const host = yield* captureHostEvidence;
+      if (args.format === "text") yield* TerminalUI.intro("uninstall");
       const terminal = yield* Terminal.Terminal;
       const isTTY = yield* terminal.isTTY;
-      const interaction: { _tag: "scripted" } | { _tag: "interactive" } =
-        args.yes || !isTTY ? { _tag: "scripted" } : { _tag: "interactive" };
+      if (!args.yes && !isTTY) {
+        return yield* new CliUsageError({ issue: "Non-interactive uninstall requires --yes." });
+      }
 
-      if (interaction._tag === "interactive" && !args.yes) {
+      if (!args.yes) {
         const confirmed = yield* TerminalUI.confirm({
-          message: `Uninstall dufflebag from ${scope} scope?`,
+          message: `Uninstall dufflebag from ${args.scope} scope?`,
           initialValue: false,
         });
         if (!confirmed) {
-          yield* TerminalUI.outro("Cancelled — nothing was changed.");
+          yield* presentUninstallCancellation(args);
           return;
         }
       }
 
-      const result = yield* uninstall({
+      const host = yield* captureHostEvidence;
+      const uninstallation = yield* uninstall({
         destination: destinationForScope({
-          scope,
+          scope: args.scope,
           homeRoot: host.homeRoot,
           projectRoot: host.projectRoot,
         }),
         host: { homeRoot: host.homeRoot },
-        interaction,
+        interaction: args.yes ? { _tag: "scripted" } : { _tag: "interactive" },
       });
 
+      if (args.format === "json") {
+        yield* TerminalUI.json(uninstallation);
+        return;
+      }
+
       yield* TerminalUI.success(
-        result._tag === "uninstalled"
-          ? `Uninstalled ${result.scope} installation.`
-          : `No ${result.scope} installation present.`,
+        uninstallation._tag === "uninstalled"
+          ? `Uninstalled ${uninstallation.scope} installation.`
+          : `No ${uninstallation.scope} installation present.`,
       );
       yield* TerminalUI.outro("Done.");
-    }).pipe(Effect.catchAll((error) => TerminalUI.presentError(error))),
-).pipe(Command.withDescription("Surgically remove everything dufflebag added"));
+    }),
+).pipe(Command.withDescription("Remove the receipt-owned installation from one scope"));

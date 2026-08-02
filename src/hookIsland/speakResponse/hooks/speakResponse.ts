@@ -10,7 +10,7 @@ import { fileURLToPath } from "node:url";
 
 type JsonRecord = Record<string, unknown>;
 
-type ResponseOrigin =
+type AgentReplyOrigin =
   | { kind: "cmux"; socket_path: string; surface_id: string; workspace_id: string }
   | { kind: "terminal" };
 
@@ -65,7 +65,7 @@ const assistantText = (entry: unknown) => {
   );
 };
 
-const responseFromTranscript = (transcriptPath: string) => {
+const agentReplyFromTranscript = (transcriptPath: string) => {
   const entries = readFileSync(transcriptPath, "utf8")
     .split("\n")
     .filter((line) => line.trim())
@@ -86,12 +86,12 @@ const agentId = () => {
   return value?.trim() || "unknown-agent";
 };
 
-const isFinalGrokEvent = (input: JsonRecord) => {
+const isCompletedGrokEvent = (input: JsonRecord) => {
   const reason = stringField(input, ["reason", "hook_reason", "hookReason"]);
   return !reason || ["complete", "completed", "end_turn", "stop"].includes(reason) || reason.endsWith(":end_turn");
 };
 
-const directResponse = (input: JsonRecord) =>
+const directAgentReply = (input: JsonRecord) =>
   stringField(input, ["last_assistant_message", "lastAssistantMessage", "last_agent_message", "lastAgentMessage"]);
 
 const voiceStateHome = () => {
@@ -108,7 +108,7 @@ const voiceStateHome = () => {
   return path.join(process.env.XDG_STATE_HOME || path.join(homedir(), ".local", "state"), "dufflebag", "voice");
 };
 
-const responseOrigin = (): ResponseOrigin => {
+const agentReplyOrigin = (): AgentReplyOrigin => {
   const workspaceId = process.env.CMUX_WORKSPACE_ID?.trim() || "";
   const surfaceId = process.env.CMUX_SURFACE_ID?.trim() || "";
   if (!workspaceId || !surfaceId) {
@@ -122,7 +122,11 @@ const responseOrigin = (): ResponseOrigin => {
   };
 };
 
-const queueResponse = (markdown: string, source: string, responseId: string) => {
+const queueAgentReply = (request: {
+  readonly markdown: string;
+  readonly source: string;
+  readonly agentReplyId: string;
+}) => {
   const inbox = path.join(voiceStateHome(), "inbox");
   mkdirSync(inbox, { recursive: true });
   const id = `${Date.now()}-${randomUUID()}`;
@@ -131,11 +135,11 @@ const queueResponse = (markdown: string, source: string, responseId: string) => 
   writeFileSync(
     temporary,
     JSON.stringify({
-      markdown,
-      origin: responseOrigin(),
+      markdown: request.markdown,
+      origin: agentReplyOrigin(),
       received_at: Date.now() / 1_000,
-      response_id: responseId,
-      source,
+      agent_reply_id: request.agentReplyId,
+      source: request.source,
     }),
     { encoding: "utf8", mode: 0o600 },
   );
@@ -160,18 +164,18 @@ const main = () => {
     return;
   }
   const source = agentId();
-  if (source === "grok" && !isFinalGrokEvent(input)) {
+  if (source === "grok" && !isCompletedGrokEvent(input)) {
     return;
   }
 
   const transcriptPath = stringField(input, ["transcript_path", "transcriptPath"]);
-  const markdown = directResponse(input) || (transcriptPath ? responseFromTranscript(transcriptPath) : "");
+  const markdown = directAgentReply(input) || (transcriptPath ? agentReplyFromTranscript(transcriptPath) : "");
   if (!markdown.trim()) {
     return;
   }
 
-  const responseId = stringField(input, ["response_id", "responseId", "turn_id", "turnId"]);
-  queueResponse(markdown, source, responseId);
+  const agentReplyId = stringField(input, ["response_id", "responseId", "turn_id", "turnId"]);
+  queueAgentReply({ markdown, source, agentReplyId });
   startWorker();
 };
 

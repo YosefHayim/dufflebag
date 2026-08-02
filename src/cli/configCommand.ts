@@ -1,294 +1,296 @@
-/**
- * `dufflebag config` — show or set managed configuration tunables.
- *
- * Show reads the managed config file (or schema defaults). Set decodes a
- * partial patch through bagConfigSchema. When an ownership receipt exists,
- * set reconciles through `update` with the selected config so the receipt
- * re-syncs. Without a receipt, set writes the managed config file directly
- * (pre-install tuning).
- */
+/** `dufflebag config show|set|reset` — managed configuration as explicit verbs. */
 
-import { Command, Options } from "@effect/cli";
-import { FileSystem, Path } from "@effect/platform";
+import { Args, Command } from "@effect/cli";
+import { FileSystem, Path, Terminal } from "@effect/platform";
 import { Effect, Either, Option, Schema } from "effect";
 
-import { bagConfigSchema, defaultBagConfig } from "../config/bagConfigSchema.js";
-import { readConfigFile } from "../config/configFile.js";
+import { type BagConfig, bagConfigSchema, defaultBagConfig } from "../config/bagConfigSchema.js";
+import { type ConfigFileSnapshot, readConfigFile } from "../config/configFile.js";
 import { managedConfigPath, planManagedConfig } from "../config/configure.js";
 import { readArtifactReceiptSnapshot } from "../install/artifactReceipt.js";
 import { receiptPath } from "../install/install.js";
 import { update } from "../install/update.js";
-import { captureHostEvidence, destinationForScope } from "./hostEvidence.js";
-import { globalOption, projectOption, resolveScope } from "./scopeOptions.js";
+import { captureHostEvidence, destinationForScope, type HostEvidence } from "./hostEvidence.js";
+import { type CliScope, CliUsageError, formatOption, scopeOption, yesOption } from "./scopeOptions.js";
 import { stagePackage } from "./stagePackage.js";
 import * as TerminalUI from "./TerminalUI.js";
 
-const warnFractionOption = Options.float("warn").pipe(
-  Options.optional,
-  Options.withDescription("Context occupancy fraction that starts warning for a handoff"),
+const configSettings = [
+  "context-warn-fraction",
+  "context-block-fraction",
+  "autorun-default-cycle-count",
+  "autorun-max-cycle-count",
+  "autorun-poll-interval-seconds",
+  "autorun-idle-threshold-seconds",
+  "idle-auto-compact",
+  "speech-voice",
+  "speech-words-per-minute",
+  "speech-response-mode",
+  "speech-read-along",
+  "prompt-refinement-mode",
+  "dictation-replacements",
+  "dedup-enforcement",
+  "dedup-skip-directories",
+  "debug-enabled",
+] as const;
+
+type ConfigSetting = (typeof configSettings)[number];
+type ConfigKey = keyof BagConfig;
+
+const configSettingChoices = configSettings.map((setting): [string, ConfigSetting] => [setting, setting]);
+
+const settingArgument = Args.choice(configSettingChoices, { name: "setting" }).pipe(
+  Args.withDescription("Managed setting name"),
 );
 
-const blockFractionOption = Options.float("block").pipe(
-  Options.optional,
-  Options.withDescription("Context occupancy fraction that blocks new code edits"),
+const optionalSettingArgument = settingArgument.pipe(Args.optional);
+
+const settingValueArgument = Args.text({ name: "value" }).pipe(Args.withDescription("New setting value"));
+
+const numericSettings = [
+  "context-warn-fraction",
+  "context-block-fraction",
+  "autorun-default-cycle-count",
+  "autorun-max-cycle-count",
+  "autorun-poll-interval-seconds",
+  "autorun-idle-threshold-seconds",
+  "speech-words-per-minute",
+] as const;
+
+const booleanSettings = ["speech-read-along", "debug-enabled"] as const;
+
+const stringSettings = [
+  "idle-auto-compact",
+  "speech-voice",
+  "speech-response-mode",
+  "prompt-refinement-mode",
+  "dictation-replacements",
+  "dedup-enforcement",
+  "dedup-skip-directories",
+] as const;
+
+const configSettingChangeSchema = Schema.Union(
+  Schema.Struct({ setting: Schema.Literal(...numericSettings), value: Schema.NumberFromString }),
+  Schema.Struct({ setting: Schema.Literal(...booleanSettings), value: Schema.BooleanFromString }),
+  Schema.Struct({ setting: Schema.Literal(...stringSettings), value: Schema.String }),
 );
 
-const budgetOption = Options.integer("budget").pipe(
-  Options.optional,
-  Options.withDescription("Autorun cycle budget used when no count is provided"),
-);
-
-const hardCapOption = Options.integer("hard-cap").pipe(
-  Options.optional,
-  Options.withDescription("Hard upper limit for an autorun cycle budget"),
-);
-
-const pollOption = Options.integer("poll").pipe(
-  Options.optional,
-  Options.withDescription("Seconds between autorun daemon observations"),
-);
-
-const idleOption = Options.integer("idle").pipe(
-  Options.optional,
-  Options.withDescription("Seconds without activity before autorun treats a turn as idle"),
-);
-
-const autoCompactIdleOption = Options.text("auto-compact-idle").pipe(
-  Options.optional,
-  Options.withDescription("Idle duration before draft submission and compaction (10s-1d, or off)"),
-);
-
-const ttsVoiceOption = Options.text("tts-voice").pipe(
-  Options.optional,
-  Options.withDescription("Supertonic voice ID: F1-F5 or M1-M5 (default F4)"),
-);
-
-const ttsRateOption = Options.integer("tts-rate").pipe(
-  Options.optional,
-  Options.withDescription("Speech response rate in words per minute"),
-);
-
-const speechModes: ReadonlyArray<"auto" | "focused" | "immediate" | "off"> = ["auto", "focused", "immediate", "off"];
-
-const speechModeOption = Options.choice("speech-mode", speechModes).pipe(
-  Options.optional,
-  Options.withDescription("Narration policy: Cmux-aware auto, focused, immediate, or off"),
-);
-
-const onOffValues: ReadonlyArray<"on" | "off"> = ["on", "off"];
-
-const readAlongOption = Options.choice("read-along", onOffValues).pipe(
-  Options.optional,
-  Options.withDescription("Show or hide synchronized active-word narration highlighting"),
-);
-
-const promptRefinementModes: ReadonlyArray<"off" | "review"> = ["off", "review"];
-
-const promptRefinementOption = Options.choice("prompt-refinement", promptRefinementModes).pipe(
-  Options.optional,
-  Options.withDescription("Enable local clipboard prompt refinement on a Control double-tap"),
-);
-
-const dictationWordsOption = Options.text("dictation-words").pipe(
-  Options.optional,
-  Options.withDescription("Speech replacements, for example Joseph=Yosef;type script=TypeScript"),
-);
-
-const dedupModes: ReadonlyArray<"deny" | "warn" | "off"> = ["deny", "warn", "off"];
-
-const dedupModeOption = Options.choice("dedup-mode", dedupModes).pipe(
-  Options.optional,
-  Options.withDescription("Duplicate-code enforcement mode"),
-);
-
-const dedupSkipOption = Options.text("dedup-skip").pipe(
-  Options.optional,
-  Options.withDescription("Comma-separated directories excluded from duplicate-code enforcement"),
-);
-
-const suppliedPatchEntry = <Value>(supplied: {
-  configKey: string;
-  chosen: Option.Option<Value>;
-}): ReadonlyArray<readonly [string, unknown]> =>
-  Option.isSome(supplied.chosen) ? [[supplied.configKey, supplied.chosen.value]] : [];
-
-const buildConfigPatch = (args: {
-  warn: Option.Option<number>;
-  block: Option.Option<number>;
-  budget: Option.Option<number>;
-  hardCap: Option.Option<number>;
-  poll: Option.Option<number>;
-  idle: Option.Option<number>;
-  autoCompactIdle: Option.Option<string>;
-  ttsVoice: Option.Option<string>;
-  ttsRate: Option.Option<number>;
-  speechMode: Option.Option<"auto" | "focused" | "immediate" | "off">;
-  readAlong: Option.Option<"on" | "off">;
-  promptRefinement: Option.Option<"off" | "review">;
-  dictationWords: Option.Option<string>;
-  dedupMode: Option.Option<"deny" | "warn" | "off">;
-  dedupSkip: Option.Option<string>;
-}): Record<string, unknown> =>
-  Object.fromEntries([
-    ...suppliedPatchEntry({ configKey: "contextWarnFraction", chosen: args.warn }),
-    ...suppliedPatchEntry({ configKey: "contextBlockFraction", chosen: args.block }),
-    ...suppliedPatchEntry({ configKey: "autorunDefaultCycleCount", chosen: args.budget }),
-    ...suppliedPatchEntry({ configKey: "autorunMaxCycleCount", chosen: args.hardCap }),
-    ...suppliedPatchEntry({ configKey: "autorunPollIntervalSeconds", chosen: args.poll }),
-    ...suppliedPatchEntry({ configKey: "autorunIdleThresholdSeconds", chosen: args.idle }),
-    ...suppliedPatchEntry({ configKey: "idleAutoCompact", chosen: args.autoCompactIdle }),
-    ...suppliedPatchEntry({ configKey: "speechVoice", chosen: args.ttsVoice }),
-    ...suppliedPatchEntry({ configKey: "speechWordsPerMinute", chosen: args.ttsRate }),
-    ...suppliedPatchEntry({ configKey: "speechResponseMode", chosen: args.speechMode }),
-    ...suppliedPatchEntry({
-      configKey: "speechReadAlong",
-      chosen: Option.map(args.readAlong, (readAlong) => readAlong === "on"),
-    }),
-    ...suppliedPatchEntry({ configKey: "promptRefinementMode", chosen: args.promptRefinement }),
-    ...suppliedPatchEntry({ configKey: "dictationReplacements", chosen: args.dictationWords }),
-    ...suppliedPatchEntry({ configKey: "dedupEnforcement", chosen: args.dedupMode }),
-    ...suppliedPatchEntry({ configKey: "dedupSkipDirectories", chosen: args.dedupSkip }),
-  ]);
-
-const CONFIG_LABELS: Record<keyof typeof defaultBagConfig, string> = {
-  contextWarnFraction: "context warn (nudge /handoff)",
-  contextBlockFraction: "context block (deny edits)",
-  autorunDefaultCycleCount: "autorun default cycles",
-  autorunMaxCycleCount: "autorun max cycles",
-  autorunPollIntervalSeconds: "autorun poll interval (s)",
-  autorunIdleThresholdSeconds: "autorun idle threshold (s)",
-  idleAutoCompact: "idle auto-compact (off|duration)",
-  speechVoice: "speech voice",
-  speechWordsPerMinute: "speech rate (wpm)",
-  speechResponseMode: "speech response mode",
-  speechReadAlong: "speech read-along",
-  promptRefinementMode: "prompt refinement",
-  dictationReplacements: "dictation replacements",
-  dedupEnforcement: "dedup enforcement (deny|warn|off)",
-  dedupSkipDirectories: "dedup skip directories",
-  debugEnabled: "debug logging",
+const configSettingKeys: Record<ConfigSetting, ConfigKey> = {
+  "context-warn-fraction": "contextWarnFraction",
+  "context-block-fraction": "contextBlockFraction",
+  "autorun-default-cycle-count": "autorunDefaultCycleCount",
+  "autorun-max-cycle-count": "autorunMaxCycleCount",
+  "autorun-poll-interval-seconds": "autorunPollIntervalSeconds",
+  "autorun-idle-threshold-seconds": "autorunIdleThresholdSeconds",
+  "idle-auto-compact": "idleAutoCompact",
+  "speech-voice": "speechVoice",
+  "speech-words-per-minute": "speechWordsPerMinute",
+  "speech-response-mode": "speechResponseMode",
+  "speech-read-along": "speechReadAlong",
+  "prompt-refinement-mode": "promptRefinementMode",
+  "dictation-replacements": "dictationReplacements",
+  "dedup-enforcement": "dedupEnforcement",
+  "dedup-skip-directories": "dedupSkipDirectories",
+  "debug-enabled": "debugEnabled",
 };
 
-type ConfigKey = keyof typeof defaultBagConfig;
+const configLabels: Record<ConfigKey, string> = {
+  contextWarnFraction: "context warn fraction",
+  contextBlockFraction: "context block fraction",
+  autorunDefaultCycleCount: "autorun default cycles",
+  autorunMaxCycleCount: "autorun maximum cycles",
+  autorunPollIntervalSeconds: "autorun poll interval (seconds)",
+  autorunIdleThresholdSeconds: "autorun idle threshold (seconds)",
+  idleAutoCompact: "idle auto-compact",
+  speechVoice: "speech voice",
+  speechWordsPerMinute: "speech rate (words per minute)",
+  speechResponseMode: "speech narration mode",
+  speechReadAlong: "speech read-along",
+  promptRefinementMode: "prompt refinement mode",
+  dictationReplacements: "dictation replacements",
+  dedupEnforcement: "dedup enforcement",
+  dedupSkipDirectories: "dedup skip directories",
+  debugEnabled: "debug diagnostics",
+};
 
-export const configCommand = Command.make(
-  "config",
-  {
-    project: projectOption,
-    global: globalOption,
-    warn: warnFractionOption,
-    block: blockFractionOption,
-    budget: budgetOption,
-    hardCap: hardCapOption,
-    poll: pollOption,
-    idle: idleOption,
-    autoCompactIdle: autoCompactIdleOption,
-    ttsVoice: ttsVoiceOption,
-    ttsRate: ttsRateOption,
-    speechMode: speechModeOption,
-    readAlong: readAlongOption,
-    promptRefinement: promptRefinementOption,
-    dictationWords: dictationWordsOption,
-    dedupMode: dedupModeOption,
-    dedupSkip: dedupSkipOption,
-  },
+const configKeys: ReadonlyArray<ConfigKey> = Object.values(configSettingKeys);
+
+type ConfigDestination =
+  | { readonly _tag: "global"; readonly root: string }
+  | { readonly _tag: "project"; readonly root: string };
+
+type ScopedConfig = {
+  readonly scope: CliScope;
+  readonly host: HostEvidence;
+  readonly destination: ConfigDestination;
+  readonly configPath: string;
+  readonly snapshot: ConfigFileSnapshot;
+  readonly current: BagConfig;
+};
+
+const readScopedConfig = (scope: CliScope) =>
+  Effect.gen(function* () {
+    const host = yield* captureHostEvidence;
+    const path = yield* Path.Path;
+    const destination = destinationForScope({ scope, homeRoot: host.homeRoot, projectRoot: host.projectRoot });
+    const configPath = path.join(destination.root, managedConfigPath);
+    const snapshot = yield* readConfigFile(configPath);
+    const current = snapshot._tag === "present" ? snapshot.config : defaultBagConfig;
+    return { scope, host, destination, configPath, snapshot, current } satisfies ScopedConfig;
+  });
+
+const writeScopedConfig = (request: { readonly scopedConfig: ScopedConfig; readonly nextConfig: BagConfig }) =>
+  Effect.gen(function* () {
+    const path = yield* Path.Path;
+    const fileSystem = yield* FileSystem.FileSystem;
+    const receiptSnapshot = yield* readArtifactReceiptSnapshot(
+      path.join(request.scopedConfig.destination.root, receiptPath),
+    );
+    if (receiptSnapshot._tag === "present") {
+      if (receiptSnapshot.receipt.scope !== request.scopedConfig.scope) {
+        return yield* Effect.fail(
+          new Error(
+            `Receipt scope is ${receiptSnapshot.receipt.scope}, not ${request.scopedConfig.scope}; select the matching scope.`,
+          ),
+        );
+      }
+      yield* update({
+        destination: request.scopedConfig.destination,
+        host: { homeRoot: request.scopedConfig.host.homeRoot },
+        stagedPackage: yield* stagePackage,
+        features: { _tag: "preserve" },
+        agents: { _tag: "detected", evidence: request.scopedConfig.host.agentEvidence },
+        interaction: { _tag: "scripted" },
+        configuration: { _tag: "selected", config: request.nextConfig },
+      });
+      return "receipt";
+    }
+
+    const previousConfigFile =
+      request.scopedConfig.snapshot._tag === "present"
+        ? { _tag: "priorFile" as const, bytes: request.scopedConfig.snapshot.bytes }
+        : { _tag: "missing" as const };
+    const plan = planManagedConfig({
+      scope: request.scopedConfig.scope,
+      selection: { _tag: "selected", config: request.nextConfig },
+      previousConfigFile,
+    });
+    if (Either.isLeft(plan)) return yield* Effect.fail(plan.left);
+    yield* fileSystem.makeDirectory(path.dirname(request.scopedConfig.configPath), { recursive: true });
+    yield* fileSystem.writeFile(request.scopedConfig.configPath, plan.right.managedConfigWrite.bytes);
+    return "file";
+  });
+
+const presentResetCancellation = (request: { readonly format: "text" | "json"; readonly scope: CliScope }) =>
+  request.format === "json"
+    ? TerminalUI.json({ _tag: "cancelled", scope: request.scope })
+    : TerminalUI.outro("Cancelled — nothing was changed.");
+
+const showCommand = Command.make(
+  "show",
+  { setting: optionalSettingArgument, scope: scopeOption, format: formatOption },
   (args) =>
     Effect.gen(function* () {
-      yield* TerminalUI.intro("config");
-      const scope = yield* resolveScope(args);
-      const host = yield* captureHostEvidence;
-      const destination = destinationForScope({
-        scope,
-        homeRoot: host.homeRoot,
-        projectRoot: host.projectRoot,
-      });
-      const path = yield* Path.Path;
-      const fileSystem = yield* FileSystem.FileSystem;
-      const configPath = path.join(destination.root, managedConfigPath);
-      const snapshot = yield* readConfigFile(configPath);
-      const current = snapshot._tag === "present" ? snapshot.config : defaultBagConfig;
-      const patch = buildConfigPatch(args);
-
-      const configKeys: ReadonlyArray<ConfigKey> = [
-        "contextWarnFraction",
-        "contextBlockFraction",
-        "autorunDefaultCycleCount",
-        "autorunMaxCycleCount",
-        "autorunPollIntervalSeconds",
-        "autorunIdleThresholdSeconds",
-        "idleAutoCompact",
-        "speechVoice",
-        "speechWordsPerMinute",
-        "speechResponseMode",
-        "speechReadAlong",
-        "promptRefinementMode",
-        "dictationReplacements",
-        "dedupEnforcement",
-        "dedupSkipDirectories",
-        "debugEnabled",
-      ];
-
-      if (Object.keys(patch).length === 0) {
-        const rows = configKeys.map((key) => `${CONFIG_LABELS[key].padEnd(34)} ${String(current[key])}`);
-        yield* TerminalUI.note(rows.join("\n"), "managed config");
-        yield* TerminalUI.outro("Change with e.g. `dufflebag config --auto-compact-idle 1m`");
+      const scopedConfig = yield* readScopedConfig(args.scope);
+      if (Option.isSome(args.setting)) {
+        const key = configSettingKeys[args.setting.value];
+        if (args.format === "json") {
+          yield* TerminalUI.json({ scope: args.scope, setting: args.setting.value, value: scopedConfig.current[key] });
+        } else {
+          yield* TerminalUI.note(`${configLabels[key]}  ${String(scopedConfig.current[key])}`, "managed config");
+        }
         return;
       }
 
-      const nextConfig = yield* Schema.decodeUnknown(bagConfigSchema, {
-        onExcessProperty: "error",
-      })({
-        ...current,
-        ...patch,
-      }).pipe(Effect.mapError((error) => new Error(`Invalid configuration values: ${String(error)}`)));
+      if (args.format === "json") {
+        yield* TerminalUI.json({ scope: args.scope, config: scopedConfig.current });
+        return;
+      }
+      const lines = configKeys.map((key) => `${configLabels[key].padEnd(40)} ${String(scopedConfig.current[key])}`);
+      yield* TerminalUI.note(lines.join("\n"), "managed config");
+    }),
+).pipe(Command.withDescription("Show all settings or one named setting"));
 
-      const previousConfigFile: { _tag: "priorFile"; bytes: Uint8Array } | { _tag: "missing" } =
-        snapshot._tag === "present" ? { _tag: "priorFile", bytes: snapshot.bytes } : { _tag: "missing" };
-
-      const receiptSnapshot = yield* readArtifactReceiptSnapshot(path.join(destination.root, receiptPath));
-
-      if (receiptSnapshot._tag === "present") {
-        if (receiptSnapshot.receipt.scope !== scope) {
-          return yield* TerminalUI.presentError(
-            new Error(
-              `Receipt scope is ${receiptSnapshot.receipt.scope}, but config was requested for ${scope}. Use the matching --project/--global flag.`,
-            ),
-          );
-        }
-
-        // Receipt-aware path: full reconcile so managed-config ownership stays in the receipt.
-        const stagedPackage = yield* stagePackage;
-        yield* update({
-          destination,
-          host: { homeRoot: host.homeRoot },
-          stagedPackage,
-          features: { _tag: "preserve" },
-          agents: { _tag: "detected", evidence: host.agentEvidence },
-          interaction: { _tag: "scripted" },
-          configuration: { _tag: "selected", config: nextConfig },
+const setCommand = Command.make(
+  "set",
+  { setting: settingArgument, value: settingValueArgument, scope: scopeOption, format: formatOption },
+  (args) =>
+    Effect.gen(function* () {
+      const scopedConfig = yield* readScopedConfig(args.scope);
+      const change = yield* Schema.decodeUnknown(configSettingChangeSchema, { onExcessProperty: "error" })({
+        setting: args.setting,
+        value: args.value,
+      });
+      const key = configSettingKeys[change.setting];
+      const nextConfig = yield* Schema.decodeUnknown(bagConfigSchema, { onExcessProperty: "error" })({
+        ...scopedConfig.current,
+        [key]: change.value,
+      });
+      const owner = yield* writeScopedConfig({ scopedConfig, nextConfig });
+      if (args.format === "json") {
+        yield* TerminalUI.json({
+          _tag: "configured",
+          scope: args.scope,
+          setting: args.setting,
+          value: nextConfig[key],
+          owner,
         });
       } else {
-        // Pre-install path: write managed config only (no receipt to re-sync).
-        const plan = planManagedConfig({
-          scope,
-          selection: { _tag: "selected", config: nextConfig },
-          previousConfigFile,
+        yield* TerminalUI.success(`${configLabels[key]} → ${String(nextConfig[key])}`);
+      }
+    }),
+).pipe(Command.withDescription("Set one managed setting"));
+
+const resetCommand = Command.make(
+  "reset",
+  { setting: optionalSettingArgument, scope: scopeOption, yes: yesOption, format: formatOption },
+  (args) =>
+    Effect.gen(function* () {
+      const terminal = yield* Terminal.Terminal;
+      const isTTY = yield* terminal.isTTY;
+      const resetsEverything = Option.isNone(args.setting);
+      if (resetsEverything && !args.yes && !isTTY) {
+        return yield* new CliUsageError({ issue: "Non-interactive full config reset requires --yes." });
+      }
+      if (resetsEverything && !args.yes) {
+        const confirmed = yield* TerminalUI.confirm({
+          message: `Reset every ${args.scope} setting to its Schema default?`,
+          initialValue: false,
         });
-
-        if (Either.isLeft(plan)) {
-          return yield* TerminalUI.presentError(plan.left);
-        }
-
-        yield* fileSystem.makeDirectory(path.dirname(configPath), { recursive: true });
-        yield* fileSystem.writeFile(configPath, plan.right.managedConfigWrite.bytes);
-      }
-
-      // Report each changed key from the applied patch.
-      for (const key of configKeys) {
-        if (Object.hasOwn(patch, key)) {
-          yield* TerminalUI.success(`${CONFIG_LABELS[key]} → ${String(nextConfig[key])}`);
+        if (!confirmed) {
+          yield* presentResetCancellation(args);
+          return;
         }
       }
-      yield* TerminalUI.outro(receiptSnapshot._tag === "present" ? "Saved and receipt re-synced." : "Saved.");
-    }).pipe(Effect.catchAll((error) => TerminalUI.presentError(error))),
-).pipe(Command.withDescription("Show or change tunables (context guard, idle compaction, TTS, …)"));
+
+      const scopedConfig = yield* readScopedConfig(args.scope);
+      let nextConfig = defaultBagConfig;
+      if (Option.isSome(args.setting)) {
+        const key = configSettingKeys[args.setting.value];
+        nextConfig = yield* Schema.decodeUnknown(bagConfigSchema, { onExcessProperty: "error" })({
+          ...scopedConfig.current,
+          [key]: defaultBagConfig[key],
+        });
+      }
+      const owner = yield* writeScopedConfig({ scopedConfig, nextConfig });
+      if (args.format === "json") {
+        yield* TerminalUI.json({
+          _tag: "reset",
+          scope: args.scope,
+          setting: Option.getOrUndefined(args.setting),
+          config: nextConfig,
+          owner,
+        });
+      } else if (Option.isSome(args.setting)) {
+        const key = configSettingKeys[args.setting.value];
+        yield* TerminalUI.success(`${configLabels[key]} reset to ${String(nextConfig[key])}`);
+      } else {
+        yield* TerminalUI.success(`All ${args.scope} settings reset to Schema defaults.`);
+      }
+    }),
+).pipe(Command.withDescription("Reset one setting or every setting to Schema defaults"));
+
+export const configCommand = Command.make("config").pipe(
+  Command.withDescription("Inspect or change managed configuration"),
+  Command.withSubcommands([showCommand, setCommand, resetCommand]),
+);

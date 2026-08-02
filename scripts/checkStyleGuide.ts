@@ -97,17 +97,17 @@ const ruleCardRanges = (request: {
     .map((entry) => entry.index);
 
   return headingIndexes.map((headingIndex, position) => ({
-    heading: request.lines[headingIndex]?.slice(4).trim() ?? "",
+    heading: request.lines[headingIndex]?.slice(4).trim() || "",
     headingLine: headingIndex + 1,
     start: headingIndex,
-    end: headingIndexes[position + 1] ?? request.section.end,
+    end: headingIndexes.at(position + 1) || request.section.end,
   }));
 };
 
 const firstContentIndex = (request: { lines: ReadonlyArray<string>; from: number; to: number }) => {
   // Stop at the first non-blank line so the caller learns where the slot's content starts.
   for (let index = request.from; index < request.to; index += 1) {
-    if ((request.lines[index] ?? "").trim().length > 0) {
+    if ((request.lines[index] || "").trim().length > 0) {
       return index;
     }
   }
@@ -137,7 +137,7 @@ const isSingleSentence = (assertion: string): boolean =>
 const validateCard = (request: ValidateCardRequest): ReadonlyArray<StyleGuideViolation> => {
   const { lines, card, rulesById } = request;
   const metadataIndex = firstContentIndex({ lines, from: card.start + 1, to: card.end });
-  const metadata = lines[metadataIndex]?.trim() ?? "";
+  const metadata = lines[metadataIndex]?.trim() || "";
   const match = METADATA_PATTERN.exec(metadata);
   if (!match) {
     return [
@@ -149,8 +149,8 @@ const validateCard = (request: ValidateCardRequest): ReadonlyArray<StyleGuideVio
     ];
   }
 
-  const id = match[1] ?? "";
-  const verify = match[2] ?? "judgment";
+  const id = match[1] || "";
+  const verify = match[2] || "judgment";
   const rule = rulesById.get(id);
   const violations: Array<StyleGuideViolation> = [];
   if (!rule) {
@@ -170,7 +170,7 @@ const validateCard = (request: ValidateCardRequest): ReadonlyArray<StyleGuideVio
   }
 
   const assertionIndex = firstContentIndex({ lines, from: metadataIndex + 1, to: card.end });
-  const assertion = lines[assertionIndex]?.trim() ?? "";
+  const assertion = lines[assertionIndex]?.trim() || "";
   if (assertionIndex < 0 || assertion.startsWith("```")) {
     return [
       ...violations,
@@ -243,7 +243,7 @@ const parityViolations = (request: {
 
   // Count documented cards per ID so a duplicated card is reported, not silently merged.
   for (const id of request.documentedIds) {
-    counts.set(id, (counts.get(id) ?? 0) + 1);
+    counts.set(id, (counts.get(id) || 0) + 1);
   }
 
   const duplicated = [...counts.entries()]
@@ -279,7 +279,7 @@ export const checkStyleGuide = (request: CheckStyleGuideRequest): ReadonlyArray<
   const rulesById = new Map(request.rules.map((rule) => [rule.id, rule]));
   const cardViolations = cards.flatMap((card) => validateCard({ lines, card, rulesById }));
   const documentedIds = cards
-    .map((card) => METADATA_PATTERN.exec(lines[firstContentIndex({ lines, from: card.start + 1, to: card.end })] ?? ""))
+    .map((card) => METADATA_PATTERN.exec(lines[firstContentIndex({ lines, from: card.start + 1, to: card.end })] || ""))
     .flatMap((match) => (match?.[1] === undefined ? [] : [match[1]]));
 
   return [

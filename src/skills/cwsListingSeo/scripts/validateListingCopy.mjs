@@ -44,7 +44,7 @@ const looksLikeKeywordDump = (line) => {
   if (trimmed.length < 24) return false;
 
   // e.g. "a, b, c, d, e, f" → 5 commas
-  const separators = (trimmed.match(/[,|]/g) ?? []).length;
+  const separators = (trimmed.match(/[,|]/g) || []).length;
   if (separators < 5) return false;
 
   // e.g. "ChatGPT, Gemini · Claude" → tokens split on punctuation/space
@@ -76,7 +76,7 @@ const tokenize = (text) =>
 const countTokens = (text) => {
   const counts = new Map();
   for (const token of tokenize(text)) {
-    counts.set(token, (counts.get(token) ?? 0) + 1);
+    counts.set(token, (counts.get(token) || 0) + 1);
   }
   return counts;
 };
@@ -108,11 +108,11 @@ const parseArgs = (argv) => {
     if (a === "--help" || a === "-h") out.help = true;
     else if (a === "--strict") out.strict = true;
     else if (a === "--json") out.json = true;
-    else if (a === "--name") out.name = argv[++i] ?? "";
-    else if (a === "--summary") out.summary = argv[++i] ?? "";
-    else if (a === "--description") out.description = argv[++i] ?? "";
-    else if (a === "--description-file") out.descriptionFile = argv[++i] ?? null;
-    else if (a === "--json-file") out.jsonFile = argv[++i] ?? null;
+    else if (a === "--name") out.name = argv[++i] || "";
+    else if (a === "--summary") out.summary = argv[++i] || "";
+    else if (a === "--description") out.description = argv[++i] || "";
+    else if (a === "--description-file") out.descriptionFile = argv[++i] || null;
+    else if (a === "--json-file") out.jsonFile = argv[++i] || null;
     else throw new Error(`Unknown argument: ${a}`);
   }
   return out;
@@ -121,10 +121,10 @@ const parseArgs = (argv) => {
 const loadInputs = (args) => {
   let { name, summary, description } = args;
   if (args.jsonFile) {
-    const raw = JSON.parse(readFileSync(args.jsonFile, "utf8"));
-    name = String(raw.name ?? name ?? "");
-    summary = String(raw.summary ?? summary ?? "");
-    description = String(raw.description ?? description ?? "");
+    const listingDocument = JSON.parse(readFileSync(args.jsonFile, "utf8"));
+    name = String(listingDocument.name || name || "");
+    summary = String(listingDocument.summary || summary || "");
+    description = String(listingDocument.description || description || "");
   }
   if (args.descriptionFile) {
     description = readFileSync(args.descriptionFile, "utf8");

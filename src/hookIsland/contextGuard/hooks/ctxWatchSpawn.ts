@@ -20,10 +20,17 @@ import { fileURLToPath } from "node:url";
 import { planDaemonSpawn } from "../../../runtime/config.js";
 import { exists, KILL_SWITCH, loopFile, writeText } from "../lib/state.js";
 
+const sessionIdFrom = (candidate: unknown): string => {
+  if (typeof candidate !== "object" || candidate === null) return "";
+  const sessionId = Object.getOwnPropertyDescriptor(candidate, "session_id")?.value;
+  return typeof sessionId === "string" ? sessionId : "";
+};
+
 const main = (): void => {
   let sid = "";
   try {
-    sid = (JSON.parse(readFileSync(0, "utf8")) as { session_id?: string }).session_id ?? "";
+    const candidate: unknown = JSON.parse(readFileSync(0, "utf8"));
+    sid = sessionIdFrom(candidate);
   } catch {
     return;
   }

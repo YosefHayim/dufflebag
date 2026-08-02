@@ -1,6 +1,7 @@
 ---
 name: reuse-first-audit
 description: Use when the user asks to build or replace a feature and wants existing repository code, platform capabilities, installed dependencies, packages, templates, or official ecosystem options checked before new implementation.
+type: flow
 ---
 
 # Reuse-First Audit

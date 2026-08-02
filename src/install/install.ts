@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 
 import { FileSystem, Path } from "@effect/platform";
 import type { PlatformError } from "@effect/platform/Error";
-import { Effect, Either, Option, ParseResult, Predicate, Schema } from "effect";
+import { Effect, Either, Option, Predicate, Schema, ParseResult as SchemaParseIssue } from "effect";
 import { findNodeAtLocation, type Node, parseTree } from "jsonc-parser";
 
 import { type AgentDefinition, agentCatalog, classifyAgents } from "../catalog/agentCatalog.js";
@@ -56,9 +56,9 @@ import {
 import {
   InstallError,
   type InstallRequest,
-  type InstallResult,
+  type InstallSummary,
   installRequestSchema,
-  installResultSchema,
+  installSummarySchema,
   receiptPath,
   runtimePath,
 } from "./installSchemas.js";
@@ -68,12 +68,12 @@ export {
   configurationChoiceSchema,
   InstallError,
   type InstallRequest,
-  type InstallResult,
+  type InstallSummary,
   installationDestinationSchema,
   installationHostSchema,
   installationLocationSchema,
   installRequestSchema,
-  installResultSchema,
+  installSummarySchema,
   interactionSchema,
   platformRequirementSchema,
   receiptPath,
@@ -193,7 +193,8 @@ const decodedSettingsSchema = Schema.Struct({
 
 type DecodedSettings = Schema.Schema.Type<typeof decodedSettingsSchema>;
 
-const formatParseError = (error: ParseResult.ParseError): string => ParseResult.TreeFormatter.formatErrorSync(error);
+const formatParseError = (error: SchemaParseIssue.ParseError): string =>
+  SchemaParseIssue.TreeFormatter.formatErrorSync(error);
 
 const formatUnknownError = (error: unknown): string => (error instanceof Error ? error.message : String(error));
 
@@ -545,7 +546,7 @@ const desiredHookGroups = (input: {
 
     feature.runtime.registrations.forEach((registration) => {
       const entrypoint = registrationSourceEntrypoint(feature, registration);
-      const executable = input.agent.detection.commands[0] ?? input.agent.id;
+      const executable = input.agent.detection.commands.at(0) || input.agent.id;
       const runtime = runtimeCommand({
         root: input.root,
         sourceDirectory: feature.sourceDirectory,
@@ -562,7 +563,7 @@ const desiredHookGroups = (input: {
         ...(registration.matcher._tag === "pattern" ? { matcher: registration.matcher.value } : {}),
         hooks: [{ type: "command", command }],
       });
-      const current = groups.get(registration.event) ?? [];
+      const current = groups.get(registration.event) || [];
 
       groups.set(registration.event, [...current, group]);
     });
@@ -577,7 +578,7 @@ const propertyKey = (property: Node): string | undefined => {
   return typeof key?.value === "string" ? key.value : undefined;
 };
 
-const objectProperties = (node: Node): ReadonlyArray<Node> => node.children ?? [];
+const objectProperties = (node: Node): ReadonlyArray<Node> => node.children || [];
 
 const commaBetween = (input: { source: string; start: number; end: number }): number | undefined => {
   const offset = input.source.indexOf(",", input.start);
@@ -907,7 +908,7 @@ const retainedDeletedSettingsValues = (
   previous: JsonValuesOwnership | undefined,
   legacy: ReadonlyArray<OwnedJsonValue>,
 ): ReadonlyArray<OwnedJsonValue> => {
-  const retained = previous?.values.filter((value) => value.installed._tag === "missing") ?? [];
+  const retained = previous?.values.filter((value) => value.installed._tag === "missing") || [];
 
   return [...retained, ...legacy.filter((value) => !retained.some((candidate) => candidate.pointer === value.pointer))];
 };
@@ -920,7 +921,7 @@ const planSettings = (input: {
   desiredGroups: ReadonlyMap<string, ReadonlyArray<ManagedHookGroup>>;
   legacySettings: LegacySettingsPlan;
 }): Either.Either<ArtifactOperation | undefined, InstallError> => {
-  const artifactPath = input.artifactPath ?? settingsPath;
+  const artifactPath = input.artifactPath === undefined ? settingsPath : input.artifactPath;
   const previousOwnership =
     input.previousArtifact?.ownership._tag === "jsonValues" ? input.previousArtifact.ownership : undefined;
   if (
@@ -970,12 +971,14 @@ const planSettings = (input: {
     });
   }
 
-  const previousEvents =
-    previousOwnership?.values.flatMap((value) => {
+  let previousEvents: ReadonlyArray<string> = [];
+  if (previousOwnership !== undefined) {
+    previousEvents = previousOwnership.values.flatMap((value) => {
       const event = hookEventFromPointer(value.pointer);
 
       return event === undefined ? [] : [event];
-    }) ?? [];
+    });
+  }
   const removedEvents = previousEvents.filter((event) => !input.desiredGroups.has(event)).reverse();
   const events = [...new Set([...removedEvents, ...input.desiredGroups.keys()])];
   const createdHooksContainer =
@@ -1006,14 +1009,16 @@ const planSettings = (input: {
 
     const desired = input.desiredGroups.get(event);
     const value = desired === undefined ? undefined : [...base.right.groups, ...desired];
-    const edited =
-      desired === undefined && base.right.previous._tag === "value" && base.right.previous.lexical !== undefined
-        ? restoreJsonLexical({ source, path: ["hooks", event], lexical: base.right.previous.lexical })
-        : editJsonValue({
-            source,
-            path: ["hooks", event],
-            value: desired === undefined ? undefined : value,
-          });
+    let edited: Either.Either<string, InstallError>;
+    if (desired === undefined && base.right.previous._tag === "value" && base.right.previous.lexical !== undefined) {
+      edited = restoreJsonLexical({ source, path: ["hooks", event], lexical: base.right.previous.lexical });
+    } else {
+      edited = editJsonValue({
+        source,
+        path: ["hooks", event],
+        value: desired === undefined ? undefined : value,
+      });
+    }
     if (Either.isLeft(edited)) {
       return Either.left(edited.left);
     }
@@ -1028,15 +1033,15 @@ const planSettings = (input: {
     }
   }
 
-  let finalDocument = decodeGeneratedSettings(source);
-  if (Either.isLeft(finalDocument)) {
-    return Either.left(finalDocument.left);
+  let mergedDocument = decodeGeneratedSettings(source);
+  if (Either.isLeft(mergedDocument)) {
+    return Either.left(mergedDocument.left);
   }
 
   if (
     createdHooksContainer &&
-    finalDocument.right.hooks !== undefined &&
-    Object.keys(finalDocument.right.hooks).length === 0
+    mergedDocument.right.hooks !== undefined &&
+    Object.keys(mergedDocument.right.hooks).length === 0
   ) {
     const edited = editJsonValue({ source, path: ["hooks"], value: undefined });
     if (Either.isLeft(edited)) {
@@ -1044,9 +1049,9 @@ const planSettings = (input: {
     }
 
     source = edited.right;
-    finalDocument = decodeGeneratedSettings(source);
-    if (Either.isLeft(finalDocument)) {
-      return Either.left(finalDocument.left);
+    mergedDocument = decodeGeneratedSettings(source);
+    if (Either.isLeft(mergedDocument)) {
+      return Either.left(mergedDocument.left);
     }
   }
 
@@ -1055,7 +1060,7 @@ const planSettings = (input: {
       return Either.right(undefined);
     }
 
-    const removeFile = !previousOwnership?.filePreviouslyPresent && Object.keys(finalDocument.right).length === 0;
+    const removeFile = !previousOwnership?.filePreviouslyPresent && Object.keys(mergedDocument.right).length === 0;
     const operation = removeFile
       ? {
           _tag: "remove",
@@ -1074,7 +1079,7 @@ const planSettings = (input: {
   }
 
   const containerCandidates = [
-    ...(previousOwnership?.createdContainers ?? []),
+    ...(previousOwnership?.createdContainers || []),
     ...(createdHooksContainer ? ["/hooks"] : []),
   ];
   const createdContainers = containerCandidates.filter(
@@ -1085,7 +1090,8 @@ const planSettings = (input: {
 
   const ownership: JsonValuesOwnership = {
     _tag: "jsonValues",
-    filePreviouslyPresent: previousOwnership?.filePreviouslyPresent ?? input.snapshot._tag === "file",
+    filePreviouslyPresent:
+      previousOwnership === undefined ? input.snapshot._tag === "file" : previousOwnership.filePreviouslyPresent,
     createdContainers,
     values: ownershipValues,
   };
@@ -1102,7 +1108,7 @@ const planSettings = (input: {
   };
 
   const mismatchedValue = ownership.values.find((ownedValue) => {
-    const value = settingsValueAtPointer(finalDocument.right, ownedValue.pointer);
+    const value = settingsValueAtPointer(mergedDocument.right, ownedValue.pointer);
 
     return !installedJsonValueMatches(ownedValue, value);
   });
@@ -1346,8 +1352,8 @@ const guardHandlerOperations = (
     }),
   );
 
-const mapFormatError = <Value>(result: Either.Either<Value, unknown>): Either.Either<Value, InstallError> =>
-  Either.mapLeft(result, toInstallError);
+const mapFormatError = <Value>(installation: Either.Either<Value, unknown>): Either.Either<Value, InstallError> =>
+  Either.mapLeft(installation, toInstallError);
 
 const controlPath = (root: string, path: Path.Path): Either.Either<string, InstallError> => {
   // Loop control lives under context-guard (ctxLoopCtl), not the skill-only autorun feature.
@@ -1740,14 +1746,16 @@ const restoreSettingsArtifact = (input: {
   // Reverse append order while restoring each pointer to its original state.
   for (const value of values) {
     const pointerPath = jsonPointerPath(value.pointer);
-    const restored =
-      value.previous._tag === "missing"
-        ? editJsonValue({ source, path: pointerPath, value: undefined })
-        : value.previous.lexical === undefined
-          ? Either.left(
-              new InstallError({ issue: `Settings value ${value.pointer} lacks lexical restoration evidence.` }),
-            )
-          : restoreJsonLexical({ source, path: pointerPath, lexical: value.previous.lexical });
+    let restored: Either.Either<string, InstallError>;
+    if (value.previous._tag === "missing") {
+      restored = editJsonValue({ source, path: pointerPath, value: undefined });
+    } else if (value.previous.lexical === undefined) {
+      restored = Either.left(
+        new InstallError({ issue: `Settings value ${value.pointer} lacks lexical restoration evidence.` }),
+      );
+    } else {
+      restored = restoreJsonLexical({ source, path: pointerPath, lexical: value.previous.lexical });
+    }
     if (Either.isLeft(restored)) {
       return Either.left(restored.left);
     }
@@ -1887,12 +1895,15 @@ const automaticConfigSelection = (input: {
     return { _tag: "selected", config: input.target.config };
   }
 
-  if (hasLegacySettingsCandidate(input.settings.document.env ?? {}) && input.settingsSnapshot._tag === "file") {
+  if (hasLegacySettingsCandidate(input.settings.document.env || {}) && input.settingsSnapshot._tag === "file") {
     return { _tag: "legacyEnvironment", settingsBytes: input.settingsSnapshot.bytes };
   }
 
   if (input.request.destination._tag === "project") {
-    return { _tag: "firstProjectInstall", globalConfig: input.global ?? { _tag: "missing" } };
+    return {
+      _tag: "firstProjectInstall",
+      globalConfig: input.global === undefined ? { _tag: "missing" } : input.global,
+    };
   }
 
   return { _tag: "selected", config: defaultBagConfig };
@@ -1937,13 +1948,13 @@ const createManagedConfigPlan = (input: {
   );
 };
 
-const createInstallResult = (input: {
+const createInstallSummary = (input: {
   tag: "installed" | "unchanged";
   request: InstallRequest;
   featureIds: ReadonlyArray<Schema.Schema.Type<typeof featureIdSchema>>;
   selectedAgents: ReadonlyArray<AgentDefinition>;
-}): InstallResult =>
-  Schema.validateSync(installResultSchema, {
+}): InstallSummary =>
+  Schema.validateSync(installSummarySchema, {
     onExcessProperty: "error",
   })({
     _tag: input.tag,
@@ -2010,7 +2021,7 @@ export const reconcileInstallation = (input: unknown) =>
       request.configuration._tag === "automatic" &&
       request.destination._tag === "project" &&
       configSnapshot._tag === "missing" &&
-      !hasLegacySettingsCandidate(settings.document.env ?? {});
+      !hasLegacySettingsCandidate(settings.document.env || {});
     const globalConfigSnapshot = shouldReadGlobalConfig
       ? yield* readConfigFile(path.join(request.host.homeRoot, managedConfigPath))
       : undefined;
@@ -2102,14 +2113,14 @@ export const reconcileInstallation = (input: unknown) =>
       plan.receipt._tag === "receiptPublish" &&
       receiptEqual(previousReceipt, plan.receipt.receipt);
     if (unchanged) {
-      return createInstallResult({ tag: "unchanged", request, featureIds, selectedAgents });
+      return createInstallSummary({ tag: "unchanged", request, featureIds, selectedAgents });
     }
 
     // 6. Apply the validated plan through the single transactional filesystem writer.
     yield* applyArtifactPlan(plan);
 
     // 7. Return one schema-validated presentation value without leaking planning internals.
-    return createInstallResult({ tag: "installed", request, featureIds, selectedAgents });
+    return createInstallSummary({ tag: "installed", request, featureIds, selectedAgents });
   }).pipe(Effect.mapError(toInstallError));
 
 // Decode one install request, inspect its receipt once, then enter the shared reconciliation pipeline.

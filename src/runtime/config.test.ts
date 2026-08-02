@@ -6,6 +6,7 @@
 
 import { describe, expect, it } from "vitest";
 
+import { defaultBagConfig } from "../config/bagConfigSchema.js";
 import {
   configFromSnapshot,
   configToEnvMap,
@@ -13,46 +14,75 @@ import {
   daemonConfigDiff,
   daemonSpawnEnv,
   ENV_KEYS,
+  HOOK_CONFIG_FIELDS,
   planDaemonSpawn,
   readConfig,
   resolveAutoCompactSeconds,
 } from "./config.js";
 
 describe("daemon spawn env", () => {
-  it("configToEnvMap emits every dufflebag key for a full BagConfig", () => {
+  it("keeps the dependency-free hook projection aligned with application defaults", () => {
+    for (const field of HOOK_CONFIG_FIELDS) expect(DEFAULTS[field]).toBe(defaultBagConfig[field]);
+  });
+
+  it("configToEnvMap emits every hook-owned environment key", () => {
     const env = configToEnvMap(DEFAULTS);
     expect(env[ENV_KEYS.contextWarnFraction]).toBe("0.18");
     expect(env[ENV_KEYS.autorunMaxCycleCount]).toBe("50");
     expect(env[ENV_KEYS.debugEnabled]).toBe("false");
     expect(env[ENV_KEYS.idleAutoCompact]).toBe("off");
-    expect(env[ENV_KEYS.speechVoice]).toBe("F4");
-    expect(env[ENV_KEYS.speechResponseMode]).toBe("auto");
-    expect(env[ENV_KEYS.speechReadAlong]).toBe("true");
-    expect(env[ENV_KEYS.promptRefinementMode]).toBe("off");
-    expect(env[ENV_KEYS.dictationReplacements]).toBe("");
     expect(Object.keys(env).sort()).toEqual(Object.values(ENV_KEYS).sort());
   });
 
   it("uses a provider override before persistent idle auto-compact", () => {
-    expect(resolveAutoCompactSeconds("codex", { DUFFLEBAG_CODEX_AUTO_COMPACT: "45s" }, "2m")).toBe(45);
-    expect(resolveAutoCompactSeconds("codex", { DUFFLEBAG_CODEX_AUTO_COMPACT: "off" }, "2m")).toBeNull();
-    expect(resolveAutoCompactSeconds("codex", {}, "2m")).toBe(120);
+    expect(
+      resolveAutoCompactSeconds({
+        agentId: "codex",
+        env: { DUFFLEBAG_CODEX_AUTO_COMPACT: "45s" },
+        persistentValue: "2m",
+      }),
+    ).toBe(45);
+    expect(
+      resolveAutoCompactSeconds({
+        agentId: "codex",
+        env: { DUFFLEBAG_CODEX_AUTO_COMPACT: "off" },
+        persistentValue: "2m",
+      }),
+    ).toBeNull();
+    expect(resolveAutoCompactSeconds({ agentId: "codex", env: {}, persistentValue: "2m" })).toBe(120);
   });
 
   it("fails closed for an invalid provider override", () => {
-    expect(resolveAutoCompactSeconds("claude-code", { DUFFLEBAG_CLAUDE_CODE_AUTO_COMPACT: "soon" }, "2m")).toBeNull();
+    expect(
+      resolveAutoCompactSeconds({
+        agentId: "claude-code",
+        env: { DUFFLEBAG_CLAUDE_CODE_AUTO_COMPACT: "soon" },
+        persistentValue: "2m",
+      }),
+    ).toBeNull();
   });
 
   it("configToEnvMap round-trips through readConfig", () => {
     const original = readConfig({
-      [ENV_KEYS.contextWarnFraction]: "0.12",
-      [ENV_KEYS.autorunDefaultCycleCount]: "7",
-      [ENV_KEYS.speechVoice]: "Ava",
-      [ENV_KEYS.dictationReplacements]: "Joseph=Yosef",
-      [ENV_KEYS.debugEnabled]: "true",
+      environment: {
+        [ENV_KEYS.contextWarnFraction]: "0.12",
+        [ENV_KEYS.autorunDefaultCycleCount]: "7",
+        [ENV_KEYS.debugEnabled]: "true",
+      },
+      managedConfig: {},
     });
-    expect(readConfig(configToEnvMap(original))).toEqual(original);
-    expect(original.dictationReplacements).toBe("Joseph=Yosef");
+    expect(readConfig({ environment: configToEnvMap(original), managedConfig: {} })).toEqual(original);
+  });
+
+  it("resolves invocation overrides before environment, managed file, and defaults", () => {
+    const config = readConfig({
+      environment: { [ENV_KEYS.contextWarnFraction]: "0.16" },
+      managedConfig: { contextWarnFraction: 0.14, contextBlockFraction: 0.24 },
+      invocationConfig: { contextWarnFraction: 0.12 },
+    });
+    expect(config.contextWarnFraction).toBe(0.12);
+    expect(config.contextBlockFraction).toBe(0.24);
+    expect(config.autorunMaxCycleCount).toBe(DEFAULTS.autorunMaxCycleCount);
   });
 
   it("daemonSpawnEnv freezes effective config over the parent env and keeps unrelated keys", () => {
@@ -98,12 +128,18 @@ describe("daemon spawn env", () => {
 
   it("daemonConfigDiff lists only autorun-relevant mismatches", () => {
     const settings = readConfig({
-      [ENV_KEYS.contextWarnFraction]: "0.15",
-      [ENV_KEYS.autorunDefaultCycleCount]: "5",
+      environment: {
+        [ENV_KEYS.contextWarnFraction]: "0.15",
+        [ENV_KEYS.autorunDefaultCycleCount]: "5",
+      },
+      managedConfig: {},
     });
     const daemon = readConfig({
-      [ENV_KEYS.contextWarnFraction]: "0.18",
-      [ENV_KEYS.autorunDefaultCycleCount]: "5",
+      environment: {
+        [ENV_KEYS.contextWarnFraction]: "0.18",
+        [ENV_KEYS.autorunDefaultCycleCount]: "5",
+      },
+      managedConfig: {},
     });
     expect(daemonConfigDiff(settings, daemon)).toEqual([{ key: "contextWarnFraction", expected: 0.15, daemon: 0.18 }]);
     expect(daemonConfigDiff(settings, settings)).toEqual([]);

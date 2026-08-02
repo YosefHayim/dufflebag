@@ -932,9 +932,9 @@ export const resolveFeatureSelection = (
 
     // Resolve every declared dependency before returning this feature.
     for (const dependency of feature.dependencies) {
-      const result = visitFeature(dependency);
-      if (Either.isLeft(result)) {
-        return result;
+      const featureCatalogCheck = visitFeature(dependency);
+      if (Either.isLeft(featureCatalogCheck)) {
+        return featureCatalogCheck;
       }
     }
 
@@ -943,9 +943,9 @@ export const resolveFeatureSelection = (
 
   // Validate and expand every caller selection into the owned set.
   for (const requestedId of requestedIds) {
-    const result = visitFeature(requestedId);
-    if (Either.isLeft(result)) {
-      return Either.left(result.left);
+    const featureCatalogCheck = visitFeature(requestedId);
+    if (Either.isLeft(featureCatalogCheck)) {
+      return Either.left(featureCatalogCheck.left);
     }
   }
 

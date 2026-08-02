@@ -270,8 +270,8 @@ layer(Layer.empty)("artifactRecovery", (it) => {
         invalidRecords,
         ({ name, record }) =>
           Effect.gen(function* () {
-            const result = yield* Effect.exit(decodeArtifactRecoveryRecordJson(JSON.stringify(record)));
-            expect(Exit.isFailure(result), name).toBe(true);
+            const artifactRecovery = yield* Effect.exit(decodeArtifactRecoveryRecordJson(JSON.stringify(record)));
+            expect(Exit.isFailure(artifactRecovery), name).toBe(true);
           }),
         { discard: true },
       );

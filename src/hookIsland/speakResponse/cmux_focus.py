@@ -8,9 +8,8 @@ import subprocess
 import sys
 import threading
 import time
-from typing import Any
 import uuid
-
+from typing import Any
 
 CMUX_BUNDLE_IDENTIFIER = "com.cmuxterm.app"
 
@@ -27,13 +26,13 @@ def cmux_identify(socket_path: str) -> dict[str, Any] | None:
             client.settimeout(0.35)
             client.connect(socket_path)
             client.sendall(json.dumps(request).encode("utf-8") + b"\n")
-            payload = b""
-            while b"\n" not in payload and len(payload) < 1_048_576:
+            socket_bytes = b""
+            while b"\n" not in socket_bytes and len(socket_bytes) < 1_048_576:
                 chunk = client.recv(65_536)
                 if not chunk:
                     break
-                payload += chunk
-        document = json.loads(payload.split(b"\n", 1)[0].decode("utf-8"))
+                socket_bytes += chunk
+        document = json.loads(socket_bytes.split(b"\n", 1)[0].decode("utf-8"))
     except (json.JSONDecodeError, OSError, UnicodeDecodeError):
         document = None
     if isinstance(document, dict) and document.get("ok") is True and isinstance(document.get("result"), dict):

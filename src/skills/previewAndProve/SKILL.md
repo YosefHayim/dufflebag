@@ -1,6 +1,7 @@
 ---
 name: preview-and-prove
 description: Use when the user asks to launch, preview, QA, or verify an app or browser-visible flow in the real UI, especially checkout, authentication, onboarding, forms, extensions, or responsive behavior.
+type: flow
 ---
 
 # Preview and Prove

@@ -17,14 +17,36 @@ const state = (phase: IdleCompactSessionState["phase"]): IdleCompactSessionState
 
 describe("idle compact lifecycle events", () => {
   it.each([
-    [{ hook_event_name: "SessionStart", session_id: "claude-1" }, "claude-code", "session-started"],
-    [{ hookEventName: "UserPromptSubmit", sessionId: "codex-1" }, "codex", "prompt-started"],
-    [{ hookEventName: "stop", sessionId: "grok-1" }, "grok", "turn-ended"],
-    [{ hook_event_name: "PreCompact", session_id: "codex-2" }, "codex", "compact-started"],
-    [{ hookEventName: "post_compact", sessionId: "grok-2" }, "grok", "compact-finished"],
-    [{ hook_event_name: "SessionEnd", session_id: "claude-2" }, "claude-code", "session-ended"],
-  ])("normalizes provider payload %#", (input, agentId, event) => {
-    expect(normalizeIdleCompactEvent(input, { DUFFLEBAG_AGENT_ID: agentId }, 5_000)).toEqual({
+    {
+      input: { hook_event_name: "SessionStart", session_id: "claude-1" },
+      agentId: "claude-code",
+      event: "session-started",
+    },
+    {
+      input: { hookEventName: "UserPromptSubmit", sessionId: "codex-1" },
+      agentId: "codex",
+      event: "prompt-started",
+    },
+    { input: { hookEventName: "stop", sessionId: "grok-1" }, agentId: "grok", event: "turn-ended" },
+    {
+      input: { hook_event_name: "PreCompact", session_id: "codex-2" },
+      agentId: "codex",
+      event: "compact-started",
+    },
+    {
+      input: { hookEventName: "post_compact", sessionId: "grok-2" },
+      agentId: "grok",
+      event: "compact-finished",
+    },
+    {
+      input: { hook_event_name: "SessionEnd", session_id: "claude-2" },
+      agentId: "claude-code",
+      event: "session-ended",
+    },
+  ])("normalizes provider payload %#", ({ input, agentId, event }) => {
+    expect(
+      normalizeIdleCompactEvent({ input, environment: { DUFFLEBAG_AGENT_ID: agentId }, occurredAtMs: 5_000 }),
+    ).toEqual({
       agentId,
       sessionId: "sessionId" in input ? input.sessionId : input.session_id,
       event,
@@ -34,20 +56,28 @@ describe("idle compact lifecycle events", () => {
 
   it("uses Grok hook environment when its payload omits lifecycle identity", () => {
     expect(
-      normalizeIdleCompactEvent(
-        {},
-        { DUFFLEBAG_AGENT_ID: "grok", GROK_HOOK_EVENT: "session_start", GROK_SESSION_ID: "grok-env" },
-        7_000,
-      ),
+      normalizeIdleCompactEvent({
+        input: {},
+        environment: {
+          DUFFLEBAG_AGENT_ID: "grok",
+          GROK_HOOK_EVENT: "session_start",
+          GROK_SESSION_ID: "grok-env",
+        },
+        occurredAtMs: 7_000,
+      }),
     ).toEqual({ agentId: "grok", sessionId: "grok-env", event: "session-started", occurredAtMs: 7_000 });
   });
 
   it.each([
-    ["invalid JSON shape", null, { DUFFLEBAG_AGENT_ID: "codex" }],
-    ["missing agent", { hookEventName: "Stop", sessionId: "one" }, {}],
-    ["unknown event", { hookEventName: "SubagentStop", sessionId: "one" }, { DUFFLEBAG_AGENT_ID: "codex" }],
-  ])("refuses %s", (_name, input, env) => {
-    expect(normalizeIdleCompactEvent(input, env, 1_000)).toBeNull();
+    { name: "invalid JSON shape", input: null, env: { DUFFLEBAG_AGENT_ID: "codex" } },
+    { name: "missing agent", input: { hookEventName: "Stop", sessionId: "one" }, env: {} },
+    {
+      name: "unknown event",
+      input: { hookEventName: "SubagentStop", sessionId: "one" },
+      env: { DUFFLEBAG_AGENT_ID: "codex" },
+    },
+  ])("refuses $name", ({ input, env }) => {
+    expect(normalizeIdleCompactEvent({ input, environment: env, occurredAtMs: 1_000 })).toBeNull();
   });
 
   it("moves a human prompt and its completed turn into a new idle cycle", () => {

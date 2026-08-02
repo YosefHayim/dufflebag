@@ -59,9 +59,9 @@ layer(NodeContext.layer)("update", (it) => {
           configuration: { _tag: "selected", config: defaultBagConfig },
         });
 
-        const result = yield* update(request({ root, stagedRoot, features: ["context-guard"] }));
+        const updateExecution = yield* update(request({ root, stagedRoot, features: ["context-guard"] }));
 
-        expect(result._tag).toBe("updated");
+        expect(updateExecution._tag).toBe("updated");
         expect(yield* fileSystem.exists(path.join(root, ".claude/skills/autorun/SKILL.md"))).toBe(false);
         expect(yield* fileSystem.exists(path.join(root, ".cursor/rules/autorun.mdc"))).toBe(false);
         expect(yield* fileSystem.exists(path.join(root, ".aider.conf.yml"))).toBe(false);

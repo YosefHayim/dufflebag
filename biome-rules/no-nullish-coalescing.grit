@@ -1,0 +1,7 @@
+`$left ?? $right` as $fallback where {
+  register_diagnostic(
+    span = $fallback,
+    message = "Decode absence and defaults at the owning boundary instead of using `??` (CODE-STYLE.md: syntax.no-nullish).",
+    severity = "error"
+  )
+}

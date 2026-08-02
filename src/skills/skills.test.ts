@@ -65,21 +65,12 @@ const sourceSkillDirectories = readdirSync(skillRoot, { withFileTypes: true })
   .map((entry) => entry.name)
   .sort();
 
-const repeatedWorkflowSkills = [
-  { skillId: "organized-commits", sourceDirectory: "organizedCommits" },
-  { skillId: "finish-and-ship", sourceDirectory: "finishAndShip" },
-  { skillId: "preview-and-prove", sourceDirectory: "previewAndProve" },
-  { skillId: "reuse-first-audit", sourceDirectory: "reuseFirstAudit" },
-  { skillId: "agent-session-auditor", sourceDirectory: "agentSessionAuditor" },
-  { skillId: "sync-agent-skills", sourceDirectory: "syncAgentSkills" },
-  { skillId: "env-config-contract", sourceDirectory: "envConfigContract" },
-  { skillId: "mcp-oauth-onboarding", sourceDirectory: "mcpOauthOnboarding" },
-  { skillId: "rtl-ui-audit", sourceDirectory: "rtlUiAudit" },
-  { skillId: "deploy-and-prove", sourceDirectory: "deployAndProve" },
-  { skillId: "coordinate-worktrees", sourceDirectory: "coordinateWorktrees" },
-  { skillId: "capture-workflow", sourceDirectory: "captureWorkflow" },
-  { skillId: "finish-agent-sessions", sourceDirectory: "finishAgentSessions" },
-];
+const flowSkills = sourceSkillDirectories.flatMap((sourceDirectory) => {
+  const skillMd = path.join(skillRoot, sourceDirectory, "SKILL.md");
+  const { frontmatter } = parseFrontmatter(skillMd);
+  if (frontmatter?.type !== "flow" || frontmatter.name === undefined) return [];
+  return [{ skillId: frontmatter.name, sourceDirectory }];
+});
 
 const expectValidSkillFrontmatter = (skillMd: string, expectedName: string): void => {
   expect(existsSync(skillMd)).toBe(true);
@@ -89,9 +80,9 @@ const expectValidSkillFrontmatter = (skillMd: string, expectedName: string): voi
   expect(frontmatter?.name).toBe(expectedName);
   // e.g. "png-to-code", "autorun" — not "PngToCode"
   expect(frontmatter?.name).toMatch(/^[a-z0-9-]+$/);
-  expect((frontmatter?.name ?? "").length).toBeLessThanOrEqual(64);
+  expect((frontmatter?.name || "").length).toBeLessThanOrEqual(64);
   expect(frontmatter?.description).toBeTruthy();
-  expect((frontmatter?.description ?? "").length).toBeLessThanOrEqual(1024);
+  expect((frontmatter?.description || "").length).toBeLessThanOrEqual(1024);
 
   if (frontmatter?.type) {
     expect(["prompt", "inline", "flow"]).toContain(frontmatter.type);
@@ -124,19 +115,16 @@ describe("local skill sources", () => {
 });
 
 describe("repeated workflow skills", () => {
-  it.each(repeatedWorkflowSkills)("$skillId declares searchable triggers and operational gates", ({
-    skillId,
-    sourceDirectory,
-  }) => {
+  it.each(flowSkills)("$skillId declares searchable triggers and operational gates", ({ skillId, sourceDirectory }) => {
     const skillMd = path.join(skillRoot, sourceDirectory, "SKILL.md");
     expect(existsSync(skillMd)).toBe(true);
 
-    const { frontmatter, body } = parseFrontmatter(skillMd);
+    const { frontmatter, body: skillInstructions } = parseFrontmatter(skillMd);
     expect(frontmatter?.name).toBe(skillId);
     expect(frontmatter?.description).toMatch(/^Use when /);
-    expect(body).toContain("## Safety");
-    expect(body).toContain("## Workflow");
-    expect(body).toContain("## Verification");
-    expect(body.split("\n").length).toBeLessThanOrEqual(500);
+    expect(skillInstructions).toContain("## Safety");
+    expect(skillInstructions).toContain("## Workflow");
+    expect(skillInstructions).toContain("## Verification");
+    expect(skillInstructions.split("\n").length).toBeLessThanOrEqual(500);
   });
 });

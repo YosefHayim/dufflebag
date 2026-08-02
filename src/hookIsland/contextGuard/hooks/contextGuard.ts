@@ -1,18 +1,5 @@
 #!/usr/bin/env node
-/**
- * context-guard — throttles code-writing as the context window fills, forcing a
- * graceful /handoff + /compact wind-down instead of a session ballooning past
- * usable context. TS port of the original Python hook; behavior is identical,
- * but the warn/block thresholds now come from `dufflebag*` env (one source of
- * truth shared with the daemon) instead of hand-synced constants.
- *
- *   Warn band  (>= contextWarnFraction, < contextBlockFraction): allow edits, nudge once to /handoff.
- *   Block band (>= contextBlockFraction):            deny code-mutation tools, EXCEPT writes
- *                                         to the handoff doc itself.
- *
- * Registered on PreToolUse (deny) + PostToolUse/UserPromptSubmit (nudge),
- * matcher Write|Edit|MultiEdit|NotebookEdit. Fail-open: any error → allow.
- */
+/** Claude Code context-occupancy guard with a fail-open process boundary. */
 
 import { readFileSync, writeSync } from "node:fs";
 import path from "node:path";
@@ -24,93 +11,182 @@ import { type HookInput, readOccupancy, resolveTranscript, windowFor } from "../
 
 const WRITE_TOOLS = new Set(["Write", "Edit", "MultiEdit", "NotebookEdit"]);
 
-const pctText = (pct: number): string => `${Math.round(pct * 100)}%`;
+const isRecord = (candidate: unknown): candidate is Record<string, unknown> =>
+  typeof candidate === "object" && candidate !== null && !Array.isArray(candidate);
 
-/** True if an edit targets the /handoff resume doc (handoff*.md) — always allowed through. */
-function isHandoffTarget(toolInput: Record<string, unknown> | undefined): boolean {
-  const p = (toolInput?.file_path ?? toolInput?.notebook_path ?? "") as string;
-  const base = path.basename(p).toLowerCase();
-  return base.includes("handoff") && base.endsWith(".md");
-}
+const optionalString = (record: Record<string, unknown>, property: string): string | undefined => {
+  const candidate = record[property];
+  return typeof candidate === "string" ? candidate : undefined;
+};
 
-/** The two-step wind-down, branched on whether the session is autorun-armed. */
-function windDown(sid: string): string {
-  if (!isArmed(sid)) {
+const decodeHookInput = (candidate: unknown): HookInput | undefined => {
+  if (!isRecord(candidate)) {
+    return undefined;
+  }
+
+  const toolInputCandidate = candidate.tool_input;
+  return {
+    transcript_path: optionalString(candidate, "transcript_path"),
+    cwd: optionalString(candidate, "cwd"),
+    session_id: optionalString(candidate, "session_id"),
+    hook_event_name: optionalString(candidate, "hook_event_name"),
+    tool_name: optionalString(candidate, "tool_name"),
+    tool_input: isRecord(toolInputCandidate) ? toolInputCandidate : undefined,
+  };
+};
+
+const percentageText = (fraction: number): string => `${Math.round(fraction * 100)}%`;
+
+const isHandoffTarget = (toolInput: Record<string, unknown> | undefined): boolean => {
+  if (!toolInput) {
+    return false;
+  }
+
+  const filePath = optionalString(toolInput, "file_path");
+  const notebookPath = optionalString(toolInput, "notebook_path");
+  const targetPath = filePath === undefined ? notebookPath : filePath;
+  if (targetPath === undefined) {
+    return false;
+  }
+
+  const basename = path.basename(targetPath).toLowerCase();
+  return basename.includes("handoff") && basename.endsWith(".md");
+};
+
+const windDownInstructions = (sessionId: string): string => {
+  if (!isArmed(sessionId)) {
     return (
       "1) Run the /handoff skill now to save a resume doc — handoff*.md writes are still allowed.\n" +
-      "2) Then tell the user, in plain text: \"I've hit the context guardrail — please run " +
-      "/compact (or /clear) and I'll continue from the handoff doc.\""
+      "2) Then tell the user: \"I've hit the context guardrail — please run /compact (or /clear) and I'll continue from the handoff doc.\""
     );
   }
+
   return (
-    "This session is autorun-armed — the daemon will /compact for you once a fresh handoff exists and the turn is idle. So:\n" +
-    "1) If work remains: run the /handoff skill now to save a resume doc (handoff*.md writes still allowed). The daemon compacts, then auto-resumes.\n" +
-    `2) If the task is GENUINELY and FULLY complete: create the done-marker \`${loopFile(sid, "done")}\` (an empty file) instead of a handoff, and stop. Do NOT invent follow-up work to keep the loop running.`
+    "This session is autorun-armed, so the daemon compacts after a fresh handoff exists and the turn is idle.\n" +
+    "1) If work remains, run /handoff now.\n" +
+    `2) If the task is genuinely complete, create \`${loopFile(sessionId, "done")}\` and stop.`
   );
-}
+};
 
-function handlePreToolUse(data: HookInput, pct: number, model: string, window: number, blockPct: number): void {
-  if (pct < blockPct) allow();
-  if (data.tool_name && WRITE_TOOLS.has(data.tool_name) && isHandoffTarget(data.tool_input)) allow();
-  const sid = data.session_id ?? "session";
+const handlePreToolUse = (request: {
+  hookInput: HookInput;
+  occupancyFraction: number;
+  model: string;
+  contextWindow: number;
+  blockFraction: number;
+}): never => {
+  if (request.occupancyFraction < request.blockFraction) {
+    return allow();
+  }
+
+  if (
+    request.hookInput.tool_name &&
+    WRITE_TOOLS.has(request.hookInput.tool_name) &&
+    isHandoffTarget(request.hookInput.tool_input)
+  ) {
+    return allow();
+  }
+
+  const sessionId = request.hookInput.session_id === undefined ? "session" : request.hookInput.session_id;
+  const modelName = request.model.length === 0 ? "this model" : request.model;
   const reason =
-    `\u{1F6D1} Context guard: session is at ${pctText(pct)} of ${model || "this model"}'s ` +
-    `${window.toLocaleString("en-US")}-token window (>= ${pctText(blockPct)} hard limit). Stop writing code.\n` +
-    `${windDown(sid)}\n` +
-    "Do not attempt further code edits until the context is compacted. (Override: `touch ~/.claude/.ctx-guard-off`.)";
-  emit({
-    hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: reason },
+    `🛑 Context guard: session is at ${percentageText(request.occupancyFraction)} of ${modelName}'s ` +
+    `${request.contextWindow.toLocaleString("en-US")}-token window ` +
+    `(≥ ${percentageText(request.blockFraction)} hard limit). Stop writing code.\n` +
+    `${windDownInstructions(sessionId)}\n` +
+    "Do not attempt further code edits until the context is compacted.";
+
+  return emit({
+    hookSpecificOutput: {
+      hookEventName: "PreToolUse",
+      permissionDecision: "deny",
+      permissionDecisionReason: reason,
+    },
   });
-}
+};
 
-/** Nudge once per warn-band entry (shared by PostToolUse + UserPromptSubmit). */
-function emitNudgeOnce(
-  data: HookInput,
-  pct: number,
-  window: number,
-  event: string,
-  warnPct: number,
-  blockPct: number,
-): void {
-  const sid = data.session_id ?? "session";
-  const flag = guardFlag(sid);
-  if (pct < warnPct) {
-    remove(flag);
-    allow();
+const emitNudgeOnce = (request: {
+  hookInput: HookInput;
+  occupancyFraction: number;
+  contextWindow: number;
+  eventName: string;
+  warnFraction: number;
+  blockFraction: number;
+}): never => {
+  const sessionId = request.hookInput.session_id === undefined ? "session" : request.hookInput.session_id;
+  const nudgeFlag = guardFlag(sessionId);
+  if (request.occupancyFraction < request.warnFraction) {
+    remove(nudgeFlag);
+    return allow();
   }
-  if (pct >= blockPct || exists(flag)) allow();
-  writeText(path.join(GUARD_STATE_DIR, `${sid}.nudged`), "");
+
+  if (request.occupancyFraction >= request.blockFraction || exists(nudgeFlag)) {
+    return allow();
+  }
+
+  writeText(path.join(GUARD_STATE_DIR, `${sessionId}.nudged`), "");
   const message =
-    `⚠️ Context guard: session is at ${pctText(pct)} of the ${window.toLocaleString("en-US")}-token window — ` +
-    `approaching the ${pctText(blockPct)} hard limit. Wrap up NOW.\n${windDown(sid)}\nAvoid starting new code work.`;
-  emit({ hookSpecificOutput: { hookEventName: event, additionalContext: message } });
-}
+    `⚠️ Context guard: session is at ${percentageText(request.occupancyFraction)} of the ` +
+    `${request.contextWindow.toLocaleString("en-US")}-token window — approaching the ` +
+    `${percentageText(request.blockFraction)} hard limit. Wrap up now.\n` +
+    `${windDownInstructions(sessionId)}\nAvoid starting new code work.`;
+  return emit({ hookSpecificOutput: { hookEventName: request.eventName, additionalContext: message } });
+};
 
-function main(): void {
-  if (exists(KILL_SWITCH)) allow();
-  let data: HookInput;
-  try {
-    data = JSON.parse(readFileSync(0, "utf8")) as HookInput;
-  } catch {
-    allow();
+const runContextGuard = (): never => {
+  if (exists(KILL_SWITCH)) {
+    return allow();
   }
-  const transcript = resolveTranscript(data!);
-  if (!transcript) allow();
-  const { occupancy, model } = readOccupancy(transcript!);
-  if (!occupancy) allow();
-  const { contextWarnFraction, contextBlockFraction } = readConfig();
-  const window = windowFor(model);
-  const pct = occupancy! / window;
-  const event = data!.hook_event_name;
-  if (event === "PreToolUse") handlePreToolUse(data!, pct, model, window, contextBlockFraction);
-  if (event === "PostToolUse" || event === "UserPromptSubmit")
-    emitNudgeOnce(data!, pct, window, event, contextWarnFraction, contextBlockFraction);
-  allow();
-}
+
+  const hookEventCandidate: unknown = JSON.parse(readFileSync(0, "utf8"));
+  const hookInput = decodeHookInput(hookEventCandidate);
+  if (!hookInput) {
+    return allow();
+  }
+
+  const transcript = resolveTranscript(hookInput);
+  if (!transcript) {
+    return allow();
+  }
+
+  const occupancyReading = readOccupancy(transcript);
+  if (occupancyReading.occupancy === null) {
+    return allow();
+  }
+
+  const config = readConfig();
+  const contextWindow = windowFor(occupancyReading.model);
+  const occupancyFraction = occupancyReading.occupancy / contextWindow;
+  const eventName = hookInput.hook_event_name;
+  if (eventName === "PreToolUse") {
+    return handlePreToolUse({
+      hookInput,
+      occupancyFraction,
+      model: occupancyReading.model,
+      contextWindow,
+      blockFraction: config.contextBlockFraction,
+    });
+  }
+
+  if (eventName === "PostToolUse" || eventName === "UserPromptSubmit") {
+    return emitNudgeOnce({
+      hookInput,
+      occupancyFraction,
+      contextWindow,
+      eventName,
+      warnFraction: config.contextWarnFraction,
+      blockFraction: config.contextBlockFraction,
+    });
+  }
+
+  return allow();
+};
 
 try {
-  main();
-} catch (e) {
-  if (readConfig().debugEnabled) writeSync(2, `guard error: ${e instanceof Error ? e.stack : String(e)}\n`);
-  process.exit(0); // fail-open: never block a tool because the guard itself errored.
+  runContextGuard();
+} catch (failure) {
+  if (readConfig().debugEnabled) {
+    writeSync(2, `guard error: ${failure instanceof Error ? failure.stack : String(failure)}\n`);
+  }
+  process.exit(0);
 }

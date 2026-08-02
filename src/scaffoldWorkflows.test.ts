@@ -48,7 +48,7 @@ describe("scaffoldWorkflows", () => {
       const dir = mkdtempSync(path.join(tmpdir(), "dufflebag-scaffold-"));
       writeFileSync(path.join(dir, "package.json"), JSON.stringify({ name: "test-pkg" }));
 
-      const result = yield* scaffoldWorkflows({
+      const workflowScaffold = yield* scaffoldWorkflows({
         targetRoot: dir,
         templateDirectory: path.join(REPO_ROOT, "templates", "workflows"),
         force: false,
@@ -58,7 +58,7 @@ describe("scaffoldWorkflows", () => {
       const ciYml = readFileSync(path.join(workflows, "ci.yml"), "utf8");
       const publishYml = readFileSync(path.join(workflows, "publish.yml"), "utf8");
 
-      expect(result.written).toEqual(["ci.yml", "publish.yml", "report-failure.yml"]);
+      expect(workflowScaffold.written).toEqual(["ci.yml", "publish.yml", "report-failure.yml"]);
       expect(ciYml).toContain("run: pnpm verify");
       expect(ciYml).not.toContain("YosefHayim/dufflebag");
       expect(ciYml).not.toContain("setup-uv");

@@ -23,7 +23,7 @@ import { fileURLToPath } from "node:url";
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const CLI_ENTRY = path.join(ROOT, "dist", "src", "cli", "main.js");
 const DIST_ISLAND = path.join(ROOT, "dist", "src", "hookIsland");
-const PAYLOAD_DIR = path.join(ROOT, "dist", "src", "runtime");
+const SKILL_CONTENT_DIRECTORY = path.join(ROOT, "dist", "src", "runtime");
 const OUT_HOOKS = path.join(ROOT, "dist", "hooks");
 const OUT_LIB = path.join(OUT_HOOKS, "lib");
 
@@ -75,7 +75,7 @@ const main = () => {
     copyJs({ fromDir: path.join(DIST_ISLAND, feature, "lib"), toDir: OUT_LIB });
   }
   // The shared zero-dep kernel (config SSOT + io) sits alongside the feature libs.
-  copyJs({ fromDir: PAYLOAD_DIR, toDir: OUT_LIB });
+  copyJs({ fromDir: SKILL_CONTENT_DIRECTORY, toDir: OUT_LIB });
 
   const libs = readdirSync(OUT_LIB).filter((n) => n.endsWith(".js")).length;
   console.log(`assembled dist/hooks: ${hooks} hook(s) + ${libs} lib(s)`);

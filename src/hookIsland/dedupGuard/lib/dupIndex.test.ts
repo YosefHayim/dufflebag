@@ -27,69 +27,71 @@ const REPO = "/repo";
 const abs = (rel: string): string => path.posix.join(REPO, rel);
 
 /** Build an in-memory index from a {relPath: source} map (mirrors what buildIndex does on disk). */
-function indexFrom(files: Record<string, string>): DupIndex {
+const indexFrom = (files: Record<string, string>): DupIndex => {
   const typeSig = new Map<string, Decl[]>();
   const fnFp = new Map<string, Decl[]>();
-  const push = (map: Map<string, Decl[]>, key: string, value: Decl): void => {
-    // dup-ignore (deliberate test mirror of the engine's index push)
-    const list = map.get(key);
-    if (list) list.push(value);
-    else map.set(key, [value]);
-  };
   for (const [file, text] of Object.entries(files)) {
-    const { types, fns } = extractFromText(ts, text, file);
-    for (const t of types) push(typeSig, t.sig, { name: t.name, file, line: t.line, ignored: t.ignored });
-    for (const f of fns) push(fnFp, f.fp, { name: f.name, file, line: f.line, ignored: f.ignored });
+    const { types, fns } = extractFromText({ ts, sourceText: text, fileName: file });
+    for (const typeEntry of types) {
+      const declarations = typeSig.get(typeEntry.sig);
+      const declaration = { name: typeEntry.name, file, line: typeEntry.line, ignored: typeEntry.ignored };
+      typeSig.set(typeEntry.sig, declarations === undefined ? [declaration] : [...declarations, declaration]);
+    }
+    for (const functionEntry of fns) {
+      const declarations = fnFp.get(functionEntry.fp);
+      const declaration = { name: functionEntry.name, file, line: functionEntry.line, ignored: functionEntry.ignored };
+      fnFp.set(functionEntry.fp, declarations === undefined ? [declaration] : [...declarations, declaration]);
+    }
   }
   return { typeSig, fnFp };
-}
+};
 
 describe("function fingerprints", () => {
   const index = indexFrom({ "a.ts": "export function add(x: number, y: number) { return x + y; }" });
 
   it("flags a renamed copy of an existing function body", () => {
-    const hits = findDuplicatesInAddedText(
+    const hits = findDuplicatesInAddedText({
       ts,
       index,
-      REPO,
-      abs("b.ts"),
-      "export function sum(a: number, b: number) { return a + b; }",
-    );
+      repoRoot: REPO,
+      filePath: abs("b.ts"),
+      addedText: "export function sum(a: number, b: number) { return a + b; }",
+    });
     expect(hits).toHaveLength(1);
     expect(hits[0]).toMatchObject({ kind: "function", name: "sum", existing: { name: "add", file: "a.ts" } });
   });
 
   it("does NOT flag a body that differs by operator", () => {
-    const hits = findDuplicatesInAddedText(
+    const hits = findDuplicatesInAddedText({
       ts,
       index,
-      REPO,
-      abs("b.ts"),
-      "export function mul(a: number, b: number) { return a * b; }",
-    );
+      repoRoot: REPO,
+      filePath: abs("b.ts"),
+      addedText: "export function mul(a: number, b: number) { return a * b; }",
+    });
     expect(hits).toHaveLength(0);
   });
 
   it("respects a // dup-ignore on the declaration line", () => {
-    const hits = findDuplicatesInAddedText(
+    const hits = findDuplicatesInAddedText({
       ts,
       index,
-      REPO,
-      abs("b.ts"),
-      "export function sum(a: number, b: number) { return a + b; } // dup-ignore",
-    );
+      repoRoot: REPO,
+      filePath: abs("b.ts"),
+      addedText: "export function sum(a: number, b: number) { return a + b; } // dup-ignore",
+    });
     expect(hits).toHaveLength(0);
   });
 
   it("never trips on the function's own name in its own file", () => {
     const self = indexFrom({ "a.ts": "export function add(x: number, y: number) { return x + y; }" });
-    const hits = findDuplicatesInAddedText(
+    const hits = findDuplicatesInAddedText({
       ts,
-      self,
-      REPO,
-      abs("a.ts"),
-      "export function add(x: number, y: number) { return x + y; }",
-    );
+      index: self,
+      repoRoot: REPO,
+      filePath: abs("a.ts"),
+      addedText: "export function add(x: number, y: number) { return x + y; }",
+    });
     expect(hits).toHaveLength(0);
   });
 });
@@ -98,25 +100,25 @@ describe("type signatures", () => {
   const index = indexFrom({ "models.ts": "export interface User { id: string; name: string; }" });
 
   it("flags an identical shape under a new name, regardless of field order", () => {
-    const hits = findDuplicatesInAddedText(
+    const hits = findDuplicatesInAddedText({
       ts,
       index,
-      REPO,
-      abs("acct.ts"),
-      "export interface Account { name: string; id: string; }",
-    );
+      repoRoot: REPO,
+      filePath: abs("acct.ts"),
+      addedText: "export interface Account { name: string; id: string; }",
+    });
     expect(hits).toHaveLength(1);
     expect(hits[0]).toMatchObject({ kind: "type", name: "Account", existing: { name: "User" } });
   });
 
   it("does NOT flag a shape with a different field type", () => {
-    const hits = findDuplicatesInAddedText(
+    const hits = findDuplicatesInAddedText({
       ts,
       index,
-      REPO,
-      abs("acct.ts"),
-      "export interface Account { id: number; name: string; }",
-    );
+      repoRoot: REPO,
+      filePath: abs("acct.ts"),
+      addedText: "export interface Account { id: number; name: string; }",
+    });
     expect(hits).toHaveLength(0);
   });
 });

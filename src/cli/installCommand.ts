@@ -1,116 +1,56 @@
-/**
- * `dufflebag install` — decode request evidence, stage the package, install.
- */
+/** `dufflebag install [feature-id...]` — thin adapter over the install capability. */
 
-import { Command } from "@effect/cli";
-import { Terminal } from "@effect/platform";
+import { Args, Command } from "@effect/cli";
 import { Effect } from "effect";
 
-import { featureCatalog, selectedFeatureIds } from "../catalog/featureCatalog.js";
 import { install } from "../install/install.js";
 import { captureHostEvidence, destinationForScope } from "./hostEvidence.js";
-import {
-  featuresOption,
-  globalOption,
-  parseFeatureIds,
-  projectOption,
-  resolveScope,
-  yesOption,
-} from "./scopeOptions.js";
+import { formatOption, scopeOption } from "./scopeOptions.js";
 import { stagePackage } from "./stagePackage.js";
 import * as TerminalUI from "./TerminalUI.js";
 
-type FeatureChoice = { _tag: "selected"; ids: ReadonlyArray<string> } | { _tag: "defaults" };
-
-const resolveFeatureChoice = (input: {
-  featureIds: ReadonlyArray<string> | undefined;
-  interactive: boolean;
-  assumeYes: boolean;
-}) =>
-  Effect.gen(function* () {
-    if (input.featureIds !== undefined) {
-      const choice: FeatureChoice = { _tag: "selected", ids: input.featureIds };
-      return choice;
-    }
-
-    if (!input.interactive || input.assumeYes) {
-      const choice: FeatureChoice = { _tag: "defaults" };
-      return choice;
-    }
-
-    const selected = yield* TerminalUI.multiSelect({
-      message: "Select features to install",
-      choices: featureCatalog.map((feature) => ({
-        title: feature.title,
-        value: feature.id,
-        description: feature.summary,
-        selected: feature.selectedByDefault,
-      })),
-      initial: selectedFeatureIds,
-    });
-
-    const choice: FeatureChoice = { _tag: "selected", ids: selected };
-    return choice;
-  });
+const featureIdsArgument = Args.text({ name: "feature-id" }).pipe(
+  Args.repeated,
+  Args.withDescription("Feature IDs from `dufflebag catalog`; omitted means catalog defaults"),
+);
 
 export const installCommand = Command.make(
   "install",
   {
-    project: projectOption,
-    global: globalOption,
-    features: featuresOption,
-    yes: yesOption,
+    featureIds: featureIdsArgument,
+    scope: scopeOption,
+    format: formatOption,
   },
   (args) =>
     Effect.gen(function* () {
-      yield* TerminalUI.intro("install");
-      const scope = yield* resolveScope(args);
+      if (args.format === "text") yield* TerminalUI.intro("install");
       const host = yield* captureHostEvidence;
       const stagedPackage = yield* stagePackage;
-      const terminal = yield* Terminal.Terminal;
-      const isTTY = yield* terminal.isTTY;
-      const interaction: { _tag: "scripted" } | { _tag: "interactive" } =
-        args.yes || !isTTY ? { _tag: "scripted" } : { _tag: "interactive" };
-      const featureIds = parseFeatureIds(args.features);
-      const features = yield* resolveFeatureChoice({
-        featureIds,
-        interactive: interaction._tag === "interactive",
-        assumeYes: args.yes,
-      });
-
-      if (interaction._tag === "interactive" && !args.yes) {
-        const confirmed = yield* TerminalUI.confirm({
-          message: `Install into ${scope} scope?`,
-          initialValue: true,
-        });
-        if (!confirmed) {
-          yield* TerminalUI.outro("Cancelled — nothing was changed.");
-          return;
-        }
-      }
-
-      const result = yield* install({
+      const installation = yield* install({
         destination: destinationForScope({
-          scope,
+          scope: args.scope,
           homeRoot: host.homeRoot,
           projectRoot: host.projectRoot,
         }),
         host: { homeRoot: host.homeRoot },
         stagedPackage,
-        features,
+        features: args.featureIds.length === 0 ? { _tag: "defaults" } : { _tag: "selected", ids: args.featureIds },
         agents: { _tag: "detected", evidence: host.agentEvidence },
-        interaction,
+        interaction: { _tag: "scripted" },
         configuration: { _tag: "automatic" },
       });
 
-      yield* TerminalUI.success(
-        result._tag === "installed"
-          ? `Installed ${result.features.join(", ")} (${result.scope})`
-          : `Already current: ${result.features.join(", ")} (${result.scope})`,
-      );
-      if (result.agents.length > 0) {
-        yield* TerminalUI.detail(`Agents: ${result.agents.join(", ")}`);
+      if (args.format === "json") {
+        yield* TerminalUI.json(installation);
+        return;
       }
+
+      yield* TerminalUI.success(
+        installation._tag === "installed"
+          ? `Installed ${installation.features.join(", ")} (${installation.scope})`
+          : `Already current: ${installation.features.join(", ")} (${installation.scope})`,
+      );
+      if (installation.agents.length > 0) yield* TerminalUI.detail(`Agents: ${installation.agents.join(", ")}`);
       yield* TerminalUI.outro("Done.");
-    }).pipe(Effect.catchAll((error) => TerminalUI.presentError(error))),
-).pipe(Command.withDescription("Install (or re-run to refresh) the selected features"));
+    }),
+).pipe(Command.withDescription("Install catalog defaults or the named features"));

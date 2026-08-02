@@ -2,8 +2,8 @@
 import fs from "node:fs";
 /** Mask a PNG by region for isolating animatable layers before tracing. */
 import { PNG } from "pngjs";
-import type { MaskBox, MaskConfig } from "../lib/index.js";
-import { hexToRgb, inPoly } from "../lib/index.js";
+import { hexToRgb, inPoly } from "../lib/png.js";
+import type { MaskBox, MaskConfig } from "../lib/types.js";
 
 const configPath = process.argv[2];
 if (!configPath) {
@@ -13,7 +13,7 @@ if (!configPath) {
 
 const cfg = JSON.parse(fs.readFileSync(configPath, "utf8")) as MaskConfig;
 const png = PNG.sync.read(fs.readFileSync(cfg.input));
-const { width: W, height: H, data } = png;
+const { width: W, height: H, data: pixelBytes } = png;
 
 const boxFill = (px: number, py: number): [number, number, number] | null => {
   for (const box of cfg.boxes || []) {
@@ -24,10 +24,10 @@ const boxFill = (px: number, py: number): [number, number, number] | null => {
 };
 
 const paint = (i: number, rgb: [number, number, number]) => {
-  data[i] = rgb[0];
-  data[i + 1] = rgb[1];
-  data[i + 2] = rgb[2];
-  data[i + 3] = 255;
+  pixelBytes[i] = rgb[0];
+  pixelBytes[i + 1] = rgb[1];
+  pixelBytes[i + 2] = rgb[2];
+  pixelBytes[i + 3] = 255;
 };
 
 for (let y = 0; y < H; y++) {

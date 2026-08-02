@@ -23,24 +23,25 @@ const processAlive = (pid: number): boolean => {
   }
 };
 
+const reclaimStaleInputLock = (): boolean => {
+  try {
+    const lockModifiedAt = existsSync(KEY_LOCK) ? statSync(KEY_LOCK).mtimeMs : Date.now();
+    if (Date.now() - lockModifiedAt <= KEY_LOCK_STALE_MS) return false;
+    remove(KEY_LOCK);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
 const acquireInputLock = (): boolean => {
   try {
     const descriptor = openSync(KEY_LOCK, "wx");
     writeSync(descriptor, `${process.pid} ${Math.floor(Date.now() / 1_000)}`);
     closeSync(descriptor);
     return true;
-  } catch {
-    try {
-      const age = Date.now() - (existsSync(KEY_LOCK) ? statSync(KEY_LOCK).mtimeMs : Date.now());
-      if (age > KEY_LOCK_STALE_MS) {
-        remove(KEY_LOCK);
-        return acquireInputLock();
-      }
-    } catch {
-      /* fail closed */
-    }
-    return false;
-  }
+  } catch {}
+  return reclaimStaleInputLock() && acquireInputLock();
 };
 
 const withInputLock = (send: () => boolean): boolean => {
@@ -50,6 +51,69 @@ const withInputLock = (send: () => boolean): boolean => {
   } finally {
     remove(KEY_LOCK);
   }
+};
+
+type CompactAction = ReturnType<typeof decideIdleCompactAction>;
+type CompactState = NonNullable<ReturnType<typeof decodeIdleCompactSessionState>>;
+
+const performAction = (request: {
+  readonly stateFile: string;
+  readonly state: CompactState;
+  readonly action: CompactAction;
+}): boolean => {
+  switch (request.action._tag) {
+    case "reap":
+      remove(request.stateFile);
+      return false;
+    case "submitDraft":
+      writeJsonAtomic(request.stateFile, {
+        ...request.state,
+        phase: "awaitingPrompt",
+        phaseStartedAtMs: Date.now(),
+      });
+      if (withInputLock(() => sendTerminalEnter(request.state.terminalId))) return true;
+      remove(request.stateFile);
+      return false;
+    case "compact":
+      writeJsonAtomic(request.stateFile, { ...request.state, phase: "compacting", phaseStartedAtMs: Date.now() });
+      if (
+        withInputLock(() =>
+          sendTerminalText({
+            terminalId: request.state.terminalId,
+            text: request.state.compactCommand,
+            submit: true,
+          }),
+        )
+      ) {
+        return true;
+      }
+      remove(request.stateFile);
+      return false;
+    case "park":
+      if (request.state.phase !== "parked") {
+        writeJsonAtomic(request.stateFile, { ...request.state, phase: "parked", phaseStartedAtMs: Date.now() });
+      }
+      return true;
+    case "wait":
+      return true;
+  }
+};
+
+const continueWatching = (stateFile: string): boolean => {
+  if (existsSync(KILL_SWITCH)) return false;
+  const state = decodeIdleCompactSessionState(readJson(stateFile));
+  if (!state) return false;
+  const action = decideIdleCompactAction({
+    phase: state.phase,
+    nowMs: Date.now(),
+    phaseStartedAtMs: state.phaseStartedAtMs,
+    idleSeconds: state.idleSeconds,
+    acknowledgementSeconds: ACKNOWLEDGEMENT_SECONDS,
+    agentAlive: processAlive(state.agentPid),
+    sessionEnded: state.sessionEnded,
+    terminalAvailable: terminalExists(state.terminalId),
+  });
+  return performAction({ stateFile, state, action });
 };
 
 const main = async (): Promise<void> => {
@@ -66,41 +130,7 @@ const main = async (): Promise<void> => {
   }
 
   try {
-    for (;;) {
-      if (existsSync(KILL_SWITCH)) return;
-      const state = decodeIdleCompactSessionState(readJson(stateFile));
-      if (!state) return;
-
-      const action = decideIdleCompactAction({
-        phase: state.phase,
-        nowMs: Date.now(),
-        phaseStartedAtMs: state.phaseStartedAtMs,
-        idleSeconds: state.idleSeconds,
-        acknowledgementSeconds: ACKNOWLEDGEMENT_SECONDS,
-        agentAlive: processAlive(state.agentPid),
-        sessionEnded: state.sessionEnded,
-        terminalAvailable: terminalExists(state.terminalId),
-      });
-
-      if (action._tag === "reap") {
-        remove(stateFile);
-        return;
-      }
-      if (action._tag === "submitDraft") {
-        writeJsonAtomic(stateFile, { ...state, phase: "awaitingPrompt", phaseStartedAtMs: Date.now() });
-        if (!withInputLock(() => sendTerminalEnter(state.terminalId))) {
-          remove(stateFile);
-          return;
-        }
-      } else if (action._tag === "compact") {
-        writeJsonAtomic(stateFile, { ...state, phase: "compacting", phaseStartedAtMs: Date.now() });
-        if (!withInputLock(() => sendTerminalText(state.terminalId, state.compactCommand, true))) {
-          remove(stateFile);
-          return;
-        }
-      } else if (action._tag === "park" && state.phase !== "parked") {
-        writeJsonAtomic(stateFile, { ...state, phase: "parked", phaseStartedAtMs: Date.now() });
-      }
+    while (continueWatching(stateFile)) {
       await sleep(POLL_MS);
     }
   } finally {

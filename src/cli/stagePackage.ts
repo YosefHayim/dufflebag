@@ -64,7 +64,7 @@ const readPackageVersion = (packageRoot: string) =>
     const fileSystem = yield* FileSystem.FileSystem;
     const path = yield* Path.Path;
     const packageJsonPath = path.join(packageRoot, "package.json");
-    const raw = yield* fileSystem.readFileString(packageJsonPath).pipe(
+    const manifestSource = yield* fileSystem.readFileString(packageJsonPath).pipe(
       Effect.mapError(
         (error) =>
           new StagePackageError({
@@ -74,7 +74,7 @@ const readPackageVersion = (packageRoot: string) =>
     );
 
     const parsed = yield* Effect.try({
-      try: (): unknown => JSON.parse(raw),
+      try: (): unknown => JSON.parse(manifestSource),
       catch: (error) =>
         new StagePackageError({
           issue: `package.json is not valid JSON: ${error instanceof Error ? error.message : String(error)}`,

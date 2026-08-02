@@ -366,11 +366,11 @@ describe("featureCatalog", () => {
   });
 
   it("returns a tagged unknown-feature error", () => {
-    const result = resolveFeatureSelection(["not-installed"]);
+    const featureCatalogCheck = resolveFeatureSelection(["not-installed"]);
 
-    expect(Either.isLeft(result)).toBe(true);
-    expect(Option.getOrThrow(Either.getLeft(result))).toBeInstanceOf(UnknownFeatureError);
-    expect(Option.getOrThrow(Either.getLeft(result)).featureId).toBe("not-installed");
+    expect(Either.isLeft(featureCatalogCheck)).toBe(true);
+    expect(Option.getOrThrow(Either.getLeft(featureCatalogCheck))).toBeInstanceOf(UnknownFeatureError);
+    expect(Option.getOrThrow(Either.getLeft(featureCatalogCheck)).featureId).toBe("not-installed");
   });
 });
 
@@ -430,9 +430,9 @@ describe("featureCatalogSchema", () => {
       message: "must end in .ts",
     },
   ])("rejects $name", ({ input, message }) => {
-    const result = decodeFixture(input);
+    const featureCatalogCheck = decodeFixture(input);
 
-    expect(Either.isLeft(result)).toBe(true);
-    expect(String(Option.getOrThrow(Either.getLeft(result)))).toContain(message);
+    expect(Either.isLeft(featureCatalogCheck)).toBe(true);
+    expect(String(Option.getOrThrow(Either.getLeft(featureCatalogCheck)))).toContain(message);
   });
 });

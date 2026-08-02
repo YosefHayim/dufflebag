@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-import { Either, ParseResult, Schema } from "effect";
+import { Either, Schema, ParseResult as SchemaParseIssue } from "effect";
 import { applyEdits, type Node as JsonNode, modify, parseTree } from "jsonc-parser";
 import { isMap, isScalar, isSeq, parseDocument } from "yaml";
 
@@ -38,7 +38,8 @@ export class ConfigReferencePlanError extends Schema.TaggedError<ConfigReference
   }
 }
 
-const formatParseError = (error: ParseResult.ParseError): string => ParseResult.TreeFormatter.formatErrorSync(error);
+const formatParseError = (error: SchemaParseIssue.ParseError): string =>
+  SchemaParseIssue.TreeFormatter.formatErrorSync(error);
 
 const formatUnknownError = (error: unknown): string => (error instanceof Error ? error.message : String(error));
 
@@ -293,7 +294,7 @@ const insertMissingJsonRules = (
     return Either.left(root.left);
   }
 
-  const properties = root.right.children ?? [];
+  const properties = root.right.children || [];
   const lastProperty = properties.at(-1);
   const insertionIndex = lastProperty === undefined ? root.right.offset + 1 : lastProperty.offset + lastProperty.length;
   const separator = lastProperty === undefined ? "" : ",";
@@ -310,7 +311,7 @@ const removeInsertedJsonRules = (source: string): Either.Either<string, ConfigRe
     return Either.left(root.left);
   }
 
-  const properties = root.right.children ?? [];
+  const properties = root.right.children || [];
   const rulesIndex = properties.findIndex((property) => jsonPropertyName(property) === "rules");
   const rulesProperty = properties[rulesIndex];
   if (rulesIndex < 0 || rulesProperty === undefined) {
@@ -519,7 +520,7 @@ const inspectYamlReadDocument = (source: string): Either.Either<YamlReadDocument
     pairStart: pair.key.range[0],
     pairEnd: pair.value.range[2],
     insertionIndex,
-    itemPrefix: itemPrefix ?? "  - ",
+    itemPrefix: itemPrefix === undefined ? "  - " : itemPrefix,
     items,
   });
 };
@@ -576,13 +577,16 @@ const createJsonOwnership = (input: {
 
   return {
     _tag: "jsonValues",
-    filePreviouslyPresent: previousOwnership?.filePreviouslyPresent ?? input.request.currentFile._tag === "file",
+    filePreviouslyPresent:
+      previousOwnership === undefined
+        ? input.request.currentFile._tag === "file"
+        : previousOwnership.filePreviouslyPresent,
     createdContainers: [],
     values: [
       {
         pointer: "/rules",
         installed: { _tag: "value", hash: hashJsonValue(input.desiredRules) },
-        previous: history?.previous ?? previousRulesValue(input.previousRules),
+        previous: history === undefined ? previousRulesValue(input.previousRules) : history.previous,
       },
     ],
   };
@@ -681,7 +685,7 @@ const planJsonReference = (
   const instructionPath = request.agent.target.instructionPath;
   const desiredRules = previousRules?.includes(instructionPath)
     ? previousRules
-    : [...(previousRules ?? []), instructionPath];
+    : [...(previousRules || []), instructionPath];
   let desiredSource = current.right.source;
   if (desiredRules !== previousRules && previousRules === undefined) {
     const insertion = insertMissingJsonRules(current.right.source, desiredRules);

@@ -7,6 +7,7 @@ import { Effect } from "effect";
 
 import { type DoctorReport, doctor } from "../doctor.js";
 import { captureHostEvidence, destinationForScope } from "./hostEvidence.js";
+import { formatOption } from "./scopeOptions.js";
 import { stagePackage } from "./stagePackage.js";
 import * as TerminalUI from "./TerminalUI.js";
 
@@ -80,15 +81,15 @@ const reportScopeHealth = (inspection: { scope: DoctorScope; report: DoctorRepor
     yield* Effect.forEach(inspection.report.discrepancies, reportDiscrepancy);
   });
 
-export const doctorCommand = Command.make("doctor", {}, () =>
+export const doctorCommand = Command.make("doctor", { format: formatOption }, (args) =>
   Effect.gen(function* () {
-    yield* TerminalUI.intro("doctor");
+    if (args.format === "text") yield* TerminalUI.intro("doctor");
     const host = yield* captureHostEvidence;
     const stagedPackage = yield* stagePackage;
 
     const scopes: ReadonlyArray<DoctorScope> = ["global", "project"];
+    const inspections: Array<{ scope: DoctorScope; report: DoctorReport }> = [];
 
-    // Inspect both scopes so one command covers global and project health.
     for (const scope of scopes) {
       const report = yield* doctor({
         destination: destinationForScope({
@@ -100,10 +101,17 @@ export const doctorCommand = Command.make("doctor", {}, () =>
         platform: host.platform,
         agentEvidence: host.agentEvidence,
       });
-
-      yield* reportScopeHealth({ scope, report });
+      inspections.push({ scope, report });
     }
 
+    const unhealthy = inspections.some((inspection) => inspection.report.discrepancies.length > 0);
+    if (unhealthy) process.exitCode = 1;
+    if (args.format === "json") {
+      yield* TerminalUI.json({ _tag: unhealthy ? "unhealthy" : "healthy", scopes: inspections });
+      return;
+    }
+
+    yield* Effect.forEach(inspections, reportScopeHealth);
     yield* TerminalUI.outro("Read-only check complete.");
-  }).pipe(Effect.catchAll((error) => TerminalUI.presentError(error))),
+  }),
 ).pipe(Command.withDescription("Read-only health check across global + project scopes"));
