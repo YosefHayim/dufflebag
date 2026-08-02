@@ -20,6 +20,7 @@ jobs:
   sync-readme:
     name: Generate & commit README
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -34,6 +35,7 @@ jobs:
         with:
           node-version: 24
           cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
 
       - name: Generate README
         run: node scripts/generateReadme.mjs

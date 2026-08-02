@@ -41,6 +41,7 @@ jobs:
     # Skip a workflow_run trigger that did not succeed — a failed Release must not publish.
     if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     permissions:
       id-token: write
       contents: read
@@ -71,11 +72,7 @@ jobs:
           node-version: 24
           registry-url: https://registry.npmjs.org
           cache: pnpm
-
-      - name: Setup uv and Python
-        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
-        with:
-          python-version: "3.12"
+          cache-dependency-path: pnpm-lock.yaml
 
       - name: Verify npm supports OIDC Trusted Publishing
         run: |

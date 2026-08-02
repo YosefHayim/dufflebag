@@ -9,7 +9,7 @@
 - **The owner / user** — runs `npx ys-dufflebag install` to wire guardrails into `~/.claude` (global) or `./.claude` (project).
 - **Claude Code, Codex, and Grok** — verified native lifecycle-hook targets.
 - **Other agents** — detected and wired only through verified catalog-driven formats; unsupported hook adapters are reported, not guessed.
-- **CI / `scaffold-workflows` consumers** — repos that copy the reusable workflow set from `templates/workflows/`.
+- **CI / `scaffold-workflows` consumers** — repos that copy the single-gate CI/publish set from `templates/workflows/`.
 
 ## Shape (capability layout)
 

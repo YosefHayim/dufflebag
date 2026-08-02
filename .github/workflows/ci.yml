@@ -1,54 +1,56 @@
 name: CI
 
-# dufflebag's own CI gate — composes the single-purpose workflows (biome /
-# typecheck / test / build / report-failure) via `./` local refs; each is
-# `on: workflow_call`. This same set is mirrored into `templates/workflows/`, which
-# `dufflebag scaffold-ci` COPIES into other repos so each owns its CI (ADR 0009).
-#
-# - `CI Gate` is the single aggregated status check: require it in branch
-#   protection so a red leg blocks PR merges.
-# - `report-failure` opens/updates a ci-failure issue when main goes red (ADR 0005);
-#   never for PRs.
+# One install and one `pnpm verify` run cover formatting, types, tests, the
+# production build, and repository gates. Dufflebag additionally needs uv for
+# its shipped voice integration test. See ADR 0018.
 
 on:
   push:
     branches: [main, dev]
   pull_request:
     branches: [main, dev]
+  workflow_dispatch:
 
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  biome:
-    uses: ./.github/workflows/biome.yml
-
-  typecheck:
-    uses: ./.github/workflows/typecheck.yml
-
-  test:
-    uses: ./.github/workflows/test.yml
-
-  build:
-    uses: ./.github/workflows/build.yml
-
-  gate:
+  verify:
     name: CI Gate
-    needs: [biome, typecheck, test, build]
-    if: always()
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
-      - name: Require every gate to pass
-        run: |
-          echo "biome=${{ needs.biome.result }} typecheck=${{ needs.typecheck.result }} test=${{ needs.test.result }} build=${{ needs.build.result }}"
-          test "${{ needs.biome.result }}" = "success" \
-            && test "${{ needs.typecheck.result }}" = "success" \
-            && test "${{ needs.test.result }}" = "success" \
-            && test "${{ needs.build.result }}" = "success"
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Setup uv and Python
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify
+        run: pnpm verify
 
   report-failure:
     name: Open issue on main failure
-    needs: [biome, typecheck, test, build]
+    needs: verify
     if: failure() && github.event_name == 'push' && github.ref == 'refs/heads/main'
     permissions:
       contents: read

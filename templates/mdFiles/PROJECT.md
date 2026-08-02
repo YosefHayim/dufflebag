@@ -43,8 +43,8 @@ immediately — a toolbelt, not a platform.
   push-to-talk dictation and an optional reviewed on-device prompt-refinement step.
 - A PNG **converges to pixel-perfect code** via a measured screenshot-diff loop, not
   eyeballing.
-- Any repo adopts the **single-purpose CI set** (and templated `publish.yml`) with one
-  `scaffold-ci`.
+- Any repo adopts one efficient **single-gate CI workflow** (and templated
+  `publish.yml`) with one `scaffold-ci`.
 
 ## Non-goals
 
@@ -61,7 +61,7 @@ immediately — a toolbelt, not a platform.
 
 - **Built:** context-guard · dedup-guard · autonomous-loop (`autorun`) · speak-response ·
   png-to-code · `scaffold-ci`. The `skills-bag → dufflebag` rename (clean break),
-  vertical-per-feature layout, catalog ship-allowlist, and reusable workflows all landed —
+  vertical-per-feature layout, catalog ship-allowlist, and copyable single-gate workflows all landed —
   as did the **2026-07-02 style refresh** (TSDoc on the exported surface, biome linter on,
   co-located tests, single-command `autorun`) and the **source consolidation**: all source
   under `src/` (capabilities + `src/skills/`), maintainer tooling under root `scripts/`, all copyable templates under `templates/`

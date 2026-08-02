@@ -30,7 +30,7 @@ describe("resolveWorkflows", () => {
   it("fills publish.yml, passes other workflows through verbatim, and drops non-yml", () => {
     const out = resolveWorkflows({
       files: [
-        { name: "ci.yml", raw: "name: CI\nuses: ./.github/workflows/biome.yml\n" },
+        { name: "ci.yml", raw: "name: CI\nrun: pnpm verify\n" },
         { name: "publish.yml", raw: "{{OWNER}}/{{REPO}} ships {{PACKAGE}}" },
         { name: "README.md", raw: "ignore me" },
       ],
@@ -38,12 +38,12 @@ describe("resolveWorkflows", () => {
     });
     expect(out.map((file) => file.name)).toEqual(["ci.yml", "publish.yml"]);
     expect(out.find((file) => file.name === "publish.yml")?.content).toBe("Acme/widget ships widget-cli");
-    expect(out.find((file) => file.name === "ci.yml")?.content).toContain("./.github/workflows/biome.yml");
+    expect(out.find((file) => file.name === "ci.yml")?.content).toContain("pnpm verify");
   });
 });
 
 describe("scaffoldWorkflows", () => {
-  it.effect("copies the whole workflow set, templating only publish.yml", () =>
+  it.effect("copies the lean workflow set, templating only publish.yml", () =>
     Effect.gen(function* () {
       const dir = mkdtempSync(path.join(tmpdir(), "dufflebag-scaffold-"));
       writeFileSync(path.join(dir, "package.json"), JSON.stringify({ name: "test-pkg" }));
@@ -58,15 +58,18 @@ describe("scaffoldWorkflows", () => {
       const ciYml = readFileSync(path.join(workflows, "ci.yml"), "utf8");
       const publishYml = readFileSync(path.join(workflows, "publish.yml"), "utf8");
 
-      expect(result.written.length).toBeGreaterThan(0);
-      expect(ciYml).toContain("uses: ./.github/workflows/biome.yml");
+      expect(result.written).toEqual(["ci.yml", "publish.yml", "report-failure.yml"]);
+      expect(ciYml).toContain("run: pnpm verify");
       expect(ciYml).not.toContain("YosefHayim/dufflebag");
-      // Every single-purpose leg + the opt-in e2e land alongside.
-      for (const leg of ["biome.yml", "typecheck.yml", "test.yml", "build.yml", "report-failure.yml", "e2e.yml"]) {
-        expect(existsSync(path.join(workflows, leg))).toBe(true);
+      expect(ciYml).not.toContain("setup-uv");
+      expect(existsSync(path.join(workflows, "report-failure.yml"))).toBe(true);
+      // The lean template must not recreate the superseded reusable legs.
+      for (const stale of ["biome.yml", "typecheck.yml", "test.yml", "build.yml", "e2e.yml"]) {
+        expect(existsSync(path.join(workflows, stale))).toBe(false);
       }
       expect(publishYml).toContain("test-pkg");
       expect(publishYml).not.toMatch(/\{\{\s*(OWNER|REPO|PACKAGE)\s*\}\}/);
+      expect(publishYml).not.toContain("setup-uv");
 
       rmSync(dir, { recursive: true, force: true });
     }),

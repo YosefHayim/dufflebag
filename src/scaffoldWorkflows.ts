@@ -1,5 +1,5 @@
 /**
- * Scaffold reusable CI + publish workflow templates into a repository.
+ * Scaffold owned single-gate CI + publish workflow templates into a repository.
  *
  * Templates live under `templates/workflows/`. Only `publish.yml` is filled
  * with OWNER/REPO/PACKAGE placeholders; every other `.yml` copies verbatim.
@@ -179,7 +179,7 @@ const detectInputs = (root: string) =>
     } satisfies ScaffoldInputs;
   });
 
-// Copy the CI + publish workflow set into a repository's .github/workflows.
+// Copy the lean CI + publish workflow set into a repository's .github/workflows.
 export const scaffoldWorkflows = (input: unknown) =>
   Effect.gen(function* () {
     const request = yield* Schema.decodeUnknown(scaffoldWorkflowsRequestSchema, {
