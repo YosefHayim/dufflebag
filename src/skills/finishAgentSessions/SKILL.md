@@ -1,6 +1,7 @@
 ---
 name: finish-agent-sessions
 description: Use when the user asks to find, recover, resume, or finish incomplete work across Claude Code, Codex, Kiro, Kimi, Cursor, OpenCode, Grok, or other agent sessions without leaving stale, duplicate, or partially completed tasks.
+type: flow
 ---
 
 # Finish Agent Sessions

@@ -1,5 +1,5 @@
 {
-  "version": 3,
+  "version": 4,
   "guide": "CODE-STYLE.md",
   "rules": [
     {
@@ -9,7 +9,7 @@
     },
     {
       "id": "path.no-generic-bucket",
-      "statement": "Every authored file name states the domain job it performs.",
+      "statement": "Every authored file and directory name states the domain job it performs.",
       "verify": "pnpm style"
     },
     {
@@ -25,6 +25,21 @@
     {
       "id": "architecture.no-wrapper-layer",
       "statement": "A repository-owned layer exists only when it owns policy the official service does not.",
+      "verify": "judgment"
+    },
+    {
+      "id": "architecture.policy-mechanism",
+      "statement": "Business decisions are pure functions and mutable filesystem, process, and terminal mechanisms are separated by reason to change.",
+      "verify": "judgment"
+    },
+    {
+      "id": "architecture.earned-abstraction",
+      "statement": "An abstraction exists only when it names a domain concept, owns a side-effect boundary, or serves a second caller.",
+      "verify": "judgment"
+    },
+    {
+      "id": "architecture.no-speculation",
+      "statement": "Fallbacks, optional branches, and recovery paths exist only at a named trust boundary with a real failure requirement.",
       "verify": "judgment"
     },
     {
@@ -58,14 +73,34 @@
       "verify": "pnpm style"
     },
     {
+      "id": "control.guard-else",
+      "statement": "Failed prerequisites return early and `else` appears only when both branches are meaningful alternatives.",
+      "verify": "judgment"
+    },
+    {
+      "id": "control.closed-switch",
+      "statement": "Closed domain variants use an exhaustive switch and extensible catalogs use keyed declarations.",
+      "verify": "judgment"
+    },
+    {
+      "id": "control.ternary",
+      "statement": "A ternary expresses only one short symmetric choice and never contains another ternary.",
+      "verify": "biome ci ."
+    },
+    {
       "id": "class.tagged-error-only",
       "statement": "The only authored class directly extends `Schema.TaggedError`.",
       "verify": "pnpm style"
     },
     {
-      "id": "comment.loop-intent",
-      "statement": "Every explicit loop carries an intent comment on the line directly above it.",
-      "verify": "pnpm style"
+      "id": "failure.domain-fields",
+      "statement": "Tagged application failures carry domain fields and leave user-facing wording to the CLI presentation boundary.",
+      "verify": "judgment"
+    },
+    {
+      "id": "failure.cli-translation",
+      "statement": "The CLI translates tagged failures once and maps usage, operation, health, duplicate, and interrupt states to their documented exit codes.",
+      "verify": "judgment"
     },
     {
       "id": "comment.index-proof",
@@ -73,8 +108,8 @@
       "verify": "pnpm style"
     },
     {
-      "id": "comment.pipeline-contract",
-      "statement": "A multi-phase pipeline states its contract above the orchestration and numbers each phase inside it.",
+      "id": "comment.hidden-intent-only",
+      "statement": "Comments explain a constraint or decision that names, types, and structure cannot express.",
       "verify": "judgment"
     },
     {
@@ -83,13 +118,38 @@
       "verify": "pnpm style"
     },
     {
-      "id": "type.no-handrolled-parser",
-      "statement": "Schema owns validation, and no exported type-guard or parse helper duplicates it.",
+      "id": "type.valid-states",
+      "statement": "Domain types encode valid states directly instead of combining flags whose invalid combinations need conditions.",
       "verify": "judgment"
     },
     {
+      "id": "type.selective-brand",
+      "statement": "Brands are reserved for domain identities whose accidental interchange would be a real defect.",
+      "verify": "judgment"
+    },
+    {
+      "id": "type.schema-serialization",
+      "statement": "The owning Schema defines decoding, encoding, defaults, and persisted migrations for its boundary value.",
+      "verify": "judgment"
+    },
+    {
+      "id": "type.no-unsafe-any",
+      "statement": "Authored types use `unknown` at trust boundaries and never use unsafe `any`.",
+      "verify": "pnpm style"
+    },
+    {
+      "id": "type.decode-once",
+      "statement": "Each application boundary decodes through its owning Schema once and downstream business logic trusts the decoded value.",
+      "verify": "judgment"
+    },
+    {
+      "id": "syntax.no-nullish",
+      "statement": "Authored TypeScript and JavaScript never use the nullish coalescing operator.",
+      "verify": "biome ci ."
+    },
+    {
       "id": "type.no-interface",
-      "statement": "Interfaces appear only in declaration-file augmentation.",
+      "statement": "Interfaces appear only for declaration merging or an external interoperability contract that requires one.",
       "verify": "pnpm style"
     },
     {
@@ -104,22 +164,22 @@
     },
     {
       "id": "type.no-assertion",
-      "statement": "Unknown input is decoded or narrowed, never asserted.",
+      "statement": "Unknown input is decoded or narrowed, while `as const`, `satisfies`, and a documented narrow external-type correction remain allowed.",
       "verify": "pnpm style"
     },
     {
       "id": "type.no-suppression",
-      "statement": "No suppression directive silences a type, lint, format, or coverage error.",
+      "statement": "A suppression is allowed only for a reasoned negative type test or a narrow external defect linked to an issue.",
       "verify": "pnpm style"
     },
     {
-      "id": "barrel.direct-wildcard",
-      "statement": "Every statement in a barrel is a direct wildcard export.",
+      "id": "module.no-passive-barrel",
+      "statement": "Authored modules export their own capability directly and never exist only to re-export sibling modules.",
       "verify": "pnpm style"
     },
     {
       "id": "name.domain-specific",
-      "statement": "Every identifier names its domain job or value.",
+      "statement": "Every authored identifier and path names its domain job and contains none of the forbidden generic tokens.",
       "verify": "pnpm style"
     },
     {
@@ -128,9 +188,9 @@
       "verify": "pnpm style"
     },
     {
-      "id": "collection.no-builder-reduce",
-      "statement": "Collections are built with `map`, `filter`, `flatMap`, or `Object.fromEntries`, never `reduce`.",
-      "verify": "pnpm style"
+      "id": "collection.intent",
+      "statement": "Collections use direct transformations, explicit loops for sequential or early-exit work, and `reduce` only for a genuine named aggregation.",
+      "verify": "judgment"
     },
     {
       "id": "effect.no-promise-all",
@@ -158,9 +218,44 @@
       "verify": "pnpm style"
     },
     {
+      "id": "config.precedence",
+      "statement": "Managed configuration combines invocation, environment, file, and Schema default precedence once in that order.",
+      "verify": "judgment"
+    },
+    {
+      "id": "path.workspace-ownership",
+      "statement": "The CLI resolves the workspace once and each capability owns constructors and containment rules for the paths it writes.",
+      "verify": "judgment"
+    },
+    {
+      "id": "process.argv",
+      "statement": "Child processes receive an executable and argument array without shell interpolation.",
+      "verify": "judgment"
+    },
+    {
       "id": "presentation.terminal-ui",
       "statement": "Application code returns structured results and leaves terminal output to `TerminalUI`.",
       "verify": "pnpm style"
+    },
+    {
+      "id": "test.behavior",
+      "statement": "Tests are colocated, name explicit scenarios, exercise public behavior in real temporary workspaces, and mock only external systems.",
+      "verify": "judgment"
+    },
+    {
+      "id": "tooling.tool-first",
+      "statement": "Maintained scripts exist only for repository-specific lifecycle work that an installed tool cannot perform directly.",
+      "verify": "judgment"
+    },
+    {
+      "id": "tooling.exact-dependencies",
+      "statement": "Runtime and development dependencies use exact versions with one lockfile per package lifecycle.",
+      "verify": "pnpm install --frozen-lockfile"
+    },
+    {
+      "id": "tooling.git-hooks-verify",
+      "statement": "Git hooks run deterministic checks and never rewrite or stage repository files.",
+      "verify": "judgment"
     }
   ],
   "protectedPaths": [
@@ -174,7 +269,7 @@
     },
     {
       "path": "src/skills/makeATrailer/scripts/assembleCut.mjs",
-      "codeRuleExemptions": ["function.arrow-only", "function.input-shape", "comment.loop-intent"]
+      "codeRuleExemptions": ["function.arrow-only", "function.input-shape"]
     }
   ]
 }

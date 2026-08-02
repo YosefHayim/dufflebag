@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 
 import { FileSystem, Path } from "@effect/platform";
-import { Effect, Either, ParseResult, Schema } from "effect";
+import { Effect, Either, Schema, ParseResult as SchemaParseIssue } from "effect";
 
 import { applyArtifactPlan } from "./applyArtifactPlan.js";
 import { createUninstallPlan } from "./artifactPlan.js";
@@ -25,21 +25,21 @@ export const uninstallRequestSchema = Schema.extend(
 
 export type UninstallRequest = Schema.Schema.Type<typeof uninstallRequestSchema>;
 
-const uninstallResultFieldsSchema = {
+const uninstallSummaryFieldsSchema = {
   scope: scopeSchema.annotations({
     description: "Installation scope inspected or removed by this capability call.",
   }),
   interaction: interactionSchema,
 };
 
-export const uninstallResultSchema = Schema.Union(
-  Schema.TaggedStruct("uninstalled", uninstallResultFieldsSchema),
-  Schema.TaggedStruct("absent", uninstallResultFieldsSchema),
+export const uninstallSummarySchema = Schema.Union(
+  Schema.TaggedStruct("uninstalled", uninstallSummaryFieldsSchema),
+  Schema.TaggedStruct("absent", uninstallSummaryFieldsSchema),
 ).annotations({
   description: "Removed or already-absent receipt-authoritative installation result.",
 });
 
-export type UninstallResult = Schema.Schema.Type<typeof uninstallResultSchema>;
+export type UninstallSummary = Schema.Schema.Type<typeof uninstallSummarySchema>;
 
 export class UninstallError extends Schema.TaggedError<UninstallError>()("UninstallError", {
   issue: Schema.NonEmptyString.annotations({
@@ -51,7 +51,8 @@ export class UninstallError extends Schema.TaggedError<UninstallError>()("Uninst
   }
 }
 
-const formatParseError = (error: ParseResult.ParseError): string => ParseResult.TreeFormatter.formatErrorSync(error);
+const formatParseError = (error: SchemaParseIssue.ParseError): string =>
+  SchemaParseIssue.TreeFormatter.formatErrorSync(error);
 
 const formatUnknownError = (error: unknown): string => (error instanceof Error ? error.message : String(error));
 
@@ -68,8 +69,11 @@ const decodeUninstallRequest = (input: unknown) =>
     onExcessProperty: "error",
   })(input).pipe(Effect.mapError((error) => new UninstallError({ issue: formatParseError(error) })));
 
-const createUninstallResult = (input: { tag: "uninstalled" | "absent"; request: UninstallRequest }): UninstallResult =>
-  Schema.validateSync(uninstallResultSchema, {
+const createUninstallSummary = (input: {
+  tag: "uninstalled" | "absent";
+  request: UninstallRequest;
+}): UninstallSummary =>
+  Schema.validateSync(uninstallSummarySchema, {
     onExcessProperty: "error",
   })({
     _tag: input.tag,
@@ -97,7 +101,7 @@ export const uninstall = (input: unknown) =>
     // 2. Inspect the sole receipt that can authorize artifact removal.
     const receiptSnapshot = yield* readArtifactReceiptSnapshot(path.join(request.destination.root, receiptPath));
     if (receiptSnapshot._tag === "missing") {
-      return createUninstallResult({ tag: "absent", request });
+      return createUninstallSummary({ tag: "absent", request });
     }
     if (receiptSnapshot.receipt.scope !== request.destination._tag) {
       return yield* new UninstallError({ issue: "Existing receipt scope does not match the requested destination." });
@@ -110,7 +114,7 @@ export const uninstall = (input: unknown) =>
     });
 
     // 4. Validate one complete uninstall plan with the inspected receipt precondition.
-    const planResult = createUninstallPlan({
+    const plannedUninstall = createUninstallPlan({
       root: request.destination.root,
       receipt: receiptSnapshot.receipt,
       restorations,
@@ -121,15 +125,15 @@ export const uninstall = (input: unknown) =>
       },
       receiptExpectedCurrent: { _tag: "file", sha256: hashBytes(receiptSnapshot.bytes) },
     });
-    if (Either.isLeft(planResult)) {
+    if (Either.isLeft(plannedUninstall)) {
       return yield* new UninstallError({
-        issue: `Generated uninstall plan is invalid: ${formatParseError(planResult.left)}`,
+        issue: `Generated uninstall plan is invalid: ${formatParseError(plannedUninstall.left)}`,
       });
     }
 
     // 5. Apply restorations atomically and remove the receipt last.
-    yield* applyArtifactPlan(planResult.right);
+    yield* applyArtifactPlan(plannedUninstall.right);
 
     // 6. Return one schema-validated presentation value.
-    return createUninstallResult({ tag: "uninstalled", request });
+    return createUninstallSummary({ tag: "uninstalled", request });
   }).pipe(Effect.mapError(toUninstallError));

@@ -6,7 +6,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const FETCH_TIMEOUT_MS = 20000;
-const RAW_FILE_SUFFIX = ".raw";
+const SOURCE_FILE_SUFFIX = ".source";
 const REQUEST_HEADERS = {
   accept: "text/html, text/markdown, text/plain;q=0.9, */*;q=0.8",
   "user-agent": "dufflebag-refresh-agent-docs/1.0",
@@ -70,8 +70,8 @@ function extensionFor(source, contentType) {
 }
 
 async function readJson(filePath) {
-  const raw = await readFile(filePath, "utf8");
-  return JSON.parse(raw);
+  const jsonText = await readFile(filePath, "utf8");
+  return JSON.parse(jsonText);
 }
 
 async function fetchSource(source) {
@@ -79,31 +79,31 @@ async function fetchSource(source) {
   const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
 
   try {
-    const response = await fetch(source.url, {
+    const httpReply = await fetch(source.url, {
       headers: REQUEST_HEADERS,
       redirect: "follow",
       signal: controller.signal,
     });
 
-    if (!response.ok) {
+    if (!httpReply.ok) {
       return {
         ok: false,
         source,
-        status: response.status,
-        error: `${response.status} ${response.statusText}`,
+        status: httpReply.status,
+        error: `${httpReply.status} ${httpReply.statusText}`,
       };
     }
 
-    const body = await response.text();
-    const contentType = response.headers.get("content-type") ?? "";
+    const pageText = await httpReply.text();
+    const contentType = httpReply.headers.get("content-type") || "";
 
     return {
       ok: true,
-      body,
+      pageText,
       contentType,
-      finalUrl: response.url,
+      finalUrl: httpReply.url,
       source,
-      status: response.status,
+      status: httpReply.status,
     };
   } catch (error) {
     return {
@@ -166,7 +166,7 @@ async function main() {
   const skillDir = path.resolve(scriptDir, "..");
   const sourcePath = path.join(skillDir, SOURCE_FILE);
   const sources = await readJson(sourcePath);
-  const outDir = path.resolve(args.out ?? path.join(os.tmpdir(), `refresh-agent-docs-${timestampSlug(new Date())}`));
+  const outDir = path.resolve(args.out || path.join(os.tmpdir(), `refresh-agent-docs-${timestampSlug(new Date())}`));
 
   await mkdir(outDir, { recursive: true });
 
@@ -174,27 +174,27 @@ async function main() {
   const successes = [];
   const failures = [];
 
-  for (const result of fetched) {
-    if (!result.ok) {
-      failures.push(result);
+  for (const fetchAttempt of fetched) {
+    if (!fetchAttempt.ok) {
+      failures.push(fetchAttempt);
       continue;
     }
 
-    const extension = extensionFor(result.source, result.contentType);
-    const fileName = `${result.source.id}${RAW_FILE_SUFFIX}.${extension}`;
-    await writeFile(path.join(outDir, fileName), result.body);
+    const extension = extensionFor(fetchAttempt.source, fetchAttempt.contentType);
+    const fileName = `${fetchAttempt.source.id}${SOURCE_FILE_SUFFIX}.${extension}`;
+    await writeFile(path.join(outDir, fileName), fetchAttempt.pageText);
 
     successes.push({
-      bytes: Buffer.byteLength(result.body, "utf8"),
-      contentType: result.contentType,
+      bytes: Buffer.byteLength(fetchAttempt.pageText, "utf8"),
+      contentType: fetchAttempt.contentType,
       file: fileName,
-      finalUrl: result.finalUrl,
-      format: result.source.format,
-      id: result.source.id,
-      name: result.source.name,
-      notes: result.source.notes,
-      status: result.status,
-      url: result.source.url,
+      finalUrl: fetchAttempt.finalUrl,
+      format: fetchAttempt.source.format,
+      id: fetchAttempt.source.id,
+      name: fetchAttempt.source.name,
+      notes: fetchAttempt.source.notes,
+      status: fetchAttempt.status,
+      url: fetchAttempt.source.url,
     });
   }
 

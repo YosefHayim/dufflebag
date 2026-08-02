@@ -3,18 +3,18 @@ import fs from "node:fs";
 import path from "node:path";
 /** Build a clip path for the waving hand silhouette from a hand PNG. */
 import { PNG } from "pngjs";
-import { argString, parseArgs } from "../lib/index.js";
+import { argString, parseArgs } from "../lib/argv.js";
 
 const args = parseArgs(process.argv.slice(2));
 const input = argString(args, "input") || "out/hand.png";
 const output = argString(args, "output") || "out/hand-clip.svg";
 
-const { width: W, height: H, data } = PNG.sync.read(fs.readFileSync(input));
+const { width: W, height: H, data: pixelBytes } = PNG.sync.read(fs.readFileSync(input));
 
 const wall = new Uint8Array(W * H);
 for (let p = 0; p < W * H; p++) {
   const i = p * 4;
-  if (0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2] < 120) wall[p] = 1;
+  if (0.299 * pixelBytes[i] + 0.587 * pixelBytes[i + 1] + 0.114 * pixelBytes[i + 2] < 120) wall[p] = 1;
 }
 
 const stamp = (mask: Uint8Array, x: number, y: number, r: number) => {

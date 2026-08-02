@@ -2,14 +2,14 @@
 
 ## What this is
 
-`dufflebag` is a personal toolbelt, not a platform: a Node-only TypeScript CLI that installs, updates, and surgically uninstalls a curated bag of coding-agent guardrails, skills, and copyable CI/publish workflow templates.
+`dufflebag` is a personal toolbelt, not a platform: a TypeScript/Node CLI that installs, updates, and surgically uninstalls a curated bag of coding-agent guardrails, skills, and copyable CI/publish workflow templates. Installed TypeScript hooks form a separate dependency-free Node runtime, and local narration/refinement includes a locked Python voice-runtime island.
 
 ## Actors
 
 - **The owner / user** — runs `npx ys-dufflebag install` to wire guardrails into `~/.claude` (global) or `./.claude` (project).
 - **Claude Code, Codex, and Grok** — verified native lifecycle-hook targets.
 - **Other agents** — detected and wired only through verified catalog-driven formats; unsupported hook adapters are reported, not guessed.
-- **CI / `scaffold-workflows` consumers** — repos that copy the single-gate CI/publish set from `templates/workflows/`.
+- **CI / `workflow scaffold` consumers** — repositories that copy the single-gate CI/publish set from `templates/workflows/`.
 
 ## Shape (capability layout)
 
@@ -40,5 +40,5 @@ A feature is either payload or runtime, never both: `src/skills/` holds only wha
 - Idle compaction is off by default, requires macOS + Ghostty 1.3+, and targets a stable terminal ID claimed by the session itself.
 - A provider-specific `DUFFLEBAG_<AGENT_ID>_AUTO_COMPACT` process override wins over persistent `idleAutoCompact` config.
 - Authored skill directories use **camelCase**; public feature IDs and installed skill IDs remain **kebab-case** data.
-- One strict style bar across maintained TypeScript, documented in root `CODE-STYLE.md`. Biome and `scripts/checkCodeStyle.ts`
-  both gate through `pnpm verify`; the `src/hookIsland/` tree is reported but not yet gated while its idiom is migrated.
+- One strict style bar across maintained TypeScript, documented in root `CODE-STYLE.md`. Biome and `scripts/checkCodeStyle.ts` both gate through `pnpm verify`, including `src/hookIsland/`; portable skill scripts additionally answer to their shipped harnesses.
+- Root `AGENTS.md` is the authoritative contract for coding agents and routes each subject to its delegated SSOT.

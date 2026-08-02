@@ -1,6 +1,7 @@
 ---
 name: env-config-contract
 description: Use when the user asks to consolidate, type, validate, migrate, or debug environment variables and configuration, especially duplicate env reads, silent defaults, client/server leakage, or inconsistent build and runtime config.
+type: flow
 ---
 
 # Environment Configuration Contract

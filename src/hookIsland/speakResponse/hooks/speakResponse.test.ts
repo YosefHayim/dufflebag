@@ -16,19 +16,24 @@ const stateHome = () => {
   return home;
 };
 
-const runHook = (input: unknown, agentId: string, home: string, environment: Record<string, string> = {}) =>
-  spawnSync(process.execPath, ["--import", "tsx", hookPath, "--dufflebag-agent-id", agentId], {
+const runHook = (request: {
+  readonly input: unknown;
+  readonly agentId: string;
+  readonly home: string;
+  readonly environment?: Record<string, string>;
+}) =>
+  spawnSync(process.execPath, ["--import", "tsx", hookPath, "--dufflebag-agent-id", request.agentId], {
     cwd: packageRoot,
-    input: JSON.stringify(input),
+    input: JSON.stringify(request.input),
     encoding: "utf8",
     env: {
       ...process.env,
       CMUX_SOCKET_PATH: "",
       CMUX_SURFACE_ID: "",
       CMUX_WORKSPACE_ID: "",
-      DUFFLEBAG_VOICE_HOME: home,
+      DUFFLEBAG_VOICE_HOME: request.home,
       PATH: "",
-      ...environment,
+      ...request.environment,
     },
   });
 
@@ -36,7 +41,10 @@ const queued = (home: string) => {
   const inbox = path.join(home, "inbox");
   const names = readdirSync(inbox);
   expect(names).toHaveLength(1);
-  return JSON.parse(readFileSync(path.join(inbox, names[0]!), "utf8")) as Record<string, unknown>;
+  const queuedName = names.at(0);
+  if (queuedName === undefined) throw new Error("Expected one queued narration file.");
+  const candidate: unknown = JSON.parse(readFileSync(path.join(inbox, queuedName), "utf8"));
+  return candidate;
 };
 
 afterEach(() => {
@@ -50,7 +58,7 @@ describe("speak-response hook", () => {
     const home = stateHome();
     const markdown = "# Release\n\n| Item | State |\n| --- | --- |\n| Voice | Ready |\n\n```ts\nconst count = 2;\n```";
 
-    const execution = runHook({ last_assistant_message: markdown }, "claude-code", home);
+    const execution = runHook({ input: { last_assistant_message: markdown }, agentId: "claude-code", home });
 
     expect(execution.status).toBe(0);
     expect(execution.stderr).toBe("");
@@ -61,11 +69,16 @@ describe("speak-response hook", () => {
     const home = stateHome();
 
     expect(
-      runHook({ last_assistant_message: "Focused response" }, "codex", home, {
-        CMUX_SOCKET_CAPABILITY: "must-not-leak",
-        CMUX_SOCKET_PATH: "/tmp/cmux-test.sock",
-        CMUX_SURFACE_ID: "surface-uuid",
-        CMUX_WORKSPACE_ID: "workspace-uuid",
+      runHook({
+        input: { last_assistant_message: "Focused response" },
+        agentId: "codex",
+        home,
+        environment: {
+          CMUX_SOCKET_CAPABILITY: "must-not-leak",
+          CMUX_SOCKET_PATH: "/tmp/cmux-test.sock",
+          CMUX_SURFACE_ID: "surface-uuid",
+          CMUX_WORKSPACE_ID: "workspace-uuid",
+        },
       }).status,
     ).toBe(0);
 
@@ -81,13 +94,25 @@ describe("speak-response hook", () => {
   });
 
   it("queues a Grok end-turn response and ignores non-final hook events", () => {
-    const finalHome = stateHome();
+    const resolvedHome = stateHome();
     const partialHome = stateHome();
 
-    expect(runHook({ lastAssistantMessage: "Complete answer", reason: "end_turn" }, "grok", finalHome).status).toBe(0);
-    expect(queued(finalHome)).toMatchObject({ markdown: "Complete answer", source: "grok" });
+    expect(
+      runHook({
+        input: { lastAssistantMessage: "Complete answer", reason: "end_turn" },
+        agentId: "grok",
+        home: resolvedHome,
+      }).status,
+    ).toBe(0);
+    expect(queued(resolvedHome)).toMatchObject({ markdown: "Complete answer", source: "grok" });
 
-    expect(runHook({ lastAssistantMessage: "Still working", reason: "tool_use" }, "grok", partialHome).status).toBe(0);
+    expect(
+      runHook({
+        input: { lastAssistantMessage: "Still working", reason: "tool_use" },
+        agentId: "grok",
+        home: partialHome,
+      }).status,
+    ).toBe(0);
     expect(() => readdirSync(path.join(partialHome, "inbox"))).toThrow();
   });
 
@@ -108,7 +133,7 @@ describe("speak-response hook", () => {
         .join("\n"),
     );
 
-    expect(runHook({ transcript_path: transcript }, "codex", home).status).toBe(0);
+    expect(runHook({ input: { transcript_path: transcript }, agentId: "codex", home }).status).toBe(0);
     expect(queued(home)).toMatchObject({ markdown: "First section\n\nSecond section\n\n- complete", source: "codex" });
   });
 });

@@ -1,6 +1,7 @@
 ---
 name: organized-commits
 description: Use when the user asks to commit, push, ship, organize commits, clean up Git history, consolidate branches or worktrees, or salvage stale work without losing progress.
+type: flow
 ---
 
 # Organized Commits

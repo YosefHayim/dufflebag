@@ -1,79 +1,33 @@
-# dufflebag — Purpose & Direction
+# Project — Purpose & Direction
 
-What an agent reads to understand *intent* before writing code. The human-facing
-version is `../../README.md`; the domain glossary and layout live in
-`../../AGENTS.md` and `../../src/skills/png-to-code/CONTEXT.md`. Purpose and direction only.
+Replace this guidance with the product-specific purpose of the repository that
+receives the template. This file is intentionally generic; Dufflebag's own purpose
+lives only in its root `PROJECT.md`.
 
 ## The problem
 
-Three papercuts, one owner: long coding-agent sessions balloon past usable context
-before winding down; agents re-paste the same function or type under a new name;
-and standing up a personal set of Claude Code hooks/skills + CI is copy-paste
-across ~18 repos. dufflebag packages the owner's personal **bag** of guardrails,
-skills, and CI templates behind one installer that wires them into supported agents
-**surgically**, and takes them back just as cleanly.
+Describe the concrete problem, who experiences it, and why it matters now.
 
-## Who it's for
+## Who it is for
 
-The **owner first**, and coding-agent users who want these specific guardrails.
-Explicitly **not**: a general-purpose plugin marketplace, a team product with SLAs,
-or an agent orchestration platform. Native lifecycle-hook adapters are verified for
-Claude Code, Codex, and Grok; other detected agents receive only their supported artifacts.
+Name the primary user and the audiences the product intentionally does not serve.
 
-## The core insight
+## Product promise
 
-A hook payload that **depends on nothing** runs the instant a hook fires and can be
-removed by a single `/dufflebag/` path marker with zero collateral; **behavior as
-data** (the `FEATURES` catalog) turns each guardrail into an install-time toggle.
-Why now: the owner runs many repos and long agent sessions daily, so guardrails that
-install/uninstall cleanly and CI that copies in one command pay for themselves
-immediately — a toolbelt, not a platform.
+State the smallest durable promise a user should be able to trust.
 
 ## Goals
 
-- One command **installs / updates / uninstalls** a chosen feature set, and uninstall
-  **byte-restores** `settings.json` (surgical, path-identified).
-- A long session **winds down gracefully** — `/handoff` nudged at the warn fraction,
-  new code edits denied near the cap — instead of overflowing.
-- An optionally configured idle session submits any waiting draft once, finishes that
-  turn when one starts, compacts once, and parks until the next human prompt.
-- A **duplicate** function/type is blocked at write time on Claude (warned on Cursor,
-  gated in CI by `dedup check`).
-- Complete agent responses are narrated locally without cross-pane Cmux spam, with
-  push-to-talk dictation and an optional reviewed on-device prompt-refinement step.
-- A PNG **converges to pixel-perfect code** via a measured screenshot-diff loop, not
-  eyeballing.
-- Any repo adopts one efficient **single-gate CI workflow** (and templated
-  `publish.yml`) with one `scaffold-ci`.
+- List observable outcomes the project is committed to delivering.
 
 ## Non-goals
 
-- **Not a marketplace** — it ships the owner's bag, not other people's skills.
-- **No back-compat shims** — a clean break is the default unless asked (the rename
-  carried no legacy markers/env; see [ADR 0007](../../docs/adr/current/0007-rename-to-dufflebag-broadened-remit.md)).
-- **Not cross-platform for the GUI loop** — the autonomous loop is macOS + Ghostty
-  only, by design (it types into the terminal).
-- **No runtime deps in the hook payload** — ever ([ADR 0001](../../docs/adr/current/0001-zero-dependency-hook-payload.md)).
-- **Not a live workflow host** — repos own **copies** of CI, never references
-  ([ADR 0009](../../docs/adr/current/0009-reusable-workflows-and-cli-scaffolding.md)).
+- Name tempting adjacent work that is deliberately outside the product boundary.
 
 ## Direction
 
-- **Built:** context-guard · dedup-guard · autonomous-loop (`autorun`) · speak-response ·
-  png-to-code · `scaffold-ci`. The `skills-bag → dufflebag` rename (clean break),
-  vertical-per-feature layout, catalog ship-allowlist, and copyable single-gate workflows all landed —
-  as did the **2026-07-02 style refresh** (TSDoc on the exported surface, biome linter on,
-  co-located tests, single-command `autorun`) and the **source consolidation**: all source
-  under `src/` (capabilities + `src/skills/`), maintainer tooling under root `scripts/`, all copyable templates under `templates/`
-  (`templates/workflows/`, `templates/mdFiles/`) — [ADR 0012](../../docs/adr/current/0012-tsdoc-on-the-exported-surface.md)–[0014](../../docs/adr/current/0014-consolidate-under-src-and-templates.md).
-- **Next:** verify native lifecycle adapters for more detected coding agents.
-- **Maybe:** more template kinds under `templates/` — a project should be able to scaffold
-  `CODE-STYLE.md`/`PROJECT.md` alongside the CI set; additional agents as install targets.
+Summarize what exists, what comes next, and which ideas remain conditional.
 
 ## Guiding principles
 
-- **SSOT / KISS / YAGNI / DRY**; reuse and extend before creating.
-- **Pure core, imperative shell**; errors chosen by role, not locale.
-- **Zero-dep hook payload**; surgical, path-identified install/uninstall.
-- **Clean break over back-compat**, unless explicitly asked to migrate.
-- **Readable over clever** — behavior in data tables and guard clauses, not metaprogramming.
+- Record the few principles that materially constrain design and implementation.

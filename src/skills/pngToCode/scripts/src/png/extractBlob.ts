@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 /** Extract soft lavender background blob from a PNG as an SVG path. */
 import { PNG } from "pngjs";
-import { argString, parseArgs } from "../lib/index.js";
+import { argString, parseArgs } from "../lib/argv.js";
 
 const args = parseArgs(process.argv.slice(2));
 const input = argString(args, "input") || "robot.png";
@@ -172,8 +172,8 @@ const subpaths: string[] = [];
 let kept = 0;
 for (let id = 1; id <= nComp; id++) {
   if (componentArea[id] < MIN_AREA) continue;
-  const raw = traceContour(id);
-  const simp = simplifyClosed(raw, 1.4);
+  const tracedContour = traceContour(id);
+  const simp = simplifyClosed(tracedContour, 1.4);
   if (simp.length < 3) continue;
   kept++;
   const d = simp.map(([x, y], i) => `${i === 0 ? "M" : "L"}${(x * F).toFixed(0)},${(y * F).toFixed(0)}`).join(" ");

@@ -38,11 +38,25 @@ const NA = "na";
  * @returns the dimension result record
  */
 function dim(id, label, score, evidence, warn) {
-  return { id, label, score, evidence, warn: warn ?? null };
+  return { id, label, score, evidence, warn: warn || null };
 }
 
 function yn(v) {
   return v ? "yes" : "no";
+}
+
+function scoreFor(complete, partial) {
+  if (complete) return OK;
+  if (partial) return PARTIAL;
+  return MISSING;
+}
+
+function securityEvidence(signals, files) {
+  if (files.headers) return "public/_headers present";
+  if (signals.headersFn && signals.csp) return "next.config headers() + CSP";
+  if (signals.manifestCsp) return "MV3 manifest CSP";
+  if (signals.csp) return "CSP string found but wiring unclear";
+  return "no CSP/HSTS found";
 }
 
 /**
@@ -61,7 +75,7 @@ export function scoreDimensions(sig, opts = {}) {
     dim(
       "semantic",
       "Semantic HTML & landmarks",
-      s.mainTag === 0 ? MISSING : !s.landmarks || s.clickableDiv > 0 ? PARTIAL : OK,
+      scoreFor(s.mainTag > 0 && s.landmarks && s.clickableDiv === 0, s.mainTag > 0),
       `${s.mainTag} <main>, landmarks ${yn(s.landmarks)}, ${s.clickableDiv} clickable <div>`,
       "verify exactly one <main> per rendered page (nested <main> is the common bug)",
     ),
@@ -83,7 +97,7 @@ export function scoreDimensions(sig, opts = {}) {
     dim(
       "media",
       "Images & fonts",
-      imgOk && fontOk ? OK : imgOk || fontOk ? PARTIAL : MISSING,
+      scoreFor(imgOk && fontOk, imgOk || fontOk),
       `next/image ${yn(s.nextImage)}, webp/avif ${yn(s.modernAsset)}, font-display ${yn(fontOk)}`,
       'check explicit width/height on images (CLS) and loading="lazy" below the fold',
     ),
@@ -105,16 +119,8 @@ export function scoreDimensions(sig, opts = {}) {
     dim(
       "security",
       "Security headers",
-      secOk ? OK : secPartial ? PARTIAL : MISSING,
-      f.headers
-        ? "public/_headers present"
-        : s.headersFn && s.csp
-          ? "next.config headers() + CSP"
-          : s.manifestCsp
-            ? "MV3 manifest CSP"
-            : s.csp
-              ? "CSP string found but wiring unclear"
-              : "no CSP/HSTS found",
+      scoreFor(secOk, secPartial),
+      securityEvidence(s, f),
       "confirm the CSP is real (not unsafe-inline everywhere) and HSTS + X-Content-Type-Options are set",
     ),
   );
@@ -130,7 +136,7 @@ export function scoreDimensions(sig, opts = {}) {
     dim(
       "seo",
       "SEO metadata",
-      seoHits >= 4 ? OK : seoHits >= 2 ? PARTIAL : MISSING,
+      scoreFor(seoHits >= 4, seoHits >= 2),
       `lang ${yn(s.htmlLang)}, title ${yn(s.titleMeta)}, desc ${yn(s.descMeta)}, OG ${yn(s.og)}, robots/sitemap ${yn(f.robots || f.sitemap)}`,
       null,
     ),
@@ -140,7 +146,7 @@ export function scoreDimensions(sig, opts = {}) {
     dim(
       "agents",
       "Machine-readability (agents)",
-      f.llmsTxt && s.jsonLd ? OK : f.llmsTxt || s.jsonLd ? PARTIAL : MISSING,
+      scoreFor(f.llmsTxt && s.jsonLd, f.llmsTxt || s.jsonLd),
       `llms.txt ${yn(f.llmsTxt)}, JSON-LD ${yn(s.jsonLd)}, robots ${yn(f.robots)}`,
       "ensure JSON-LD is server-rendered and content is in the initial HTML (not JS-only)",
     ),
@@ -152,13 +158,13 @@ export function scoreDimensions(sig, opts = {}) {
 /**
  * Which dimensions fail the build. Security is always critical; --strict adds
  * machine-readability. N/A never fails.
- * @param results scored dimensions
+ * @param dimensionScores scored dimensions
  * @param opts.strict also gate on the agents dimension
  * @returns failing dimension ids
  */
-export function criticalFailures(results, opts = {}) {
+export function criticalFailures(dimensionScores, opts = {}) {
   const critical = new Set(opts.strict ? ["security", "agents"] : ["security"]);
-  return results.filter((r) => critical.has(r.id) && r.score === MISSING).map((r) => r.id);
+  return dimensionScores.filter((r) => critical.has(r.id) && r.score === MISSING).map((r) => r.id);
 }
 
 // --- IO layer ---
@@ -332,17 +338,17 @@ function main(argv) {
   const internal = flags.has("--internal");
   const strict = flags.has("--strict");
   const sig = collectSignals(root);
-  const results = scoreDimensions(sig, { internal });
-  const failures = criticalFailures(results, { strict });
+  const dimensionScores = scoreDimensions(sig, { internal });
+  const failures = criticalFailures(dimensionScores, { strict });
 
   if (flags.has("--json")) {
-    console.log(JSON.stringify({ root, internal, strict, results, failures }, null, 2));
+    console.log(JSON.stringify({ root, internal, strict, scores: dimensionScores, failures }, null, 2));
     return failures.length ? 1 : 0;
   }
 
   console.log(`\nweb-best-practices — ${path.basename(root)}${internal ? " (internal)" : ""}`);
   console.log(`scanned ${sig.filesScanned} source files\n`);
-  for (const r of results) {
+  for (const r of dimensionScores) {
     console.log(`${MARK[r.score]} ${r.label.padEnd(30)} ${r.evidence}`);
     if (r.warn && r.score !== NA) console.log(`   ⚠ ${r.warn}`);
   }

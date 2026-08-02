@@ -32,10 +32,14 @@
       }
     }
   },
-  "plugins": ["./biome-rules/no-focused-tests.grit"],
+  "plugins": [
+    "./biome-rules/no-focused-tests.grit",
+    "./biome-rules/no-nullish-coalescing.grit",
+    "./biome-rules/no-nested-ternary.grit"
+  ],
   "overrides": [
     {
-      "includes": ["src/skills/*/hooks/**", "src/skills/*/command/**", "src/runtime/**"],
+      "includes": ["src/hookIsland/**", "src/runtime/**"],
       "linter": {
         "rules": {
           "style": {

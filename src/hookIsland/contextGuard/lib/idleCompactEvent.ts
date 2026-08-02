@@ -45,14 +45,19 @@ const booleanProperty = (input: object, key: string): boolean | null => {
   return typeof value === "boolean" ? value : null;
 };
 
-const phases: ReadonlySet<string> = new Set([
-  "working",
-  "waitingIdle",
-  "awaitingPrompt",
-  "compacting",
-  "compactionFinished",
-  "parked",
-]);
+const decodePhase = (candidate: string | null): IdleCompactPhase | null => {
+  switch (candidate) {
+    case "working":
+    case "waitingIdle":
+    case "awaitingPrompt":
+    case "compacting":
+    case "compactionFinished":
+    case "parked":
+      return candidate;
+    default:
+      return null;
+  }
+};
 
 export const decodeIdleCompactSessionState = (input: unknown): IdleCompactSessionState | null => {
   if (typeof input !== "object" || input === null) return null;
@@ -62,7 +67,7 @@ export const decodeIdleCompactSessionState = (input: unknown): IdleCompactSessio
   const terminalId = stringProperty(input, "terminalId");
   const compactCommand = stringProperty(input, "compactCommand");
   const idleSeconds = numberProperty(input, "idleSeconds");
-  const phase = stringProperty(input, "phase");
+  const phase = decodePhase(stringProperty(input, "phase"));
   const phaseStartedAtMs = numberProperty(input, "phaseStartedAtMs");
   const sessionEnded = booleanProperty(input, "sessionEnded");
   const lastEventAtMs = numberProperty(input, "lastEventAtMs");
@@ -74,7 +79,6 @@ export const decodeIdleCompactSessionState = (input: unknown): IdleCompactSessio
     !compactCommand ||
     !idleSeconds ||
     !phase ||
-    !phases.has(phase) ||
     phaseStartedAtMs === null ||
     sessionEnded === null ||
     lastEventAtMs === null
@@ -88,7 +92,7 @@ export const decodeIdleCompactSessionState = (input: unknown): IdleCompactSessio
     terminalId,
     compactCommand,
     idleSeconds,
-    phase: phase as IdleCompactPhase,
+    phase,
     phaseStartedAtMs,
     sessionEnded,
     lastEventAtMs,
@@ -106,28 +110,30 @@ const normalizedEvent = (value: string): IdleCompactEventName | null => {
   return null;
 };
 
-export const normalizeIdleCompactEvent = (
-  input: unknown,
-  environment: Environment,
-  occurredAtMs: number,
-): IdleCompactEvent | null => {
-  if (typeof input !== "object" || input === null) return null;
+export const normalizeIdleCompactEvent = (request: {
+  readonly input: unknown;
+  readonly environment: Environment;
+  readonly occurredAtMs: number;
+}): IdleCompactEvent | null => {
+  if (typeof request.input !== "object" || request.input === null) return null;
 
-  const agentId = environment.DUFFLEBAG_AGENT_ID;
+  const agentId = request.environment.DUFFLEBAG_AGENT_ID;
   if (!agentId) return null;
 
-  const rawEvent =
-    stringProperty(input, "hook_event_name") ?? stringProperty(input, "hookEventName") ?? environment.GROK_HOOK_EVENT;
+  const agentEventCandidate =
+    stringProperty(request.input, "hook_event_name") ||
+    stringProperty(request.input, "hookEventName") ||
+    request.environment.GROK_HOOK_EVENT;
   const sessionId =
-    stringProperty(input, "session_id") ??
-    stringProperty(input, "sessionId") ??
-    environment.GROK_SESSION_ID ??
-    environment.CLAUDE_SESSION_ID;
-  if (!rawEvent || !sessionId) return null;
+    stringProperty(request.input, "session_id") ||
+    stringProperty(request.input, "sessionId") ||
+    request.environment.GROK_SESSION_ID ||
+    request.environment.CLAUDE_SESSION_ID;
+  if (!agentEventCandidate || !sessionId) return null;
 
-  const event = normalizedEvent(rawEvent);
+  const event = normalizedEvent(agentEventCandidate);
   if (!event) return null;
-  return { agentId, sessionId, event, occurredAtMs };
+  return { agentId, sessionId, event, occurredAtMs: request.occurredAtMs };
 };
 
 export const applyIdleCompactEvent = (

@@ -85,7 +85,7 @@ function lowpass(buf, cutoffHz) {
 export function renderBed({ seconds, bpm, mood, seed }) {
   const n = Math.floor(seconds * SR);
   const out = new Float64Array(n);
-  const spec = MOODS[mood] ?? MOODS.epic;
+  const spec = MOODS[mood] || MOODS.epic;
   const rng = mulberry32(seed);
   const beat = 60 / bpm;
   const barLen = beat * 4;
@@ -159,10 +159,10 @@ export function encodeWav(mono) {
   const n = mono.length;
   const bytesPerSample = 2;
   const channels = 2;
-  const dataLen = n * channels * bytesPerSample;
-  const buf = Buffer.alloc(44 + dataLen);
+  const pcmByteLength = n * channels * bytesPerSample;
+  const buf = Buffer.alloc(44 + pcmByteLength);
   buf.write("RIFF", 0);
-  buf.writeUInt32LE(36 + dataLen, 4);
+  buf.writeUInt32LE(36 + pcmByteLength, 4);
   buf.write("WAVE", 8);
   buf.write("fmt ", 12);
   buf.writeUInt32LE(16, 16);
@@ -173,7 +173,7 @@ export function encodeWav(mono) {
   buf.writeUInt16LE(channels * bytesPerSample, 32);
   buf.writeUInt16LE(16, 34);
   buf.write("data", 36);
-  buf.writeUInt32LE(dataLen, 40);
+  buf.writeUInt32LE(pcmByteLength, 40);
   const haas = Math.floor(0.008 * SR);
   let off = 44;
   for (let i = 0; i < n; i++) {
@@ -197,14 +197,14 @@ function main() {
   const f = parseFlags(process.argv.slice(2));
   if (!f.out) throw new Error("Usage: synth.mjs --out bed.wav [--seconds 24] [--bpm 100] [--mood epic] [--seed 7]");
   const bed = renderBed({
-    seconds: Number(f.seconds ?? 24),
-    bpm: Number(f.bpm ?? 100),
-    mood: f.mood ?? "epic",
-    seed: Number(f.seed ?? 7),
+    seconds: Number(f.seconds || 24),
+    bpm: Number(f.bpm || 100),
+    mood: f.mood || "epic",
+    seed: Number(f.seed || 7),
   });
   mkdirSync(dirname(f.out), { recursive: true });
   writeFileSync(f.out, encodeWav(bed));
-  process.stdout.write(`Wrote ${f.out} (${f.seconds ?? 24}s, ${f.mood ?? "epic"} @ ${f.bpm ?? 100}bpm)\n`);
+  process.stdout.write(`Wrote ${f.out} (${f.seconds || 24}s, ${f.mood || "epic"} @ ${f.bpm || 100}bpm)\n`);
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

@@ -1,2 +1,1 @@
-pnpm generate-readme
-git add README.md
+pnpm verify

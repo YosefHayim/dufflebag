@@ -27,8 +27,8 @@ const decodeSettings = Schema.decodeUnknownSync(settingsJsonSchema, {
 });
 const missingPrevious = { _tag: "missing" };
 
-const unwrap = (result: Either.Either<ManagedConfigPlan, ConfigurePlanError>): ManagedConfigPlan =>
-  Either.getOrThrowWith(result, (error) => new Error(error.message));
+const unwrap = (configurationPlan: Either.Either<ManagedConfigPlan, ConfigurePlanError>): ManagedConfigPlan =>
+  Either.getOrThrowWith(configurationPlan, (error) => new Error(error.message));
 
 const settingsBytes = (settings: unknown): Uint8Array => textEncoder.encode(`${JSON.stringify(settings, null, 2)}\n`);
 
@@ -88,7 +88,7 @@ describe("planManagedConfig", () => {
 
   it("rejects a global snapshot whose decoded config does not match its source bytes", () => {
     const sourceConfig = { ...defaultBagConfig, speechVoice: "Ava" };
-    const result = planManagedConfig({
+    const configurationPlan = planManagedConfig({
       scope: "project",
       selection: {
         _tag: "firstProjectInstall",
@@ -101,23 +101,23 @@ describe("planManagedConfig", () => {
       previousConfigFile: missingPrevious,
     });
 
-    expect(Either.isLeft(result)).toBe(true);
-    if (Either.isLeft(result)) {
-      expect(result.left.message).toContain("source bytes");
+    expect(Either.isLeft(configurationPlan)).toBe(true);
+    if (Either.isLeft(configurationPlan)) {
+      expect(configurationPlan.left.message).toContain("source bytes");
     }
   });
 
   it("rejects first-project selection in global scope", () => {
-    const result = planManagedConfig({
+    const configurationPlan = planManagedConfig({
       scope: "global",
       selection: { _tag: "firstProjectInstall", globalConfig: missingConfigSnapshot },
       previousConfigFile: missingPrevious,
     });
 
-    expect(Either.isLeft(result)).toBe(true);
-    if (Either.isLeft(result)) {
-      expect(result.left).toBeInstanceOf(ConfigurePlanError);
-      expect(result.left.message).toContain("project");
+    expect(Either.isLeft(configurationPlan)).toBe(true);
+    if (Either.isLeft(configurationPlan)) {
+      expect(configurationPlan.left).toBeInstanceOf(ConfigurePlanError);
+      expect(configurationPlan.left.message).toContain("project");
     }
   });
 
@@ -128,15 +128,15 @@ describe("planManagedConfig", () => {
       { _tag: "legacyEnvironment", settingsBytes: settingsBytes({ env: { dufflebagDebugEnabled: "true" } }) },
     ],
   ])("rejects a one-time %s selection when a target config already exists", (_case, selection) => {
-    const result = planManagedConfig({
+    const configurationPlan = planManagedConfig({
       scope: "project",
       selection,
       previousConfigFile: { _tag: "priorFile", bytes: textEncoder.encode("original config") },
     });
 
-    expect(Either.isLeft(result)).toBe(true);
-    if (Either.isLeft(result)) {
-      expect(result.left.message).toContain("missing target managed config");
+    expect(Either.isLeft(configurationPlan)).toBe(true);
+    if (Either.isLeft(configurationPlan)) {
+      expect(configurationPlan.left.message).toContain("missing target managed config");
     }
   });
 
@@ -241,13 +241,13 @@ describe("planManagedConfig", () => {
     ],
     ["missing legacy keys", { env: { userSetting: "keep" } }],
   ])("returns no plan for %s", (_case, settings) => {
-    const result = planManagedConfig({
+    const configurationPlan = planManagedConfig({
       scope: "project",
       selection: { _tag: "legacyEnvironment", settingsBytes: settingsBytes(settings) },
       previousConfigFile: missingPrevious,
     });
 
-    expect(Either.isLeft(result)).toBe(true);
+    expect(Either.isLeft(configurationPlan)).toBe(true);
   });
 
   it("returns no plan for malformed or duplicate settings data", () => {
@@ -279,21 +279,21 @@ describe("planManagedConfig", () => {
   });
 
   it("returns no plan for non-UTF-8 settings bytes", () => {
-    const result = planManagedConfig({
+    const configurationPlan = planManagedConfig({
       scope: "project",
       selection: { _tag: "legacyEnvironment", settingsBytes: new Uint8Array([0xff]) },
       previousConfigFile: missingPrevious,
     });
 
-    expect(Either.isLeft(result)).toBe(true);
-    if (Either.isLeft(result)) {
-      expect(result.left.message).toContain("UTF-8");
+    expect(Either.isLeft(configurationPlan)).toBe(true);
+    if (Either.isLeft(configurationPlan)) {
+      expect(configurationPlan.left.message).toContain("UTF-8");
     }
   });
 
   it("rejects a UTF-8 BOM instead of silently dropping source bytes", () => {
     const json = settingsBytes({ env: { dufflebagDebugEnabled: "true" } });
-    const result = planManagedConfig({
+    const configurationPlan = planManagedConfig({
       scope: "project",
       selection: {
         _tag: "legacyEnvironment",
@@ -302,7 +302,7 @@ describe("planManagedConfig", () => {
       previousConfigFile: missingPrevious,
     });
 
-    expect(Either.isLeft(result)).toBe(true);
+    expect(Either.isLeft(configurationPlan)).toBe(true);
   });
 
   it("preserves exact prior config bytes and correlates desired bytes with their hash", () => {

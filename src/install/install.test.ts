@@ -24,7 +24,7 @@ const stageContextGuardRuntime = (stagedRoot: string) =>
     }
   });
 
-const stageSpeakResponseRuntime = (stagedRoot: string) =>
+const stageVoiceRuntime = (stagedRoot: string) =>
   Effect.gen(function* () {
     const fileSystem = yield* FileSystem.FileSystem;
     const path = yield* Path.Path;
@@ -60,15 +60,15 @@ layer(NodeContext.layer)("install", (it) => {
           '{\n  "theme": "dark",\n  "hooks": {\n    "Stop": [{ "hooks": [{ "type": "command", "command": "user-command" }] }]\n  }\n}\n',
         );
 
-        const result = yield* install(installRequest({ root, stagedRoot }));
+        const installation = yield* install(installRequest({ root, stagedRoot }));
 
-        expect(result).toMatchObject({
+        expect(installation).toMatchObject({
           _tag: "installed",
           scope: "project",
           features: ["context-guard"],
           agents: ["claude-code"],
         });
-        expect(result.platformRequirements).toEqual([{ featureId: "context-guard", platform: "any" }]);
+        expect(installation.platformRequirements).toEqual([{ featureId: "context-guard", platform: "any" }]);
         expect(
           yield* fileSystem.readFileString(
             path.join(root, ".claude/dufflebag/runtime/contextGuard/hooks/contextGuard.js"),
@@ -144,7 +144,7 @@ layer(NodeContext.layer)("install", (it) => {
         const root = yield* fileSystem.makeTempDirectoryScoped({ prefix: "dufflebag-voice-hooks-root-" });
         const stagedRoot = yield* fileSystem.makeTempDirectoryScoped({ prefix: "dufflebag-voice-hooks-stage-" });
 
-        yield* stageSpeakResponseRuntime(stagedRoot);
+        yield* stageVoiceRuntime(stagedRoot);
         yield* install({
           ...installRequest({ root, stagedRoot }),
           features: { _tag: "selected", ids: ["speak-response"] },
@@ -175,10 +175,10 @@ layer(NodeContext.layer)("install", (it) => {
 
         yield* install(request);
         const before = yield* fileSystem.readFile(path.join(root, ".claude/dufflebag/receipt.json"));
-        const result = yield* install(request);
+        const installation = yield* install(request);
         const after = yield* fileSystem.readFile(path.join(root, ".claude/dufflebag/receipt.json"));
 
-        expect(result._tag).toBe("unchanged");
+        expect(installation._tag).toBe("unchanged");
         expect(after).toEqual(before);
       }),
     ),
@@ -212,9 +212,9 @@ layer(NodeContext.layer)("install", (it) => {
         );
         yield* fileSystem.writeFileString(installedSkill, synced);
 
-        const result = yield* install(request);
+        const installation = yield* install(request);
 
-        expect(result._tag).toBe("installed");
+        expect(installation._tag).toBe("installed");
         expect(yield* fileSystem.readFileString(installedSkill)).toBe(synced);
 
         // The refreshed receipt must describe the adopted bytes, so the next install stays clean.

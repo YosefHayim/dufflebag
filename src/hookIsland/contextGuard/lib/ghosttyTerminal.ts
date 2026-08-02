@@ -59,20 +59,26 @@ export const claimFocusedTerminalScript = (): string => `tell application "Ghost
   end try
 end tell`;
 
-export const terminalInputScript = (terminalId: string, text: string, submit: boolean): string => {
+type TerminalInput = {
+  readonly terminalId: string;
+  readonly text: string;
+  readonly submit: boolean;
+};
+
+export const terminalInputScript = (request: TerminalInput): string => {
   const lines = [
     'tell application "Ghostty"',
-    `  set matches to every terminal whose id is "${appleScriptString(terminalId)}"`,
+    `  set matches to every terminal whose id is "${appleScriptString(request.terminalId)}"`,
     '  if (count of matches) is not 1 then return "MISSING"',
     "  set target to item 1 of matches",
   ];
-  if (text !== "") lines.push(`  input text "${appleScriptString(text)}" to target`);
-  if (submit) lines.push('  send key "enter" to target');
+  if (request.text !== "") lines.push(`  input text "${appleScriptString(request.text)}" to target`);
+  if (request.submit) lines.push('  send key "enter" to target');
   lines.push('  return "OK"', "end tell");
   return lines.join("\n");
 };
 
-export const decodeClaimResult = (output: string): TerminalClaim => {
+export const decodeClaimDecision = (output: string): TerminalClaim => {
   if (output === "") return { _tag: "refused", reason: "ghostty-unavailable" };
   const prefix = "OK\t";
   if (!output.startsWith(prefix) || output.length === prefix.length)
@@ -87,23 +93,23 @@ export const claimGhosttyTerminal = (sessionId: string, terminalDevice = "/dev/t
 
   const marker = `dufflebag-${sessionId}`;
   if (!writeTerminalTitle(marker, terminalDevice)) return { _tag: "refused", reason: "terminal-not-proven" };
-  const result = decodeClaimResult(runAppleScript(claimTerminalScript(marker)));
+  const terminalCommand = decodeClaimDecision(runAppleScript(claimTerminalScript(marker)));
   writeTerminalTitle("", terminalDevice);
-  return result;
+  return terminalCommand;
 };
 
 export const claimFocusedGhosttyTerminal = (): TerminalClaim => {
   const version = runAppleScript('tell application "Ghostty" to get version');
   if (version === "") return { _tag: "refused", reason: "ghostty-unavailable" };
   if (!versionSupportsTerminalInput(version)) return { _tag: "refused", reason: "ghostty-version" };
-  return decodeClaimResult(runAppleScript(claimFocusedTerminalScript()));
+  return decodeClaimDecision(runAppleScript(claimFocusedTerminalScript()));
 };
 
 export const terminalExists = (terminalId: string): boolean =>
-  runAppleScript(terminalInputScript(terminalId, "", false)) === "OK";
+  runAppleScript(terminalInputScript({ terminalId, text: "", submit: false })) === "OK";
 
 export const sendTerminalEnter = (terminalId: string): boolean =>
-  runAppleScript(terminalInputScript(terminalId, "", true)) === "OK";
+  runAppleScript(terminalInputScript({ terminalId, text: "", submit: true })) === "OK";
 
-export const sendTerminalText = (terminalId: string, text: string, submit = false): boolean =>
-  runAppleScript(terminalInputScript(terminalId, text, submit)) === "OK";
+export const sendTerminalText = (request: TerminalInput): boolean =>
+  runAppleScript(terminalInputScript(request)) === "OK";

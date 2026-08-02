@@ -1,6 +1,7 @@
 ---
 name: deploy-and-prove
 description: Use when the user asks to deploy, publish, release, promote, or confirm that the latest version is live, especially when success must be proven from the production provider and real runtime rather than local state.
+type: flow
 ---
 
 # Deploy and Prove

@@ -1,17 +1,12 @@
-/**
- * `dufflebag dedup check` — CI / pre-commit gate for the dedup-guard feature.
- *
- * Thin Effect CLI adapter over the skill-local gate command. Presentation and
- * exit-code policy live in the skill command (fail-closed is the product).
- */
+/** `dufflebag dedup [workspace]` — duplicate-code gate for local work and CI. */
 
 import { Args, Command, Options } from "@effect/cli";
 import { Effect, Option } from "effect";
 
 import { dedupCheck } from "../hookIsland/dedupGuard/command/dedupCheck.js";
-import * as TerminalUI from "./TerminalUI.js";
+import { CliUsageError, formatOption } from "./scopeOptions.js";
 
-const targetPathArg = Args.directory({ name: "path", exists: "either" }).pipe(
+const workspaceArgument = Args.directory({ name: "workspace", exists: "either" }).pipe(
   Args.optional,
   Args.withDescription("Repository root to scan (default: current working directory)"),
 );
@@ -23,31 +18,28 @@ const stagedOption = Options.boolean("staged").pipe(
 
 const sinceOption = Options.text("since").pipe(
   Options.optional,
-  Options.withDescription("Restrict findings to files changed since this git ref (e.g. main)"),
+  Options.withDescription("Restrict findings to files changed since this git ref"),
 );
 
-const checkCommand = Command.make(
-  "check",
+export const dedupCommand = Command.make(
+  "dedup",
   {
-    path: targetPathArg,
+    workspace: workspaceArgument,
     staged: stagedOption,
     since: sinceOption,
+    format: formatOption,
   },
   (args) =>
     Effect.gen(function* () {
       if (args.staged && Option.isSome(args.since)) {
-        return yield* Effect.fail(new Error("Use either --staged or --since, not both."));
+        return yield* new CliUsageError({ issue: "Use either --staged or --since, not both." });
       }
 
       dedupCheck({
-        path: Option.getOrUndefined(args.path),
+        workspace: Option.getOrUndefined(args.workspace),
         staged: args.staged,
         since: Option.getOrUndefined(args.since),
+        format: args.format,
       });
-    }).pipe(Effect.catchAll((error) => TerminalUI.presentError(error))),
-).pipe(Command.withDescription("Scan a repo for duplicate function bodies / type shapes (exits non-zero on findings)"));
-
-export const dedupCommand = Command.make("dedup").pipe(
-  Command.withDescription("Dedup-guard tools (scan / CI gate)"),
-  Command.withSubcommands([checkCommand]),
-);
+    }),
+).pipe(Command.withDescription("Find duplicate function bodies and type shapes"));

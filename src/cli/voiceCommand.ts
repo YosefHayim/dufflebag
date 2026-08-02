@@ -2,7 +2,7 @@
 
 import { Args, Command as CliCommand, Options } from "@effect/cli";
 import { FileSystem, Path, Command as PlatformCommand } from "@effect/platform";
-import { Effect, Option, Schema } from "effect";
+import { Effect, Schema } from "effect";
 
 import { featureCatalog } from "../catalog/featureCatalog.js";
 import { defaultBagConfig } from "../config/bagConfigSchema.js";
@@ -12,20 +12,14 @@ import { readArtifactReceiptSnapshot } from "../install/artifactReceipt.js";
 import { install, receiptPath, runtimePath } from "../install/install.js";
 import { update } from "../install/update.js";
 import { captureHostEvidence, destinationForScope } from "./hostEvidence.js";
-import { globalOption, projectOption, resolveScope } from "./scopeOptions.js";
+import { type CliScope, formatOption, scopeOption } from "./scopeOptions.js";
 import { stagePackage } from "./stagePackage.js";
 import * as TerminalUI from "./TerminalUI.js";
 
 const voiceFeatureId = "speak-response";
-type VoiceAgent = "claude-code" | "codex" | "grok" | "devin";
+type VoiceSource = "claude-code" | "codex" | "grok" | "devin" | "manual";
 
-const voiceAgents: ReadonlyArray<[string, VoiceAgent]> = [
-  ["claude", "claude-code"],
-  ["claude-code", "claude-code"],
-  ["codex", "codex"],
-  ["grok", "grok"],
-  ["devin", "devin"],
-];
+const voiceSources: ReadonlyArray<VoiceSource> = ["claude-code", "codex", "grok", "devin", "manual"];
 
 export class VoiceCommandError extends Schema.TaggedError<VoiceCommandError>()("VoiceCommandError", {
   issue: Schema.NonEmptyString,
@@ -51,21 +45,9 @@ export const nextVoiceFeatures = (selection: {
 export const normalizeVoiceId = (voice: string): string =>
   /^[MF][1-5]$/i.test(voice.trim()) ? voice.trim().toUpperCase() : "F4";
 
-const agentArgument = Args.choice<VoiceAgent>(voiceAgents, { name: "agent" }).pipe(
-  Args.optional,
-  Args.withDescription("Response source: claude, codex, grok, or devin"),
-);
-
-const exampleOption = Options.text("example").pipe(
-  Options.optional,
-  Options.withDescription("Speak this text immediately after enabling voice"),
-);
-
-const exampleSources: ReadonlyArray<VoiceAgent | "example"> = ["claude-code", "codex", "grok", "devin", "example"];
-
-const sourceOption = Options.choice("source", exampleSources).pipe(
-  Options.withDefault("example"),
-  Options.withDescription("Agent label shown for this spoken example"),
+const sourceOption = Options.choice("source", voiceSources).pipe(
+  Options.withDefault("manual"),
+  Options.withDescription("Origin label for this spoken text"),
 );
 
 const textArgument = Args.text({ name: "text" }).pipe(Args.withDescription("Complete Markdown response to read aloud"));
@@ -92,13 +74,11 @@ const requireSuccess = (command: PlatformCommand.Command, label: string) =>
         ? Effect.void
         : Effect.fail(new VoiceCommandError({ issue: `${label} exited with status ${String(code)}.` })),
     ),
-    Effect.mapError((error) =>
-      error instanceof VoiceCommandError
-        ? error
-        : new VoiceCommandError({
-            issue: `${label} could not start: ${error instanceof Error ? error.message : String(error)}`,
-          }),
-    ),
+    Effect.mapError((error) => {
+      if (error instanceof VoiceCommandError) return error;
+      const issue = error instanceof Error ? error.message : String(error);
+      return new VoiceCommandError({ issue: `${label} could not start: ${issue}` });
+    }),
   );
 
 const requireUv = requireSuccess(PlatformCommand.make("uv", "--version"), "uv");
@@ -122,9 +102,8 @@ const runVoice = (invocation: { script: string; args: ReadonlyArray<string>; lab
     invocation.label,
   );
 
-const voiceLocation = (scopeArgs: { project: boolean; global: boolean }) =>
+const voiceLocation = (scope: CliScope) =>
   Effect.gen(function* () {
-    const scope = yield* resolveScope(scopeArgs);
     const host = yield* captureHostEvidence;
     const destination = destinationForScope({
       scope,
@@ -137,16 +116,13 @@ const voiceLocation = (scopeArgs: { project: boolean; global: boolean }) =>
 const onCommand = CliCommand.make(
   "on",
   {
-    agent: agentArgument,
-    example: exampleOption,
-    project: projectOption,
-    global: globalOption,
+    scope: scopeOption,
   },
   (args) =>
     Effect.gen(function* () {
       yield* TerminalUI.intro("voice on");
       yield* requireUv;
-      const location = yield* voiceLocation(args);
+      const location = yield* voiceLocation(args.scope);
       const path = yield* Path.Path;
       const snapshot = yield* readArtifactReceiptSnapshot(path.join(location.destination.root, receiptPath));
       const current = snapshot._tag === "present" ? snapshot.receipt.features : [];
@@ -188,33 +164,19 @@ const onCommand = CliCommand.make(
         yield* TerminalUI.detail("Double-tap Control to refine the copied prompt, then press ⌘V to paste it.");
       }
 
-      if (Option.isSome(args.example)) {
-        const source = Option.getOrElse(args.agent, () => "example");
-        yield* TerminalUI.step(`speaking ${source} example`);
-        yield* runVoice({
-          script,
-          args: ["example", "--text", args.example.value, "--source", source],
-          label: "Voice example",
-        });
-      }
-
-      if (Option.isSome(args.agent) && args.agent.value === "devin") {
-        yield* TerminalUI.detail("Run Devin through `dufflebag voice devin` to narrate every completed turn.");
-      }
       yield* TerminalUI.outro("Ready.");
-    }).pipe(Effect.catchAll((error) => TerminalUI.presentError(error))),
-).pipe(CliCommand.withDescription("Install/start voice; optionally play --example text"));
+    }),
+).pipe(CliCommand.withDescription("Install and start local voice"));
 
 const offCommand = CliCommand.make(
   "off",
   {
-    project: projectOption,
-    global: globalOption,
+    scope: scopeOption,
   },
   (args) =>
     Effect.gen(function* () {
       yield* TerminalUI.intro("voice off");
-      const location = yield* voiceLocation(args);
+      const location = yield* voiceLocation(args.scope);
       const path = yield* Path.Path;
       const fileSystem = yield* FileSystem.FileSystem;
       const script = voiceScriptPath(location.destination.root, path);
@@ -241,26 +203,29 @@ const offCommand = CliCommand.make(
       });
       yield* TerminalUI.success(`Voice is off (${location.scope}).`);
       yield* TerminalUI.outro("Done.");
-    }).pipe(Effect.catchAll((error) => TerminalUI.presentError(error))),
+    }),
 ).pipe(CliCommand.withDescription("Stop voice and remove only the voice feature"));
 
 const statusCommand = CliCommand.make(
   "status",
   {
-    project: projectOption,
-    global: globalOption,
+    scope: scopeOption,
+    format: formatOption,
   },
   (args) =>
     Effect.gen(function* () {
-      yield* TerminalUI.intro("voice status");
-      const location = yield* voiceLocation(args);
+      if (args.format === "text") yield* TerminalUI.intro("voice status");
+      const location = yield* voiceLocation(args.scope);
       const path = yield* Path.Path;
       const snapshot = yield* readArtifactReceiptSnapshot(path.join(location.destination.root, receiptPath));
       const installed =
         snapshot._tag === "present" && snapshot.receipt.features.some((feature) => feature === voiceFeatureId);
       if (!installed) {
-        yield* TerminalUI.note(`feature  off\nscope    ${location.scope}`, "Voice");
-        yield* TerminalUI.outro("Enable with `dufflebag voice on`.");
+        if (args.format === "json") yield* TerminalUI.json({ installed: false, scope: location.scope });
+        else {
+          yield* TerminalUI.note(`feature  off\nscope    ${location.scope}`, "Voice");
+          yield* TerminalUI.outro("Enable with `dufflebag voice on`.");
+        }
         return;
       }
 
@@ -269,30 +234,33 @@ const statusCommand = CliCommand.make(
       const status = yield* PlatformCommand.string(
         PlatformCommand.make("uv", "run", "--frozen", "--script", script, "status"),
       );
-      yield* TerminalUI.note(`feature  on\nscope    ${location.scope}\nworker   ${status.trim()}`, "Voice");
-      yield* TerminalUI.outro("Tap Control to stop narration; hold it to dictate; release it to finish.");
-    }).pipe(Effect.catchAll((error) => TerminalUI.presentError(error))),
+      if (args.format === "json")
+        yield* TerminalUI.json({ installed: true, scope: location.scope, worker: status.trim() });
+      else {
+        yield* TerminalUI.note(`feature  on\nscope    ${location.scope}\nworker   ${status.trim()}`, "Voice");
+        yield* TerminalUI.outro("Tap Control to stop narration; hold it to dictate; release it to finish.");
+      }
+    }),
 ).pipe(CliCommand.withDescription("Show install, worker, and dictation state"));
 
-const exampleCommand = CliCommand.make(
-  "example",
+const speakCommand = CliCommand.make(
+  "speak",
   {
     text: textArgument,
     source: sourceOption,
-    project: projectOption,
-    global: globalOption,
+    scope: scopeOption,
   },
   (args) =>
     Effect.gen(function* () {
       yield* requireUv;
-      const location = yield* voiceLocation(args);
+      const location = yield* voiceLocation(args.scope);
       const script = yield* requireInstalledVoice(location.destination.root);
       yield* runVoice({
         script,
-        args: ["example", "--text", args.text, "--source", args.source],
-        label: "Voice example",
+        args: ["speak", "--text", args.text, "--source", args.source],
+        label: "Voice narration",
       });
-    }).pipe(Effect.catchAll((error) => TerminalUI.presentError(error))),
+    }),
 ).pipe(CliCommand.withDescription("Read one complete Markdown response aloud"));
 
 const refineCommand = CliCommand.make(
@@ -300,35 +268,33 @@ const refineCommand = CliCommand.make(
   {
     prompt: promptArgument,
     speak: speakRefinementOption,
-    project: projectOption,
-    global: globalOption,
+    scope: scopeOption,
   },
   (args) =>
     Effect.gen(function* () {
       yield* requireUv;
-      const location = yield* voiceLocation(args);
+      const location = yield* voiceLocation(args.scope);
       const script = yield* requireInstalledVoice(location.destination.root);
       yield* runVoice({
         script,
         args: ["refine", "--text", args.prompt, ...(args.speak ? ["--speak"] : [])],
         label: "Prompt refinement",
       });
-    }).pipe(Effect.catchAll((error) => TerminalUI.presentError(error))),
+    }),
 ).pipe(CliCommand.withDescription("Refine one prompt with Apple's local on-device model"));
 
 const devinCommand = CliCommand.make(
   "devin",
   {
     arguments: devinArguments,
-    project: projectOption,
-    global: globalOption,
+    scope: scopeOption,
   },
   (args) =>
     Effect.scoped(
       Effect.gen(function* () {
         yield* TerminalUI.intro("voice devin");
         yield* requireUv;
-        const location = yield* voiceLocation(args);
+        const location = yield* voiceLocation(args.scope);
         const script = yield* requireInstalledVoice(location.destination.root);
         const fileSystem = yield* FileSystem.FileSystem;
         const path = yield* Path.Path;
@@ -343,11 +309,11 @@ const devinCommand = CliCommand.make(
         yield* TerminalUI.detail(`Watching Devin's official ATIF export (watcher ${String(watcher.pid)}).`);
         yield* requireSuccess(inheritedCommand("devin", ["--export", exportPath, ...args.arguments]), "Devin");
         yield* TerminalUI.outro("Devin session ended; voice watcher stopped.");
-      }).pipe(Effect.catchAll((error) => TerminalUI.presentError(error))),
+      }),
     ),
 ).pipe(CliCommand.withDescription("Run Devin and narrate complete turns from its official ATIF export"));
 
 export const voiceCommand = CliCommand.make("voice").pipe(
   CliCommand.withDescription("Natural local response narration and caret dictation"),
-  CliCommand.withSubcommands([onCommand, offCommand, statusCommand, exampleCommand, refineCommand, devinCommand]),
+  CliCommand.withSubcommands([onCommand, offCommand, statusCommand, speakCommand, refineCommand, devinCommand]),
 );

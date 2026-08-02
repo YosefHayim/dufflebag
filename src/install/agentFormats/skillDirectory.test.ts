@@ -51,18 +51,18 @@ const request = () => ({
   previousFiles: previousFiles(),
 });
 
-const unwrap = (result: Either.Either<SkillDirectoryPlan, SkillDirectoryPlanError>): SkillDirectoryPlan =>
-  Either.getOrThrowWith(result, (error) => new Error(error.message));
+const unwrap = (skillInstallation: Either.Either<SkillDirectoryPlan, SkillDirectoryPlanError>): SkillDirectoryPlan =>
+  Either.getOrThrowWith(skillInstallation, (error) => new Error(error.message));
 
 const errorMessage = (input: unknown): string => {
-  const result = planSkillDirectory(input);
-  if (Either.isRight(result)) {
+  const skillInstallation = planSkillDirectory(input);
+  if (Either.isRight(skillInstallation)) {
     throw new Error("Expected skill-directory planning to fail.");
   }
 
-  expect(result.left).toBeInstanceOf(SkillDirectoryPlanError);
+  expect(skillInstallation.left).toBeInstanceOf(SkillDirectoryPlanError);
 
-  return result.left.message;
+  return skillInstallation.left.message;
 };
 
 describe("planSkillDirectory", () => {

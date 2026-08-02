@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 import fs from "node:fs";
 import path from "node:path";
-/** Rig the robot arm: produce arm.png (green key) and body.png (arm hole filled). */
+/** Rig the robot arm: produce arm.png (green key) and torso.png (arm hole filled). */
 import { PNG } from "pngjs";
-import { argString, inPoly, parseArgs } from "../../src/lib/index.js";
+import { argString, parseArgs } from "../../src/lib/argv.js";
+import { inPoly } from "../../src/lib/png.js";
 
 const args = parseArgs(process.argv.slice(2));
 const srcPath = argString(args, "input") || "robot.png";
@@ -47,8 +48,8 @@ const arm = new PNG({ width: W, height: H });
 png.data.copy(arm.data);
 for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (!inPoly(x, y, ARM)) setpx(arm, x, y, [0, 255, 0]);
 
-const body = new PNG({ width: W, height: H });
-png.data.copy(body.data);
+const torsoLayer = new PNG({ width: W, height: H });
+png.data.copy(torsoLayer.data);
 for (let y = 0; y < H; y++) {
   let lo = W,
     hi = -1;
@@ -71,10 +72,10 @@ for (let y = 0; y < H; y++) {
   const left = sample(lo - 2, -1);
   const right = sample(hi + 2, +1);
   const mid = (lo + hi) / 2;
-  for (let x = lo; x <= hi; x++) setpx(body, x, y, x < mid ? left : right);
+  for (let x = lo; x <= hi; x++) setpx(torsoLayer, x, y, x < mid ? left : right);
 }
 
 fs.mkdirSync(outDir, { recursive: true });
 fs.writeFileSync(path.join(outDir, "arm.png"), PNG.sync.write(arm));
-fs.writeFileSync(path.join(outDir, "body.png"), PNG.sync.write(body));
-console.log(`wrote ${outDir}/arm.png + ${outDir}/body.png`);
+fs.writeFileSync(path.join(outDir, "torso.png"), PNG.sync.write(torsoLayer));
+console.log(`wrote ${outDir}/arm.png + ${outDir}/torso.png`);

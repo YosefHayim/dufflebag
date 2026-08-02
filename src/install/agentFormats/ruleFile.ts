@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-import { Either, ParseResult, Schema } from "effect";
+import { Either, Schema, ParseResult as SchemaParseIssue } from "effect";
 
 import { agentCatalog, agentDefinitionSchema } from "../../catalog/agentCatalog.js";
 import { featureCatalog, installedSkillDefinitionSchema } from "../../catalog/featureCatalog.js";
@@ -36,7 +36,8 @@ export class RuleFilePlanError extends Schema.TaggedError<RuleFilePlanError>()("
   }
 }
 
-const formatParseError = (error: ParseResult.ParseError): string => ParseResult.TreeFormatter.formatErrorSync(error);
+const formatParseError = (error: SchemaParseIssue.ParseError): string =>
+  SchemaParseIssue.TreeFormatter.formatErrorSync(error);
 
 const hashBytes = (bytes: Uint8Array): string => createHash("sha256").update(bytes).digest("hex");
 
@@ -45,7 +46,7 @@ const hasCompleteLeadingFrontmatter = (markdown: string): boolean =>
 
 const stripLeadingFrontmatter = (markdown: string): string => markdown.replace(leadingFrontmatterBlockPattern, "");
 
-const hasRuleBody = (markdown: string): boolean => stripLeadingFrontmatter(markdown).trim().length > 0;
+const hasRuleContent = (markdown: string): boolean => stripLeadingFrontmatter(markdown).trim().length > 0;
 
 const substituteControlPath = (markdown: string, ctl: string): string => markdown.split(templateToken).join(ctl);
 
@@ -64,7 +65,7 @@ const ruleFileMarkdownSchema = Schema.String.pipe(
   Schema.filter(hasCompleteLeadingFrontmatter, {
     message: () => "Leading YAML frontmatter must have exact opening and closing delimiter lines.",
   }),
-  Schema.filter(hasRuleBody, {
+  Schema.filter(hasRuleContent, {
     message: () => "Rule-file markdown requires a non-empty body after frontmatter.",
   }),
   Schema.annotations({

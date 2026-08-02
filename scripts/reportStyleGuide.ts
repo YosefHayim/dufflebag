@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { checkStyleGuide } from "./checkStyleGuide.js";
 
-const repositoryRoot = resolve(process.argv[2] ?? process.cwd());
+const repositoryRoot = resolve(process.argv[2] || process.cwd());
 const guidePath = join(repositoryRoot, "CODE-STYLE.md");
 const rulesPath = join(repositoryRoot, "code-style.rules.json");
 

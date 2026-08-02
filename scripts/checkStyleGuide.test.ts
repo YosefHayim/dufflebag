@@ -105,7 +105,7 @@ describe("rule-card format", () => {
         verify: "`pnpm style`",
         assertion: "Named functions are arrow constants. Declare them before first use.",
       }),
-      validCards[1] ?? "",
+      validCards.at(1) || "",
     ]);
 
     expect(messagesFor(guide).join("\n")).toMatch(/exactly one sentence/u);
@@ -118,7 +118,7 @@ describe("rule-card format", () => {
         verify: "`pnpm style`",
         assertion: "Named functions are arrow constants declared before first use",
       }),
-      validCards[1] ?? "",
+      validCards.at(1) || "",
     ]);
 
     expect(messagesFor(guide).join("\n")).toMatch(/exactly one sentence/u);
@@ -131,7 +131,7 @@ describe("rule-card format", () => {
         verify: "`pnpm style`",
         assertion: "Named functions are arrow constants declared before use.",
       }),
-      validCards[1] ?? "",
+      validCards.at(1) || "",
     ]);
 
     expect(messagesFor(guide)).toContain(
@@ -179,14 +179,14 @@ describe("rule-card format", () => {
         "",
         "Why: one reason.",
       ].join("\n"),
-      validCards[1] ?? "",
+      validCards.at(1) || "",
     ]);
 
     expect(messagesFor(guide)).toContain("Rule function.arrow-only needs a fenced example block.");
   });
 
   it("reports a machine rule with no card", () => {
-    const guide = guideWith([validCards[0] ?? ""]);
+    const guide = guideWith([validCards.at(0) || ""]);
 
     expect(messagesFor(guide)).toContain(
       "Rule function.one-job is in code-style.rules.json but has no card in CODE-STYLE.md.",
@@ -194,7 +194,7 @@ describe("rule-card format", () => {
   });
 
   it("reports a duplicated card", () => {
-    const guide = guideWith([...validCards, validCards[0] ?? ""]);
+    const guide = guideWith([...validCards, validCards.at(0) || ""]);
 
     expect(messagesFor(guide)).toContain("Rule function.arrow-only has more than one card in CODE-STYLE.md.");
   });

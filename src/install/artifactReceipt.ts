@@ -1,6 +1,6 @@
 import { FileSystem } from "@effect/platform";
 import type { PlatformError } from "@effect/platform/Error";
-import { Effect, Either, Encoding, Option, ParseResult, Predicate, Schema } from "effect";
+import { Effect, Either, Encoding, Option, Predicate, Schema, ParseResult as SchemaParseIssue } from "effect";
 
 import { agentCatalog, agentIdSchema } from "../catalog/agentCatalog.js";
 import { featureIdSchema, resolveFeatureSelection } from "../catalog/featureCatalog.js";
@@ -528,7 +528,9 @@ const settingsLexicalIssues = (entry: { kind: ArtifactKind; ownership: ArtifactO
     }
 
     const expectedTag = value.installed._tag === "missing" ? "property" : "value";
-    const actualTag = lexical?._tag === "value" ? "value" : lexical === undefined ? "missing" : "property";
+    let actualTag = "property";
+    if (lexical === undefined) actualTag = "missing";
+    else if (lexical._tag === "value") actualTag = "value";
 
     return actualTag === expectedTag && lexicalMatchesPrevious(value)
       ? []
@@ -667,7 +669,7 @@ const decodeArtifactReceiptBytes = (bytes: Uint8Array): Either.Either<ArtifactRe
       Schema.decodeUnknownEither(artifactReceiptJsonSchema, {
         onExcessProperty: "error",
       })(json),
-      ParseResult.TreeFormatter.formatErrorSync,
+      SchemaParseIssue.TreeFormatter.formatErrorSync,
     );
   });
 };

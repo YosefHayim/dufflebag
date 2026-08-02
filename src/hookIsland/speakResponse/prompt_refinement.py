@@ -7,7 +7,6 @@ import re
 import sys
 from typing import Any
 
-
 PROMPT_REFINEMENT_INSTRUCTIONS = """Refine the user's draft into a precise prompt for a coding agent.
 Preserve the exact intent, facts, constraints, code, commands, paths, URLs, quoted literals, and acceptance criteria.
 Remove filler and repetition. Make implied deliverables explicit only when they are already supported by the draft.
@@ -54,7 +53,9 @@ def refinement_unavailable_reason(reason: Any) -> str:
         "MODEL_NOT_READY": "the Apple Intelligence model is still downloading or preparing",
         "UNKNOWN": "Apple did not report why the model is unavailable",
     }
-    return messages.get(name, str(reason) if reason is not None else "Apple did not report why the model is unavailable")
+    return messages.get(
+        name, str(reason) if reason is not None else "Apple did not report why the model is unavailable"
+    )
 
 
 def refinement_availability() -> tuple[bool, str]:
@@ -78,8 +79,8 @@ async def generate_refined_prompt(original: str) -> str:
     if not available:
         raise RuntimeError(f"Apple Foundation Models is unavailable: {refinement_unavailable_reason(reason)}")
     session = fm.LanguageModelSession(model=model, instructions=PROMPT_REFINEMENT_INSTRUCTIONS)
-    response = await session.respond(prompt=original)
-    return validate_refined_prompt(original, str(response))
+    refined_reply = await session.respond(prompt=original)
+    return validate_refined_prompt(original, str(refined_reply))
 
 
 def refine_prompt(original: str) -> str:

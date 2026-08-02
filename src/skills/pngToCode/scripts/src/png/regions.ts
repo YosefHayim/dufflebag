@@ -2,20 +2,21 @@
 import fs from "node:fs";
 /** Locate logo groups on a mostly-white canvas via column/row projection. */
 import { PNG } from "pngjs";
-import { argString, parseArgs, toHex } from "../lib/index.js";
+import { argString, parseArgs } from "../lib/argv.js";
+import { toHex } from "../lib/png.js";
 
 const args = parseArgs(process.argv.slice(2));
 const input = argString(args, "input") || "target.png";
 const png = PNG.sync.read(fs.readFileSync(input));
-const { width: W, height: H, data } = png;
+const { width: W, height: H, data: pixelBytes } = png;
 
 const isBg = (x: number, y: number) => {
   const i = (y * W + x) * 4;
-  return data[i] > 240 && data[i + 1] > 240 && data[i + 2] > 240;
+  return pixelBytes[i] > 240 && pixelBytes[i + 1] > 240 && pixelBytes[i + 2] > 240;
 };
 const hexAt = (x: number, y: number) => {
   const i = (y * W + x) * 4;
-  return toHex(data[i], data[i + 1], data[i + 2]);
+  return toHex(pixelBytes[i], pixelBytes[i + 1], pixelBytes[i + 2]);
 };
 
 const col = new Array<number>(W).fill(0);
@@ -43,7 +44,7 @@ for (let x = 0; x <= W; x++) {
   }
 }
 
-const result: Record<string, unknown> = {
+const regionMap: Record<string, unknown> = {
   background: hexAt(4, 4),
   dimensions: { W, H },
   bands: [] as unknown[],
@@ -58,7 +59,7 @@ for (const [x0, x1] of bands) {
       if (y < yTop) yTop = y;
       if (y > yBot) yBot = y;
       const i = (y * W + x) * 4;
-      const key = `#${[data[i] & 0xf0, data[i + 1] & 0xf0, data[i + 2] & 0xf0].map((v) => v.toString(16).padStart(2, "0")).join("")}`;
+      const key = `#${[pixelBytes[i] & 0xf0, pixelBytes[i + 1] & 0xf0, pixelBytes[i + 2] & 0xf0].map((v) => v.toString(16).padStart(2, "0")).join("")}`;
       colorCounts.set(key, (colorCounts.get(key) || 0) + 1);
     }
   }
@@ -66,10 +67,10 @@ for (const [x0, x1] of bands) {
     .sort((a, b) => b[1] - a[1])
     .slice(0, 3)
     .map(([h]) => h);
-  (result.bands as unknown[]).push({
+  (regionMap.bands as unknown[]).push({
     bbox: { x: x0, y: yTop, w: x1 - x0 + 1, h: yBot - yTop + 1 },
     colors: topColors,
   });
 }
 
-console.log(JSON.stringify(result, null, 2));
+console.log(JSON.stringify(regionMap, null, 2));

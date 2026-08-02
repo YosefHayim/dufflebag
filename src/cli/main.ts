@@ -9,17 +9,19 @@ import { readFileSync, realpathSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { Command } from "@effect/cli";
-import { Terminal } from "@effect/platform";
+import { CliConfig, Command, ValidationError } from "@effect/cli";
 import { NodeContext, NodeRuntime } from "@effect/platform-node";
-import { Effect } from "effect";
+import { Effect, ParseResult } from "effect";
 
+import { catalogCommand } from "./catalogCommand.js";
 import { configCommand } from "./configCommand.js";
 import { dedupCommand } from "./dedupCheckCommand.js";
 import { doctorCommand } from "./doctorCommand.js";
 import { installCommand } from "./installCommand.js";
-import { runMenu } from "./menuCommand.js";
-import { scaffoldWorkflowsCommand } from "./scaffoldWorkflowsCommand.js";
+import { menuCommand } from "./menuCommand.js";
+import { workflowCommand } from "./scaffoldWorkflowsCommand.js";
+import { CliUsageError } from "./scopeOptions.js";
+import * as TerminalUI from "./TerminalUI.js";
 import { uninstallCommand } from "./uninstallCommand.js";
 import { updateCommand } from "./updateCommand.js";
 import { voiceCommand } from "./voiceCommand.js";
@@ -66,10 +68,12 @@ const dufflebag = Command.make("dufflebag").pipe(
     installCommand,
     updateCommand,
     uninstallCommand,
+    menuCommand,
+    catalogCommand,
     configCommand,
     doctorCommand,
     dedupCommand,
-    scaffoldWorkflowsCommand,
+    workflowCommand,
     voiceCommand,
   ]),
 );
@@ -79,24 +83,41 @@ const cli = Command.run(dufflebag, {
   version: VERSION,
 });
 
+const presentCliFailure = (error: unknown) => {
+  const exitCode =
+    ValidationError.isValidationError(error) || ParseResult.isParseError(error) || error instanceof CliUsageError
+      ? 2
+      : 1;
+  const presentation = ValidationError.isValidationError(error) ? Effect.void : TerminalUI.presentError(error);
+  return presentation.pipe(
+    Effect.zipRight(
+      Effect.sync(() => {
+        process.exitCode = exitCode;
+      }),
+    ),
+  );
+};
+
 const program = Effect.gen(function* () {
-  const terminal = yield* Terminal.Terminal;
-  const isTTY = yield* terminal.isTTY;
   const bareInvocation = process.argv.length <= 2;
 
-  if (bareInvocation && isTTY) {
-    yield* runMenu;
-    return;
-  }
-
-  if (bareInvocation && !isTTY) {
-    // Non-TTY bare invocation must not hang: print help and exit.
+  if (bareInvocation) {
     yield* cli(["node", "dufflebag", "--help"]);
     return;
   }
 
-  yield* cli(process.argv);
-}).pipe(Effect.provide(NodeContext.layer));
+  const invocationArguments = process.argv[2] === "-V" ? ["node", "dufflebag", "--version"] : process.argv;
+  yield* cli(invocationArguments);
+}).pipe(
+  Effect.catchAll(presentCliFailure),
+  Effect.onInterrupt(() =>
+    Effect.sync(() => {
+      process.exitCode = 130;
+    }),
+  ),
+  Effect.provide(NodeContext.layer),
+  Effect.provide(CliConfig.layer({ showBuiltIns: false })),
+);
 
 // Exported for tests that exercise request assembly without starting the runtime.
 export { cli, dufflebag, VERSION };

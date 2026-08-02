@@ -31,16 +31,16 @@ const RATE_LIMITS_FILE = path.join(homedir(), ".claude", ".last-rate-limits.json
 const daemonPath = (): string => path.join(path.dirname(fileURLToPath(import.meta.url)), "ctxWatch.js");
 
 /** Read a marker file's text content (the halt reason), or "" if absent. */
-function readText(file: string): string {
+const readText = (file: string): string => {
   try {
     return readFileSync(file, "utf8").trim();
   } catch {
     return "";
   }
-}
+};
 
 /** True if the daemon process recorded for this session is still alive. */
-function daemonAlive(sid: string): boolean {
+const daemonAlive = (sid: string): boolean => {
   const pid = readInt(loopFile(sid, "pid"), 0);
   if (pid <= 0) return false;
   try {
@@ -49,22 +49,27 @@ function daemonAlive(sid: string): boolean {
   } catch {
     return false;
   }
-}
+};
 
 /** Launch the daemon detached if it isn't already holding the lock. */
-function spawnDaemon(sid: string): void {
+const spawnDaemon = (sid: string): void => {
   if (daemonAlive(sid)) return;
   // Same explicit-env contract as SessionStart so re-arm freezes settings, not defaults.
   const plan = planDaemonSpawn({ sessionId: sid, daemonPath: daemonPath() });
   writeText(loopFile(sid, "config"), JSON.stringify(plan.configSnapshot));
   const child = spawn(plan.command, [...plan.args], plan.options);
   child.unref();
-}
+};
 
-const fmtTokens = (n: number): string =>
-  n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M` : n >= 1_000 ? `${(n / 1_000).toFixed(1)}k` : String(n);
+const fmtTokens = (tokenCount: number): string => {
+  if (tokenCount >= 1_000_000) return `${(tokenCount / 1_000_000).toFixed(1)}M`;
+  if (tokenCount >= 1_000) return `${(tokenCount / 1_000).toFixed(1)}k`;
+  return String(tokenCount);
+};
+
 const fmtPct = (v: unknown): string => (typeof v === "number" ? `${Math.round(v)}%` : "n/a");
-function fmtDuration(seconds: number): string {
+
+const fmtDuration = (seconds: number): string => {
   if (seconds <= 0) return "n/a";
   const h = Math.floor(seconds / 3600);
   const m = Math.floor((seconds % 3600) / 60);
@@ -72,7 +77,7 @@ function fmtDuration(seconds: number): string {
   if (h) return `${h}h ${m}m`;
   if (m) return `${m}m ${s}s`;
   return `${s}s`;
-}
+};
 
 const HALT_REASONS: Record<string, string> = {
   "budget-reached": "cycle budget reached",
@@ -81,16 +86,22 @@ const HALT_REASONS: Record<string, string> = {
 };
 
 /** Best-effort (five_hour_pct, weekly_pct) from the statusline side-channel. */
-function rateLimits(): { five?: number; week?: number } {
+const rateLimits = (): { five?: number; week?: number } => {
   try {
-    const data = JSON.parse(readFileSync(RATE_LIMITS_FILE, "utf8")) as { five_hour_pct?: number; weekly_pct?: number };
-    return { five: data.five_hour_pct, week: data.weekly_pct };
+    const candidate: unknown = JSON.parse(readFileSync(RATE_LIMITS_FILE, "utf8"));
+    if (typeof candidate !== "object" || candidate === null) return {};
+    const fiveCandidate = Object.getOwnPropertyDescriptor(candidate, "five_hour_pct")?.value;
+    const weekCandidate = Object.getOwnPropertyDescriptor(candidate, "weekly_pct")?.value;
+    return {
+      five: typeof fiveCandidate === "number" ? fiveCandidate : undefined,
+      week: typeof weekCandidate === "number" ? weekCandidate : undefined,
+    };
   } catch {
     return {};
   }
-}
+};
 
-function report(sid: string, headline: string): void {
+const report = (sid: string, headline: string): void => {
   const cycles = readInt(loopFile(sid, "cycles"), 0);
   const budget = readInt(loopFile(sid, "budget"), DEFAULT_BUDGET);
   const started = readInt(loopFile(sid, "started"), 0);
@@ -108,11 +119,11 @@ function report(sid: string, headline: string): void {
     `  • 5h usage       : ${fmtPct(five)}`,
     `  • weekly usage   : ${fmtPct(week)}`,
   ];
-  if (halt) lines.push(`  • last auto-halt : ${HALT_REASONS[halt] ?? halt}`);
+  if (halt) lines.push(`  • last auto-halt : ${HALT_REASONS[halt] || halt}`);
   console.log(lines.join("\n"));
-}
+};
 
-function cmdArm(sid: string, args: string[]): void {
+const cmdArm = (sid: string, args: string[]): void => {
   let budget = DEFAULT_BUDGET;
   if (args[0]) {
     const n = parseInt(args[0], 10);
@@ -131,20 +142,20 @@ function cmdArm(sid: string, args: string[]): void {
       "   Safety: it types only into THIS session's Ghostty window (located by title, idle-only) and refuses rather than guess. " +
       "Global kill: touch ~/.claude/.ctx-guard-off",
   );
-}
+};
 
-function cmdStop(sid: string): void {
+const cmdStop = (sid: string): void => {
   remove(loopFile(sid, "armed"));
   report(sid, "⏸️  Autorun PAUSED (/autorun stop) — daemon still observing; /autorun to resume.");
-}
+};
 
-function cmdExit(sid: string): void {
+const cmdExit = (sid: string): void => {
   remove(loopFile(sid, "armed"));
   writeText(loopFile(sid, "exit"), ""); // daemon self-terminates on its next poll
   report(sid, "🛑 Autorun EXITED (/autorun exit) — daemon shutting down for this session.");
-}
+};
 
-function main(): void {
+const main = (): void => {
   const cmd = process.argv[2];
   if (!cmd || !["arm", "stop", "exit"].includes(cmd)) {
     console.error("usage: ctxLoopCtl.js {arm <n>|stop|exit}");
@@ -158,6 +169,6 @@ function main(): void {
   if (cmd === "arm") cmdArm(sid, process.argv.slice(3));
   else if (cmd === "stop") cmdStop(sid);
   else cmdExit(sid);
-}
+};
 
 main();

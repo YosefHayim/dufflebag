@@ -7,7 +7,7 @@ Entrypoint for coding agents and maintainers. `CLAUDE.md` and `GEMINI.md` are sy
 **dufflebag** is a TypeScript CLI that installs, updates, uninstalls, diagnoses, configures, and scaffolds an owned set of agent skills, dependency-free hooks, agent configuration, and copyable single-gate CI/publish workflow templates.
 
 ```bash
-npx ys-dufflebag install --features png-to-code
+npx ys-dufflebag install png-to-code
 ```
 
 ## Source-of-truth map
@@ -50,23 +50,26 @@ Public feature and installed-skill IDs are decoded catalog data and can differ f
 | `statuslines/` | Agent status-line presets installed by their own shell script (not receipt-owned) |
 | `public/` | README image assets; referenced by absolute URL so npm renders them |
 | `docs/adr/current/` | Current architectural decisions |
-| `.husky/pre-commit` | README regeneration before commits |
+| `.husky/pre-commit` | Deterministic `pnpm verify` gate; never rewrites or stages files |
 
 Capability layout is current ([ADR 0016](docs/adr/current/0016-capability-layout-replaces-core.md)). Do not reintroduce `src/core/`, `src/commands/`, or `src/payload/`.
 
 A feature is payload **or** runtime, never both. Put executable code under `src/hookIsland/`; put anything copied verbatim into a user's skill directory under `src/skills/`. `pnpm style` governs application, hook-island, and tooling code; skill payload answers to Biome and its own harness because it is authored for other repositories.
 
+Golden paths: mirror `src/skills/githubRepoMetadata/` for a copied skill, `src/hookIsland/dedupGuard/` for dependency-free policy/mechanism separation, and an existing file in `src/cli/` for a command adapter. Reuse the nearest capability seam; do not create a generic layer.
+
+<!-- rules digest — full guide in CODE-STYLE.md; edit there -->
 ## Working contract
 
 Hard rules agents must hold every turn. Full prescription: [`CODE-STYLE.md`](CODE-STYLE.md) and `docs/adr/current/`.
 
-- **Verify gate** — `pnpm verify` = `biome ci` + typecheck + `style` + `style:guide` + test + build. Biome is linter and formatter (double quotes). One root `tsconfig`; the png harness under `src/skills/pngToCode/scripts/` is the single sanctioned exception.
+- **Verify gate** — `pnpm verify` = Biome + pinned Ruff + typecheck + `style` + `style:guide` + tests + build + generated-document check. One root `tsconfig`; the png harness under `src/skills/pngToCode/scripts/` is the single sanctioned exception.
 - **Effect / Schema** — capabilities return Effect; only `src/cli/main.ts` starts the runtime. Runtime, persisted, catalog, CLI, and agent-format data begin as Effect Schema. Application failures use `Schema.TaggedError`. No hand-rolled `isX` / `parseX` pairs for literals and numbers.
 - **Hook island** — installed hooks stay dependency-free plain Node (`node:*`, `src/runtime/**`, own feature runtime only), **fail-open**. Application code never imports installed hook code.
 - **Ownership** — inspect → plan → validate → apply → write receipt last. A receipt is the only deletion authority. Catalog-closed shipping: the feature catalog owns exact shipped paths.
 - **Shape** — capability-owned paths; camelCase authored directories; PascalCase UI files; kebab-case public IDs/flags. One command path; `TerminalUI` owns presentation; non-TTY never prompts.
 - **Local tooling** — gitignored `scripts/dev/` for personal/one-off scripts. All maintained build/verify tools live under root `scripts/` (not under `src/`).
-- **README** — pre-commit may regenerate and stage `README.md`; inspect the index after committing.
+- **Git hooks** — pre-commit runs `pnpm verify`; hooks report drift and never rewrite or stage files.
 
 ## Validate changes
 
@@ -85,7 +88,7 @@ pnpm style              # AST, path, and import-graph rules over the maintained 
 pnpm style:guide .      # rule-card format of CODE-STYLE.md; accepts any repo path
 ```
 
-`pnpm style` fails on the **gated** categories — application, tooling, and payload placement — which are clean and must stay that way. It also prints the `src/hookIsland/` findings under a "reported but not gated" heading: that tree predates the current style, and converting a `function` declaration to an arrow constant changes hoisting in fail-open code, so it is migrated deliberately rather than by codemod ([ADR 0017](docs/adr/current/0017-payload-and-runtime-are-separate-trees.md)).
+`pnpm style` gates application, tooling, payload placement, `src/runtime/`, and `src/hookIsland/`; all are clean and must stay that way ([ADR 0021](docs/adr/current/0021-hook-island-style-gate.md)). Copied skill content follows Biome and its own harness rather than application architecture rules.
 
 For png-to-code script changes:
 
@@ -99,7 +102,7 @@ pnpm --dir src/skills/pngToCode/scripts typecheck
 | --- | --- |
 | Issue tracker | [`docs/agents/issue-tracker.md`](docs/agents/issue-tracker.md) (GitHub `YosefHayim/dufflebag`) |
 | Triage labels | [`docs/agents/triage-labels.md`](docs/agents/triage-labels.md) |
-| Domain docs | [`docs/agents/domain.md`](docs/agents/domain.md) — e.g. png-to-code: `src/skills/png-to-code/CONTEXT.md` |
+| Domain docs | [`docs/agents/domain.md`](docs/agents/domain.md) — e.g. png-to-code: `src/skills/pngToCode/CONTEXT.md` |
 
 <!-- dufflebag:skills start -->
 ## autorun

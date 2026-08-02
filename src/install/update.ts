@@ -1,10 +1,10 @@
 import { Path } from "@effect/platform";
-import { Effect, ParseResult, Schema } from "effect";
+import { Effect, Schema, ParseResult as SchemaParseIssue } from "effect";
 import { readArtifactReceiptSnapshot } from "./artifactReceipt.js";
 import {
   agentChoiceSchema,
   configurationChoiceSchema,
-  type InstallResult,
+  type InstallSummary,
   installationLocationSchema,
   installRequestSchema,
   interactionSchema,
@@ -39,7 +39,7 @@ export const updateRequestSchema = Schema.extend(
 
 export type UpdateRequest = Schema.Schema.Type<typeof updateRequestSchema>;
 
-const updateResultFieldsSchema = {
+const updateSummaryFieldsSchema = {
   scope: Schema.Literal("global", "project"),
   features: selectedFeatureChoiceSchema.fields.ids,
   agents: agentChoiceSchema.members[0].fields.ids,
@@ -47,14 +47,14 @@ const updateResultFieldsSchema = {
   interaction: interactionSchema,
 };
 
-export const updateResultSchema = Schema.Union(
-  Schema.TaggedStruct("updated", updateResultFieldsSchema),
-  Schema.TaggedStruct("unchanged", updateResultFieldsSchema),
+export const updateSummarySchema = Schema.Union(
+  Schema.TaggedStruct("updated", updateSummaryFieldsSchema),
+  Schema.TaggedStruct("unchanged", updateSummaryFieldsSchema),
 ).annotations({
   description: "Applied or already-current update result.",
 });
 
-export type UpdateResult = Schema.Schema.Type<typeof updateResultSchema>;
+export type UpdateSummary = Schema.Schema.Type<typeof updateSummarySchema>;
 
 export class UpdateError extends Schema.TaggedError<UpdateError>()("UpdateError", {
   issue: Schema.NonEmptyString.annotations({
@@ -66,7 +66,8 @@ export class UpdateError extends Schema.TaggedError<UpdateError>()("UpdateError"
   }
 }
 
-const formatParseError = (error: ParseResult.ParseError): string => ParseResult.TreeFormatter.formatErrorSync(error);
+const formatParseError = (error: SchemaParseIssue.ParseError): string =>
+  SchemaParseIssue.TreeFormatter.formatErrorSync(error);
 
 const formatUnknownError = (error: unknown): string => (error instanceof Error ? error.message : String(error));
 
@@ -83,16 +84,16 @@ const decodeInstallRequest = (input: unknown) =>
     onExcessProperty: "error",
   })(input).pipe(Effect.mapError((error) => new UpdateError({ issue: formatParseError(error) })));
 
-const createUpdateResult = (result: InstallResult): UpdateResult =>
-  Schema.validateSync(updateResultSchema, {
+const createUpdateSummary = (updateExecution: InstallSummary): UpdateSummary =>
+  Schema.validateSync(updateSummarySchema, {
     onExcessProperty: "error",
   })({
-    _tag: result._tag === "installed" ? "updated" : "unchanged",
-    scope: result.scope,
-    features: result.features,
-    agents: result.agents,
-    platformRequirements: result.platformRequirements,
-    interaction: result.interaction,
+    _tag: updateExecution._tag === "installed" ? "updated" : "unchanged",
+    scope: updateExecution.scope,
+    features: updateExecution.features,
+    agents: updateExecution.agents,
+    platformRequirements: updateExecution.platformRequirements,
+    interaction: updateExecution.interaction,
   });
 
 // Update one existing receipt through a visible decode, inspect, resolve, reconcile, and result pipeline.
@@ -118,8 +119,8 @@ export const update = (input: unknown) =>
     });
 
     // 5. Reconcile through the shared planner with the already-inspected receipt snapshot.
-    const result = yield* reconcileInstallation({ request: installRequest, receiptSnapshot });
+    const updateExecution = yield* reconcileInstallation({ request: installRequest, receiptSnapshot });
 
     // 6. Return one schema-validated update presentation value.
-    return createUpdateResult(result);
+    return createUpdateSummary(updateExecution);
   }).pipe(Effect.mapError(toUpdateError));

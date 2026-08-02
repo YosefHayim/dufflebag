@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-import { Either, ParseResult, Schema } from "effect";
+import { Either, Schema, ParseResult as SchemaParseIssue } from "effect";
 
 import { agentCatalog, agentDefinitionSchema } from "../../catalog/agentCatalog.js";
 import { featureCatalog, installedSkillDefinitionSchema } from "../../catalog/featureCatalog.js";
@@ -33,7 +33,8 @@ export class SkillDirectoryPlanError extends Schema.TaggedError<SkillDirectoryPl
   }
 }
 
-const formatParseError = (error: ParseResult.ParseError): string => ParseResult.TreeFormatter.formatErrorSync(error);
+const formatParseError = (error: SchemaParseIssue.ParseError): string =>
+  SchemaParseIssue.TreeFormatter.formatErrorSync(error);
 
 const normalizedPath = (path: string): string => path.toLowerCase();
 

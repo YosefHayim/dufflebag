@@ -50,7 +50,7 @@ layer(NodeContext.layer)("configFile", (it) => {
         const configPath = path.join(root, "config.json");
         const {
           idleAutoCompact: _idleRemoved,
-          speechResponseMode: _speechResponseModeRemoved,
+          speechResponseMode: _speechNarrationModeRemoved,
           speechReadAlong: _speechReadAlongRemoved,
           promptRefinementMode: _promptRefinementModeRemoved,
           dictationReplacements: _dictationRemoved,
@@ -66,7 +66,7 @@ layer(NodeContext.layer)("configFile", (it) => {
     ),
   );
 
-  it.effect("reports the file and missing property for an incomplete config", () =>
+  it.effect("applies schema defaults to an incomplete config", () =>
     Effect.scoped(
       Effect.gen(function* () {
         const fileSystem = yield* FileSystem.FileSystem;
@@ -76,11 +76,9 @@ layer(NodeContext.layer)("configFile", (it) => {
 
         yield* fileSystem.writeFileString(configPath, JSON.stringify({ contextWarnFraction: 0.18 }));
 
-        const error = yield* Effect.flip(readConfigFile(configPath));
-        expect(error).toBeInstanceOf(ConfigFileSchemaError);
-        expect(error.message).toContain(configPath);
-        expect(error.message).toContain("contextBlockFraction");
-        expect(error.message).toContain("Fix or remove");
+        const snapshot = yield* readConfigFile(configPath);
+        expect(snapshot._tag).toBe("present");
+        if (snapshot._tag === "present") expect(snapshot.config).toEqual(defaultBagConfig);
       }),
     ),
   );

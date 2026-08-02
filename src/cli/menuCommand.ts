@@ -3,6 +3,7 @@
  * Routes into the same capability requests as explicit commands.
  */
 
+import { Command } from "@effect/cli";
 import { FileSystem, Path } from "@effect/platform";
 import { Effect } from "effect";
 
@@ -16,7 +17,7 @@ import { captureHostEvidence, destinationForScope } from "./hostEvidence.js";
 import { stagePackage } from "./stagePackage.js";
 import * as TerminalUI from "./TerminalUI.js";
 
-type MenuAction = "install" | "update" | "config" | "doctor" | "scaffold-ci" | "uninstall" | "exit";
+type MenuAction = "install" | "update" | "config" | "doctor" | "workflow" | "uninstall" | "exit";
 
 const resolvePackageRoot = Effect.gen(function* () {
   const path = yield* Path.Path;
@@ -65,7 +66,7 @@ const runInstall = Effect.gen(function* () {
     initial: selectedFeatureIds,
   });
 
-  const result = yield* install({
+  const menuSelection = yield* install({
     destination: destinationForScope({ scope, homeRoot: host.homeRoot, projectRoot: host.projectRoot }),
     host: { homeRoot: host.homeRoot },
     stagedPackage,
@@ -75,14 +76,14 @@ const runInstall = Effect.gen(function* () {
     configuration: { _tag: "automatic" },
   });
 
-  yield* TerminalUI.success(`${result._tag}: ${result.features.join(", ")}`);
+  yield* TerminalUI.success(`${menuSelection._tag}: ${menuSelection.features.join(", ")}`);
 });
 
 const runUpdate = Effect.gen(function* () {
   const scope = yield* pickScope("Update");
   const host = yield* captureHostEvidence;
   const stagedPackage = yield* stagePackage;
-  const result = yield* update({
+  const menuSelection = yield* update({
     destination: destinationForScope({ scope, homeRoot: host.homeRoot, projectRoot: host.projectRoot }),
     host: { homeRoot: host.homeRoot },
     stagedPackage,
@@ -92,7 +93,7 @@ const runUpdate = Effect.gen(function* () {
     configuration: { _tag: "automatic" },
   });
 
-  yield* TerminalUI.success(`${result._tag}: ${result.features.join(", ")}`);
+  yield* TerminalUI.success(`${menuSelection._tag}: ${menuSelection.features.join(", ")}`);
 });
 
 const runUninstall = Effect.gen(function* () {
@@ -107,13 +108,13 @@ const runUninstall = Effect.gen(function* () {
   }
 
   const host = yield* captureHostEvidence;
-  const result = yield* uninstall({
+  const menuSelection = yield* uninstall({
     destination: destinationForScope({ scope, homeRoot: host.homeRoot, projectRoot: host.projectRoot }),
     host: { homeRoot: host.homeRoot },
     interaction: { _tag: "interactive" },
   });
 
-  yield* TerminalUI.success(result._tag);
+  yield* TerminalUI.success(menuSelection._tag);
 });
 
 const runDoctor = Effect.gen(function* () {
@@ -139,12 +140,12 @@ const runDoctor = Effect.gen(function* () {
 const runScaffold = Effect.gen(function* () {
   const path = yield* Path.Path;
   const packageRoot = yield* resolvePackageRoot;
-  const result = yield* scaffoldWorkflows({
+  const menuSelection = yield* scaffoldWorkflows({
     targetRoot: path.resolve(process.cwd()),
     templateDirectory: path.join(packageRoot, "templates", "workflows"),
     force: false,
   });
-  yield* TerminalUI.success(`wrote ${result.written.length}, skipped ${result.skipped.length}`);
+  yield* TerminalUI.success(`wrote ${menuSelection.written.length}, skipped ${menuSelection.skipped.length}`);
 });
 
 // Interactive menu: pick an action, then invoke the same capability as the explicit command.
@@ -157,7 +158,7 @@ export const runMenu = Effect.gen(function* () {
       { title: "Update", value: "update", description: "refresh hook code" },
       { title: "Configure", value: "config", description: "show managed config" },
       { title: "Doctor", value: "doctor", description: "read-only health check" },
-      { title: "Scaffold CI", value: "scaffold-ci", description: "copy single-gate workflows" },
+      { title: "Scaffold workflows", value: "workflow", description: "copy CI and publish workflows" },
       { title: "Uninstall", value: "uninstall", description: "remove installation" },
       { title: "Exit", value: "exit", description: "close the bag" },
     ],
@@ -172,14 +173,12 @@ export const runMenu = Effect.gen(function* () {
       yield* runUpdate;
       break;
     case "config":
-      yield* TerminalUI.detail(
-        "Use `dufflebag config` with flags to change tunables, or bare `dufflebag config` to show values.",
-      );
+      yield* TerminalUI.detail("Use `dufflebag config show`, `dufflebag config set`, or `dufflebag config reset`.");
       break;
     case "doctor":
       yield* runDoctor;
       break;
-    case "scaffold-ci":
+    case "workflow":
       yield* runScaffold;
       break;
     case "uninstall":
@@ -191,4 +190,8 @@ export const runMenu = Effect.gen(function* () {
   }
 
   yield* TerminalUI.outro("Done.");
-}).pipe(Effect.catchAll((error) => TerminalUI.presentError(error)));
+});
+
+export const menuCommand = Command.make("menu", {}, () => runMenu).pipe(
+  Command.withDescription("Open the interactive command menu"),
+);

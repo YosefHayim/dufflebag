@@ -1,6 +1,7 @@
 ---
 name: agent-session-auditor
 description: Use when the user asks to scan local Claude Code, Codex, Kiro, Kimi, Cursor, Grok, OpenCode, or other agent sessions for repeated prompts, fuzzy-similar requests, workflow patterns, or skill opportunities.
+type: flow
 ---
 
 # Agent Session Auditor

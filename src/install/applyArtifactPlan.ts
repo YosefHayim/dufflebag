@@ -733,10 +733,12 @@ const restoreTargets = (transaction: TransactionRuntime) =>
         exit,
       })),
     );
-    const failedSnapshots = outcomes.flatMap((outcome) =>
-      Exit.isFailure(outcome.exit) ? [outcome.mutation.snapshot] : [],
+    const failedSnapshots = outcomes.flatMap((applicationStatus) =>
+      Exit.isFailure(applicationStatus.exit) ? [applicationStatus.mutation.snapshot] : [],
     );
-    const rollbackCauses = outcomes.flatMap((outcome) => (Exit.isFailure(outcome.exit) ? [outcome.exit.cause] : []));
+    const rollbackCauses = outcomes.flatMap((applicationStatus) =>
+      Exit.isFailure(applicationStatus.exit) ? [applicationStatus.exit.cause] : [],
+    );
 
     return { failedSnapshots, rollbackCause: combineCauses(rollbackCauses) };
   });

@@ -16,8 +16,8 @@ const noPreviousArtifact = { _tag: "missing" };
 
 const hashJson = (value: unknown): string => createHash("sha256").update(JSON.stringify(value)).digest("hex");
 
-const unwrap = (result: ReturnType<typeof planConfigReference>): ConfigReferencePlan =>
-  Either.getOrThrowWith(result, (error) => new Error(error.message));
+const unwrap = (configReferenceMerge: ReturnType<typeof planConfigReference>): ConfigReferencePlan =>
+  Either.getOrThrowWith(configReferenceMerge, (error) => new Error(error.message));
 
 const operationValue = (plan: ConfigReferencePlan) => {
   if (plan._tag === "none") {
@@ -51,8 +51,8 @@ const request = (input?: {
   desired?: "present" | "absent";
   previousArtifact?: ArtifactOperation["artifact"];
 }) => ({
-  agent: input?.agent ?? aider,
-  desired: { _tag: input?.desired ?? "present" },
+  agent: input?.agent || aider,
+  desired: { _tag: input?.desired || "present" },
   currentFile: input?.currentBytes === undefined ? missingFile : { _tag: "file", bytes: input.currentBytes },
   previousArtifact:
     input?.previousArtifact === undefined ? noPreviousArtifact : { _tag: "owned", artifact: input.previousArtifact },
@@ -199,7 +199,7 @@ describe("planConfigReference", () => {
 
   it("rejects edits to the exact installed Aider reference line", () => {
     const installed = writeValue(unwrap(planConfigReference(request())));
-    const result = planConfigReference(
+    const configReferenceMerge = planConfigReference(
       request({
         desired: "absent",
         currentBytes: textEncoder.encode("read:\n  - AGENTS.md # user edit\n"),
@@ -207,12 +207,12 @@ describe("planConfigReference", () => {
       }),
     );
 
-    expect(Either.isLeft(result)).toBe(true);
+    expect(Either.isLeft(configReferenceMerge)).toBe(true);
   });
 
   it("rejects edits to a handler-created Aider key before removing the pair", () => {
     const installed = writeValue(unwrap(planConfigReference(request())));
-    const result = planConfigReference(
+    const configReferenceMerge = planConfigReference(
       request({
         desired: "absent",
         currentBytes: textEncoder.encode("read: # user note\n  - AGENTS.md\n"),
@@ -220,7 +220,7 @@ describe("planConfigReference", () => {
       }),
     );
 
-    expect(Either.isLeft(result)).toBe(true);
+    expect(Either.isLeft(configReferenceMerge)).toBe(true);
   });
 
   it.each([
@@ -354,14 +354,14 @@ describe("planConfigReference", () => {
     ["non-array rules", '{"rules":"AGENTS.md"}'],
     ["non-string rule", '{"rules":[1]}'],
   ])("rejects %s instead of overwriting Continue configuration", (_case, json) => {
-    const result = planConfigReference(
+    const configReferenceMerge = planConfigReference(
       request({
         agent: continueAgent,
         currentBytes: textEncoder.encode(json),
       }),
     );
 
-    expect(Either.isLeft(result)).toBe(true);
+    expect(Either.isLeft(configReferenceMerge)).toBe(true);
   });
 
   it.each([
@@ -468,12 +468,12 @@ describe("planConfigReference", () => {
         })),
       },
     };
-    const result = planConfigReference({
+    const configReferenceMerge = planConfigReference({
       ...request({ agent: continueAgent, currentBytes: installed.bytes }),
       previousArtifact: { _tag: "owned", artifact: invalidHistory },
     });
 
-    expect(Either.isLeft(result)).toBe(true);
+    expect(Either.isLeft(configReferenceMerge)).toBe(true);
   });
 
   it("rejects edits inside receipted Continue and Aider references", () => {

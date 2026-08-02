@@ -8,7 +8,7 @@ Names-only glossary: human↔agent bridge for the domain vocabulary used in code
 | **feature** | An installable unit such as `context-guard`, `dedup-guard`, `autonomous-loop`, `speak-response`, or `png-to-code` (public kebab-case IDs). | "plugin", "extension" |
 | **sourceDirectory** | Authored camelCase directory naming a feature under `src/skills/` (payload) or `src/hookIsland/` (runtime) — e.g. `contextGuard`, `pngToCode`. Distinct from the public feature ID. | "skill folder name" when used as public ID |
 | **skill** | Agent instruction set under `src/skills/<sourceDirectory>/`. Installed directory names stay kebab-case data. | "prompt", "instruction file" |
-| **skill payload** | Authored content under `src/skills/` copied verbatim into an installed skill directory, including its `scripts/` and `templates/`. Outside the `pnpm style` contract. | "skill code" |
+| **skill payload** | Approved compound for authored content under `src/skills/` copied verbatim into an installed skill directory, including its `scripts/` and `templates/`. | standalone "payload", "skill code" |
 | **hook island** | Executable dependency-free runtime under `src/hookIsland/<sourceDirectory>/` plus the shared `src/runtime/` kernel. Compiled, assembled flat, installed to `.claude/dufflebag/runtime/`. | "skills", "payload" |
 | **hook** | Zero-dependency runtime script that runs on an agent hook event. Must be **fail-open**. | "callback", "handler" (imprecise) |
 | **runtime** | Dependency-free hook kernel under `src/runtime/` and the flat `dist/hooks/` output. | "payload" (legacy), "bundle", "binary" |
@@ -22,15 +22,16 @@ Names-only glossary: human↔agent bridge for the domain vocabulary used in code
 | **terminal claim** | Session-start proof binding automation to one stable Ghostty terminal ID, including tabs and splits. | "focused pane", "front window" |
 | **dedup-guard** | DRY guard that blocks duplicate function/type bodies at write time. | "duplicate checker" |
 | **autonomous-loop / `autorun`** | Skill that arms the context-guard SessionStart daemon for hands-free compact/resume (`stop`/`exit` verbs). Hook runtime is owned by **context-guard**. | "auto-compact", "daemon" (alone) |
-| **speak-response** | Stop hook that speaks Claude prose via macOS `say`. | "TTS", "voice" |
+| **speak-response** | Public feature ID for the stop hook that narrates a complete agent reply locally. Internal code uses domain terms such as `agentReply`. | standalone "response" in authored identifiers |
 | **png-to-code** | PNG → measured pixel-perfect code skill (SVG/HTML/CSS) with screenshot-diff harness. | "image-to-code" |
-| **scaffold-workflows** | CLI command that copies the owned single-gate CI/publish set into another repo. | "scaffold-ci" (legacy name), "ci-setup" |
+| **workflow scaffold** | CLI command that copies the owned single-gate CI/publish set into another repository. | "scaffold-ci", "scaffold-workflows", "ci-setup" |
 | **fail-open** | Hooks must exit successfully on any error so a guard bug never blocks the user. | "graceful degrade" |
 | **capability layout** | Folders group by product capability (`cli`, `catalog`, `config`, `install`, `runtime`, `skills`, `hookIsland`). | "src/core layers", pure-core/imperative-shell folders |
 | **biome** | Linter and formatter; `biome ci` is the lint half of the gate. | "linter", "prettier" (only half) |
 | **co-located tests** | `foo.test.ts` beside `foo.ts`. | "test/ dir" |
 | **vertical per feature** | Each feature owns one folder named for its `sourceDirectory` — under `src/skills/` when it ships payload, under `src/hookIsland/` when it ships runtime. | "horizontal layers" |
 | **single command per tool surface** | One `autorun` skill with verbs instead of multiple thin skills. | "one skill per verb" |
-| **SSOT** | Single source of truth; app config schema lives in `src/config/bagConfigSchema.ts`; hook defaults in `src/runtime/config.ts`. | "source of truth" (ok, but acronym is used) |
+| **agent root contract** | Root `AGENTS.md`, authoritative for agent behavior and the routing map to delegated subject SSOTs; `CLAUDE.md` and `GEMINI.md` are symlinks to it. | "agent digest" when implying it is non-authoritative |
+| **SSOT** | Single source of truth; the full managed-configuration contract lives in `src/config/bagConfigSchema.ts`, while `src/runtime/config.ts` holds only the dependency-free hook projection. | "source of truth" (acceptable, but the acronym is established) |
 | **clean break** | No back-compat shims on renames/pivots. | "migration", "deprecation" |
 | **verify** | The one aggregate script that owns every repository check required by CI. | "qa", "validate" |

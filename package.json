@@ -1,6 +1,6 @@
 {
   "name": "ys-dufflebag",
-  "version": "0.13.2",
+  "version": "0.14.0",
   "description": "TypeScript CLI that installs and surgically updates coding-agent skills, native hooks, managed configuration, and copyable workflows for Claude Code, Codex, Grok, Kimi, Kiro, and more.",
   "type": "module",
   "bin": {
@@ -13,6 +13,8 @@
     "templates",
     "README.md",
     "LICENSE",
+    "!src/skills/**/node_modules",
+    "!src/skills/**/node_modules/**",
     "!src/skills/**/*.test.ts",
     "!src/hookIsland/**/*.test.ts"
   ],
@@ -27,13 +29,16 @@
     "typecheck": "tsc --noEmit",
     "style": "tsx scripts/reportCodeStyle.ts",
     "style:guide": "tsx scripts/reportStyleGuide.ts",
+    "python:check": "uvx ruff@0.16.0 check src/hookIsland/speakResponse scripts/checkPythonNames.py && uvx ruff@0.16.0 format --check src/hookIsland/speakResponse scripts/checkPythonNames.py && uv run --python 3.10 scripts/checkPythonNames.py",
+    "python:fix": "uvx ruff@0.16.0 check --fix src/hookIsland/speakResponse scripts/checkPythonNames.py && uvx ruff@0.16.0 format src/hookIsland/speakResponse scripts/checkPythonNames.py",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
     "format": "biome format --write .",
     "check:ci": "biome ci .",
-    "verify": "biome ci . && tsc --noEmit && pnpm style && pnpm style:guide . && pnpm build && vitest run",
+    "verify": "biome ci . && pnpm python:check && tsc --noEmit && pnpm style && pnpm style:guide . && vitest run && pnpm build && pnpm generate-readme:check",
     "prepublishOnly": "npm run build",
-    "generate-readme": "node scripts/generateReadme.mjs"
+    "generate-readme": "node scripts/generateReadme.mjs",
+    "generate-readme:check": "node scripts/generateReadme.mjs --check"
   },
   "keywords": [
     "claude-code",
@@ -76,13 +81,13 @@
     "yaml": "2.9.0"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.5.2",
+    "@biomejs/biome": "2.5.2",
     "@effect/vitest": "0.30.0",
-    "@types/node": "^22.10.0",
-    "glob": "^13.0.6",
-    "husky": "^9.1.7",
-    "tsx": "^4.19.2",
-    "typescript": "^5.7.2",
+    "@types/node": "22.20.0",
+    "glob": "13.0.6",
+    "husky": "9.1.7",
+    "tsx": "4.22.4",
+    "typescript": "5.9.3",
     "vitest": "3.2.7"
   }
 }

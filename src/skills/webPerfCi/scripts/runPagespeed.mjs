@@ -142,10 +142,10 @@ function resolveMetric(metric, urlField, originField, labAudits) {
     const entry = experience?.metrics?.[metric.field];
     if (!entry || typeof entry.percentile !== "number") return null;
     const value = metric.cls ? entry.percentile / 100 : entry.percentile;
-    const rating = ratingFromCategory(entry.category) ?? ratingFromValue(value, metric.good, metric.poor);
+    const rating = ratingFromCategory(entry.category) || ratingFromValue(value, metric.good, metric.poor);
     return { value, rating, source };
   };
-  const field = fromField(urlField, "field") ?? fromField(originField, "origin");
+  const field = fromField(urlField, "field") || fromField(originField, "origin");
   if (field) return field;
 
   const audit = labAudits?.[metric.audit];
@@ -170,11 +170,12 @@ function formatValue(metric, value) {
 }
 
 /** Build the full evaluation object from a PSI response. Pure. */
-function evaluate(data, budgets, strict) {
-  const labScore = data?.lighthouseResult?.categories?.performance?.score ?? null;
-  const labAudits = data?.lighthouseResult?.audits;
-  const urlField = data?.loadingExperience;
-  const originField = data?.originLoadingExperience;
+function evaluate(psiDocument, budgets, strict) {
+  const scoreCandidate = psiDocument?.lighthouseResult?.categories?.performance?.score;
+  const labScore = scoreCandidate === undefined ? null : scoreCandidate;
+  const labAudits = psiDocument?.lighthouseResult?.audits;
+  const urlField = psiDocument?.loadingExperience;
+  const originField = psiDocument?.originLoadingExperience;
 
   const rows = METRICS.map((metric) => {
     const resolved = resolveMetric(metric, urlField, originField, labAudits);
@@ -187,33 +188,38 @@ function evaluate(data, budgets, strict) {
 
   const scoreFailed = labScore !== null && labScore < budgets.performanceScore;
   const passed = !scoreFailed && !rows.some((row) => row.failed);
+  let fieldOrigin = "lab-only";
+  if (urlField) fieldOrigin = "this-url";
+  else if (originField) fieldOrigin = "origin";
   return {
     labScore,
     rows,
     scoreFailed,
     passed,
-    fieldOrigin: urlField ? "this-url" : originField ? "origin" : "lab-only",
+    fieldOrigin,
   };
 }
 
-function renderReport(result, meta) {
+function renderReport(assessment, meta) {
   const lines = [`PageSpeed Insights — ${meta.url} (${meta.strategy})`, ""];
-  const score = result.labScore === null ? "n/a" : Math.round(result.labScore * 100);
-  const scoreMark = result.scoreFailed ? "FAIL" : "PASS";
+  const score = assessment.labScore === null ? "n/a" : Math.round(assessment.labScore * 100);
+  const scoreMark = assessment.scoreFailed ? "FAIL" : "PASS";
   lines.push(
     `Lab performance score: ${score}  (budget ≥ ${Math.round(meta.budgets.performanceScore * 100)})  ${scoreMark}`,
     "",
   );
-  lines.push(`Real-user Core Web Vitals (source: ${result.fieldOrigin}):`);
-  for (const row of result.rows) {
-    const flag = row.failed ? "  ✗ FAIL" : row.rating === "needs-improvement" ? "  ! warn" : "";
+  lines.push(`Real-user Core Web Vitals (source: ${assessment.fieldOrigin}):`);
+  for (const row of assessment.rows) {
+    let flag = "";
+    if (row.failed) flag = "  ✗ FAIL";
+    else if (row.rating === "needs-improvement") flag = "  ! warn";
     const proxy = row.proxy ? " [lab TBT proxy]" : "";
     const budget = `budget ${row.cls ? "≤ " : "≤ "}${formatValue(row, row.budget)}`;
     lines.push(
       `  ${row.id.padEnd(5)} ${formatValue(row, row.value).padEnd(9)} ${row.rating.padEnd(18)} (${budget})${proxy}${flag}`,
     );
   }
-  lines.push("", `Verdict: ${result.passed ? "PASS" : "FAIL"}`);
+  lines.push("", `Verdict: ${assessment.passed ? "PASS" : "FAIL"}`);
   return lines.join("\n");
 }
 
@@ -221,20 +227,20 @@ function renderReport(result, meta) {
 
 async function loadBudgets(file) {
   if (!file) return DEFAULT_BUDGETS;
-  const raw = await readFile(file, "utf8");
-  return { ...DEFAULT_BUDGETS, ...JSON.parse(raw) };
+  const budgetText = await readFile(file, "utf8");
+  return { ...DEFAULT_BUDGETS, ...JSON.parse(budgetText) };
 }
 
 async function fetchPsi(url, strategy, key) {
   const params = new URLSearchParams({ url, strategy, category: "performance" });
   if (key) params.set("key", key);
-  const response = await fetch(`${PSI_ENDPOINT}?${params.toString()}`);
-  const data = await response.json().catch(() => null);
-  if (!response.ok) {
-    const message = data?.error?.message ?? `${response.status} ${response.statusText}`;
+  const httpReply = await fetch(`${PSI_ENDPOINT}?${params.toString()}`);
+  const psiDocument = await httpReply.json().catch(() => null);
+  if (!httpReply.ok) {
+    const message = psiDocument?.error?.message || `${httpReply.status} ${httpReply.statusText}`;
     throw new Error(`PageSpeed request failed: ${message}`);
   }
-  return data;
+  return psiDocument;
 }
 
 async function main() {
@@ -244,15 +250,15 @@ async function main() {
     return;
   }
   const budgets = await loadBudgets(args.budgets);
-  const data = await fetchPsi(args.url, args.strategy, args.key);
-  const result = evaluate(data, budgets, args.strict);
+  const psiDocument = await fetchPsi(args.url, args.strategy, args.key);
+  const assessment = evaluate(psiDocument, budgets, args.strict);
 
   if (args.json) {
-    console.log(JSON.stringify({ url: args.url, strategy: args.strategy, ...result }, null, 2));
+    console.log(JSON.stringify({ url: args.url, strategy: args.strategy, ...assessment }, null, 2));
   } else {
-    console.log(renderReport(result, { url: args.url, strategy: args.strategy, budgets }));
+    console.log(renderReport(assessment, { url: args.url, strategy: args.strategy, budgets }));
   }
-  if (!result.passed) process.exitCode = 1;
+  if (!assessment.passed) process.exitCode = 1;
 }
 
 main().catch((error) => {

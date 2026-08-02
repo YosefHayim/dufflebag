@@ -68,7 +68,7 @@ export const scaffoldWorkflowsRequestSchema = Schema.Struct({
 
 export type ScaffoldWorkflowsRequest = Schema.Schema.Type<typeof scaffoldWorkflowsRequestSchema>;
 
-export const scaffoldWorkflowsResultSchema = Schema.Struct({
+export const workflowScaffoldSummarySchema = Schema.Struct({
   written: Schema.Array(Schema.NonEmptyTrimmedString).annotations({
     description: "Workflow filenames written by this run.",
   }),
@@ -80,7 +80,7 @@ export const scaffoldWorkflowsResultSchema = Schema.Struct({
   }),
 });
 
-export type ScaffoldWorkflowsResult = Schema.Schema.Type<typeof scaffoldWorkflowsResultSchema>;
+export type WorkflowScaffoldSummary = Schema.Schema.Type<typeof workflowScaffoldSummarySchema>;
 
 export const fillPublishTemplate = (input: { template: string; inputs: ScaffoldInputs }): string =>
   input.template
@@ -113,8 +113,8 @@ const readTemplates = (templateDirectory: string) =>
     const names = (yield* fileSystem.readDirectory(templateDirectory)).filter((name) => name.endsWith(".yml")).sort();
     const files = yield* Effect.forEach(names, (name) =>
       Effect.gen(function* () {
-        const raw = yield* fileSystem.readFileString(path.join(templateDirectory, name));
-        return { name, raw };
+        const workflowSource = yield* fileSystem.readFileString(path.join(templateDirectory, name));
+        return { name, raw: workflowSource };
       }),
     );
 
@@ -152,9 +152,9 @@ const detectInputs = (root: string) =>
         return missing;
       }
 
-      const raw = yield* fileSystem.readFileString(packageJsonPath);
+      const workflowSource = yield* fileSystem.readFileString(packageJsonPath);
       const parsed: unknown = yield* Effect.try({
-        try: (): unknown => JSON.parse(raw),
+        try: (): unknown => JSON.parse(workflowSource),
         catch: (error) => error,
       }).pipe(Effect.catchAll(() => Effect.succeed(undefined)));
 
@@ -173,9 +173,9 @@ const detectInputs = (root: string) =>
     });
 
     return {
-      owner: remote?.owner ?? "OWNER",
-      repo: remote?.repo ?? "REPO",
-      packageName: packageName ?? "your-package",
+      owner: remote?.owner || "OWNER",
+      repo: remote?.repo || "REPO",
+      packageName: packageName || "your-package",
     } satisfies ScaffoldInputs;
   });
 
@@ -220,5 +220,5 @@ export const scaffoldWorkflows = (input: unknown) =>
       written,
       skipped,
       targetRoot: request.targetRoot,
-    } satisfies ScaffoldWorkflowsResult;
+    } satisfies WorkflowScaffoldSummary;
   });

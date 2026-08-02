@@ -6,14 +6,14 @@
 
 `dufflebag` is a one-command installer for Yosef's reusable [Claude Code](https://code.claude.com/docs/en/overview) skills, hooks, and repo templates. It is a [TypeScript](https://www.typescriptlang.org/) CLI for [Node.js](https://nodejs.org/en), built with [pnpm](https://pnpm.io/), [Biome](https://biomejs.dev/), and [Vitest](https://vitest.dev/).
 
-It installs into global `~/.claude` or project-local `.claude/`, edits `settings.json` surgically, and removes only entries it owns. The shipped skills target Claude Code first, while the docs and some skills also account for [Cursor](https://cursor.com/docs), [OpenAI Codex](https://developers.openai.com/codex), [Kiro](https://kiro.dev/docs/steering/), [Gemini CLI](https://geminicli.com/docs/cli/gemini-md/), and [Roo Code](https://docs.roocode.com/features/custom-instructions/).
+It installs into global `~/.claude` or project-local `.claude/`, keeps Schema-validated managed configuration, edits agent settings surgically, and removes only receipt-owned artifacts. The shipped skills target Claude Code first, while the docs and some skills also account for [Cursor](https://cursor.com/docs), [OpenAI Codex](https://developers.openai.com/codex), [Kiro](https://kiro.dev/docs/steering/), [Gemini CLI](https://geminicli.com/docs/cli/gemini-md/), and [Roo Code](https://docs.roocode.com/features/custom-instructions/).
 
 ## Quick start
 
 Install the safe default context guard globally:
 
 ```bash
-npx ys-dufflebag install --yes --features context-guard
+npx ys-dufflebag install context-guard
 ```
 
 Then restart Claude Code so hooks and skills load in the next session.
@@ -21,23 +21,24 @@ Then restart Claude Code so hooks and skills load in the next session.
 For a repo-local install that can be committed with the project:
 
 ```bash
-npx ys-dufflebag install --project
+npx ys-dufflebag install --scope project
 ```
 
 ## Usage
 
-Run the interactive installer:
+Print command help, or open the explicit interactive menu:
 
 ```bash
-npx ys-dufflebag install
+npx ys-dufflebag
+npx ys-dufflebag menu
 ```
 
 Install a specific skill or hook set:
 
 ```bash
-npx ys-dufflebag install --features readme-editor,refresh-agent-docs
-npx ys-dufflebag install --features dedup-guard
-npx ys-dufflebag install --features png-to-code
+npx ys-dufflebag install readme-editor refresh-agent-docs
+npx ys-dufflebag install dedup-guard
+npx ys-dufflebag install png-to-code
 ```
 
 Keep an existing install and refresh the copied payload:
@@ -50,7 +51,7 @@ Remove only dufflebag-owned hooks, env keys, payload files, and installed skills
 
 ```bash
 dufflebag uninstall
-dufflebag uninstall --project
+dufflebag uninstall --scope project
 ```
 
 Inspect host support and installed state without changing files:
@@ -59,20 +60,42 @@ Inspect host support and installed state without changing files:
 dufflebag doctor
 ```
 
-Tune guard and loop behavior through the same `dufflebag*` settings keys the hooks read:
+Inspect or change the managed configuration one setting at a time:
 
 ```bash
-dufflebag config
-dufflebag config --warn 0.15 --block 0.22 --budget 5
-dufflebag config --auto-compact-idle 1m
+dufflebag config show
+dufflebag config set context-warn-fraction 0.15
+dufflebag config set context-block-fraction 0.22
+dufflebag config set idle-auto-compact 1m
 ```
+
+Scaffold the copyable workflow set or scan a workspace for duplicates:
+
+```bash
+dufflebag workflow scaffold .
+dufflebag dedup . --staged
+```
+
+### Migrating to 0.14
+
+Version 0.14 intentionally removes the old pre-1.0 grammar instead of carrying hidden aliases.
+
+| Before | Now |
+| --- | --- |
+| `install --features a,b` | `install a b` |
+| `--project` / `--global` | `--scope project` / `--scope global` |
+| `config --warn 0.15` | `config set context-warn-fraction 0.15` |
+| `scaffold-ci` | `workflow scaffold` |
+| `dedup check` | `dedup` |
+| `voice example "text"` | `voice speak "text"` |
 
 ### Natural voice and dictation
 
 Turn on complete-response narration and play a first example:
 
 ```bash
-dufflebag voice on devin --example "Read this number one. Now read this number two."
+dufflebag voice on
+dufflebag voice speak "Read this number one. Now read this number two." --source manual
 ```
 
 Claude Code, Codex, and Grok use native end-of-turn hooks. Run Devin through its
@@ -86,13 +109,13 @@ Markdown is translated into speech instead of read as punctuation: tables name
 their columns and cells, links stay understandable, and code blocks are announced
 and read in full. Nothing is truncated. While narration plays, a bottom-center
 read-along keeps nearby words visible and fits a blue background to the word being
-spoken. Turn it off with `dufflebag config --read-along off`.
+spoken. Turn it off with `dufflebag config set speech-read-along false`.
 
 Inside Cmux, each response is bound to its originating workspace and surface. A
 background response remains silent until that surface is focused and Cmux is the
 frontmost app; older unread responses from the same surface coalesce into the
-latest one. Use `--speech-mode immediate` for the old global behavior or
-`--speech-mode off` to suppress narration without uninstalling voice.
+latest one. Use `dufflebag config set speech-response-mode immediate` for the old global behavior or
+`dufflebag config set speech-response-mode off` to suppress narration without uninstalling voice.
 
 Tap Control to stop narration. Hold Control for 120 ms to dictate locally into
 the active caret. A small
@@ -111,7 +134,7 @@ use literal comma as the field name period
 Add machine-specific corrections without an LLM:
 
 ```bash
-dufflebag config --dictation-words "Joseph=Yosef;type script=TypeScript"
+dufflebag config set dictation-replacements "Joseph=Yosef;type script=TypeScript"
 ```
 
 On macOS 26+, prompt refinement can use Apple's on-device Foundation Models
@@ -121,17 +144,17 @@ validated refined draft; and reads it with the same active-word highlight. Press
 Command-V to paste and review it—the feature never submits for you.
 
 ```bash
-dufflebag config --prompt-refinement review
+dufflebag config set prompt-refinement-mode review
 dufflebag voice refine "please make this request precise" --speak
 ```
 
 Apple Intelligence must be enabled and its local model ready. If it is not,
 the original clipboard remains untouched and the overlay reports why refinement
-is unavailable. Disable the gesture with `dufflebag config --prompt-refinement off`.
+is unavailable. Disable the gesture with `dufflebag config set prompt-refinement-mode off`.
 
 ```bash
 dufflebag voice status
-dufflebag voice example "Release status: Devin is ready."
+dufflebag voice speak "Release status: Devin is ready." --source devin
 dufflebag voice off
 ```
 
@@ -203,7 +226,7 @@ Override one launched agent without changing persistent config, for example
 ## Recommended community skills
 
 <!-- AUTO:SKILLS:START -->
-These skills ship in the bag for convenience — installable the same way (`npx ys-dufflebag install --features <id>`) — but they are **authored by others**, not by dufflebag. Full credit and upstream sources:
+These skills ship in the bag for convenience — installable the same way (`npx ys-dufflebag install <id>`) — but they are **authored by others**, not by dufflebag. Full credit and upstream sources:
 
 | Skill | What it does | By |
 | --- | --- | --- |

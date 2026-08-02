@@ -1,7 +1,7 @@
 // Compose the animated robot from a clean two-layer trace (robot case study).
 import fs from "node:fs";
 import path from "node:path";
-import { argString, parseArgs } from "../../src/lib/index.js";
+import { argString, parseArgs } from "../../src/lib/argv.js";
 
 const args = parseArgs(process.argv.slice(2));
 const outDir = argString(args, "out-dir") || "out";

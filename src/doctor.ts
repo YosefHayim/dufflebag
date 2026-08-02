@@ -1,5 +1,5 @@
 import { FileSystem, Path } from "@effect/platform";
-import { Effect, ParseResult, Schema } from "effect";
+import { Effect, Schema, ParseResult as SchemaParseIssue } from "effect";
 
 import {
   type AgentEvidence,
@@ -266,7 +266,7 @@ const decodeDoctorRequest = (input: unknown) =>
     Effect.mapError(
       (error) =>
         new DoctorError({
-          issue: ParseResult.TreeFormatter.formatErrorSync(error),
+          issue: SchemaParseIssue.TreeFormatter.formatErrorSync(error),
         }),
     ),
   );
@@ -328,7 +328,7 @@ const createFeatureDiagnostics = (request: DoctorRequest, receipt: ArtifactRecei
 
 const createAgentDiagnostics = (evidence: AgentEvidence, receipt: ArtifactReceipt | undefined) => {
   const managedIds = new Set(
-    receipt?.artifacts.flatMap((artifact) => (artifact.owner._tag === "agent" ? artifact.owner.agentIds : [])) ?? [],
+    receipt?.artifacts.flatMap((artifact) => (artifact.owner._tag === "agent" ? artifact.owner.agentIds : [])) || [],
   );
   const detectedAgents = new Map(classifyAgents(evidence).map((agent) => [agent.id, agent.installed]));
 
@@ -341,12 +341,10 @@ const createAgentDiagnostics = (evidence: AgentEvidence, receipt: ArtifactReceip
   }));
 };
 
-const toDoctorError = (error: unknown): DoctorError =>
-  error instanceof DoctorError
-    ? error
-    : new DoctorError({
-        issue: error instanceof Error ? error.message : String(error),
-      });
+const toDoctorError = (error: unknown): DoctorError => {
+  if (error instanceof DoctorError) return error;
+  return new DoctorError({ issue: error instanceof Error ? error.message : String(error) });
+};
 
 const processAlive = (pid: number): boolean => {
   if (pid <= 0) return false;
@@ -358,11 +356,11 @@ const processAlive = (pid: number): boolean => {
   }
 };
 
-const parseDaemonSnapshot = (raw: string): ManagedConfigFile | undefined => {
+const parseDaemonSnapshot = (diagnosticSource: string): ManagedConfigFile | undefined => {
   try {
     const decoded = Schema.decodeUnknownEither(managedConfigFileSchema, {
       onExcessProperty: "error",
-    })(JSON.parse(raw));
+    })(JSON.parse(diagnosticSource));
     return decoded._tag === "Right" ? decoded.right : undefined;
   } catch {
     return undefined;
@@ -404,8 +402,10 @@ const createDaemonDiagnostics = (request: DoctorRequest) =>
         continue;
       }
 
-      const raw = yield* fileSystem.readFileString(snapshotPath).pipe(Effect.catchAll(() => Effect.succeed("")));
-      const config = parseDaemonSnapshot(raw);
+      const diagnosticSource = yield* fileSystem
+        .readFileString(snapshotPath)
+        .pipe(Effect.catchAll(() => Effect.succeed("")));
+      const config = parseDaemonSnapshot(diagnosticSource);
       daemons.push({
         sessionId,
         pid,

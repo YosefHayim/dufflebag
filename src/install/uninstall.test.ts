@@ -73,9 +73,9 @@ layer(NodeContext.layer)("uninstall", (it) => {
         );
         yield* install(installRequest({ root, stagedRoot }));
 
-        const result = yield* uninstall(uninstallRequest(root));
+        const uninstallation = yield* uninstall(uninstallRequest(root));
 
-        expect(result).toEqual({ _tag: "uninstalled", scope: "project", interaction: { _tag: "scripted" } });
+        expect(uninstallation).toEqual({ _tag: "uninstalled", scope: "project", interaction: { _tag: "scripted" } });
         yield* Effect.forEach(originals, ([relativePath, contents]) =>
           Effect.gen(function* () {
             expect(yield* fileSystem.readFileString(path.join(root, relativePath))).toBe(contents);
@@ -129,9 +129,9 @@ layer(NodeContext.layer)("uninstall", (it) => {
         yield* fileSystem.makeDirectory(path.dirname(userPath), { recursive: true });
         yield* fileSystem.writeFileString(userPath, "User-owned rule.\n");
 
-        const result = yield* uninstall(uninstallRequest(root));
+        const uninstallation = yield* uninstall(uninstallRequest(root));
 
-        expect(result).toEqual({ _tag: "absent", scope: "project", interaction: { _tag: "scripted" } });
+        expect(uninstallation).toEqual({ _tag: "absent", scope: "project", interaction: { _tag: "scripted" } });
         expect(yield* fileSystem.readFileString(userPath)).toBe("User-owned rule.\n");
       }),
     ),

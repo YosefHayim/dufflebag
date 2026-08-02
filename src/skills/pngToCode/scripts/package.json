@@ -11,14 +11,14 @@
     "frames": "tsx src/bin/frames.ts"
   },
   "dependencies": {
-    "pixelmatch": "^6.0.0",
-    "playwright": "^1.49.0",
-    "pngjs": "^7.0.0",
-    "svgo": "^3.3.2"
+    "pixelmatch": "6.0.0",
+    "playwright": "1.61.1",
+    "pngjs": "7.0.0",
+    "svgo": "3.3.4"
   },
   "devDependencies": {
-    "@types/node": "^22.10.0",
-    "tsx": "^4.19.0",
-    "typescript": "^5.7.0"
+    "@types/node": "22.20.0",
+    "tsx": "4.22.4",
+    "typescript": "5.9.3"
   }
 }

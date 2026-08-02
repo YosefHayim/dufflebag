@@ -28,6 +28,8 @@ export const fail = (message: string) => writeLine(`  ✗ ${message}`);
 
 export const detail = (message: string) => writeLine(`  · ${message}`);
 
+export const json = (document: unknown) => writeLine(JSON.stringify(document));
+
 export const note = (message: string, title?: string) =>
   Effect.gen(function* () {
     if (title !== undefined) {
@@ -70,7 +72,7 @@ export const selectOne = <Value>(input: {
     const terminal = yield* Terminal.Terminal;
     const isTTY = yield* terminal.isTTY;
     if (!isTTY) {
-      const fallback = input.initial ?? input.choices[0]?.value;
+      const fallback = input.initial === undefined ? input.choices.at(0)?.value : input.initial;
       if (fallback === undefined) {
         return yield* Effect.fail(new Error("No choices available for non-interactive select."));
       }

@@ -131,7 +131,7 @@ const captureAgentEvidence = (homeRoot: string) =>
 // Capture home/project roots, platform observations, and agent detection evidence.
 export const captureHostEvidence = Effect.gen(function* () {
   const path = yield* Path.Path;
-  const homeRoot = absoluteRoot(process.env.HOME ?? process.env.USERPROFILE ?? "", path);
+  const homeRoot = absoluteRoot(process.env.HOME || process.env.USERPROFILE || "", path);
   if (homeRoot === "/" || homeRoot === "") {
     return yield* new HostEvidenceError({
       issue: "HOME (or USERPROFILE) must resolve to an absolute home directory.",

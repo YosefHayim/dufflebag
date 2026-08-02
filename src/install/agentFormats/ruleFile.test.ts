@@ -45,8 +45,8 @@ const ruleFileRequest = {
   ],
 };
 
-const unwrap = <Right, Left>(result: Either.Either<Right, Left>): Right =>
-  Either.getOrThrowWith(result, (error) => new Error(String(error)));
+const unwrap = <Right, Left>(ruleMerge: Either.Either<Right, Left>): Right =>
+  Either.getOrThrowWith(ruleMerge, (error) => new Error(String(error)));
 
 const hashBytes = (bytes: Uint8Array): string => createHash("sha256").update(bytes).digest("hex");
 
@@ -206,22 +206,22 @@ describe("planRuleFiles", () => {
       issue: "unexpected",
     },
   ])("rejects $name", ({ request, issue }) => {
-    const result = planRuleFiles(request);
+    const ruleMerge = planRuleFiles(request);
 
-    expect(Either.isLeft(result)).toBe(true);
-    expect(String(Option.getOrThrow(Either.getLeft(result)))).toContain(issue);
+    expect(Either.isLeft(ruleMerge)).toBe(true);
+    expect(String(Option.getOrThrow(Either.getLeft(ruleMerge)))).toContain(issue);
   });
 
   it("strictly rejects unknown nested request properties", () => {
-    const result = Schema.decodeUnknownEither(ruleFileRequestSchema, {
+    const ruleMerge = Schema.decodeUnknownEither(ruleFileRequestSchema, {
       onExcessProperty: "error",
     })({
       ...ruleFileRequest,
       skills: [{ ...ruleFileRequest.skills[0], unexpected: true }],
     });
 
-    expect(Either.isLeft(result)).toBe(true);
-    expect(String(Option.getOrThrow(Either.getLeft(result)))).toContain("unexpected");
+    expect(Either.isLeft(ruleMerge)).toBe(true);
+    expect(String(Option.getOrThrow(Either.getLeft(ruleMerge)))).toContain("unexpected");
   });
 
   it.each(["   ", "@@CTL@@", "node @@CTL@@ status"])("rejects a non-concrete control command %j", (ctl) => {
@@ -231,7 +231,7 @@ describe("planRuleFiles", () => {
   it("rejects a result whose ownership hash drifts from its bytes", () => {
     const plan = unwrap(planRuleFiles(ruleFileRequest));
     const firstWrite = Option.getOrThrow(Option.fromNullable(plan.writes.at(0)));
-    const result = Schema.validateEither(ruleFilePlanSchema, {
+    const ruleMerge = Schema.validateEither(ruleFilePlanSchema, {
       onExcessProperty: "error",
     })({
       ...plan,
@@ -247,7 +247,7 @@ describe("planRuleFiles", () => {
       ],
     });
 
-    expect(Either.isLeft(result)).toBe(true);
-    expect(String(Option.getOrThrow(Either.getLeft(result)))).toContain("exact desired bytes");
+    expect(Either.isLeft(ruleMerge)).toBe(true);
+    expect(String(Option.getOrThrow(Either.getLeft(ruleMerge)))).toContain("exact desired bytes");
   });
 });

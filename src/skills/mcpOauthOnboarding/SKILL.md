@@ -1,6 +1,7 @@
 ---
 name: mcp-oauth-onboarding
 description: Use when the user asks to add, install, configure, authenticate, or troubleshoot an MCP server for Claude Code or another agent, especially global user-scope setup, OAuth login, restart, and real tool verification.
+type: flow
 ---
 
 # MCP OAuth Onboarding

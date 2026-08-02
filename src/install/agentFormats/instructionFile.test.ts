@@ -41,23 +41,23 @@ const request = (input?: {
   previousArtifact?: ReceiptEntry;
   skills?: ReadonlyArray<{ installedSkill: typeof deslopSkill; markdown: string }>;
 }) => ({
-  path: input?.path ?? "AGENTS.md",
+  path: input?.path || "AGENTS.md",
   desired:
     input?.desired === "absent"
       ? { _tag: "absent" }
       : {
           _tag: "present",
-          agentIds: input?.agentIds ?? ["aider"],
-          skills: input?.skills ?? [desiredSkill()],
-          ctl: input?.ctl ?? "dufflebag",
+          agentIds: input?.agentIds || ["aider"],
+          skills: input?.skills || [desiredSkill()],
+          ctl: input?.ctl || "dufflebag",
         },
   currentFile: input?.currentBytes === undefined ? { _tag: "missing" } : { _tag: "file", bytes: input.currentBytes },
   previousArtifact:
     input?.previousArtifact === undefined ? { _tag: "missing" } : { _tag: "owned", artifact: input.previousArtifact },
 });
 
-const unwrap = (result: ReturnType<typeof planInstructionFile>): InstructionFilePlan =>
-  Either.getOrThrowWith(result, (error) => new Error(error.message));
+const unwrap = (instructionMerge: ReturnType<typeof planInstructionFile>): InstructionFilePlan =>
+  Either.getOrThrowWith(instructionMerge, (error) => new Error(error.message));
 
 const expectWrite = (plan: InstructionFilePlan) => {
   if (plan._tag !== "write") {
@@ -90,13 +90,13 @@ describe("planInstructionFile", () => {
         ),
       ),
     );
-    const expectedBody = "\n## deslop\n\nDeslop uses $&/$`/$'.\n\n---\n\n## deslop-v2\n\nV2 body.\n";
+    const expectedContent = "\n## deslop\n\nDeslop uses $&/$`/$'.\n\n---\n\n## deslop-v2\n\nV2 body.\n";
     const exactInstructionKind: "instruction" = plan.artifact.kind._tag;
 
     expectTypeOf(exactInstructionKind).toEqualTypeOf<"instruction">();
     expectTypeOf(plan.artifact.owner._tag).toEqualTypeOf<"agent">();
     expectTypeOf(plan.artifact.ownership._tag).toEqualTypeOf<"managedBlock">();
-    expect(decode(plan.bytes)).toBe(`${startMarker}${expectedBody}${endMarker}\n`);
+    expect(decode(plan.bytes)).toBe(`${startMarker}${expectedContent}${endMarker}\n`);
     expect(plan.artifact).toEqual({
       owner: { _tag: "agent", agentIds: ["aider"] },
       path: "AGENTS.md",
@@ -106,7 +106,7 @@ describe("planInstructionFile", () => {
         filePreviouslyPresent: false,
         startMarker,
         endMarker,
-        installedBodyHash: hash(encode(expectedBody)),
+        installedBodyHash: hash(encode(expectedContent)),
       },
     });
   });
@@ -250,14 +250,14 @@ describe("planInstructionFile", () => {
   });
 
   it("ignores malformed reserved markers in an unreceipted file when absence is desired", () => {
-    const result = planInstructionFile(
+    const instructionMerge = planInstructionFile(
       request({
         desired: "absent",
         currentBytes: encode(`User bytes ${startMarker}`),
       }),
     );
 
-    expect(unwrap(result)).toEqual({ _tag: "none" });
+    expect(unwrap(instructionMerge)).toEqual({ _tag: "none" });
   });
 
   it.each(
@@ -282,18 +282,18 @@ describe("planInstructionFile", () => {
     ["reversed markers", `${endMarker}body${startMarker}`],
     ["duplicate blocks", `${startMarker}one${endMarker}${startMarker}two${endMarker}`],
   ])("rejects %s", (_case, current) => {
-    const result = planInstructionFile(request({ currentBytes: encode(current) }));
+    const instructionMerge = planInstructionFile(request({ currentBytes: encode(current) }));
 
-    expect(Either.isLeft(result)).toBe(true);
-    if (Either.isLeft(result)) {
-      expect(result.left).toBeInstanceOf(InstructionFilePlanError);
-      expect(result.left.message).toContain("marker");
+    expect(Either.isLeft(instructionMerge)).toBe(true);
+    if (Either.isLeft(instructionMerge)) {
+      expect(instructionMerge.left).toBeInstanceOf(InstructionFilePlanError);
+      expect(instructionMerge.left.message).toContain("marker");
     }
   });
 
   it("rejects edits inside a receipted body and changed framing", () => {
     const installed = expectWrite(unwrap(planInstructionFile(request())));
-    const editedBody = planInstructionFile(
+    const editedContent = planInstructionFile(
       request({
         currentBytes: encode(`${startMarker}\nEdited\n${endMarker}\n`),
         previousArtifact: installed.artifact,
@@ -306,7 +306,7 @@ describe("planInstructionFile", () => {
       }),
     );
 
-    expect(Either.isLeft(editedBody)).toBe(true);
+    expect(Either.isLeft(editedContent)).toBe(true);
     expect(Either.isLeft(changedFrame)).toBe(true);
   });
 
@@ -345,7 +345,7 @@ describe("planInstructionFile", () => {
     ).toBe(true);
   });
 
-  it("rejects generic result kind and managed-body hash drift", () => {
+  it("rejects a wrong artifact kind and managed-body hash drift", () => {
     const plan = expectWrite(unwrap(planInstructionFile(request())));
     const wrongKind = {
       ...plan,

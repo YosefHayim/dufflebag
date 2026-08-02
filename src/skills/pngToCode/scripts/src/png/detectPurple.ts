@@ -2,17 +2,17 @@
 import fs from "node:fs";
 /** Find saturated-violet clusters (sparkles + eyes) via connected components. */
 import { PNG } from "pngjs";
-import { argString, parseArgs } from "../lib/index.js";
+import { argString, parseArgs } from "../lib/argv.js";
 
 const args = parseArgs(process.argv.slice(2));
 const input = argString(args, "input") || "robot.png";
 const png = PNG.sync.read(fs.readFileSync(input));
-const { width: W, height: H, data } = png;
+const { width: W, height: H, data: pixelBytes } = png;
 
 const isViolet = (i: number) => {
-  const r = data[i],
-    g = data[i + 1],
-    b = data[i + 2];
+  const r = pixelBytes[i],
+    g = pixelBytes[i + 1],
+    b = pixelBytes[i + 2];
   return b > 150 && r > 100 && r < 232 && g < r - 20 && b > r + 10;
 };
 

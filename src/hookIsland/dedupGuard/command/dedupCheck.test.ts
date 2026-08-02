@@ -24,7 +24,7 @@ describe("dedupCheck", () => {
     try {
       writeFileSync(path.join(dir, "a.ts"), "export const x = 1;\n");
       process.exitCode = 0;
-      dedupCheck({ path: dir });
+      dedupCheck({ workspace: dir });
       expect(process.exitCode).toBe(0);
     } finally {
       rmSync(dir, { recursive: true, force: true });
@@ -38,7 +38,7 @@ describe("dedupCheck", () => {
       writeFileSync(path.join(dir, "a.ts"), "export function add(x: number, y: number) { return x + y; }\n");
       writeFileSync(path.join(dir, "b.ts"), "export function sum(a: number, b: number) { return a + b; }\n");
       process.exitCode = 0;
-      dedupCheck({ path: dir });
+      dedupCheck({ workspace: dir });
       expect(process.exitCode).toBe(1);
     } finally {
       rmSync(dir, { recursive: true, force: true });

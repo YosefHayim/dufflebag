@@ -1,0 +1,12 @@
+`$condition ? $when_true : $when_false` as $choice where {
+  or {
+    $condition <: contains `$_ ? $_ : $_`,
+    $when_true <: contains `$_ ? $_ : $_`,
+    $when_false <: contains `$_ ? $_ : $_`
+  },
+  register_diagnostic(
+    span = $choice,
+    message = "Replace the nested ternary with named control flow (CODE-STYLE.md: control.ternary).",
+    severity = "error"
+  )
+}

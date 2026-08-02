@@ -69,29 +69,22 @@ const parseFeatures = () => {
   }
 
   return starts.map((start, index) => {
-    const end = starts[index + 1]?.index ?? featuresSource.length;
+    const nextFeature = starts.at(index + 1);
+    const end = nextFeature === undefined ? featuresSource.length : nextFeature.index;
     const block = featuresSource.slice(start.index, end);
 
     // e.g. `title: "Context guard"` → "Context guard"
-    const title = block.match(/title:\s*"((?:\\.|[^"\\])*)"/)?.[1] ?? start.id;
-    const summary =
-      block
-        // e.g. `summary: "One-line…"` or multiline string concat
-        .match(/summary:\s*\n?\s*"((?:\\.|[^"\\])*)"/s)?.[1]
-        ?.replace(/\\n/g, " ") // e.g. "line1\\nline2" → "line1 line2"
-        ?.replace(/"\s*\+\s*"/g, "") ?? // e.g. `"a" + "b"` fragments → "ab"
-      "";
+    const title = block.match(/title:\s*"((?:\\.|[^"\\])*)"/)?.[1] || start.id;
+    const summaryMatch = block.match(/summary:\s*\n?\s*"((?:\\.|[^"\\])*)"/s)?.[1];
+    const summary = summaryMatch === undefined ? "" : summaryMatch.replace(/\\n/g, " ").replace(/"\s*\+\s*"/g, "");
     // e.g. `platform: "macos"` → "macos"
-    const platform = block.match(/platform:\s*"([^"]+)"/)?.[1] ?? "any";
-
-    const platformEmoji =
-      platform === "any"
-        ? "🟢 any OS"
-        : platform === "macos"
-          ? "🟡 macOS"
-          : platform === "macos+ghostty"
-            ? "🔴 macOS + Ghostty"
-            : platform;
+    const platform = block.match(/platform:\s*"([^"]+)"/)?.[1] || "any";
+    const platformLabels = {
+      any: "🟢 any OS",
+      macos: "🟡 macOS",
+      "macos+ghostty": "🔴 macOS + Ghostty",
+    };
+    const platformEmoji = platformLabels[platform] || platform;
 
     return { id: start.id, title, summary, platform: platformEmoji };
   });
@@ -129,9 +122,9 @@ const parseFrontmatter = (content) => {
  */
 const fallbackDescription = (content) => {
   // e.g. strip YAML frontmatter then the first "# Title" heading line
-  const body = content.replace(/^---\n[\s\S]*?\n---/, "").replace(/^#\s+.*$/m, "");
+  const readmeSection = content.replace(/^---\n[\s\S]*?\n---/, "").replace(/^#\s+.*$/m, "");
   // Stop at the first prose line; blanks, headings, and fences are not descriptions.
-  for (const line of body.split("\n")) {
+  for (const line of readmeSection.split("\n")) {
     const trimmed = line.trim();
     if (!trimmed || trimmed.startsWith("#") || trimmed.startsWith("```")) continue;
     // e.g. "**Bold** [link](url)" → "Bold link"
@@ -163,9 +156,9 @@ const scanSkillRoot = (root, label) => {
     skills.push({
       dirName,
       root,
-      name: fm.name ?? dirName,
+      name: fm.name || dirName,
       description,
-      trigger: fm.trigger ?? "",
+      trigger: fm.trigger || "",
       label,
     });
   }
@@ -226,7 +219,7 @@ const generateCommunitySection = (skills) => {
   const community = skills.filter((s) => COMMUNITY_SKILLS[s.name]);
 
   const lines = [
-    "These skills ship in the bag for convenience — installable the same way (`npx ys-dufflebag install --features <id>`) — but they are **authored by others**, not by dufflebag. Full credit and upstream sources:",
+    "These skills ship in the bag for convenience — installable the same way (`npx ys-dufflebag install <id>`) — but they are **authored by others**, not by dufflebag. Full credit and upstream sources:",
     "",
     "| Skill | What it does | By |",
     "| --- | --- | --- |",
@@ -266,26 +259,38 @@ const replaceSection = ({ readme, startMarker, endMarker, content }) => {
 
 const features = parseFeatures();
 const skills = parseSkills();
+const checkOnly = process.argv.includes("--check");
 
 console.log(`Found ${features.length} features, ${skills.length} skills`);
 
-let readme = readFileSync(path.join(ROOT, "README.md"), "utf8");
+const readmePath = path.join(ROOT, "README.md");
+const currentReadme = readFileSync(readmePath, "utf8");
+let renderedReadme = currentReadme;
 
 // Replace features table
-readme = replaceSection({
-  readme,
+renderedReadme = replaceSection({
+  readme: renderedReadme,
   startMarker: "<!-- AUTO:FEATURES:START -->",
   endMarker: "<!-- AUTO:FEATURES:END -->",
   content: generateFeaturesTable(features),
 });
 
 // Replace community-skills section
-readme = replaceSection({
-  readme,
+renderedReadme = replaceSection({
+  readme: renderedReadme,
   startMarker: "<!-- AUTO:SKILLS:START -->",
   endMarker: "<!-- AUTO:SKILLS:END -->",
   content: generateCommunitySection(skills),
 });
 
-writeFileSync(path.join(ROOT, "README.md"), readme);
-console.log("✅ README.md updated");
+if (checkOnly) {
+  if (renderedReadme !== currentReadme) {
+    console.error("README.md is stale. Run `pnpm generate-readme`.");
+    process.exitCode = 1;
+  } else {
+    console.log("README.md matches its generated sections");
+  }
+} else {
+  writeFileSync(readmePath, renderedReadme);
+  console.log("✅ README.md updated");
+}

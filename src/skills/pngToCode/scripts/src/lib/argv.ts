@@ -1,7 +1,7 @@
 export type ArgValue = string | boolean | string[];
 
 export function parseArgs(argv: string[], options?: { repeat?: string[] }): Record<string, ArgValue> {
-  const repeat = new Set(options?.repeat ?? []);
+  const repeat = new Set(options?.repeat || []);
   const args: Record<string, ArgValue> = {};
   for (const key of repeat) args[key] = [];
 

@@ -1,13 +1,13 @@
 import { FileSystem } from "@effect/platform";
 import { PlatformError } from "@effect/platform/Error";
-import { Effect, Either, Option, ParseResult, Predicate, Schema } from "effect";
+import { Effect, Either, Option, Schema, ParseResult as SchemaParseIssue } from "effect";
 
-import { bagConfigSchema, defaultBagConfig } from "./bagConfigSchema.js";
+import { bagConfigSchema } from "./bagConfigSchema.js";
 import { findDuplicateJsonProperty } from "./jsonDocument.js";
 
 const textDecoder = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
 
-export const managedConfigFileSchema = Schema.typeSchema(bagConfigSchema);
+export const managedConfigFileSchema = bagConfigSchema;
 
 export type ManagedConfigFile = Schema.Schema.Type<typeof managedConfigFileSchema>;
 
@@ -49,28 +49,8 @@ const decodeManagedConfigFile = Schema.decodeUnknownEither(managedConfigFileSche
   onExcessProperty: "error",
 });
 
-const additiveConfigFieldSchema = Schema.Literal(
-  "idleAutoCompact",
-  "speechResponseMode",
-  "speechReadAlong",
-  "promptRefinementMode",
-  "dictationReplacements",
-);
-
-const additiveConfigFields = additiveConfigFieldSchema.literals;
-
-const decodeManagedConfigValue = (value: unknown) => {
-  const current = decodeManagedConfigFile(value);
-  if (Either.isRight(current) || !Predicate.isRecord(value)) return current;
-  const migrated = { ...value };
-  // Backfill each field added after this config file was last written, so an older file still decodes.
-  for (const field of additiveConfigFields) {
-    if (!Object.hasOwn(migrated, field)) migrated[field] = defaultBagConfig[field];
-  }
-  return decodeManagedConfigFile(migrated);
-};
-
-const formatParseError = (error: ParseResult.ParseError): string => ParseResult.TreeFormatter.formatErrorSync(error);
+const formatParseError = (error: SchemaParseIssue.ParseError): string =>
+  SchemaParseIssue.TreeFormatter.formatErrorSync(error);
 
 const formatUnknownError = (error: unknown): string => (error instanceof Error ? error.message : String(error));
 
@@ -133,7 +113,7 @@ const decodeConfigFileBytes = (input: {
 
   // 4. Decode the complete managed configuration shape and invariants.
   return Either.mapLeft(
-    decodeManagedConfigValue(parsed.right),
+    decodeManagedConfigFile(parsed.right),
     (error) =>
       new ConfigFileSchemaError({
         configPath: input.configPath,

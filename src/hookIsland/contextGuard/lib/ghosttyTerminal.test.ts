@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   claimFocusedTerminalScript,
   claimTerminalScript,
-  decodeClaimResult,
+  decodeClaimDecision,
   terminalInputScript,
   versionSupportsTerminalInput,
 } from "./ghosttyTerminal.js";
@@ -26,7 +26,7 @@ describe("Ghostty terminal control", () => {
   });
 
   it("targets one stable ID without referring to focus", () => {
-    const script = terminalInputScript("term-2", "/compact", true);
+    const script = terminalInputScript({ terminalId: "term-2", text: "/compact", submit: true });
 
     expect(script).toContain('whose id is "term-2"');
     expect(script).toContain('input text "/compact" to target');
@@ -36,8 +36,9 @@ describe("Ghostty terminal control", () => {
   });
 
   it("escapes AppleScript string content", () => {
-    expect(terminalInputScript('term"2', 'say "hi"\\there', false)).toContain('whose id is "term\\"2"');
-    expect(terminalInputScript('term"2', 'say "hi"\\there', false)).toContain('input text "say \\"hi\\"\\\\there"');
+    const script = terminalInputScript({ terminalId: 'term"2', text: 'say "hi"\\there', submit: false });
+    expect(script).toContain('whose id is "term\\"2"');
+    expect(script).toContain('input text "say \\"hi\\"\\\\there"');
   });
 
   it.each([
@@ -46,7 +47,7 @@ describe("Ghostty terminal control", () => {
     ["AMBIGUOUS", { _tag: "refused", reason: "terminal-not-proven" }],
     ["", { _tag: "refused", reason: "ghostty-unavailable" }],
   ])("decodes claim result %s", (output, expected) => {
-    expect(decodeClaimResult(output)).toEqual(expected);
+    expect(decodeClaimDecision(output)).toEqual(expected);
   });
 
   it.each([
