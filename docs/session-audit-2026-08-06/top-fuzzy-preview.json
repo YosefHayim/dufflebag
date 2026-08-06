@@ -1,0 +1,815 @@
+[
+  {
+    "id": "c0095",
+    "sessions": 25,
+    "prompts": 25,
+    "variants": 3,
+    "agents": [
+      "codex"
+    ],
+    "terms": [
+      "obivous",
+      "body",
+      "begining",
+      "repo",
+      "raw",
+      "style",
+      "deslop",
+      "entire"
+    ],
+    "confidence": "high",
+    "example0": "I would like you to preform with me $grill-me-code-\n    style-with-docs from the begining so we can do a full\n    deslop on this entire repo. to change her structure\n    libraires deps etc so it looks"
+  },
+  {
+    "id": "c0330",
+    "sessions": 16,
+    "prompts": 19,
+    "variants": 11,
+    "agents": [
+      "codex"
+    ],
+    "terms": [
+      "workspace",
+      "context",
+      "filesystem",
+      "roots",
+      "type",
+      "current",
+      "profile",
+      "path"
+    ],
+    "confidence": "high",
+    "example0": "<environment_context>\n  <cwd>[PATH]/Code</cwd>\n  <shell>zsh</shell>\n  <current_date>2026-07-31</current_date>\n  <timezone>Asia/Jerusalem</timezone>\n  <filesystem><workspace_roots><root>[PATH]/root></w"
+  },
+  {
+    "id": "c0335",
+    "sessions": 16,
+    "prompts": 16,
+    "variants": 1,
+    "agents": [
+      "codex"
+    ],
+    "terms": [
+      "detect",
+      "prevented",
+      "role",
+      "brings",
+      "count",
+      "repo",
+      "card",
+      "practices"
+    ],
+    "confidence": "medium",
+    "example0": "<skill>\n<name>grill-me-code-style-with-docs</name>\n<path>[PATH]/SKILL.md</path>\n---\nname: grill-me-code-style-with-docs\ndescription: Grill the user on how an EXISTING codebase is built — code style, s"
+  },
+  {
+    "id": "c0370",
+    "sessions": 12,
+    "prompts": 12,
+    "variants": 2,
+    "agents": [
+      "codex",
+      "grok"
+    ],
+    "terms": [
+      "frontier",
+      "repo",
+      "practices",
+      "npm",
+      "awesome",
+      "years",
+      "west",
+      "over"
+    ],
+    "confidence": "high",
+    "example0": "System Prompt:\nYou are a skill author for Grok Build.\n\nYour ONLY job: convert the transcript into one or more production-quality agent skills in official SKILL.md format.\n\n## Sources of truth (in orde"
+  },
+  {
+    "id": "c0466",
+    "sessions": 8,
+    "prompts": 8,
+    "variants": 8,
+    "agents": [
+      "grok"
+    ],
+    "terms": [
+      "report",
+      "paths",
+      "mypr",
+      "identity",
+      "only",
+      "removed",
+      "keep",
+      "changed"
+    ],
+    "confidence": "high",
+    "example0": "MYPR monorepo at [PATH]/Code/MYPR-App.\n\n## Mission\nRemove/slim identity mappers. contracts.meaningful-mapping.\n\n## Your ONLY paths\n`server/src/affiliates/**`\n`server/src/whatsapp/**`\n`server/src/journ"
+  },
+  {
+    "id": "c0362",
+    "sessions": 8,
+    "prompts": 8,
+    "variants": 2,
+    "agents": [
+      "codex"
+    ],
+    "terms": [
+      "instruction",
+      "role",
+      "entry",
+      "page",
+      "heavy",
+      "cannot",
+      "stay",
+      "postgres"
+    ],
+    "confidence": "high",
+    "example0": "<recommended_plugins>\nHere is a list of plugins that are available but not installed.\n\n- Airtable (airtable@openai-curated-remote)\n- Apollo.io (apollo@openai-curated-remote)\n- Asana (asana@openai-cura"
+  },
+  {
+    "id": "c0243",
+    "sessions": 6,
+    "prompts": 8,
+    "variants": 4,
+    "agents": [
+      "codex"
+    ],
+    "terms": [
+      "ports",
+      "local",
+      "except",
+      "kill",
+      "metro",
+      "genshot",
+      "launch"
+    ],
+    "confidence": "high",
+    "example0": "kill please all local ports except 8081"
+  },
+  {
+    "id": "c0500",
+    "sessions": 6,
+    "prompts": 6,
+    "variants": 6,
+    "agents": [
+      "grok"
+    ],
+    "terms": [
+      "report",
+      "paths",
+      "mypr",
+      "identity",
+      "only",
+      "removed",
+      "changed",
+      "remove"
+    ],
+    "confidence": "high",
+    "example0": "MYPR monorepo at [PATH]/Code/MYPR-App.\n\n## Mission\nRemove redundant identity/DTO mappers. contracts.meaningful-mapping.\n\n## Your ONLY paths\n`client/src/services/**`\n`client/src/news/**`\n`client/src/sy"
+  },
+  {
+    "id": "c0028",
+    "sessions": 5,
+    "prompts": 6,
+    "variants": 4,
+    "agents": [
+      "codex"
+    ],
+    "terms": [
+      "git",
+      "commit",
+      "push",
+      "main",
+      "nice"
+    ],
+    "confidence": "high",
+    "example0": "ok git commit push please."
+  },
+  {
+    "id": "c0008",
+    "sessions": 5,
+    "prompts": 5,
+    "variants": 2,
+    "agents": [
+      "codex"
+    ],
+    "terms": [
+      "oly",
+      "one",
+      "app",
+      "repo",
+      "every",
+      "duplicate",
+      "including",
+      "installs"
+    ],
+    "confidence": "high",
+    "example0": "Can you please duplicate every repo we got on our gh? including one from Oly-App into the Code folder. without installs just duplicate."
+  },
+  {
+    "id": "c0053",
+    "sessions": 5,
+    "prompts": 5,
+    "variants": 2,
+    "agents": [
+      "codex"
+    ],
+    "terms": [
+      "proper",
+      "style",
+      "how",
+      "hvent",
+      "docs",
+      "aside",
+      "confusing",
+      "grilled"
+    ],
+    "confidence": "high",
+    "example0": "1.its confusing same folder named on other folder e.g. config. so aside of that i agree on all. secondly is that how the code-styl.emd is applying i want to proper $grill-me-code-style-with-docs with "
+  },
+  {
+    "id": "c0225",
+    "sessions": 5,
+    "prompts": 5,
+    "variants": 2,
+    "agents": [
+      "codex"
+    ],
+    "terms": [
+      "response",
+      "indication",
+      "tsconfig",
+      "comments",
+      "cannot",
+      "aaware",
+      "npm",
+      "emoji"
+    ],
+    "confidence": "high",
+    "example0": "1.Cannot find name 'process'. Do you need to install type definitions for node? Try `npm i --save-dev @types/node` and then add 'node' to the types field in your tsconfig.ts(2591) make sure it is part"
+  },
+  {
+    "id": "c0226",
+    "sessions": 5,
+    "prompts": 5,
+    "variants": 2,
+    "agents": [
+      "codex"
+    ],
+    "terms": [
+      "recommened",
+      "style",
+      "docs",
+      "feel",
+      "logic",
+      "grill",
+      "thigtehn",
+      "structure"
+    ],
+    "confidence": "high",
+    "example0": "the structure of codebase does make a sense and logic but i feel like we can make it leaner and thigtehn $grill-me-code-style-with-docs whwat do u recommened?"
+  },
+  {
+    "id": "c0254",
+    "sessions": 5,
+    "prompts": 5,
+    "variants": 2,
+    "agents": [
+      "codex"
+    ],
+    "terms": [
+      "body",
+      "proper",
+      "response",
+      "repo",
+      "thorwing",
+      "style",
+      "here",
+      "docs"
+    ],
+    "confidence": "high",
+    "example0": "Help me do a proper cleanup and $grill-me-code-style-with-docs on this repo so we are have proper following order code-style.md and clean and professional codebase. filenames conventions etc no generi"
+  },
+  {
+    "id": "c0029",
+    "sessions": 5,
+    "prompts": 5,
+    "variants": 1,
+    "agents": [
+      "codex"
+    ],
+    "terms": [
+      "mentioning",
+      "two",
+      "styles",
+      "how",
+      "really",
+      "widget",
+      "folders",
+      "maybe"
+    ],
+    "confidence": "medium",
+    "example0": "I need your help with doing a huge deslop on the entire cord base, changing its structure and making the entire project more logical on how it's currently structured. This means, I believe, maybe doin"
+  },
+  {
+    "id": "c0047",
+    "sessions": 5,
+    "prompts": 5,
+    "variants": 1,
+    "agents": [
+      "codex"
+    ],
+    "terms": [
+      "body",
+      "response",
+      "correctly",
+      "data",
+      "names",
+      "slop",
+      "structure",
+      "better"
+    ],
+    "confidence": "medium",
+    "example0": "do you think we can have better codebase structure,file names ,and cli for this to make it 0 ai slop and 100% desloped correctly? like better naming for variables and forbidden Files that are naming l"
+  },
+  {
+    "id": "c0049",
+    "sessions": 5,
+    "prompts": 5,
+    "variants": 1,
+    "agents": [
+      "codex"
+    ],
+    "terms": [
+      "structure",
+      "tree",
+      "prposed",
+      "files",
+      "folder",
+      "show",
+      "one"
+    ],
+    "confidence": "medium",
+    "example0": "and what about structure of files/folder tree show the prposed one"
+  },
+  {
+    "id": "c0142",
+    "sessions": 5,
+    "prompts": 5,
+    "variants": 1,
+    "agents": [
+      "codex"
+    ],
+    "terms": [
+      "fully",
+      "next",
+      "repo",
+      "widget",
+      "practices",
+      "best"
+    ],
+    "confidence": "medium",
+    "example0": "i would say repo with just widget and fully next.js. best practices"
+  },
+  {
+    "id": "c0143",
+    "sessions": 5,
+    "prompts": 5,
+    "variants": 1,
+    "agents": [
+      "codex"
+    ],
+    "terms": [
+      "next",
+      "practices",
+      "best"
+    ],
+    "confidence": "medium",
+    "example0": "i would say next.js best practices."
+  },
+  {
+    "id": "c0038",
+    "sessions": 4,
+    "prompts": 4,
+    "variants": 2,
+    "agents": [
+      "codex"
+    ],
+    "terms": [
+      "see",
+      "unsued",
+      "repo",
+      "logical",
+      "explain",
+      "looks",
+      "removed",
+      "itself"
+    ],
+    "confidence": "medium",
+    "example0": "Explain to me about this repo what it does what deps you see unsued can be removed what is in a middle of merges or stale and if the current structure looks logical to the purpose of\n  this repo struc"
+  },
+  {
+    "id": "c0216",
+    "sessions": 4,
+    "prompts": 4,
+    "variants": 2,
+    "agents": [
+      "codex"
+    ],
+    "terms": [
+      "resume",
+      "view",
+      "sessions",
+      "recent",
+      "proceed",
+      "paused",
+      "session",
+      "run"
+    ],
+    "confidence": "medium",
+    "example0": "I would like you to proceed from where devin paused. Resume this session with `devin -r maple-dogwood`, or run `devin -r` to view recent sessions"
+  },
+  {
+    "id": "c0274",
+    "sessions": 4,
+    "prompts": 4,
+    "variants": 2,
+    "agents": [
+      "codex"
+    ],
+    "terms": [
+      "questions",
+      "one",
+      "ask",
+      "remaining",
+      "shot",
+      "planpage"
+    ],
+    "confidence": "medium",
+    "example0": "ask all remaining questions in planpage so i can one shot"
+  },
+  {
+    "id": "c0280",
+    "sessions": 4,
+    "prompts": 4,
+    "variants": 2,
+    "agents": [
+      "codex"
+    ],
+    "terms": [
+      "approve",
+      "recommendtation"
+    ],
+    "confidence": "medium",
+    "example0": "approve all recommendtation"
+  },
+  {
+    "id": "c0206",
+    "sessions": 4,
+    "prompts": 4,
+    "variants": 1,
+    "agents": [
+      "codex"
+    ],
+    "terms": [
+      "interrupted",
+      "proceed"
+    ],
+    "confidence": "medium",
+    "example0": "proceed from where interrupted"
+  },
+  {
+    "id": "c0340",
+    "sessions": 4,
+    "prompts": 4,
+    "variants": 1,
+    "agents": [
+      "codex"
+    ],
+    "terms": [
+      "plain",
+      "build",
+      "skill",
+      "module",
+      "skip",
+      "plainly",
+      "repo",
+      "cite"
+    ],
+    "confidence": "medium",
+    "example0": "<skill>\n<name>grill-me-code-style-coach</name>\n<path>[PATH]/SKILL.md</path>\n---\nname: grill-me-code-style-coach\ndescription: >\n  Coach the user WHILE building or fixing code in a repo that has a code-"
+  },
+  {
+    "id": "c0382",
+    "sessions": 3,
+    "prompts": 3,
+    "variants": 3,
+    "agents": [
+      "grok"
+    ],
+    "terms": [
+      "only",
+      "reply",
+      "effort",
+      "low",
+      "high",
+      "medium"
+    ],
+    "confidence": "medium",
+    "example0": "Reply with only: effort-low"
+  },
+  {
+    "id": "c0418",
+    "sessions": 3,
+    "prompts": 3,
+    "variants": 1,
+    "agents": [
+      "grok"
+    ],
+    "terms": [
+      "main",
+      "test",
+      "approval",
+      "already",
+      "rewrite",
+      "gate",
+      "another",
+      "branch"
+    ],
+    "confidence": "medium",
+    "example0": "why not history rewrite from duplication of main in another branch that will be the test of this? main already will have all.  approval gate is approved"
+  },
+  {
+    "id": "c0085",
+    "sessions": 2,
+    "prompts": 4,
+    "variants": 2,
+    "agents": [
+      "codex"
+    ],
+    "terms": [
+      "oly",
+      "motion",
+      "tracking",
+      "experience",
+      "nice",
+      "other",
+      "thing",
+      "worked"
+    ],
+    "confidence": "low",
+    "example0": "ok nice it worked now for other thing need here multiple fixes and adjustments OLY Motion Tracking Experience (1).docx"
+  },
+  {
+    "id": "c0328",
+    "sessions": 2,
+    "prompts": 4,
+    "variants": 2,
+    "agents": [
+      "codex"
+    ],
+    "terms": [
+      "time",
+      "skill",
+      "mapped",
+      "context",
+      "practices",
+      "regroup",
+      "caption",
+      "best"
+    ],
+    "confidence": "low",
+    "example0": "ok nice now regroup on how ot genreated into the scraped-yt so if we run agent to create skill it also create skill in the scraped-yt/agents/<agent-name>/the caption file plus the skill.md created and"
+  },
+  {
+    "id": "c0022",
+    "sessions": 2,
+    "prompts": 3,
+    "variants": 2,
+    "agents": [
+      "codex"
+    ],
+    "terms": [
+      "color",
+      "add",
+      "wont",
+      "reading",
+      "lost",
+      "tui",
+      "image",
+      "word"
+    ],
+    "confidence": "low",
+    "example0": "do it all and [Image #1] add it and also if u can a bg bg color that fit each word that the model is reading but in the tui so i can follow it while it read and i wont get lost"
+  },
+  {
+    "id": "c0055",
+    "sessions": 2,
+    "prompts": 3,
+    "variants": 2,
+    "agents": [
+      "codex"
+    ],
+    "terms": [
+      "admin",
+      "between",
+      "mypr",
+      "new",
+      "every",
+      "two",
+      "works",
+      "show"
+    ],
+    "confidence": "low",
+    "example0": "two tasks 1. we got in mypr [Image #1] [URL]  a notifications settings can u confirm if we actually verify it works e2e production readY?\n\n2. admin has jump messages when they show up in app for regul"
+  },
+  {
+    "id": "c0108",
+    "sessions": 2,
+    "prompts": 3,
+    "variants": 2,
+    "agents": [
+      "codex"
+    ],
+    "terms": [
+      "request",
+      "home",
+      "proper",
+      "works",
+      "init",
+      "api",
+      "web",
+      "redirect"
+    ],
+    "confidence": "low",
+    "example0": "u checked it works proper and init? get the web api request it need to works cause i run and got casue on the web it still redirect to [Image #1] and not to the home still."
+  },
+  {
+    "id": "c0116",
+    "sessions": 2,
+    "prompts": 3,
+    "variants": 2,
+    "agents": [
+      "codex"
+    ],
+    "terms": [
+      "seeing",
+      "silhoutte",
+      "pose",
+      "accracu",
+      "start",
+      "fix",
+      "web",
+      "static"
+    ],
+    "confidence": "low",
+    "example0": "[Image #1] i am not seeing the silhoutte at start of pose and not the gif or static se and accracu y need fix in the web view"
+  },
+  {
+    "id": "c0126",
+    "sessions": 2,
+    "prompts": 3,
+    "variants": 2,
+    "agents": [
+      "codex"
+    ],
+    "terms": [
+      "looks",
+      "visible",
+      "check",
+      "plus",
+      "web",
+      "teh",
+      "skeleton",
+      "cause"
+    ],
+    "confidence": "low",
+    "example0": "check logs now cause looks like skeleton still not launch or visible in teh web ui plus [Image #1]"
+  },
+  {
+    "id": "c0151",
+    "sessions": 2,
+    "prompts": 3,
+    "variants": 2,
+    "agents": [
+      "codex"
+    ],
+    "terms": [
+      "render",
+      "pose",
+      "see",
+      "suppost",
+      "nice",
+      "web",
+      "too",
+      "gif"
+    ],
+    "confidence": "low",
+    "example0": "[Image #1] ok nice but i do not see the gif pose in web why ? its suppost to be render too."
+  },
+  {
+    "id": "c0162",
+    "sessions": 2,
+    "prompts": 3,
+    "variants": 2,
+    "agents": [
+      "codex"
+    ],
+    "terms": [
+      "see",
+      "proper",
+      "right",
+      "chips",
+      "detector",
+      "green",
+      "image",
+      "properly"
+    ],
+    "confidence": "low",
+    "example0": "[Image #1]   what do u see in the image? this need fix e.g. the pink detector need proper position right now it hiding the chips and the angles not properly lock when i am in the green join position."
+  },
+  {
+    "id": "c0168",
+    "sessions": 2,
+    "prompts": 3,
+    "variants": 2,
+    "agents": [
+      "codex"
+    ],
+    "terms": [
+      "oly",
+      "violate",
+      "nice",
+      "docx",
+      "find",
+      "something",
+      "file",
+      "downloads"
+    ],
+    "confidence": "low",
+    "example0": "[Image #1] ok nice but do u find from image something that violate the docx file from Downloads of oly ?"
+  },
+  {
+    "id": "c0072",
+    "sessions": 2,
+    "prompts": 2,
+    "variants": 2,
+    "agents": [
+      "codex"
+    ],
+    "terms": [
+      "redploy",
+      "commits",
+      "push",
+      "ship",
+      "organized",
+      "job",
+      "great",
+      "now"
+    ],
+    "confidence": "low",
+    "example0": "great job now do [$organized-commits]([PATH]/organized-commits/SKILL.md) then push and ship (redploy)"
+  },
+  {
+    "id": "c0219",
+    "sessions": 2,
+    "prompts": 2,
+    "variants": 2,
+    "agents": [
+      "codex"
+    ],
+    "terms": [
+      "declartions",
+      "report",
+      "refresh",
+      "example",
+      "schema",
+      "undercase",
+      "untrusted",
+      "imports"
+    ],
+    "confidence": "low",
+    "example0": "1.converts scripts folder to fully ts scripts plus \n2. tons of imports with as in the import that is forbidden remove. and fix e.g. clean imports \n3.[PATH]/report/assetsBrand.ts can be in the file its"
+  },
+  {
+    "id": "c0221",
+    "sessions": 2,
+    "prompts": 2,
+    "variants": 2,
+    "agents": [
+      "codex"
+    ],
+    "terms": [
+      "redploy",
+      "see",
+      "everything",
+      "exist",
+      "after",
+      "init",
+      "said",
+      "folders"
+    ],
+    "confidence": "low",
+    "example0": "after finish all what i said please [$organized-commits]([PATH]/organized-commits/SKILL.md) launch local, delete stale files or folders exist e.g. root ignored files or folders so i see everything bef"
+  }
+]
