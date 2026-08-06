@@ -274,10 +274,7 @@
     },
     {
       "path": "src/skills/makeATrailer/scripts/assembleCut.mjs",
-      "codeRuleExemptions": [
-        "function.arrow-only",
-        "function.input-shape"
-      ]
+      "codeRuleExemptions": ["function.arrow-only", "function.input-shape"]
     }
   ]
 }
