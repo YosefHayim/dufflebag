@@ -1,6 +1,6 @@
 ---
 name: messy-repo-orchestrator
-description: Use when the user has a messy existing project and wants an orchestrator to fan out one sub-agent per feature (or module) for refactors, hardening, deslop, or fixes without damaging main — backup main first, work on topic branches in .worktrees/, open PRs to main with review-ready summaries. Triggers: "messy repo", "clean up this whole project by feature", "fan out agents per feature", "refactor every feature safely", "backup main then parallel cleanup".
+description: Use when the user has a messy existing project and wants an orchestrator to fan out one sub-agent per feature (or module) for refactors, hardening, deslop, or fixes without damaging main — backup main first, work on topic branches in .worktrees/, open PRs to main with review-ready summaries. Also when they want a cmux terminal (or other visible host) per sub-agent so they can watch lanes live, jump into a terminal, or continue tasks with that agent. Triggers: "messy repo", "clean up this whole project by feature", "fan out agents per feature", "refactor every feature safely", "backup main then parallel cleanup", "cmux terminal per agent", "visible terminals for each lane".
 type: flow
 ---
 
@@ -40,6 +40,7 @@ Reuse existing skills rather than inventing a second ship path:
 - Do not merge PRs to main unless the user explicitly asks after review.
 - Do not deploy, publish, or delete production resources as part of cleanup.
 - Respect `AGENTS.md` / `CODE-STYLE.md` / ADRs; if they are missing or useless, run a **single** style grill first rather than N conflicting styles.
+- **Never close cmux workspaces/panes** created for lanes unless the user explicitly asks. They are human entry points, not throwaway spawn shells.
 
 ## Workflow
 
@@ -49,6 +50,25 @@ Reuse existing skills rather than inventing a second ship path:
 2. Read `AGENTS.md`, `CODE-STYLE.md`, `PROJECT.md` / `CONTEXT.md` when present.
 3. Inventory **features/modules** from evidence (not vibes): app routes, `src/features/*`, packages in a monorepo, documented domains, or a user-provided list. Produce a table: `id | path globs | risk | suggested work (refactor|harden|deslop|fix|docs)`.
 4. Present the table and get approval on **which lanes to open now** (batch size). Huge repos: wave 1 critical paths only.
+5. **Ask host mode** (required unless the user already stated a preference in this turn). Do not assume background-only fan-out.
+
+### 1b. Host mode (ask the human)
+
+Present these options clearly; wait for an answer before creating agents:
+
+| Mode | What the human gets | When to pick |
+|------|---------------------|--------------|
+| **A. Host subagents** (default if they say “just run it”) | Background spawn via the current agent host (`spawn_subagent` / equivalent). Progress comes back to the orchestrator. **No dedicated terminal per lane.** | Fire-and-forget; they only want the review matrix + PRs. |
+| **B. cmux terminal per lane** | One named cmux **workspace** (or surface) per feature, `cwd` = that lane’s worktree, agent CLI launched with the lane brief. Human can **watch live**, **jump into any lane terminal**, and **keep chatting / give follow-up tasks** to that same agent. | “I want to see them”, “cmux for each”, “I want to go into the sub-agents”, multipane supervision. |
+| **C. Briefs only** | Worktrees + issues + `LANE-BRIEF.md` written; human (or they) starts agents themselves. | They control every launch, or cmux/agent CLI is unavailable. |
+
+If they choose **B**, also ask (short, one pass):
+
+1. **Agent CLI** for the lane terminals: `grok` | `claude` | `codex` | other command they name (default: same family as the orchestrator host when obvious, else ask).
+2. **Layout preference** (optional): one **workspace per lane** (recommended — easy tab switch) vs split panes inside one workspace (only when lane count is small, ≤4).
+3. **Auto-start agent?** yes (default) = open terminal and run the agent with the brief; no = open terminal at worktree with brief file only, they submit.
+
+If they already said e.g. “cmux terminal for each sub agent”, skip re-asking mode and only fill gaps (CLI / auto-start).
 
 ### 2. Freeze a safe base
 
@@ -66,7 +86,69 @@ For each approved feature, follow `coordinate-worktrees` **setup-lanes** with th
 | Branch | `refactor/<issue>-<slug>` or `fix/…` / `feat/…` by work type |
 | Issue | `gh issue create` with acceptance criteria + path globs + out-of-scope |
 | Agent brief | **Only** that feature’s paths, backup SHA, default branch name, style doc paths, “no main commits”, “open PR with Fixes #n”, “do not merge”, “do not delete remote” |
-| Host | Agent-agnostic: host spawn/subagent when available; else one terminal + written brief per lane |
+| Host | From **§1b** — A host subagent, B cmux terminal, or C brief-only. Never invent a fourth ship path. |
+
+Always write the full mandate (§4) to:
+
+```text
+<worktree>/LANE-BRIEF.md
+```
+
+so a human can open any lane later, re-paste, or continue work after the first agent turn.
+
+#### Host A — host subagents
+
+- Prefer the host spawn/subagent API with `cwd` = the lane worktree (and worktree isolation when the host supports it).
+- Orchestrator remains the only chat surface unless the user later asks to open cmux for a subset of lanes.
+
+#### Host B — cmux terminal per lane
+
+Requires `cmux` on `PATH` and a live cmux socket (`cmux ping` / `cmux identify`). If cmux is missing or the socket is down: report that, fall back to **C** for those lanes, and keep going.
+
+Per approved lane (after worktree + issue + `LANE-BRIEF.md` exist):
+
+```bash
+# from orchestrator shell; do not steal focus on every lane
+cmux new-workspace \
+  --name "lane:<issue>-<slug>" \
+  --description "<branch> · Fixes #<issue> · <worktree>" \
+  --cwd "<absolute-worktree-path>" \
+  --command "<agent-start-command>" \
+  --focus false
+```
+
+**Agent start command** (pick the CLI they chose; brief must land in the agent session):
+
+| CLI | Suggested `--command` pattern |
+|-----|-------------------------------|
+| `grok` | `grok "$(cat LANE-BRIEF.md)"` or host-equivalent that starts a session in cwd with the brief as the first user message |
+| `claude` | `claude --dangerously-skip-permissions "$(cat LANE-BRIEF.md)"` only if the user already uses that flag; otherwise `claude "$(cat LANE-BRIEF.md)"` |
+| `codex` | `codex -- "$(cat LANE-BRIEF.md)"` (or their usual flags, e.g. `--yolo`, only if they use them) |
+| other | Exact command the user named; still `cwd` = worktree |
+
+If **auto-start = no**, omit `--command` (or send only `clear` / a no-op) so the terminal opens at the worktree; tell the human the brief path and a one-liner to start the agent.
+
+Optional small-batch split layout (≤4 lanes, only if they asked for panes not tabs):
+
+```bash
+cmux new-workspace --name "messy-wave-1" --cwd "<repo-root>" --layout '<json with one terminal surface per lane, each with its own cwd/command>'
+```
+
+Prefer **one workspace per lane** when unsure — easier to pin, rename, notify, and re-enter without layout thrash.
+
+Record for each lane: cmux workspace ref/id (and surface if known), name, and that the human may:
+
+- switch to that workspace/tab anytime to **watch** the agent;
+- type additional instructions in that terminal to **continue or redirect** the same lane;
+- leave it running while reviewing other lanes.
+
+Do **not** treat cmux lanes as fire-and-forget only: poll or re-read PR/branch state when building the matrix, and leave terminals open.
+
+#### Host C — briefs only
+
+- Create worktree + issue + `LANE-BRIEF.md` as usual.
+- Print a start matrix (path, branch, issue, brief path, suggested agent command).
+- Do not claim agents are running until the human says they started them (or PRs appear).
 
 ### 4. Per-agent mandate (paste into every lane brief)
 
@@ -104,20 +186,23 @@ Each sub-agent must:
      ```
 
 7. Stop at open PR. Do not merge. Do not delete remote branches.
+8. If running inside a **cmux** terminal the human opened for this lane: stay in that session after the PR is open so they can assign follow-up work in the same place; do not exit the agent solely because the first mandate finished unless they asked for a one-shot run.
 
 ### 5. Orchestrator review pack (for you)
 
-After lanes report, produce one matrix for the human:
+After lanes report (or when the human asks for status), produce one matrix:
 
-| Feature | Issue | Branch | Worktree | PR | Head SHA | Verify | Notes |
-|---------|-------|--------|----------|----|----------|--------|-------|
+| Feature | Issue | Branch | Worktree | Host (A/B/C) | cmux workspace | PR | Head SHA | Verify | Notes |
+|---------|-------|--------|----------|--------------|----------------|----|----------|--------|-------|
 
 Plus:
 
 - backup branch name + SHA;
+- chosen host mode + agent CLI;
 - default branch still pointing at pre-fan-out tip (or only intentionally advanced if user merged something);
 - recommended review order (low-risk first, or dependency order);
-- which PRs block others (shared contracts, migrations).
+- which PRs block others (shared contracts, migrations);
+- for mode **B**: how to re-enter a lane (workspace name/ref) and reminder that terminals were left open for watch / follow-up tasks.
 
 If two PRs conflict, do **not** force-resolve on main. Prefer rebasing the later PR onto updated default after earlier merges, or run `coordinate-worktrees` **land-lanes** with backups when the user wants a single integration branch—still no silent main rewrite.
 
@@ -125,7 +210,8 @@ If two PRs conflict, do **not** force-resolve on main. Prefer rebasing the later
 
 - Merge only when the user says so (GitHub UI or authorized `gh pr merge`).
 - Leave feature and backup remotes unless the user explicitly authorizes deletion.
-- Optional: next wave of features once wave 1 is merged.
+- Leave cmux lane workspaces unless the user explicitly asks to close them.
+- Optional: next wave of features once wave 1 is merged (re-ask host mode only if they change preference).
 
 ## Verification
 
@@ -137,6 +223,8 @@ Do not claim the messy repo is “cleaned” until:
 - no remote branches were deleted unless explicitly requested;
 - each PR body includes Summary / Scope / Risk / Test plan / Main safety;
 - orchestrator matrix lists SHA + verify status per lane;
+- host mode was **asked** (or explicitly pre-stated) and recorded; for mode **B**, each lane has a cmux workspace ref/name (or a documented fallback to C);
+- every lane has `LANE-BRIEF.md` in its worktree;
 - handoff states what remains messy and what was deferred.
 
-“Agents ran” is not success. **Reviewable PRs against an undamaged main, with a restore point**, is success.
+“Agents ran” is not success. **Reviewable PRs against an undamaged main, with a restore point**, is success. For cmux mode, success also means the human **can still enter each lane terminal** to inspect or continue work unless they asked for one-shot auto-close (default: keep open).

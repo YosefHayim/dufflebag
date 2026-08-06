@@ -1,6 +1,6 @@
 ---
 name: coordinate-worktrees
-description: Use when the user asks to set up multi-agent worktrees, fire one feature per agent/lane, spawn parallel task worktrees under .worktrees/, or coordinate/consolidate/merge/salvage/land work from multiple branches or Git worktrees (dirty, overlapping, stale, concurrent agents). Modes: setup-lanes (create isolated lanes + issue/branch/PR) and land-lanes (integrate existing lanes).
+description: Use when the user asks to set up multi-agent worktrees, fire one feature per agent/lane, spawn parallel task worktrees under .worktrees/, open a cmux terminal per lane, or coordinate/consolidate/merge/salvage/land work from multiple branches or Git worktrees (dirty, overlapping, stale, concurrent agents). Modes: setup-lanes (create isolated lanes + issue/branch/PR) and land-lanes (integrate existing lanes).
 type: flow
 ---
 
@@ -24,7 +24,7 @@ A clean integration branch is not proof that every worktree's progress remains r
 - **Own-lane isolation:** each agent edits only its worktree and branch. Foreign dirty trees are user-owned until proven otherwise.
 - Use `organized-commits` for dirty lanes when available. Preserve unrelated user changes and stop when intent is ambiguous.
 - Do not merge to the default branch, force-push protected refs, deploy, or close/delete issues unless the request authorizes that step.
-- Agent host is **agnostic**: use the host's multi-agent tool when available; otherwise prepare worktrees + written task briefs for separate terminals.
+- Agent host is **agnostic**: use the host's multi-agent tool when available; **cmux terminal per lane** when the user wants visible/joinable sessions; otherwise prepare worktrees + written task briefs for separate terminals.
 
 ## Workflow
 
@@ -51,7 +51,10 @@ One **task** = one **agent** = one **worktree** = one **branch** = one **issue**
 
    - **Branch:** `<type>/<issue>-<short-slug>` where `type` is `feat` | `fix` | `refactor` | `chore` | `docs` (or repo convention).
    - **Worktree dir:** `.worktrees/<type>-<issue>-<slug>` (slashes → dashes). Ensure `.worktrees/` is gitignored if the repo agrees.
-5. Hand each agent **only its task brief**: worktree path, branch, issue URL/number, acceptance criteria, required style docs, and “do not touch other lanes.” Prefer the host's subagent/spawn API with cwd = that worktree; otherwise open one terminal per lane with the brief pasted.
+5. Hand each agent **only its task brief**: worktree path, branch, issue URL/number, acceptance criteria, required style docs, and “do not touch other lanes.” Write the brief to `<worktree>/LANE-BRIEF.md`. Prefer the host mode the user chose (or that the calling skill asked for):
+   - **Host subagent:** spawn API with cwd = that worktree.
+   - **cmux terminal per lane:** `cmux new-workspace --name "lane:<issue>-<slug>" --cwd <worktree> --command "<agent-cli…>" --focus false` so the human can watch, jump in, and continue tasks in that terminal (see `messy-repo-orchestrator` §1b / Host B).
+   - **Briefs only:** print paths + suggested start command; do not claim agents are running.
 6. Each lane implements, verifies (narrow then full gate), and commits via `organized-commits` / `finish-and-ship` on **its** branch — never on the default branch.
 7. Each lane pushes its branch and opens a PR to the default branch with the issue linked:
 
@@ -89,7 +92,7 @@ One **task** = one **agent** = one **worktree** = one **branch** = one **issue**
 Report:
 
 - default branch and base SHA used for each worktree;
-- per lane: path, branch, issue number/URL, agent/terminal assignment, PR URL, head SHA, verify outcome;
+- per lane: path, branch, issue number/URL, host mode, agent/terminal assignment (cmux workspace ref/name when used), `LANE-BRIEF.md` path, PR URL, head SHA, verify outcome;
 - confirmation no lane committed on the default branch;
 - confirmation no remote branches were deleted;
 - leftover unassigned tasks or blocked overlaps.
