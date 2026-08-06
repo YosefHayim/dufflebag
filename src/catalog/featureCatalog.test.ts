@@ -52,6 +52,7 @@ const expectedFeatureIds = [
   "messy-repo-orchestrator",
   "skill-from-feedback",
   "agent-benchmark",
+  "mobile-release",
   "capture-workflow",
   "finish-agent-sessions",
 ];
@@ -97,6 +98,7 @@ const expectedSourceDirectories = [
   "messyRepoOrchestrator",
   "skillFromFeedback",
   "agentBenchmark",
+  "mobileRelease",
   "captureWorkflow",
   "finishAgentSessions",
 ];
@@ -226,6 +228,7 @@ describe("featureCatalog", () => {
       ["messy-repo-orchestrator", ["SKILL.md"]],
       ["skill-from-feedback", ["SKILL.md"]],
       ["agent-benchmark", ["SKILL.md", "REFERENCE.md"]],
+      ["mobile-release", ["SKILL.md"]],
       ["capture-workflow", ["SKILL.md"]],
       ["finish-agent-sessions", ["SKILL.md"]],
     ]);
