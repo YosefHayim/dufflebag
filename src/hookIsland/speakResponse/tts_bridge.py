@@ -22,6 +22,7 @@ Modes:
 
 from __future__ import annotations
 
+import contextlib
 import argparse
 import json
 import re
@@ -94,10 +95,8 @@ def play_samples(samples: Any, sample_rate: int, stop_file: str) -> str:
     started = time.monotonic()
     while time.monotonic() - started < duration:
         if stop_requested(stop_file):
-            try:
+            with contextlib.suppress(Exception):
                 sounddevice.stop()
-            except Exception:
-                pass
             return "stopped"
         time.sleep(0.03)
     try:
@@ -124,10 +123,8 @@ def speak(text: str, voice: str, speed: float, stop_file: str = "", *, stream_ev
     total = len(pieces)
     for index, piece in enumerate(pieces):
         if stop_requested(stop_file):
-            try:
+            with contextlib.suppress(Exception):
                 sounddevice.stop()
-            except Exception:
-                pass
             if stream_events:
                 emit({"event": "done", "status": "stopped"})
             return "stopped"
@@ -144,10 +141,8 @@ def speak(text: str, voice: str, speed: float, stop_file: str = "", *, stream_ev
             verbose=False,
         )
         if stop_requested(stop_file):
-            try:
+            with contextlib.suppress(Exception):
                 sounddevice.stop()
-            except Exception:
-                pass
             if stream_events:
                 emit({"event": "done", "status": "stopped"})
             return "stopped"
@@ -177,7 +172,12 @@ def serve(default_voice: str) -> int:
     except Exception as error:
         emit({"event": "error", "message": str(error)})
         return 1
-    emit({"event": "ready", "voice": default_voice.upper() if re.fullmatch(r"[MF][1-5]", default_voice.upper() or "") else "F4"})
+    emit(
+        {
+            "event": "ready",
+            "voice": default_voice.upper() if re.fullmatch(r"[MF][1-5]", default_voice.upper() or "") else "F4",
+        }
+    )
     for raw in sys.stdin:
         line = raw.strip()
         if not line:
@@ -196,12 +196,10 @@ def serve(default_voice: str) -> int:
             return 0
         if cmd == "stop":
             _stop_event.set()
-            try:
+            with contextlib.suppress(Exception):
                 import sounddevice
 
                 sounddevice.stop()
-            except Exception:
-                pass
             emit({"event": "done", "status": "stopped"})
             continue
         if cmd == "ping":
