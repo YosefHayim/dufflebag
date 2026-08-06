@@ -62,6 +62,8 @@ Use this as a quick lookup. Prefer **one primary** skill.
 
 ## Template refined prompts
 
+These strings are what should land **in the agent input** (STT inject) or be executed **same-turn** — not a multi-page plan.
+
 **Branch + line edit + PR (no merge):**
 
 ```text
@@ -76,8 +78,39 @@ messy-repo-orchestrator: backup main, inventory features, one agent per feature,
 issue + branch + PR each, no merge until I review.
 ```
 
-**Unsure:**
+**Unsure (advice only):**
 
 ```text
-route-request: here is my raw ask — <paste> — give me primary skill + refined prompt.
+route-request: here is my raw ask — <paste> — primary skill + paste-ready refined prompt only.
 ```
+
+## Seamless UX (how to do this right)
+
+```text
+[STT hold-Control release] or [typed draft]
+        │
+        ▼
+  route-aware refine  (route-request rules + preserve literals)
+        │
+        ▼
+  insert into focused input  (type_text / caret — user sees it)
+        │
+        ▼
+  user hits Enter  →  normal agent turn in SAME session
+        │
+        ▼
+  primary skill runs (finish-and-ship, deslop-v2, …)
+```
+
+| Approach | Feels like | Use |
+|----------|------------|-----|
+| Refine → **input** → Enter | Talking to one agent | STT / pre-send (preferred) |
+| Messy Enter → **same turn** silent route + execute | One reply, work happens | Typed freeform already sent |
+| Separate “routing chat” then restart | Interrupt / context switch | **Avoid** |
+| Manual Cmd+C / Cmd+V as the product | Clunky | Only internal to `type_text` |
+
+Existing pieces:
+
+- STT already pastes into the caret (`voice/src/typing.rs`).
+- Optional Control double-tap refines **clipboard** (`prompt_refinement` review mode).
+- Next product step: after **final STT transcript**, run route-aware refine, then `type_text(refined)` so the input shows the ready prompt—no separate session.
