@@ -74,6 +74,7 @@ Hard rules agents must hold every turn. Full prescription: [`CODE-STYLE.md`](COD
 - **Remote branches** — do not delete remote branches unless the user explicitly asks; leave them for handoff/CI after push or PR.
 - **Parallel features** — one task per worktree under `.worktrees/`; issue + branch + PR to default with `Fixes #n` / `Closes #n`. Use `coordinate-worktrees` (setup-lanes / land-lanes).
 - **Messy whole-repo cleanup** — backup default branch first, then one sub-agent per feature with PRs for human review (`messy-repo-orchestrator`); ask host mode (background subagents vs cmux terminal per lane vs briefs only); never damage main history.
+- **Unsure which skill** — run `route-request` first: refine freeform → primary existing skill + pasteable prompt (do not invent a parallel workflow).
 - **Ship** — verify gate green before push/PR; no force-push to protected branches; merge to default only when asked.
 
 ## Validate changes
