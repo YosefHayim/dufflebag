@@ -1,0 +1,1924 @@
+[
+  {
+    "id": "c0095",
+    "member_norms": 3,
+    "prompt_count": 25,
+    "unique_sessions": 25,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "top_terms": [
+      "obivous",
+      "body",
+      "begining",
+      "repo",
+      "raw",
+      "style",
+      "deslop",
+      "entire"
+    ],
+    "examples": [
+      "I would like you to preform with me $grill-me-code-\n    style-with-docs from the begining so we can do a full\n    deslop on this entire repo. to change her structure\n    libraires deps etc so it looks cleanly. clean code,\n    obivous structure that make sense and no use of\n  generic\n    and not helping variables like\n    result,payload,body,data,raw etc etc",
+      "I would like you to preform with me $grill-me-code-style-with-docs from the begining so we can do a full deslop on this entire repo. to change her structure libraires deps etc so it looks cleanly. clean code, obivous structure that make sense and no use of generic and not helping variables like result,payload,body,data,raw etc etc",
+      "I would like you to preform with me [$grill-me-code-style-with-docs]([PATH]/grill-me-code-style-with-docs/SKILL.md) from the begining so we can do a full deslop on this entire repo. to change her structure libraires deps etc so it looks cleanly. clean code, obivous structure that make sense and no use of generic and not helping variables like result,payload,body,data,raw etc etc"
+    ],
+    "confidence": "high"
+  },
+  {
+    "id": "c0330",
+    "member_norms": 11,
+    "prompt_count": 19,
+    "unique_sessions": 16,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "top_terms": [
+      "workspace",
+      "context",
+      "filesystem",
+      "roots",
+      "type",
+      "current",
+      "profile",
+      "path"
+    ],
+    "examples": [
+      "<environment_context>\n  <cwd>[PATH]/Code</cwd>\n  <shell>zsh</shell>\n  <current_date>2026-07-31</current_date>\n  <timezone>Asia/Jerusalem</timezone>\n  <filesystem><workspace_roots><root>[PATH]/root></workspace_roots><permission_profile type=\"disabled\"><file_system type=\"unrestricted\" /></permission_profile></filesystem>\n</environment_context>",
+      "<environment_context>\n  <current_date>2026-08-04</current_date>\n  <timezone>Asia/Jerusalem</timezone>\n  <filesystem><workspace_roots><root>[PATH]/root></workspace_roots><permission_profile type=\"disabled\"><file_system type=\"unrestricted\" /></permission_profile></filesystem>\n</environment_context>",
+      "<environment_context>\n  <current_date>2026-07-31</current_date>\n  <timezone>Asia/Jerusalem</timezone>\n  <filesystem><workspace_roots><root>[PATH]/root></workspace_roots><permission_profile type=\"managed\"><file_system type=\"restricted\"><entry access=\"read\"><special>:root</special></entry><entry access=\"write\"><path>[PATH]/path></entry><entry access=\"write\"><special>:slash_tmp</special></entry><entr",
+      "<environment_context>\n  <current_date>2026-08-01</current_date>\n  <timezone>Asia/Jerusalem</timezone>\n  <filesystem><workspace_roots><root>[PATH]/root></workspace_roots><permission_profile type=\"disabled\"><file_system type=\"unrestricted\" /></permission_profile></filesystem>\n</environment_context>"
+    ],
+    "confidence": "high"
+  },
+  {
+    "id": "c0335",
+    "member_norms": 1,
+    "prompt_count": 16,
+    "unique_sessions": 16,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "top_terms": [
+      "detect",
+      "prevented",
+      "role",
+      "brings",
+      "count",
+      "repo",
+      "card",
+      "practices"
+    ],
+    "examples": [
+      "<skill>\n<name>grill-me-code-style-with-docs</name>\n<path>[PATH]/SKILL.md</path>\n---\nname: grill-me-code-style-with-docs\ndescription: Grill the user on how an EXISTING codebase is built — code style, structure docs, and CLI — using the real code as evidence, then render an HTML plan and, on approval, write/update CODE-STYLE.md + a formatter config and refresh the AGENTS.md digest. Ensures PROJECT.m"
+    ],
+    "confidence": "medium"
+  },
+  {
+    "id": "c0370",
+    "member_norms": 2,
+    "prompt_count": 12,
+    "unique_sessions": 12,
+    "agents": [
+      "codex",
+      "grok"
+    ],
+    "workspaces": [
+      "/Users/yosefhayimsabag/Desktop/Code/yt-captions-mini-ai"
+    ],
+    "top_terms": [
+      "frontier",
+      "repo",
+      "practices",
+      "npm",
+      "awesome",
+      "years",
+      "west",
+      "over"
+    ],
+    "examples": [
+      "System Prompt:\nYou are a skill author for Grok Build.\n\nYour ONLY job: convert the transcript into one or more production-quality agent skills in official SKILL.md format.\n\n## Sources of truth (in order)\n1. Official product skill docs: not published / incomplete for Grok Build.\n2. Open standard: [URL]\n3. Local fallback reference in this repo: docs/skill-authoring.md\nIf (1) is missing, follow (2) + ",
+      "System Prompt:\nYou are a skill author for OpenAI Codex CLI.\n\nYour ONLY job: convert the transcript into one or more production-quality agent skills in official SKILL.md format.\n\n## Sources of truth (in order)\n1. Official docs (follow first): [URL]\n2. Open standard: [URL]\n3. Local fallback reference in this repo: docs/skill-authoring.md\nIf (1) is missing, follow (2) + (3) exactly. Do not invent a p"
+    ],
+    "confidence": "high"
+  },
+  {
+    "id": "c0466",
+    "member_norms": 8,
+    "prompt_count": 8,
+    "unique_sessions": 8,
+    "agents": [
+      "grok"
+    ],
+    "workspaces": [
+      "/Users/yosefhayimsabag/Desktop/Code/MYPR-App"
+    ],
+    "top_terms": [
+      "report",
+      "paths",
+      "mypr",
+      "identity",
+      "only",
+      "removed",
+      "keep",
+      "changed"
+    ],
+    "examples": [
+      "MYPR monorepo at [PATH]/Code/MYPR-App.\n\n## Mission\nRemove/slim identity mappers. contracts.meaningful-mapping.\n\n## Your ONLY paths\n`server/src/affiliates/**`\n`server/src/whatsapp/**`\n`server/src/journalists/**`\n`server/src/chat/**`\n\n## Do\n`toPartnerResponse`, `toConversionResponse`, `toWhatsappError`, photo helpers.\nKEEP real transforms. Slim field-for-field DTO copies.\n\n## Report\nFiles changed, k",
+      "MYPR monorepo at [PATH]/Code/MYPR-App.\n\n## Mission\nRemove/slim identity mappers. contracts.meaningful-mapping.\n\n## Your ONLY paths\n`server/src/notifications/**`\n`server/src/popups/**`\n`server/src/sync/**`\n\n## Do\n`toNotificationResponse`, `toClientPopup`, `toMillis`, shellSerialize helpers.\nKEEP Date→ms, gender/locale personalization, dual-map renames (messageText).\nRemove pure identity copies.\n\n##",
+      "MYPR monorepo at [PATH]/Code/MYPR-App.\n\n## Mission\nRemove/slim identity mappers. contracts.meaningful-mapping.\n\n## Your ONLY paths\n`server/src/blog/**`\n`server/src/support/**`\n`server/src/rss/**`\n\n## Do\n`toBlogResponse`, `toSupportContentResponse`, etc.\nKEEP Date→ms, cover URL derivation, slug/redaction.\nSLIM pure field lists with spread+date overrides where types allow.\n\n## Report\nFiles changed, ",
+      "MYPR monorepo at [PATH]/Code/MYPR-App.\n\n## Mission\nRemove/slim identity mappers. contracts.meaningful-mapping.\n\n## Your ONLY paths\n`server/src/billing/**`\n\n## Do\n`toWireLemonConfig`, `toDiscountCampaignResponse`, `toTargetResponse`, `toSubscriptionPlan`, `toLemonCreatePayload`, etc.\nKEEP provider payload shaping and Date→ms.\nREMOVE pure field copies. Slim with spread where safe.\nRun billing unit t"
+    ],
+    "confidence": "high"
+  },
+  {
+    "id": "c0362",
+    "member_norms": 2,
+    "prompt_count": 8,
+    "unique_sessions": 8,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "top_terms": [
+      "instruction",
+      "role",
+      "entry",
+      "page",
+      "heavy",
+      "cannot",
+      "stay",
+      "postgres"
+    ],
+    "examples": [
+      "<recommended_plugins>\nHere is a list of plugins that are available but not installed.\n\n- Airtable (airtable@openai-curated-remote)\n- Apollo.io (apollo@openai-curated-remote)\n- Asana (asana@openai-curated-remote)\n- Atlassian Rovo (atlassian-rovo@openai-curated-remote)\n- Base44 (base44@openai-curated-remote)\n- Box (box@openai-curated-remote)\n- Canva (canva@openai-curated-remote)\n- Cloudflare (cloudf",
+      "<recommended_plugins>\nHere is a list of plugins that are available but not installed.\n\n- Airtable (airtable@openai-curated-remote)\n- Apollo.io (apollo@openai-curated-remote)\n- Asana (asana@openai-curated-remote)\n- Atlassian Rovo (atlassian-rovo@openai-curated-remote)\n- Base44 (base44@openai-curated-remote)\n- Box (box@openai-curated-remote)\n- Canva (canva@openai-curated-remote)\n- Cloudflare (cloudf"
+    ],
+    "confidence": "high"
+  },
+  {
+    "id": "c0243",
+    "member_norms": 4,
+    "prompt_count": 8,
+    "unique_sessions": 6,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "top_terms": [
+      "ports",
+      "local",
+      "except",
+      "kill",
+      "metro",
+      "genshot",
+      "launch"
+    ],
+    "examples": [
+      "kill please all local ports except 8081",
+      "please kill all local ports except metro and launch genshot local",
+      "please kill all local ports except metro",
+      "kill all local ports except metro"
+    ],
+    "confidence": "high"
+  },
+  {
+    "id": "c0500",
+    "member_norms": 6,
+    "prompt_count": 6,
+    "unique_sessions": 6,
+    "agents": [
+      "grok"
+    ],
+    "workspaces": [
+      "/Users/yosefhayimsabag/Desktop/Code/MYPR-App"
+    ],
+    "top_terms": [
+      "report",
+      "paths",
+      "mypr",
+      "identity",
+      "only",
+      "removed",
+      "changed",
+      "remove"
+    ],
+    "examples": [
+      "MYPR monorepo at [PATH]/Code/MYPR-App.\n\n## Mission\nRemove redundant identity/DTO mappers. contracts.meaningful-mapping.\n\n## Your ONLY paths\n`client/src/services/**`\n`client/src/news/**`\n`client/src/sync/**`\n`client/src/subscription/**`\n`client/src/account/**`\n`client/src/notifications/**` if present\n\n## Do\ne.g. `toTrendingHeadlines` — KEEP if it filters/sorts/decodes (real presentation). Remove fi",
+      "MYPR monorepo at [PATH]/Code/MYPR-App.\n\n## Mission\nRemove redundant identity/DTO mappers (`toX` field-for-field copies, parallel Record types). CODE-STYLE contracts.meaningful-mapping.\n\n## Your ONLY paths\n`client/src/features/journalist/**`\n`client/src/features/discovery/**`\n`client/src/features/match/**`\nAlso check: `client/src/journalists/**` if present.\n\n## Do\nSearch and delete identity mappers",
+      "MYPR monorepo at [PATH]/Code/MYPR-App.\n\n## Mission\nRemove redundant identity/DTO mappers. contracts.meaningful-mapping.\n\n## Your ONLY paths\n`client/src/features/membership/**`\n`client/src/features/media-coverage/**`\n`client/src/features/tracking/**`\n`client/src/features/support/**`\n`client/src/features/settings/**`\n`client/src/features/workspace/**`\n\n## Do\nSearch to*/identity DTO rebuilds; remove;",
+      "MYPR monorepo at [PATH]/Code/MYPR-App.\n\n## Mission\nRemove redundant identity/DTO mappers. contracts.meaningful-mapping.\n\n## Your ONLY paths\n`client/src/features/chat/**`\n`client/src/features/chats/**`\n\n## Do\nFind to*/from* field-for-field API clones; remove; use wire types. Keep real UI transforms. Implement + local tests.\n\n## Report\nFiles changed, removed, kept(+why)."
+    ],
+    "confidence": "high"
+  },
+  {
+    "id": "c0028",
+    "member_norms": 4,
+    "prompt_count": 6,
+    "unique_sessions": 5,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "top_terms": [
+      "git",
+      "commit",
+      "push",
+      "main",
+      "nice"
+    ],
+    "examples": [
+      "ok git commit push please.",
+      "git commit push please",
+      "please git commit push to main",
+      "ok nice git commit push"
+    ],
+    "confidence": "high"
+  },
+  {
+    "id": "c0008",
+    "member_norms": 2,
+    "prompt_count": 5,
+    "unique_sessions": 5,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "top_terms": [
+      "oly",
+      "one",
+      "app",
+      "repo",
+      "every",
+      "duplicate",
+      "including",
+      "installs"
+    ],
+    "examples": [
+      "Can you please duplicate every repo we got on our gh? including one from Oly-App into the Code folder. without installs just duplicate.",
+      "Can you please duplicate every repo we got on our gh? including one from Oly-App"
+    ],
+    "confidence": "high"
+  },
+  {
+    "id": "c0053",
+    "member_norms": 2,
+    "prompt_count": 5,
+    "unique_sessions": 5,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "top_terms": [
+      "proper",
+      "style",
+      "how",
+      "hvent",
+      "docs",
+      "aside",
+      "confusing",
+      "grilled"
+    ],
+    "examples": [
+      "1.its confusing same folder named on other folder e.g. config. so aside of that i agree on all. secondly is that how the code-styl.emd is applying i want to proper $grill-me-code-style-with-docs with what we hvent talked yet and grilled",
+      "1.its confusing same folder named on other folder e.g. config. so aside of that i agree on all. secondly is that how the code-styl.emd is applying i want to proper [$grill-me-code-style-with-docs]([PATH]/grill-me-code-style-with-docs/SKILL.md) with what we hvent talked yet and grilled"
+    ],
+    "confidence": "high"
+  },
+  {
+    "id": "c0225",
+    "member_norms": 2,
+    "prompt_count": 5,
+    "unique_sessions": 5,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "top_terms": [
+      "response",
+      "indication",
+      "tsconfig",
+      "comments",
+      "cannot",
+      "aaware",
+      "npm",
+      "emoji"
+    ],
+    "examples": [
+      "1.Cannot find name 'process'. Do you need to install type definitions for node? Try `npm i --save-dev @types/node` and then add 'node' to the types field in your tsconfig.ts(2591) make sure it is part of dev deps so we have smooth dev process. \n2. replace all emojis with proper inline text or ascii e.g. checkmark without emoji or x without emoji so its cleanler. \n3.thats looks duplicate hardcode v",
+      "1.Cannot find name 'process'. Do you need to install type definitions for node? Try `npm i --save-dev @types/node` and then add 'node' to the types field in your tsconfig.ts(2591) make sure it is part of dev deps so we have smooth dev process. \n2. replace all emojis with proper inline text or ascii e.g. checkmark without emoji or x without emoji so its cleanler. \n3.thats looks duplicate hardcode v"
+    ],
+    "confidence": "high"
+  },
+  {
+    "id": "c0226",
+    "member_norms": 2,
+    "prompt_count": 5,
+    "unique_sessions": 5,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "top_terms": [
+      "recommened",
+      "style",
+      "docs",
+      "feel",
+      "logic",
+      "grill",
+      "thigtehn",
+      "structure"
+    ],
+    "examples": [
+      "the structure of codebase does make a sense and logic but i feel like we can make it leaner and thigtehn $grill-me-code-style-with-docs whwat do u recommened?",
+      "the structure of codebase does make a sense and logic but i feel like we can make it leaner and thigtehn [$grill-me-code-style-with-docs]([PATH]/grill-me-code-style-with-docs/SKILL.md) whwat do u recommened?"
+    ],
+    "confidence": "high"
+  },
+  {
+    "id": "c0254",
+    "member_norms": 2,
+    "prompt_count": 5,
+    "unique_sessions": 5,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "top_terms": [
+      "body",
+      "proper",
+      "response",
+      "repo",
+      "thorwing",
+      "style",
+      "here",
+      "docs"
+    ],
+    "examples": [
+      "Help me do a proper cleanup and $grill-me-code-style-with-docs on this repo so we are have proper following order code-style.md and clean and professional codebase. filenames conventions etc no generic result,response,data,payload,body, isRecord (ai slop functions) etc unified uses for ui or utils etc i am just thorwing here some of what i got in mind",
+      "Help me do a proper cleanup and [$grill-me-code-style-with-docs]([PATH]/grill-me-code-style-with-docs/SKILL.md) on this repo so we are have proper following order code-style.md and clean and professional codebase. filenames conventions etc no generic result,response,data,payload,body, isRecord (ai slop functions) etc unified uses for ui or utils etc i am just thorwing here some of what i got in mi"
+    ],
+    "confidence": "high"
+  },
+  {
+    "id": "c0029",
+    "member_norms": 1,
+    "prompt_count": 5,
+    "unique_sessions": 5,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "top_terms": [
+      "mentioning",
+      "two",
+      "styles",
+      "how",
+      "really",
+      "widget",
+      "folders",
+      "maybe"
+    ],
+    "examples": [
+      "I need your help with doing a huge deslop on the entire cord base, changing its structure and making the entire project more logical on how it's currently structured. This means, I believe, maybe doing a new gridme, including code styles, structure, files, folders, what technology we are going to use, et cetera, et cetera, like building this entire project from start. This includes static assets i"
+    ],
+    "confidence": "medium"
+  },
+  {
+    "id": "c0047",
+    "member_norms": 1,
+    "prompt_count": 5,
+    "unique_sessions": 5,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "top_terms": [
+      "body",
+      "response",
+      "correctly",
+      "data",
+      "names",
+      "slop",
+      "structure",
+      "better"
+    ],
+    "examples": [
+      "do you think we can have better codebase structure,file names ,and cli for this to make it 0 ai slop and 100% desloped correctly? like better naming for variables and forbidden Files that are naming like payload or response body or data"
+    ],
+    "confidence": "medium"
+  },
+  {
+    "id": "c0049",
+    "member_norms": 1,
+    "prompt_count": 5,
+    "unique_sessions": 5,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "top_terms": [
+      "structure",
+      "tree",
+      "prposed",
+      "files",
+      "folder",
+      "show",
+      "one"
+    ],
+    "examples": [
+      "and what about structure of files/folder tree show the prposed one"
+    ],
+    "confidence": "medium"
+  },
+  {
+    "id": "c0142",
+    "member_norms": 1,
+    "prompt_count": 5,
+    "unique_sessions": 5,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "top_terms": [
+      "fully",
+      "next",
+      "repo",
+      "widget",
+      "practices",
+      "best"
+    ],
+    "examples": [
+      "i would say repo with just widget and fully next.js. best practices"
+    ],
+    "confidence": "medium"
+  },
+  {
+    "id": "c0143",
+    "member_norms": 1,
+    "prompt_count": 5,
+    "unique_sessions": 5,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "top_terms": [
+      "next",
+      "practices",
+      "best"
+    ],
+    "examples": [
+      "i would say next.js best practices."
+    ],
+    "confidence": "medium"
+  },
+  {
+    "id": "c0038",
+    "member_norms": 2,
+    "prompt_count": 4,
+    "unique_sessions": 4,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "top_terms": [
+      "see",
+      "unsued",
+      "repo",
+      "logical",
+      "explain",
+      "looks",
+      "removed",
+      "itself"
+    ],
+    "examples": [
+      "Explain to me about this repo what it does what deps you see unsued can be removed what is in a middle of merges or stale and if the current structure looks logical to the purpose of\n  this repo structure itself",
+      "Explain to me about this repo what it does what deps you see unsued can be removed what is in a middle of merges or stale and if the current structure looks logical to the purpose of\n  this repo structure itself if its in the same structure that the apple api docs expect so we give the most expierenced and good develoepr expierence"
+    ],
+    "confidence": "medium"
+  },
+  {
+    "id": "c0216",
+    "member_norms": 2,
+    "prompt_count": 4,
+    "unique_sessions": 4,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "top_terms": [
+      "resume",
+      "view",
+      "sessions",
+      "recent",
+      "proceed",
+      "paused",
+      "session",
+      "run"
+    ],
+    "examples": [
+      "I would like you to proceed from where devin paused. Resume this session with `devin -r maple-dogwood`, or run `devin -r` to view recent sessions",
+      "I would like you to proceed from where devin paused Resume this session with `devin -r traveling-harrier`, or run `devin -r` to view recent sessions"
+    ],
+    "confidence": "medium"
+  },
+  {
+    "id": "c0274",
+    "member_norms": 2,
+    "prompt_count": 4,
+    "unique_sessions": 4,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "top_terms": [
+      "questions",
+      "one",
+      "ask",
+      "remaining",
+      "shot",
+      "planpage"
+    ],
+    "examples": [
+      "ask all remaining questions in planpage so i can one shot",
+      "› ask all remaining questions in planpage so i can one shot"
+    ],
+    "confidence": "medium"
+  },
+  {
+    "id": "c0280",
+    "member_norms": 2,
+    "prompt_count": 4,
+    "unique_sessions": 4,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "top_terms": [
+      "approve",
+      "recommendtation"
+    ],
+    "examples": [
+      "approve all recommendtation",
+      "› approve all recommendtation"
+    ],
+    "confidence": "medium"
+  },
+  {
+    "id": "c0206",
+    "member_norms": 1,
+    "prompt_count": 4,
+    "unique_sessions": 4,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "top_terms": [
+      "interrupted",
+      "proceed"
+    ],
+    "examples": [
+      "proceed from where interrupted"
+    ],
+    "confidence": "medium"
+  },
+  {
+    "id": "c0340",
+    "member_norms": 1,
+    "prompt_count": 4,
+    "unique_sessions": 4,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "top_terms": [
+      "plain",
+      "build",
+      "skill",
+      "module",
+      "skip",
+      "plainly",
+      "repo",
+      "cite"
+    ],
+    "examples": [
+      "<skill>\n<name>grill-me-code-style-coach</name>\n<path>[PATH]/SKILL.md</path>\n---\nname: grill-me-code-style-coach\ndescription: >\n  Coach the user WHILE building or fixing code in a repo that has a code-style.rules.json — at\n  each real style/structure decision, explain the concept concisely (KISS) in terms they already\n  know, show two concrete variants, make them confirm the direction before writin"
+    ],
+    "confidence": "medium"
+  },
+  {
+    "id": "c0382",
+    "member_norms": 3,
+    "prompt_count": 3,
+    "unique_sessions": 3,
+    "agents": [
+      "grok"
+    ],
+    "workspaces": [
+      "/Users/yosefhayimsabag/Desktop/Code"
+    ],
+    "top_terms": [
+      "only",
+      "reply",
+      "effort",
+      "low",
+      "high",
+      "medium"
+    ],
+    "examples": [
+      "Reply with only: effort-low",
+      "Reply with only: effort-high",
+      "Reply with only: effort-medium"
+    ],
+    "confidence": "medium"
+  },
+  {
+    "id": "c0418",
+    "member_norms": 1,
+    "prompt_count": 3,
+    "unique_sessions": 3,
+    "agents": [
+      "grok"
+    ],
+    "workspaces": [
+      "/Users/yosefhayimsabag/Desktop/Code/ebay-mcp",
+      "/Users/yosefhayimsabag/Desktop/Code/launch-store",
+      "/Users/yosefhayimsabag/Desktop/Code/vybekiit"
+    ],
+    "top_terms": [
+      "main",
+      "test",
+      "approval",
+      "already",
+      "rewrite",
+      "gate",
+      "another",
+      "branch"
+    ],
+    "examples": [
+      "why not history rewrite from duplication of main in another branch that will be the test of this? main already will have all.  approval gate is approved"
+    ],
+    "confidence": "medium"
+  },
+  {
+    "id": "c0085",
+    "member_norms": 2,
+    "prompt_count": 4,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "top_terms": [
+      "oly",
+      "motion",
+      "tracking",
+      "experience",
+      "nice",
+      "other",
+      "thing",
+      "worked"
+    ],
+    "examples": [
+      "ok nice it worked now for other thing need here multiple fixes and adjustments OLY Motion Tracking Experience (1).docx",
+      "ok nice it worked now for other thing need here multiple fixes and adjustments OLY Motion\n  Tracking Experience (1).docx read this file from Downloads folder share with me what need to be fixed properly. u got the silhotte too human-silhouette-transparent.png"
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0328",
+    "member_norms": 2,
+    "prompt_count": 4,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "top_terms": [
+      "time",
+      "skill",
+      "mapped",
+      "context",
+      "practices",
+      "regroup",
+      "caption",
+      "best"
+    ],
+    "examples": [
+      "ok nice now regroup on how ot genreated into the scraped-yt so if we run agent to create skill it also create skill in the scraped-yt/agents/<agent-name>/the caption file plus the skill.md created and a json of getting the output tokens,input tokens, tools calls, reosurces used, time took, model used , context window etc. this needs to be mapped to the official resource of each so i want u to do  ",
+      "ok nice now regroup on how ot genreated into the scraped-yt so if we run agent to create skill it also create skill in the scraped-yt/agents/<agent-name>/the caption file plus the skill.md created and a json of getting the output tokens,input tokens, tools calls, reosurces used, time took, model used , context window etc. this needs to be mapped to the official resource of each so i want u to do  "
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0022",
+    "member_norms": 2,
+    "prompt_count": 3,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "top_terms": [
+      "color",
+      "add",
+      "wont",
+      "reading",
+      "lost",
+      "tui",
+      "image",
+      "word"
+    ],
+    "examples": [
+      "do it all and [Image #1] add it and also if u can a bg bg color that fit each word that the model is reading but in the tui so i can follow it while it read and i wont get lost",
+      "<image name=[Image #1] path=\"/var/folders/1b/0zhz4fn11w5gpjqczstysy5m0000gn/T/TemporaryItems/NSIRD_screencaptureui_edn0P8/Screenshot 2026-07-31 at 1.47.41.png\">\n</image>\ndo it all and [Image #1] add it and also if u can a bg bg color that fit each word that the model is reading but in the tui so i can follow it while it read and i wont get lost"
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0055",
+    "member_norms": 2,
+    "prompt_count": 3,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "top_terms": [
+      "admin",
+      "between",
+      "mypr",
+      "new",
+      "every",
+      "two",
+      "works",
+      "show"
+    ],
+    "examples": [
+      "two tasks 1. we got in mypr [Image #1] [URL]  a notifications settings can u confirm if we actually verify it works e2e production readY?\n\n2. admin has jump messages when they show up in app for regular user and admin can config them when and how we got 60 something of these can u confirm if that is propely e2e tested too verified worked ? between demo user to admin demo changes modificatiosn to v",
+      "<image name=[Image #1] path=\"/var/folders/1b/0zhz4fn11w5gpjqczstysy5m0000gn/T/TemporaryItems/NSIRD_screencaptureui_jvKR3N/Screenshot 2026-08-02 at 3.43.26.png\">\n</image>\ntwo tasks 1. we got in mypr [Image #1] [URL]  a notifications settings can u confirm if we actually verify it works e2e production readY?\n\n2. admin has jump messages when they show up in app for regular user and admin can config t"
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0108",
+    "member_norms": 2,
+    "prompt_count": 3,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "top_terms": [
+      "request",
+      "home",
+      "proper",
+      "works",
+      "init",
+      "api",
+      "web",
+      "redirect"
+    ],
+    "examples": [
+      "u checked it works proper and init? get the web api request it need to works cause i run and got casue on the web it still redirect to [Image #1] and not to the home still.",
+      "<image name=[Image #1] path=\"/var/folders/1b/0zhz4fn11w5gpjqczstysy5m0000gn/T/TemporaryItems/NSIRD_screencaptureui_HTChvx/Screenshot 2026-08-02 at 19.09.16.png\">\n</image>\nu checked it works proper and init? get the web api request it need to works cause i run and got casue on the web it still redirect to [Image #1] and not to the home still."
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0116",
+    "member_norms": 2,
+    "prompt_count": 3,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "top_terms": [
+      "seeing",
+      "silhoutte",
+      "pose",
+      "accracu",
+      "start",
+      "fix",
+      "web",
+      "static"
+    ],
+    "examples": [
+      "[Image #1] i am not seeing the silhoutte at start of pose and not the gif or static se and accracu y need fix in the web view",
+      "<image name=[Image #1] path=\"/var/folders/1b/0zhz4fn11w5gpjqczstysy5m0000gn/T/TemporaryItems/NSIRD_screencaptureui_nYztfB/Screenshot 2026-08-02 at 19.28.58.png\">\n</image>\n[Image #1] i am not seeing the silhoutte at start of pose and not the gif or static se and accracu y need fix in the web view"
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0126",
+    "member_norms": 2,
+    "prompt_count": 3,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "top_terms": [
+      "looks",
+      "visible",
+      "check",
+      "plus",
+      "web",
+      "teh",
+      "skeleton",
+      "cause"
+    ],
+    "examples": [
+      "check logs now cause looks like skeleton still not launch or visible in teh web ui plus [Image #1]",
+      "<image name=[Image #1] path=\"[PATH]/Desktop/Screenshot 2026-08-02 at 20.03.49.png\">\n</image>\ncheck logs now cause looks like skeleton still not launch or visible in teh web ui plus [Image #1]"
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0151",
+    "member_norms": 2,
+    "prompt_count": 3,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "top_terms": [
+      "render",
+      "pose",
+      "see",
+      "suppost",
+      "nice",
+      "web",
+      "too",
+      "gif"
+    ],
+    "examples": [
+      "[Image #1] ok nice but i do not see the gif pose in web why ? its suppost to be render too.",
+      "<image name=[Image #1] path=\"/var/folders/1b/0zhz4fn11w5gpjqczstysy5m0000gn/T/TemporaryItems/NSIRD_screencaptureui_rOA0Y2/Screenshot 2026-08-03 at 1.21.43.png\">\n</image>\n[Image #1] ok nice but i do not see the gif pose in web why ? its suppost to be render too."
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0162",
+    "member_norms": 2,
+    "prompt_count": 3,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "top_terms": [
+      "see",
+      "proper",
+      "right",
+      "chips",
+      "detector",
+      "green",
+      "image",
+      "properly"
+    ],
+    "examples": [
+      "[Image #1]   what do u see in the image? this need fix e.g. the pink detector need proper position right now it hiding the chips and the angles not properly lock when i am in the green join position.",
+      "<image name=[Image #1] path=\"/var/folders/1b/0zhz4fn11w5gpjqczstysy5m0000gn/T/clipboard-2026-08-03-013157-29C12862.png\">\n</image>\n[Image #1]   what do u see in the image? this need fix e.g. the pink detector need proper position right now it hiding the chips and the angles not properly lock when i am in the green join position."
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0168",
+    "member_norms": 2,
+    "prompt_count": 3,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "top_terms": [
+      "oly",
+      "violate",
+      "nice",
+      "docx",
+      "find",
+      "something",
+      "file",
+      "downloads"
+    ],
+    "examples": [
+      "[Image #1] ok nice but do u find from image something that violate the docx file from Downloads of oly ?",
+      "<image name=[Image #1] path=\"/var/folders/1b/0zhz4fn11w5gpjqczstysy5m0000gn/T/TemporaryItems/NSIRD_screencaptureui_odsR6p/Screenshot 2026-08-03 at 1.47.32.png\">\n</image>\n[Image #1] ok nice but do u find from image something that violate the docx file from Downloads of oly ?"
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0072",
+    "member_norms": 2,
+    "prompt_count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "top_terms": [
+      "redploy",
+      "commits",
+      "push",
+      "ship",
+      "organized",
+      "job",
+      "great",
+      "now"
+    ],
+    "examples": [
+      "great job now do [$organized-commits]([PATH]/organized-commits/SKILL.md) then push and ship (redploy)",
+      "great job now do $organized-commits then push and ship (redploy)"
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0219",
+    "member_norms": 2,
+    "prompt_count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "top_terms": [
+      "declartions",
+      "report",
+      "refresh",
+      "example",
+      "schema",
+      "undercase",
+      "untrusted",
+      "imports"
+    ],
+    "examples": [
+      "1.converts scripts folder to fully ts scripts plus \n2. tons of imports with as in the import that is forbidden remove. and fix e.g. clean imports \n3.[PATH]/report/assetsBrand.ts can be in the file its used delete files that are being used in just one single file they can be used in it and screaming undercase e.g. THIS_IS_EXAMPLE of hardcoded constants should be position after imports and after typ",
+      "1.converts scripts folder to fully ts scripts plus \n2. tons of imports with as in the import that is forbidden remove. and fix e.g. clean imports \n3.[PATH]/report/assetsBrand.ts can be in the file its used delete files that are being used in just one single file they can be used in it and screaming undercase e.g. THIS_IS_EXAMPLE of hardcoded constants should be position after imports and after typ"
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0221",
+    "member_norms": 2,
+    "prompt_count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "top_terms": [
+      "redploy",
+      "see",
+      "everything",
+      "exist",
+      "after",
+      "init",
+      "said",
+      "folders"
+    ],
+    "examples": [
+      "after finish all what i said please [$organized-commits]([PATH]/organized-commits/SKILL.md) launch local, delete stale files or folders exist e.g. root ignored files or folders so i see everything before we redploy and sync. also did u backup d1 to drop and re init it properly?",
+      "after finish all what i said please $organized-commits launch local, delete stale files or folders exist e.g. root ignored files or folders so i see everything before we redploy and sync. also did u backup d1 to drop and re init it properly?"
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0368",
+    "member_norms": 2,
+    "prompt_count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "top_terms": [
+      "brings",
+      "training",
+      "detailed",
+      "nice",
+      "microsystems",
+      "items",
+      "mathematics",
+      "architects"
+    ],
+    "examples": [
+      "System Prompt:\nYou are a senior TypeScript engineer.\nRead the provided transcript and produce a reusable, minimal skill-style implementation.\nReturn only source-ready files with clear function boundaries, typed inputs, and no speculative code.\nUse a small clean structure with one file per concern and include setup notes where needed.\n\nVideo: 7EmboKQH8lM\n\nLanguage: en\n\nTranscript:\nfor such an ambit",
+      "System Prompt:\nYou are a skill author for OpenAI Codex CLI.\n\nYour ONLY job: convert the transcript into one or more production-quality agent skills in official SKILL.md format.\n\n## Sources of truth (in order)\n1. Official docs (follow first): [URL]\n2. Open standard: [URL]\n3. Local fallback reference in this repo: docs/skill-authoring.md\nIf (1) is missing, follow (2) + (3) exactly. Do not invent a p"
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0494",
+    "member_norms": 2,
+    "prompt_count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "grok"
+    ],
+    "workspaces": [
+      "/Users/yosefhayimsabag/Desktop/Code/MYPR-App"
+    ],
+    "top_terms": [
+      "mypr",
+      "duplicate",
+      "deslop",
+      "commit",
+      "parallel",
+      "api",
+      "audit",
+      "app"
+    ],
+    "examples": [
+      "MYPR: [PATH]/Code/MYPR-App\n\nAudit+deslop client/src/features/{discovery,match,tracking,workspace} for duplicate API types vs @/api and @mypr/shared.\nImport SSOT; delete parallel DTOs. No commit. Return per-folder findings.",
+      "MYPR: [PATH]/Code/MYPR-App\n\nAudit+deslop client/src/features/chat AND client/src/features/chats for duplicate API types vs @/api chatModels/chatContracts and @mypr/shared.\nRemove parallel message/thread/attachment types; import SSOT.\nNo commit. Return files changed."
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0501",
+    "member_norms": 2,
+    "prompt_count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "grok"
+    ],
+    "workspaces": [
+      "/Users/yosefhayimsabag/Desktop/Code/MYPR-App"
+    ],
+    "top_terms": [
+      "features",
+      "barrel",
+      "mypr",
+      "push",
+      "after",
+      "commit",
+      "api",
+      "audit"
+    ],
+    "examples": [
+      "In MYPR-App at [PATH]/Code/MYPR-App:\n\nAudit/fix client/src/features/landing/**, membership/**, settings/**, discovery/**, journalist/** after `@/api` barrel deletion.\n\nNo barrel imports, no MediaCoverageItem/SupportContentItem aliases.\n\nDo not commit/push.",
+      "In MYPR-App at [PATH]/Code/MYPR-App:\n\nAudit/fix client/src/features/pitch/**, match/**, send/**, tracking/**, workspace/** after `@/api` barrel deletion. Concrete SSOT paths only.\n\nDo not commit/push."
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0000",
+    "member_norms": 1,
+    "prompt_count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "top_terms": [
+      "main",
+      "syscall",
+      "exists",
+      "debug",
+      "repo",
+      "mbp",
+      "complete",
+      "says"
+    ],
+    "examples": [
+      "Ive run pnpm i in the repo but it says yosefhayimsabag@yosefs-mbp dufflebag % pnpm i\nAlready up to date\nDone in 12ms using pnpm v11.18.0\nyosefhayimsabag@yosefs-mbp dufflebag % but then when i do yosefhayimsabag@yosefs-mbp dufflebag % pnpm i\nAlready up to date\nDone in 12ms using pnpm v11.18.0\nyosefhayimsabag@yosefs-mbp dufflebag % pnpm run dev\nAlready up to date\nDone in 14ms using pnpm v11.18.0\n$ p"
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0002",
+    "member_norms": 1,
+    "prompt_count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "top_terms": [
+      "work",
+      "installed",
+      "ive",
+      "dufflebag",
+      "check",
+      "correctly",
+      "ship",
+      "double"
+    ],
+    "examples": [
+      "ok now ive installed the dufflebag and we ship it with tts and stt but not work can u double check i installed it correctly ?"
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0003",
+    "member_norms": 1,
+    "prompt_count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "top_terms": [
+      "cmux",
+      "voice",
+      "animation",
+      "control",
+      "show",
+      "maybe",
+      "stt",
+      "hold"
+    ],
+    "examples": [
+      "ok so i hold the control and i am in cmux maybe that why but it didnt show the animation and the voice and stt me"
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0004",
+    "member_norms": 1,
+    "prompt_count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "top_terms": [
+      "workspace",
+      "fix",
+      "ignore",
+      "bug"
+    ],
+    "examples": [
+      "fix the ignore workspace bug"
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0005",
+    "member_norms": 1,
+    "prompt_count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "top_terms": [
+      "pnpm",
+      "teh",
+      "stale",
+      "ellete",
+      "latest"
+    ],
+    "examples": [
+      "no stale ellete teh 10.33.2 and use the latest pnpm."
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0006",
+    "member_norms": 1,
+    "prompt_count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "top_terms": [
+      "holding",
+      "nice",
+      "now",
+      "still",
+      "control",
+      "well",
+      "stt"
+    ],
+    "examples": [
+      "ok nice now  well holding control still not stt me..."
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0007",
+    "member_norms": 1,
+    "prompt_count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "top_terms": [
+      "see",
+      "starting",
+      "hello",
+      "microphone",
+      "very",
+      "llm",
+      "looks",
+      "working"
+    ],
+    "examples": [
+      "Hello. Hello, so looks like this is working. I need your help with another bug that currently is being I'm applied, I do not see the voice UI appears starting microphone... and I am not sure if the llm modal were using is enough good for this tts for the current machine what small very popular but very good on stt we can implement and use?"
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0010",
+    "member_norms": 1,
+    "prompt_count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "top_terms": [
+      "genshot",
+      "org",
+      "dev",
+      "two",
+      "duplicate",
+      "vybekiit"
+    ],
+    "examples": [
+      "please also duplicate our two org e.g. vybekiit and genshot.dev"
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0011",
+    "member_norms": 1,
+    "prompt_count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "top_terms": [
+      "main",
+      "genshot",
+      "repo",
+      "org",
+      "two",
+      "duplicate",
+      "vybekiit"
+    ],
+    "examples": [
+      "please also duplicate our two org e.g. vybekiit main repo and the genshot repo from the org"
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0012",
+    "member_norms": 1,
+    "prompt_count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "top_terms": [
+      "keeps",
+      "works",
+      "item",
+      "hold",
+      "looking",
+      "nice",
+      "regarding",
+      "tts"
+    ],
+    "examples": [
+      "it works nice but why for the tts it keeps say item? and regarding the stt it still misses some text and when i hold the control the ui animation is looking like hot reloading tons of times need fix there"
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0013",
+    "member_norms": 1,
+    "prompt_count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "top_terms": [
+      "dynamic",
+      "current",
+      "context",
+      "statusline",
+      "model",
+      "limit",
+      "weekly",
+      "show"
+    ],
+    "examples": [
+      "/statusline show context dynamic current model context and weekly limit as Context <n>% (<n>K) | Weekly <n>% (<n>K)"
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0014",
+    "member_norms": 1,
+    "prompt_count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "top_terms": [
+      "except",
+      "each",
+      "pnpm",
+      "nice",
+      "repo",
+      "ones",
+      "now",
+      "folder"
+    ],
+    "examples": [
+      "ok nice now can u install via pnpm for each repo we got in the code folder except the ones who use npm."
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0015",
+    "member_norms": 1,
+    "prompt_count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "top_terms": [
+      "thats",
+      "keep",
+      "said",
+      "how",
+      "small",
+      "leader",
+      "things",
+      "stt"
+    ],
+    "examples": [
+      "I said hell how r u but it stt 'Hello, our leader.' thats annoying and this small things keep happein.g"
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0016",
+    "member_norms": 1,
+    "prompt_count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "top_terms": [
+      "delete",
+      "rustup",
+      "completely",
+      "repo",
+      "template",
+      "official",
+      "install",
+      "vybekiit"
+    ],
+    "examples": [
+      "so for Template repo you can delete it completely and for vybekiit install official rustup please"
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0018",
+    "member_norms": 1,
+    "prompt_count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "top_terms": [
+      "response",
+      "repo",
+      "practices",
+      "best",
+      "thinking",
+      "incossistent",
+      "window",
+      "how"
+    ],
+    "examples": [
+      "I would like to consult with you Regarding the current code base of Dufferberg and how its structure Additionally how the code base is following the code style.md And whether we are following the best practices for this kind of repo hat do you find incossistent and few bugs i find but i am not sure we can call it bugs So one, when I'm working in multiple terminals using Cmux, The automatic respons"
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0019",
+    "member_norms": 1,
+    "prompt_count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "top_terms": [
+      "context",
+      "weekly",
+      "used",
+      "statusline",
+      "another",
+      "iti",
+      "current",
+      "edit"
+    ],
+    "examples": [
+      "/statusline edit the current one we got with another thing and iti s the current folder we are and the current model is being used. not just context and weekly"
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0020",
+    "member_norms": 1,
+    "prompt_count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "top_terms": [
+      "level",
+      "right",
+      "model",
+      "well",
+      "show",
+      "after",
+      "reasoning"
+    ],
+    "examples": [
+      "show as well the reasoning level right after the model"
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0021",
+    "member_norms": 1,
+    "prompt_count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "top_terms": [
+      "time",
+      "setup",
+      "proper",
+      "statuslines",
+      "under",
+      "new",
+      "add",
+      "dufflebag"
+    ],
+    "examples": [
+      "add in the dufflebag this so we can setup it next time if i need to easily exactly as it is now under a new proper folder but in proper position name statuslines/codex"
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0024",
+    "member_norms": 1,
+    "prompt_count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "top_terms": [
+      "repo",
+      "every",
+      "everything",
+      "how",
+      "remote",
+      "once",
+      "done",
+      "pull"
+    ],
+    "examples": [
+      "Can you please pull every repo remote branches and pull it locally like sync everything we got from remote gh so were sync share with me how many got added to each repo once done."
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0026",
+    "member_norms": 1,
+    "prompt_count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "top_terms": [
+      "response",
+      "reads",
+      "words",
+      "every",
+      "bad",
+      "appear",
+      "blue",
+      "remove"
+    ],
+    "examples": [
+      "ok can u remove please the following words while it reads response? e.g. bg blue and text white for every word there are some noise bg appear and that sounds bad just remove it."
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0027",
+    "member_norms": 1,
+    "prompt_count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "top_terms": [
+      "check",
+      "nice",
+      "appear",
+      "voice",
+      "sounds",
+      "crunches",
+      "dorecord",
+      "hear"
+    ],
+    "examples": [
+      "ok nice but dorecord voice that let it stt and hear it check the sounds cause there are some crunches appear."
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0030",
+    "member_norms": 1,
+    "prompt_count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "top_terms": [
+      "own",
+      "crawl",
+      "crm",
+      "projects",
+      "email",
+      "scan",
+      "cold",
+      "outreach"
+    ],
+    "examples": [
+      "I think the product should be without the automatic scan and outreach and we will have our own cold outreach email unified crm system that can easily crawl scrape and get emails for different projects we got so we can apply it for each of our saas more unified."
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0031",
+    "member_norms": 1,
+    "prompt_count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "top_terms": [
+      "public",
+      "structure",
+      "recommendation",
+      "better",
+      "agree",
+      "keep",
+      "scan"
+    ],
+    "examples": [
+      "i agree with ur recommendation keep public scan but i do want to have better structure for this."
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0032",
+    "member_norms": 1,
+    "prompt_count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "top_terms": [
+      "understand",
+      "under",
+      "next",
+      "open",
+      "too",
+      "why"
+    ],
+    "examples": [
+      "i would like to understand why use cf and open next under this too"
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0033",
+    "member_norms": 1,
+    "prompt_count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "top_terms": [
+      "her",
+      "yes",
+      "remains"
+    ],
+    "examples": [
+      "just remains her d1 yes."
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0034",
+    "member_norms": 1,
+    "prompt_count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "top_terms": [
+      "follow",
+      "change",
+      "effect",
+      "lets",
+      "practices",
+      "best",
+      "lean"
+    ],
+    "examples": [
+      "so lets change it to follow the best practices of effect. and make it lean"
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0035",
+    "member_norms": 1,
+    "prompt_count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "top_terms": [
+      "yosefhayim",
+      "every",
+      "deslop",
+      "done",
+      "first",
+      "list",
+      "current",
+      "checkbox"
+    ],
+    "examples": [
+      "write in the current folder root TODO.md to deslop every folder mark YosefHayim as done with checkbox and numbered list from first to last"
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0036",
+    "member_norms": 1,
+    "prompt_count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "top_terms": [
+      "delete",
+      "remote",
+      "sow",
+      "remove",
+      "template",
+      "merge"
+    ],
+    "examples": [
+      "you can remove sow-template i delete it from the remote and _merge-all-2026-07-31"
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0037",
+    "member_norms": 1,
+    "prompt_count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "top_terms": [
+      "thats",
+      "delete",
+      "learning",
+      "unity",
+      "mobile",
+      "rename",
+      "apps",
+      "shopify"
+    ],
+    "examples": [
+      "rename chatly to replybase thats the product. u can delete learning unity and mobile-apps-monorepoe. same as shabbat guard and shopify apps"
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0040",
+    "member_norms": 1,
+    "prompt_count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "top_terms": [
+      "fix",
+      "find",
+      "conflicts"
+    ],
+    "examples": [
+      "find all conflicts and fix"
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0042",
+    "member_norms": 1,
+    "prompt_count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "top_terms": [
+      "remote",
+      "proper",
+      "check",
+      "confirm",
+      "issues",
+      "exist",
+      "handled"
+    ],
+    "examples": [
+      "did we handled proper issues exist on gh remote ? please check and confirm"
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0043",
+    "member_norms": 1,
+    "prompt_count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "top_terms": [
+      "before",
+      "push",
+      "fix",
+      "git",
+      "commit"
+    ],
+    "examples": [
+      "fix please before we git commit push"
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0045",
+    "member_norms": 1,
+    "prompt_count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "top_terms": [
+      "granted",
+      "check",
+      "cleaner",
+      "fix",
+      "how",
+      "remove",
+      "authorization",
+      "wrangler"
+    ],
+    "examples": [
+      "we got proxy on the cf why is that? and how can we remove it I Authorization granted to Wrangler can u check that and fix it so we wont need that proxy to make it cleaner"
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0046",
+    "member_norms": 1,
+    "prompt_count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "top_terms": [
+      "give",
+      "other",
+      "url",
+      "create",
+      "one",
+      "image",
+      "here"
+    ],
+    "examples": [
+      "[Image #1] this one here or in other url can u give me it so i create for u"
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0048",
+    "member_norms": 1,
+    "prompt_count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "top_terms": [
+      "project",
+      "mypr",
+      "workspace",
+      "proejct",
+      "supported",
+      "mbp",
+      "yaml",
+      "pnpm"
+    ],
+    "examples": [
+      "why i cant launch proejct yosefhayimsabag@yosefs-mbp MYPR-App % pnpm run dev\n[WARN] The \"workspaces\" field in package.json is not supported by pnpm. Create a \"pnpm-workspace.yaml\" file instead.\n[ERROR] This project is configured to use npm\nFor help, run: pnpm help run\n\nyosefhayimsabag@yosefs-mbp MYPR-App %"
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0050",
+    "member_norms": 1,
+    "prompt_count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "top_terms": [
+      "others",
+      "module",
+      "tsconfig",
+      "argument",
+      "starting",
+      "updatedat",
+      "compile",
+      "replyexplanation"
+    ],
+    "examples": [
+      "fix yosefhayimsabag@yosefs-mbp MYPR-App % npm run dev\nnpm notice run dev\nnpm notice run concurrently --kill-others --names client,api \"npm:dev:client\" \"npm:dev:api\"\n[api] npm notice run dev:api\n[api] npm notice run npm run dev --workspace=@mypr/server\n[client] npm notice run dev:client\n[client] npm notice run npm run dev --workspace=@mypr/client\n[api] npm notice run @mypr/server@0.1.0 dev\n[client]"
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0054",
+    "member_norms": 1,
+    "prompt_count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "top_terms": [
+      "sceneview",
+      "build",
+      "argument",
+      "entry",
+      "repeatedly",
+      "assign",
+      "wrappedscreencomponent",
+      "layouts"
+    ],
+    "examples": [
+      "fix Maximum update depth exceeded. This can happen when a component repeatedly calls setState inside componentWillUpdate or componentDidUpdate. React limits the number of nested updates to prevent infinite loops.\n\nComponent Stack\n  at <anonymous> (client/node_modules/expo-router/build/layouts/withLayoutContext.js:128:133)\n  at Object.assign$argument_0 (client/node_modules/expo-router/build/layouts"
+    ],
+    "confidence": "low"
+  }
+]

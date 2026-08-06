@@ -1,0 +1,1341 @@
+[
+  {
+    "norm": "i would like you to preform with me $grill-me-code- style-with-docs from the begining so we can do a full deslop on this entire repo. to change her structure libraires deps etc so it looks cleanly. clean code, obivous structure that make sense and no use of generic and not helping variables like result,payload,body,data,raw etc etc",
+    "count": 20,
+    "unique_sessions": 20,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "examples": [
+      "I would like you to preform with me $grill-me-code-\n  style-with-docs from the begining so we can do a full\n  deslop on this entire repo. to change her structure\n  libraires deps etc so it looks cleanly. clean code,\n  obivous structure that make sense and no use of generic\n  and not helping variables like\n  result,payload,body,data,raw etc etc",
+      "I would like you to preform with me $grill-me-code-\n    style-with-docs from the begining so we can do a full\n    deslop on this entire repo. to change her structure\n    libraires deps etc so it looks cleanly. clean code,\n    obivous structure that make sense and no use of\n  generic\n    and not helping variables like\n    result,payload,body,data,raw etc etc",
+      "I would like you to preform with me $grill-me-code-\n    style-with-docs from the begining so we can do a full\n    deslop on this entire repo. to change her structure\n    libraires deps etc so it looks cleanly. clean code,\n    obivous structure that make sense and no use of\n  generic\n    and not helping variables like\n    result,payload,body,data,raw etc etc"
+    ]
+  },
+  {
+    "norm": "<skill> <name>grill-me-code-style-with-docs</name> <path>[path]/skill.md</path> --- name: grill-me-code-style-with-docs description: grill the user on how an existing codebase is built — code style, structure docs, and cli — using the real code as evidence, then render an html plan and, on approval, write/update code-style.md + a formatter config and refresh the agents.md digest. ensures project.md/context.md/language.md exist (create if missing, validate if present), fans out sub-agents for the most-repeated patterns (including a mandatory ceremony/tool-slop kill list: house typegen, tool wrappers, scripts layout), grills real code idioms + formatting with before/after, audits deps, and references official framework skills. use when defining/updating style, structure, or cli conventions for a repo with meaningful code. for a brand-new or empty project, use grill-me-code-style instead. --- <what-to-do> interview me relentlessly about **how this codebase is built** — its code style, its structure docs, and its cli — until we reach a shared understanding. walk down each branch of the decision tree, resolving dependencies one-by-one. for each question, provide your recommended answer. ask the questions one at a time, waiting for feedback on each before continuing. my **taste is the source of truth**; the existing code is **evidence, not gospel** — much of it may be the slop i want gone. when code and my stated taste conflict, my taste wins and `code-style.md` records the desired end-state, not the current one. **nothing is written to disk until i approve.** you scan and grill (steps 1–4) — the code-style grill is a **pick-the-code gallery**: you show me real code variants and i pick what i like, dimension by dimension (step 3) — then compose the **golden path for adding a unit + its slop guard** from those picks and the evidence (step 6). you render an **interactive html plan** as the review gate (step 7, built with the **planpage** kit — i approve, adjust, or flip any decision right in the browser and it posts back), write the files on approval (step 8), then run one **structure-review capstone** (step 9) that can reorganize the tree and open a pr. </what-to-do> <supporting-info> ## step 1 — detect language and runtime, then ensure the structure docs ### auto-detect language and runtime before scanning, auto-detect from the codebase: - **language** — from file extensions, package manifest (`package.json` → ts/js, `cargo.toml` → rust, `go.mod` → go, `pyproject.toml`/`setup.py` → python, etc.), and build config (`tsconfig.json`, `.swiftpm`). report: \"detected: **{language}** via `{evidence}`\". confirm with the user. if ambiguous (e.g. a repo with both python and typescript), ask which is primary. - **runtime target** — from the manifest/config (e.g. `wrangler.toml` → edge/worker, `expo` in package.json → native app, `bin` field → cli tool, browser entry → spa). report and confirm. these gate which [style-catalog.md](../grill-me-code-style/_shared/style-catalog.md) sections apply and which [formatters.md](../grill-me-code-style/_shared/formatters.md) row to use. ### ensure the three structure docs read whatever exists first so you grill about code, not product. then **ensure the three structure docs** — gather the missing ones' content, validate the present ones against their role, and **never restructure a doc that already exists** (report drift, don't rewrite it). defer file writes to step 7 so the plan can show them. - **project.md** — purpose & direction. missing/thin → gather via `grill-with-docs`' project.md flow (its seven-part checklist in [project-format.md](../grill-me-code-style/_shared/project-format.md)). `grill-with-docs` owns project.md. - **context.md** — orientation (what it is, actors, shape — not a glossary). model on the oly-app `context.md` convention. - **language.md** — glossary / human↔agent bridge: **names only** (term → definition + aliases to avoid). validate an existing one against the code's real vocabulary; model on the oly-app `language.md` convention. record each doc's state — `create` · `validate ✓` · `drift` — for the step 6 plan. --- ## step 2 — scan the code with sub-agents fan out read-only sub-agents to survey the codebase and report the **most-repeated** patterns — dominant reality, not a file dump. see [scan.md](scan.md) for the fan-out strategy (**includes a mandatory ceremony & tool-slop angle** — tool wrappers, house typegen, scripts layout, orphan generated files). bring back a compact \"current reality\" brief + **ceremony kill list** to drive the grill. --- ## step 3 — grill the code as a pick-the-code gallery the code-style grill runs as **pick-the-code**, not prose. for each dimension i show you real code **variants in the tui** (`askuserquestion` — the code goes in each option's `preview`) and you **pick**; your pick is recorded verbatim. variant **a** is the repo's actual incumbent (pulled verbatim by the scan, `file:symbol`-cited — you react to *your* code, warts and all); variant **b** is the de-slopped rewrite; an **uncontested** dimension collapses to a single **keep/kill** rather than a fabricated choice. run the full catalog: **[style-catalog.md](../grill-me-code-style/_shared/style-catalog.md)** — all language-conditional sections filtered by the auto-detected language, all new dimensions included. key behaviors: - **each pick → a rule card.** chosen variant = the `✓` example; rejected variant = the `✗` case. every card follows the fixed five-slot anatomy in [code-style-format.md](../grill-me-code-style/_shared/code-style-format.md): heading, `[rule:<id>] · verify: <command>` metadata line, **one-sentence** assertion, ✓/✗ block, `why:` line. `verify:` names a real command, or `judgment`. - **formatting** — quotes/semis/width/trailing-commas/import-order: grill my preference but land it as a **formatter config** (per [formatters.md](../grill-me-code-style/_shared/formatters.md)), recorded as an adr — not prose. reconcile with any config already in the repo. the **machine-catchable slop tells** land here too as **linter rules** — prevented, not just documented. - **ai-slop fingerprint (the tells)** — the scan's fingerprint angle brings back the recognizable ai tells **with counts**; grill each **keep or kill**. a high count is *not* a free pass — repeated slop is still slop. killed tells become the concrete `## never` list, each with its real `file:symbol` offender and an enforced-vs-taste tag. - **over-engineering (the \"too much\" fingerprint)** — run [style-catalog.md](../grill-me-code-style/_shared/style-catalog.md) **round 7**: grill each over-engineering family (needless indirection, fake robustness, control-flow contortion, shape noise, dead space, structural too-much/too-little — `ls`/tree the repo first — **and ceremony c1–c8** from the mandatory scan angle) as **keep/kill against real `file:symbol` / path offenders**. tests: *abstraction earns its place only with a second real caller or a genuine domain concept*; *tool-first — if the cli already does it, no house wrapper; generated orphans die with dead scripts*. before/after: `deslop-v2` references (`line-smells`, `structure-smells`, **`ceremony-smells`**). killed families fold into `## never`; ceremony hits become a **kill list** in the plan (path → replace with tool / delete). wire machine-catchable ones into lint; point mass cleanup at `deslop-v2` (“kill ceremony”). - **golden exemplars** — grill me to name **1–3 real files** that best embody the agreed style (\"write new code exactly like these\"). they anchor `code-style.md`'s exemplars and give `deslop` a concrete target. if nothing qualifies yet, flag it — that's a finding. - **compose the canonical example.** after the rounds, assemble every pick into one **canonical example** — a real feature slice from this repo rewritten in the agreed style — so i see the whole pattern working together, not just atomized picks. it becomes the step 6 litmus and the `## canonical example` block of `code-style.md`. --- ## step 4 — grill the cli every project earns a **cli both humans and agents drive**. if the repo already has one, hand the deep audit to the `interactive-cli-reviewer` skill and fold its findings back here; otherwise grill it fresh: - **have/need one?** default yes — a dev+ops surface. - **command surface** — verbs/nouns. - **dual-mode contract** — a bare invocation in a tty opens a menu; flags or non-tty defer and **never hang**; both routes call the **same functions** (the `dufflebag` adr [n] \"interactive front door\" pattern). record the command surface as an **adr**; the conventions become `code-style.md` rules + a recipe. --- ## steps 5–9 — dependencies, golden path, framework refs, plan, write, capstone see **[steps.md](../grill-me-code-style/_shared/steps.md)** for the shared procedures: - **step 5** → audit dependencies (flag unmaintained/unstable/duplicative, record adrs). - **step 6** → compose the **golden path + slop guard** (see [extension-pattern.md](../grill-me-code-style/_shared/extension-pattern.md)) — name the unit of extension, **mine how the last 1–3 units were really added** (the `scan.md` \"how a {unit} gets added\" angle) and grill the derived numbered path step-by-step, end with a definition-of-done checklist, and wire the guard (machine-catchable `## never` tells → the lint config that ci blocks; taste → `deslop` per-diff; ceremony → `deslop-v2` kill list). - **step 7** → reference framework practices, then render the interactive planpage plan (the review gate) — including the **golden-path + guard block** and the **ceremony kill list** (paths to delete/replace with official tools) when the scan found hits. - **step 8** → on approval, write the files (code-style.md incl. `## golden path`, formatter + lint config, structure docs, adrs, agents.md digest incl. the tight golden-path mirror). - **step 9** → structure review & reorg capstone (judge organization, propose moves, open pr on approval). - **re-running** → idempotent; surface drift and ask \"fix the code, or evolve the guide?\" </supporting-info> </skill>",
+    "count": 16,
+    "unique_sessions": 16,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "examples": [
+      "<skill>\n<name>grill-me-code-style-with-docs</name>\n<path>[PATH]/SKILL.md</path>\n---\nname: grill-me-code-style-with-docs\ndescription: Grill the user on how an EXISTING codebase is built — code style, structure docs, and CLI — using the real code as evidence, then render an HTML plan and, on approval, write/update CODE-STYLE.md + a formatter config and refresh the AGENTS.md digest. Ensures PROJECT.md/CONTEXT.md/LANGUAGE.md exist (create if missing, validate if present), fans out sub-agents for the",
+      "<skill>\n<name>grill-me-code-style-with-docs</name>\n<path>[PATH]/SKILL.md</path>\n---\nname: grill-me-code-style-with-docs\ndescription: Grill the user on how an EXISTING codebase is built — code style, structure docs, and CLI — using the real code as evidence, then render an HTML plan and, on approval, write/update CODE-STYLE.md + a formatter config and refresh the AGENTS.md digest. Ensures PROJECT.md/CONTEXT.md/LANGUAGE.md exist (create if missing, validate if present), fans out sub-agents for the",
+      "<skill>\n<name>grill-me-code-style-with-docs</name>\n<path>[PATH]/SKILL.md</path>\n---\nname: grill-me-code-style-with-docs\ndescription: Grill the user on how an EXISTING codebase is built — code style, structure docs, and CLI — using the real code as evidence, then render an HTML plan and, on approval, write/update CODE-STYLE.md + a formatter config and refresh the AGENTS.md digest. Ensures PROJECT.md/CONTEXT.md/LANGUAGE.md exist (create if missing, validate if present), fans out sub-agents for the"
+    ]
+  },
+  {
+    "norm": "system prompt: you are a skill author for grok build. your only job: convert the transcript into one or more production-quality agent skills in official skill.md format. ## sources of truth (in order) 1. official product skill docs: not published / incomplete for grok build. 2. open standard: [url] 3. local fallback reference in this repo: docs/skill-authoring.md if (1) is missing, follow (2) + (3) exactly. do not invent a proprietary skill format. ## target agent - agent: grok build (`grok`) - install path hint: ~/.grok/skills/<name>/skill.md or .grok/skills/<name>/skill.md - frontmatter: yaml frontmatter with name + description. optional metadata.short-description. - notes: match grok create-skill format exactly. name is lowercase-hyphen slug. description must include trigger phrases and /slash-command usage. ## what to produce - one skill if the transcript is a single workflow. - multiple skills if the transcript covers distinct workflows/triggers (preferred over one mega-skill). - each skill is a directory with skill.md (required). optionally mention scripts/ or references/ when needed. - every skill.md must start with yaml frontmatter between --- markers. - required frontmatter fields at minimum: - name: lowercase-hyphen slug - description: what it does and when to use it (trigger phrases, slash command) - body must include: - when to use - when not to use - step-by-step procedure the agent can follow - best practices / constraints from the transcript - concrete examples - expected inputs/outputs - failure modes / verification - keep each body concise and actionable (prefer under 500 lines). put long reference material in references/*.md notes inside the file markers if needed. - do not dump unrelated typescript app code unless the skill procedure requires a small script snippet. - do not invent facts that are not grounded in the transcript. if the transcript is incomplete, state assumptions under an assumptions section. ## output format (strict machine-readable) return only skill files using this exact multi-file envelope (repeat for each file): ===file: <relative-path>=== <file contents> ===end=== rules for paths: - use paths like: <skill-name>/skill.md - optional: <skill-name>/references/<topic>.md - optional: <skill-name>/scripts/<helper>.sh|ts|py - never wrap the whole response in a single markdown code fence outside the file markers. - no preamble, no epilogue, no tool chatter. ## quality bar - description must be specific enough for auto-invocation. - skills must be reusable on a real repo after install. - prefer principles and checklists extracted from the transcript over paraphrased motivation talk. - if the transcript teaches clean code / architecture / testing, encode those as executable agent procedures, not essays. video: iqyg-kypkaa language: en transcript: hi everyone. welcome to this video and this will be a full walkthrough of my agent engineering workflow. my name is kun. i was previously an late principal engineer, worked at meta, microsoft, and assassin on many large scale systems like the bing search engine, windows, and facebook games. in the recent couple of years, i have been building frontier coding agents at atlassian and helped many engineering teams figure out how to use them effectively. and i have been building heavily with agents myself and shipping 40 to 50 almost every day, sometimes more. and these are all well tested and shipped production. not those minecraft demos. you see people wipe code on social media. i have shaped my workflow to be both highly productive and enjoyable. many people recently asked me what it looks like, be honest, i did debate a lot with myself whether i should make this video a paid course because it does have that level of value, but ultimately i decided to just share it here with everyone because i want to stay focused on building products as my main business. you can see this is a bit of a long video, because i'm going to walk through many fundamental concepts of agent engineering that's not only show you how i do it, but also the why and how things really work under the hood. these are not gimmicks that look cool but can't actually be used for real work. these are all real workflows that professionals like myself use to get real work done. by the end of this video, i want you to feel like a captain that can sail a large ship with a crew of agents working for you, and do so in a stress free and satisfying way. largely speaking, we will be walking through these chapters. we'll start with assembling our ship, where i will introduce the core setup. we will then talk through how we recruit and ramp up our crewmates with the right usage of memory and skills. i will then demonstrate how we work with a single crewmate effectively. then we'll upgrade to working with multiple crewmates all at the same time. and lastly, we will recruit a first mate that manages a lot of the overhead for us so we can stay focused on the big picture. as a captain, the very first level is to gather our gears and build our ship. now, as we get into my workflow, something that's going to be really hard to miss is that i do almost everything in my terminal. i know there are a lot of people who will tell you that the graphical user interface is better. it allows richer interactions and better visuals, but i think by the end of this video, i might just be able to convince you that terminal is not quite that yet. i use the terminal mostly for two very real reasons. one is to allow my hands to almost never have to leave the keyboard. this is actually a much bigger deal than most people think, because when your hands stay on the keyboard, you stay in the flow. but if you have to move your hand to the mouse every couple of seconds, it breaks the flow and forces your brain to contact switch. i know there are some guy apps that also have great key points that allow you to do most things with the keyboard as well, but that's just not the primary interaction paradigm for guy apps, and it's hard to build the discipline of hands on keyboard when every once in a while you still have to use the mouse terminal apps. on the other hand, are all designed for the keyboard, so there is no reason for your hands to move anywhere else. the other very important factor that drives me to use the terminal is that i can keep the exact same workflow everywhere, even on my phone. but if you really don't like the terminal, that's okay too. i designed this video to be more about the fundamental concepts behind agent engineering rather than the mechanics. so most of the things that i talk about should be applicable to gui based workflows as well. now. since we are looking at a terminal here, let me share what it is i'm using this beautiful, clean and elegant terminal emulator you are looking at here is called western. western is a highly performance terminal emulator built by a guy named west. it's got 26 k github stars and has existed for many years. i like it mostly for two reasons. one is that it's truly cross-platform. it's pretty much the only terminal emulator i can find that can work on windows exactly the same way it works on mac and linux. right now i mostly only work on mac, but it was a big lifesaver when i was working for microsoft and was forced to use windows for work. the other reason is that it's highly customizable. you can write lua scripts to configure pretty much everything. here. let me show you my config in my dot files. it's all in this file called western dot lua. it's a lower script. so it's not just static values. you can actually set conditions and write various kind of logic to make your config very dynamic and flexible. if i change some settings here, let's say i change the color scheme to chalk. you will see that it does a hot reload instantly, which is super handy. but i still like my rose pine moon, so let's come back to it. i can't use anything else. inside of west term, i run something called tmux. it's short for terminal multiplexer. if you haven't come across this yet, it's probably easiest to just show you what this does. so i'm typing this command here to start a session. now i'm inside of t max. you can see not much is different except for that. there is a bar at the top showing some information, and i still get a shell where i can type commands, but now i can split my terminal into multiple panes, as many of them as i like. this is super useful because i can spin up an agent in one pain and spin up an editor in another, and still have a pain to myself so i can just run commands. i can also spin up multiple tabs and they are also called windows in. this is very useful for running multiple agent sessions in parallel. the other cool thing is that tmux sessions are persistent in the server. so if i use a keyboard shortcut here to detach from tmux, you can see i'm back in the normal shell without the status bar at the top. but if i type the same command to launch tmux again, i get back to the exact same state i was in so i can continue my work here. what's even more useful is that i can connect to this same session from another device, like my laptop or my phone. that's a real game changer. that's very hard to replicate without this terminal centric workflow. if you just install tmux by default, it doesn't have the same experience while showing here, like the tab bar and the metadata. you will probably need to do a bit of configuration and customize it. let me show you my team config. here it is. most of these settings are key points that i have been using for many years, and built into my muscle memory. some of these are for styling and various kind of behaviors. there are many youtube videos that go into more details about tmux configuration. so i'm not going to go down the rabbit hole here. for now. you just need to know that you are likely want to spend some time configuring your t mux for it. look good and work well for this text editor here is nuvem. it's basically the modern version of vim. it's my favorite text editor. if you are not familiar with vim yet, it's an editor whose main purpose is to keep your hands on the keyboard. so if you watch my keystrokes here, i can move the cursor up and down, left and right with keys. i can also scroll up or scroll down. if i have to make edits, i can go into insert mode and start to type anything i like. there are a ton of keyboard shortcuts for doing everything you need. for example, let's say i want to delete the current line. i can just type dd and it's gone. i can undo it by typing you. and if you look at the left hand side i have relative line numbers. this line number 238 is the current line number. and the line above shows one, which means it's one line above the current line and the lines below as well. so let's say i want to jump to the line that says set environment. that's 11 lines above the current line. so i can just type 11 k. and i'm here. so once you have enough muscle memory, you can just navigate around much more quickly than using a mouse. i also have a bunch of plugins that help me get around in as well. and i have key points for all of them. like space s allows me to search or grep for the code base, so i can just type rows and it will find all the occurrences of rows in the current code base. i can type space f to find files by their names, like if i type flake i'll get to the flake file immediately. working with them has a learning curve for sure. but once you get used to it, it just feels really, really good. whenever i'm in, i'm just flying like a bird and it's awesome okay? i have to stop here before this turns into a vim tutorial. you can find a lot of great youtube videos that will help you get started on them and become a master. maybe one last tip for me is just how to exit. here you go. all right. our ship is ready to sail, but we have no crewmates yet. where? the captain. we can't do everything by ourselves. we need to bring in agents as our crewmates. i use four different agent harnesses regularly. there is cloud, which is cloud code, which is basically the only practical choice if you are using the subscription from anthropic. generally speaking, though, it's a pretty good harness. i think it has the most sensible default experience out of the box. it's also got a pretty rich feature set. the downside is that sometimes it's a little bit buggy, and it's not as customizable as some of the other options. the next one i use a lot is codex coi. it's written in rust, and you can feel it's a little bit smoother than cloud code when you use it. it's also open source, so if you run into some problems, you can often just have codex inspect its own source code and figure out a workaround by itself. it's a bit lacking in terms of bells and whistles, and it's also not very customizable. and then there is the pi coding agent. and this whole philosophy is to be minimal and highly extensible. it's great if you don't want any bloat and you'd like to tinker around and kind of make it your own. and lastly, there is open code. i like it a lot. it's got a battery smooth t ui, and it's got good integration with pretty much every model you can find. it's also got a more complete out of the box feature set than pi. so if you want to use an agent harness that is model agnostic and one that you can just grab from the shelf and just go. open code is a pretty good choice. for the rest of this video though. i'm going to use cloud code because i know many people are already familiar with it, but i have been very strict about making my workflow agent agnostic because the landscape is changing very, very fast. who knows which model or agents will be the best performing one next month? right. so everything i show here in the video is agent agnostic and should be applicable regardless of which model or harness you use. the problem with this crewmates is that they are fresh recruits, and they have no idea how we run our ship or how we like to work. we need a proper onboarding process to ramp them up. we will do this mostly through two ways memory files and skills. there are few types of memory files, global memory files, and project level memory files. the global memory file for cloud code is at this location, and every other agent uses the other standard location here. so what i do is that i use this command which made md a symbolic link to md. so they both exist, but under the hood they point to the same file. here's the content of my actual global memory file. you can see it's pretty minimal. there is only 27 lines. because everything in this file gets loaded into the system prompt of every single agent session across all our projects. if we have too much content in this file, it will silently use a lot of our tokens. i mostly write down my personal preferences here, like never use em. somehow ai models are trained to use em by default instead of a plain dash. so now whenever i see em, i just feel like it's robotic. and i don't like that when i need the agent to write something for me. like pr descriptions. oh, and this is a good one. when making technical decisions, don't give too much weight to development cost. here is something interesting that you may not know. let me show you. if we ask a frontier model to estimate the development cost of a project, let's say i want to build a 3d first person shooting game that i can play locally with ai enemies. how long do you think that will take? let's see …[middle truncated — full text in the offloaded file]… actually they are all github projects i own. first mate is starting up and the first time we run it it will do some setup and ask for some preferences, but it's also just talking to it, which is pretty easy. you might wonder why is the transcription so good? because it's recognizing this project names. let me show you. open silver whisper actually supports this customization through a system prompt. so what we can do here is in this model menu in the transcription menu there is an initial prompt. and we can put in some common vocabulary that we use into this system prompt. this prompt is what makes the transcription really good. first mate here is asking how strict i want to be with the code changes in this repos, and i want to select full gates to pr. this is basically going to be using no mistakes as the pipeline to validate its change and first task. yeah, i'll describe it. right now. a real thing i want to do is for all three projects, i'd like to add an update command on the cli that will update their version to the latest on npm. and let's see what first mate does. it realizes that this is not one task, but three parallel tasks, and it's now spinning up these tabs in timox, just like we be the scenes. it would also call tree house to create work trees, and then run an agent in that work tree to get the work done, and then it will run. no mistakes to validate the change and get the pr ready for us to review. now you can see it's first made that it's doing the juggling. i don't need to worry about any of this now. i can just keep giving it more work. hey first mate, let's also look at the most recent three open issues in lavish axillary and let's discuss which ones are actionable. boom! first mate now is pulling the open issues from the repo while waiting for the three background agents working in parallel. all right, first mate said number 87 is cleanest. it's very actionable. and let me just see. what is this? don't toggle in annotation mode. okay. that's the clear bug. all right, first mate, let's address number 87. look, now first mate is struggling a lot of tasks for me that i otherwise would have to manage by myself. watching it context switch is actually an oddly satisfying experience, because i know that's what i would have to do otherwise. first mate is basically all my tools coming together as one cohesive workflow, and i have been really happy with it. it's been a pretty significant improvement to my overall experience working with agents. i highly recommend trying it out if you are still directly talking to every single agent session one by one, it will be a pretty massive upgrade. something you start to notice after having a first mate. is that because first mate took care of so many things for you, you start to run out of ideas for what to ask you to do. this is a good thing because it indicates the bottleneck is shifting, but it also means you, as the captain, needs to keep up. this requires a mindset shift of focusing more of your energy on understanding what matters by talking to your users, understanding the competitive landscape, and crafting a good treasure map that can lead your crew to a good direction. once you started doing that, congratulations! you have successfully transitioned from a sailor into a great captain. all right. we have gone from not having a ship to being a captain that has a first mate and a big crew that sailed together. this is a pretty good time to wrap up this video. all my tools can be found on my github and will be linked in the description below. they are all free and open source. i built them because i just want to see more people learning how to do a genetic engineering effectively and doing it in an enjoyable way, and that's what i hope you can get out of this video. i will continue to share more of my workflow and things i find useful on my channel, so don't forget to subscribe if you don't want to miss anything. thank you for watching and see you next time!",
+    "count": 11,
+    "unique_sessions": 11,
+    "agents": [
+      "grok"
+    ],
+    "workspaces": [
+      "/Users/yosefhayimsabag/Desktop/Code/yt-captions-mini-ai"
+    ],
+    "examples": [
+      "System Prompt:\nYou are a skill author for Grok Build.\n\nYour ONLY job: convert the transcript into one or more production-quality agent skills in official SKILL.md format.\n\n## Sources of truth (in order)\n1. Official product skill docs: not published / incomplete for Grok Build.\n2. Open standard: [URL]\n3. Local fallback reference in this repo: docs/skill-authoring.md\nIf (1) is missing, follow (2) + (3) exactly. Do not invent a proprietary skill format.\n\n## Target agent\n- Agent: Grok Build (`grok`)",
+      "System Prompt:\nYou are a skill author for Grok Build.\n\nYour ONLY job: convert the transcript into one or more production-quality agent skills in official SKILL.md format.\n\n## Sources of truth (in order)\n1. Official product skill docs: not published / incomplete for Grok Build.\n2. Open standard: [URL]\n3. Local fallback reference in this repo: docs/skill-authoring.md\nIf (1) is missing, follow (2) + (3) exactly. Do not invent a proprietary skill format.\n\n## Target agent\n- Agent: Grok Build (`grok`)",
+      "System Prompt:\nYou are a skill author for Grok Build.\n\nYour ONLY job: convert the transcript into one or more production-quality agent skills in official SKILL.md format.\n\n## Sources of truth (in order)\n1. Official product skill docs: not published / incomplete for Grok Build.\n2. Open standard: [URL]\n3. Local fallback reference in this repo: docs/skill-authoring.md\nIf (1) is missing, follow (2) + (3) exactly. Do not invent a proprietary skill format.\n\n## Target agent\n- Agent: Grok Build (`grok`)"
+    ]
+  },
+  {
+    "norm": "agreed b",
+    "count": 10,
+    "unique_sessions": 10,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "examples": [
+      "agreed b",
+      "agreed b",
+      "agreed b"
+    ]
+  },
+  {
+    "norm": "agreed a",
+    "count": 8,
+    "unique_sessions": 8,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "examples": [
+      "agreed a",
+      "agreed a",
+      "agreed a"
+    ]
+  },
+  {
+    "norm": "agreed. a",
+    "count": 8,
+    "unique_sessions": 8,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "examples": [
+      "agreed. a",
+      "agreed. a",
+      "agreed. a"
+    ]
+  },
+  {
+    "norm": "agreed. b",
+    "count": 6,
+    "unique_sessions": 6,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "examples": [
+      "agreed. b",
+      "agreed. b",
+      "agreed. b"
+    ]
+  },
+  {
+    "norm": "approved",
+    "count": 6,
+    "unique_sessions": 6,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "examples": [
+      "approved",
+      "approved",
+      "approved"
+    ]
+  },
+  {
+    "norm": "<environment_context> <cwd>[path]/code</cwd> <shell>zsh</shell> <current_date>[n]-07-31</current_date> <timezone>asia/jerusalem</timezone> <filesystem><workspace_roots><root>[path]/root></workspace_roots><permission_profile type=\"disabled\"><file_system type=\"unrestricted\" /></permission_profile></filesystem> </environment_context>",
+    "count": 6,
+    "unique_sessions": 6,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "examples": [
+      "<environment_context>\n  <cwd>[PATH]/Code</cwd>\n  <shell>zsh</shell>\n  <current_date>2026-07-31</current_date>\n  <timezone>Asia/Jerusalem</timezone>\n  <filesystem><workspace_roots><root>[PATH]/root></workspace_roots><permission_profile type=\"disabled\"><file_system type=\"unrestricted\" /></permission_profile></filesystem>\n</environment_context>",
+      "<environment_context>\n  <cwd>[PATH]/Code</cwd>\n  <shell>zsh</shell>\n  <current_date>2026-07-31</current_date>\n  <timezone>Asia/Jerusalem</timezone>\n  <filesystem><workspace_roots><root>[PATH]/root></workspace_roots><permission_profile type=\"disabled\"><file_system type=\"unrestricted\" /></permission_profile></filesystem>\n</environment_context>",
+      "<environment_context>\n  <cwd>[PATH]/Code</cwd>\n  <shell>zsh</shell>\n  <current_date>2026-07-31</current_date>\n  <timezone>Asia/Jerusalem</timezone>\n  <filesystem><workspace_roots><root>[PATH]/root></workspace_roots><permission_profile type=\"disabled\"><file_system type=\"unrestricted\" /></permission_profile></filesystem>\n</environment_context>"
+    ]
+  },
+  {
+    "norm": "<recommended_plugins> here is a list of plugins that are available but not installed. - airtable (airtable@openai-curated-remote) - apollo.io (apollo@openai-curated-remote) - asana (asana@openai-curated-remote) - atlassian rovo (atlassian-rovo@openai-curated-remote) - base44 (base44@openai-curated-remote) - box (box@openai-curated-remote) - canva (canva@openai-curated-remote) - cloudflare (cloudflare@openai-curated-remote) - codex security (codex-security@openai-curated-remote) - figma (figma@openai-curated-remote) - github (github@openai-curated-remote) - gmail (gmail@openai-curated-remote) - google calendar (google-calendar@openai-curated-remote) - google drive (google-drive@openai-curated-remote) - granola (granola@openai-curated-remote) - heygen (heygen@openai-curated-remote) - hubspot (hubspot@openai-curated-remote) - hyperframes by heygen (hyperframes@openai-curated-remote) - linear (linear@openai-curated-remote) - lovable (lovable@openai-curated-remote) - monday.com (monday-com@openai-curated-remote) - neon postgres (neon-postgres@openai-curated-remote) - notion (notion@openai-curated-remote) - openai developers (openai-developers@openai-curated-remote) - outlook calendar (outlook-calendar@openai-curated-remote) - outlook email (outlook-email@openai-curated-remote) - posthog (posthog@openai-curated-remote) - remotion (remotion@openai-curated-remote) - replit (replit@openai-curated-remote) - semrush (semrush@openai-curated-remote) - sentry (sentry@openai-curated-remote) - sharepoint (sharepoint@openai-curated-remote) - slack (slack@openai-curated-remote) - stripe (stripe@openai-curated-remote) - supabase (supabase@openai-curated-remote) - superpowers (superpowers@openai-curated-remote) - teams (teams@openai-curated-remote) - vercel (vercel@openai-curated-remote) - wix (wix@openai-curated-remote) - zotero (zotero@openai-curated-remote) </recommended_plugins> # agents.md instructions for [path]/code/yt-captions-mini-ai <instructions> # yt-captions-mini-ai — agent instructions small [node.js]([url]) / [typescript]([url]) cli: download public [youtube]([url]) captions (video or playlist), optionally pipe the transcript to a local coding agent to scaffold a reusable skill. human landing page: [readme.md](readme.md). visual: [assets/hero.png](assets/hero.png). ## source of truth | concern | canonical file | | --- | --- | | agent contract (this file) | `agents.md` | | code style and file map | `code-style.md` | | package scripts | `package.json` | | human pitch / quick start | `readme.md` | codex, cursor, claude code, gemini cli, kiro, roo, and other agents-aware tools read this file directly. prefer editing here over inventing parallel instruction files. ## read order 1. this file 2. `code-style.md` when changing structure, naming, or logging 3. the specific `src/*.ts` file you touch ## commands ```bash npm start -- url=<youtube-url-or-id> [format=vtt] [lang=en] [auto] [stdout] [out-dir=./scraped-yt] [output-format=txt|md|json|jsonl] [cookies=./cookies.txt] [agent=codex|grok|devin|claude|gemini|kiro|kimi|agent|cursor] [system-prompt=\"...\"] npm run typecheck npm run build ``` cli options (see `src/cli.ts`): - `format=<list>` — subtitle formats (`vtt`, `srt`, `json3`, …); default `vtt` - `lang=<list>` — language tokens; default `en` - `auto` — allow auto-generated captions - `stdout` — print captions instead of writing files - `cookies=<path>` — optional netscape `cookies.txt` for youtube session cookies - `agent=<name>` — local agent for skill scaffold (`claude|codex|cursor|devin|gemini|grok|kimi|kiro|agent`) - `system-prompt=\"<prompt>\"` — prompt sent to local agent (default: minimal skill-style implementation) - `out-dir=<path>` — output directory; default `./scraped-yt` resilience (captions-only, yt-dlp-inspired): - watch html 429 does not hard-fail; multi-client innertube player is tried next - clients: `android_vr` → `android` → `ios` → `tv` → `mweb` → `web` → `web_embedded` - http retries 429/502/503/504 with backoff + `retry-after` - optional netscape cookies + in-process `set-cookie` jar ## layout (summary) keep the surface intentionally tiny — a small set of focused modules, not a platform. | file | role | | --- | --- | | `src/main.ts` | cli entry + orchestration only | | `src/cli.ts` | argument parsing (+ interactive prompts) | | `src/captions.ts` | caption track selection and url building | | `src/playlist.ts` | playlist page extraction and video ids | | `src/http.ts` | network helpers | | `src/parsing.ts` | html/json extraction helpers | | `src/player-api.ts` | player api caption track fallback | | `src/output.ts` | caption → txt/md/json/jsonl conversion | | `src/agent.ts` | local agent cli invocation + metrics parsing | | `src/log.ts` | structured one-line logs | | `src/types.ts` | shared typed contracts | | `src/cookies.ts` | optional netscape/session cookie helpers for requests | full layout rules: `code-style.md`. ## agent output layout when `agent=<name>` is set, artifacts land under: ```text scraped-yt/ <videoid>.<lang>.txt agents/<agent-name>/ <videoid>.<lang>.txt <videoid>.<lang>.skill.md <videoid>.<lang>.metrics.json ``` `metrics.json` includes wall-clock `durationms`, command summary, and nullable usage fields (`inputtokens`, `outputtokens`, `modelused`, tool counts, cost, context window). fields a cli cannot expose headlessly stay `null` with notes in `unavailablenotes`. | agent | headless usage notes | | --- | --- | | `claude` | `claude -p` / json output variants | | `codex` | `codex exec --json` ndjson when available | | `gemini` | `gemini -p` json when available | | `grok` / `agent` | `-p` / json variants when available | | `devin` | print text; tokens often not on stdout | | `kiro` | non-interactive chat text when available | | `kimi` / `cursor` | best-effort; no stable public per-run usage json | ## working rules - keep the project intentionally small; no heavy abstractions. - fail fast with clear error text when expected youtube markers or fields are missing. - do not add silent fallbacks that hide failure causes. - arrow functions; domain-specific names (not `data` / `result` / `json`); `const` by default. - one responsibility per file; keep parsing/transport separate from selection/orchestration. - logs are one-line and tagged: `[info]`, `[warn]`, `[err]`. - prefer [effect]([url]) where the codebase already uses it; do not introduce new frameworks without a clear need. - prefer small utilities over dense inline one-liners. - do not grow this into yt-dlp (no video/audio pipeline, no cookie-auth scraping of private content). ## verify before done - `npm run typecheck` must pass. - when behavior changes, smoke-test with a known public video or playlist if the network is available. ## safety - fetches use a browser-like user-agent for public pages only; do not add auth cookies or scrape private content. - do not commit secrets, api keys, or large caption dumps (`scraped-yt/` is gitignored). - playlist downloads already throttle slightly; do not remove rate-limiting without reason. - leave `dist/` and `node_modules/` alone unless the task is explicitly about build output. </instructions> <environment_context> <cwd>[path]/yt-captions-mini-ai</cwd> <shell>zsh</shell> <current_date>[n]-08-06</current_date> <timezone>asia/jerusalem</timezone> <filesystem><workspace_roots><root>[path]/root></workspace_roots><permission_profile type=\"managed\"><file_system type=\"restricted\"><entry access=\"read\"><special>:root</special></entry></file_system></permission_profile></filesystem> </environment_context>",
+    "count": 6,
+    "unique_sessions": 6,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "examples": [
+      "<recommended_plugins>\nHere is a list of plugins that are available but not installed.\n\n- Airtable (airtable@openai-curated-remote)\n- Apollo.io (apollo@openai-curated-remote)\n- Asana (asana@openai-curated-remote)\n- Atlassian Rovo (atlassian-rovo@openai-curated-remote)\n- Base44 (base44@openai-curated-remote)\n- Box (box@openai-curated-remote)\n- Canva (canva@openai-curated-remote)\n- Cloudflare (cloudflare@openai-curated-remote)\n- Codex Security (codex-security@openai-curated-remote)\n- Figma (figma@o",
+      "<recommended_plugins>\nHere is a list of plugins that are available but not installed.\n\n- Airtable (airtable@openai-curated-remote)\n- Apollo.io (apollo@openai-curated-remote)\n- Asana (asana@openai-curated-remote)\n- Atlassian Rovo (atlassian-rovo@openai-curated-remote)\n- Base44 (base44@openai-curated-remote)\n- Box (box@openai-curated-remote)\n- Canva (canva@openai-curated-remote)\n- Cloudflare (cloudflare@openai-curated-remote)\n- Codex Security (codex-security@openai-curated-remote)\n- Figma (figma@o",
+      "<recommended_plugins>\nHere is a list of plugins that are available but not installed.\n\n- Airtable (airtable@openai-curated-remote)\n- Apollo.io (apollo@openai-curated-remote)\n- Asana (asana@openai-curated-remote)\n- Atlassian Rovo (atlassian-rovo@openai-curated-remote)\n- Base44 (base44@openai-curated-remote)\n- Box (box@openai-curated-remote)\n- Canva (canva@openai-curated-remote)\n- Cloudflare (cloudflare@openai-curated-remote)\n- Codex Security (codex-security@openai-curated-remote)\n- Figma (figma@o"
+    ]
+  },
+  {
+    "norm": "i need your help with doing a huge deslop on the entire cord base, changing its structure and making the entire project more logical on how it's currently structured. this means, i believe, maybe doing a new gridme, including code styles, structure, files, folders, what technology we are going to use, et cetera, et cetera, like building this entire project from start. this includes static assets i have a two-bucket and d1 architecture of the dp over the architecture of how everything is currently being applied and running and making sure that this is can be really at a scale level with proper explanations and proper mentioning why this and why that etc etc it could maybe involve research about our existing widget. other competitors are selling their widget to their customers so we can maybe follow a similar approach if there is something better than what we have currently before we are doing the migration.",
+    "count": 5,
+    "unique_sessions": 5,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "examples": [
+      "I need your help with doing a huge deslop on the entire cord base, changing its structure and making the entire project more logical on how it's currently structured. This means, I believe, maybe doing a new gridme, including code styles, structure, files, folders, what technology we are going to use, et cetera, et cetera, like building this entire project from start. This includes static assets i have a two-bucket and d1 architecture of the dp over the architecture of how everything is currentl",
+      "I need your help with doing a huge deslop on the entire cord base, changing its structure and making the entire project more logical on how it's currently structured. This means, I believe, maybe doing a new gridme, including code styles, structure, files, folders, what technology we are going to use, et cetera, et cetera, like building this entire project from start. This includes static assets i have a two-bucket and d1 architecture of the dp over the architecture of how everything is currentl",
+      "I need your help with doing a huge deslop on the entire cord base, changing its structure and making the entire project more logical on how it's currently structured. This means, I believe, maybe doing a new gridme, including code styles, structure, files, folders, what technology we are going to use, et cetera, et cetera, like building this entire project from start. This includes static assets i have a two-bucket and d1 architecture of the dp over the architecture of how everything is currentl"
+    ]
+  },
+  {
+    "norm": "do you think we can have better codebase structure,file names ,and cli for this to make it 0 ai slop and 100% desloped correctly? like better naming for variables and forbidden files that are naming like payload or response body or data",
+    "count": 5,
+    "unique_sessions": 5,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "examples": [
+      "do you think we can have better codebase structure,file names ,and cli for this to make it 0 ai slop and 100% desloped correctly? like better naming for variables and forbidden Files that are naming like payload or response body or data",
+      "do you think we can have better codebase structure,file names ,and cli for this to make it 0 ai slop and 100% desloped correctly? like better naming for variables and forbidden Files that are naming like payload or response body or data",
+      "do you think we can have better codebase structure,file names ,and cli for this to make it 0 ai slop and 100% desloped correctly? like better naming for variables and forbidden Files that are naming like payload or response body or data"
+    ]
+  },
+  {
+    "norm": "and what about structure of files/folder tree show the prposed one",
+    "count": 5,
+    "unique_sessions": 5,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "examples": [
+      "and what about structure of files/folder tree show the prposed one",
+      "and what about structure of files/folder tree show the prposed one",
+      "and what about structure of files/folder tree show the prposed one"
+    ]
+  },
+  {
+    "norm": "i would say repo with just widget and fully next.js. best practices",
+    "count": 5,
+    "unique_sessions": 5,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "examples": [
+      "i would say repo with just widget and fully next.js. best practices",
+      "i would say repo with just widget and fully next.js. best practices",
+      "i would say repo with just widget and fully next.js. best practices"
+    ]
+  },
+  {
+    "norm": "i would say next.js best practices.",
+    "count": 5,
+    "unique_sessions": 5,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "examples": [
+      "i would say next.js best practices.",
+      "i would say next.js best practices.",
+      "i would say next.js best practices."
+    ]
+  },
+  {
+    "norm": "yes agreed.",
+    "count": 5,
+    "unique_sessions": 5,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "examples": [
+      "yes agreed.",
+      "yes agreed.",
+      "yes agreed."
+    ]
+  },
+  {
+    "norm": "agreed do it.",
+    "count": 4,
+    "unique_sessions": 4,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "examples": [
+      "agreed do it.",
+      "agreed do it.",
+      "agreed do it."
+    ]
+  },
+  {
+    "norm": "try now.",
+    "count": 4,
+    "unique_sessions": 4,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "examples": [
+      "try now.",
+      "try now.",
+      "try now."
+    ]
+  },
+  {
+    "norm": "keep going",
+    "count": 4,
+    "unique_sessions": 4,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "examples": [
+      "keep going",
+      "keep going",
+      "keep going"
+    ]
+  },
+  {
+    "norm": "proceed from where interrupted",
+    "count": 4,
+    "unique_sessions": 4,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "examples": [
+      "proceed from where interrupted",
+      "proceed from where interrupted",
+      "proceed from where interrupted"
+    ]
+  },
+  {
+    "norm": "agrede. b",
+    "count": 4,
+    "unique_sessions": 4,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "examples": [
+      "agrede. b",
+      "agrede. b",
+      "agrede. b"
+    ]
+  },
+  {
+    "norm": "help me do a proper cleanup and $grill-me-code-style-with-docs on this repo so we are have proper following order code-style.md and clean and professional codebase. filenames conventions etc no generic result,response,data,payload,body, isrecord (ai slop functions) etc unified uses for ui or utils etc i am just thorwing here some of what i got in mind",
+    "count": 4,
+    "unique_sessions": 4,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "examples": [
+      "Help me do a proper cleanup and $grill-me-code-style-with-docs on this repo so we are have proper following order code-style.md and clean and professional codebase. filenames conventions etc no generic result,response,data,payload,body, isRecord (ai slop functions) etc unified uses for ui or utils etc i am just thorwing here some of what i got in mind",
+      "Help me do a proper cleanup and $grill-me-code-style-with-docs on this repo so we are have proper following order code-style.md and clean and professional codebase. filenames conventions etc no generic result,response,data,payload,body, isRecord (ai slop functions) etc unified uses for ui or utils etc i am just thorwing here some of what i got in mind",
+      "Help me do a proper cleanup and $grill-me-code-style-with-docs on this repo so we are have proper following order code-style.md and clean and professional codebase. filenames conventions etc no generic result,response,data,payload,body, isRecord (ai slop functions) etc unified uses for ui or utils etc i am just thorwing here some of what i got in mind"
+    ]
+  },
+  {
+    "norm": "<environment_context> <current_date>[n]-08-04</current_date> <timezone>asia/jerusalem</timezone> <filesystem><workspace_roots><root>[path]/root></workspace_roots><permission_profile type=\"disabled\"><file_system type=\"unrestricted\" /></permission_profile></filesystem> </environment_context>",
+    "count": 4,
+    "unique_sessions": 4,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "examples": [
+      "<environment_context>\n  <current_date>2026-08-04</current_date>\n  <timezone>Asia/Jerusalem</timezone>\n  <filesystem><workspace_roots><root>[PATH]/root></workspace_roots><permission_profile type=\"disabled\"><file_system type=\"unrestricted\" /></permission_profile></filesystem>\n</environment_context>",
+      "<environment_context>\n  <current_date>2026-08-04</current_date>\n  <timezone>Asia/Jerusalem</timezone>\n  <filesystem><workspace_roots><root>[PATH]/root></workspace_roots><permission_profile type=\"disabled\"><file_system type=\"unrestricted\" /></permission_profile></filesystem>\n</environment_context>",
+      "<environment_context>\n  <current_date>2026-08-04</current_date>\n  <timezone>Asia/Jerusalem</timezone>\n  <filesystem><workspace_roots><root>[PATH]/root></workspace_roots><permission_profile type=\"disabled\"><file_system type=\"unrestricted\" /></permission_profile></filesystem>\n</environment_context>"
+    ]
+  },
+  {
+    "norm": "1.cannot find name 'process'. do you need to install type definitions for node? try `npm i --save-dev @types/node` and then add 'node' to the types field in your tsconfig.ts([n]) make sure it is part of dev deps so we have smooth dev process. 2. replace all emojis with proper inline text or ascii e.g. checkmark without emoji or x without emoji so its cleanler. 3.thats looks duplicate hardcode values so why we need it?... [path]/services/screenshotassets.ts 4. a lot of files has at the top a noisy comments like tons e.g. for example at [path]/services/screenshotspecs.ts need just more simple and easy fileoverview with the shrtoduel. 5.[path]/services/json.ts this is indication of ai slop. if we got effect schemas etc why do we need the isrecord? we should be aaware and understand what to expect where this is used. delete. 6. ban ?? or || or generic and not helpful variables e.g. response,result,data,payload,body,row etc etc and more what u find. 7. i want tech.md by $grill-me-code-style-coach 8. does google store can have generated too? like apple has but i dont see for google store.",
+    "count": 4,
+    "unique_sessions": 4,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "examples": [
+      "1.Cannot find name 'process'. Do you need to install type definitions for node? Try `npm i --save-dev @types/node` and then add 'node' to the types field in your tsconfig.ts(2591) make sure it is part of dev deps so we have smooth dev process. \n2. replace all emojis with proper inline text or ascii e.g. checkmark without emoji or x without emoji so its cleanler. \n3.thats looks duplicate hardcode values so why we need it?... [PATH]/services/screenshotAssets.ts \n4. a lot of files has at the top a ",
+      "1.Cannot find name 'process'. Do you need to install type definitions for node? Try `npm i --save-dev @types/node` and then add 'node' to the types field in your tsconfig.ts(2591) make sure it is part of dev deps so we have smooth dev process. \n2. replace all emojis with proper inline text or ascii e.g. checkmark without emoji or x without emoji so its cleanler. \n3.thats looks duplicate hardcode values so why we need it?... [PATH]/services/screenshotAssets.ts \n4. a lot of files has at the top a ",
+      "1.Cannot find name 'process'. Do you need to install type definitions for node? Try `npm i --save-dev @types/node` and then add 'node' to the types field in your tsconfig.ts(2591) make sure it is part of dev deps so we have smooth dev process. \n2. replace all emojis with proper inline text or ascii e.g. checkmark without emoji or x without emoji so its cleanler. \n3.thats looks duplicate hardcode values so why we need it?... [PATH]/services/screenshotAssets.ts \n4. a lot of files has at the top a "
+    ]
+  },
+  {
+    "norm": "<skill> <name>grill-me-code-style-coach</name> <path>[path]/skill.md</path> --- name: grill-me-code-style-coach description: > coach the user while building or fixing code in a repo that has a code-style.rules.json — at each real style/structure decision, explain the concept concisely (kiss) in terms they already know, show two concrete variants, make them confirm the direction before writing, then teach the mechanism and link the exemplar it mirrors. high-friction on judgment calls; silent on anything biome already enforces. grounds \"where the business logic goes\" in project.md / context.md. use when writing a feature/fix and the user wants to learn their own architecture as we go, not just delegate — or says \"coach me\", \"teach me as we build\", \"grill me while we code\". for reviewing a finished diff instead, use grill-me-code-style-review; to create the ruleset, grill-me-code-style. --- <what-to-do> we build together, but i want to **learn my own codebase as we go** — not just watch you type. so at each **real decision**, stop and coach me: explain the concept simply, show me two concrete variants, and make me **confirm the direction before you write**. then teach me *why* and show me the file to imitate. i get better; the code stays on-style. **read first (never coach from memory):** the repo's `code-style.rules.json` (the machine ruleset — each rule's `verify` command + exemplars), `code-style.md` (the prose), and `project.md` / `context.md` (so \"where does this go\" comes from *my* docs, not generic advice). no ruleset in the repo? say so and offer to run `grill-me-code-style` / `grill-me-code-style-with-docs` first. **only grill me on what matters.** each rule's `verify` field tells you what to skip and what to teach: - a **real command** (`biome ci .`, `pnpm style`, …) → **a tool already enforces this. do not grill me on it** — just follow it and let the gate catch any slip. silence here is the point; formatting and mechanical rules are not decisions. - `judgment` (taste / architecture / placement) → **this is where you stop and coach.** these are the calls a machine can't make, so they're the ones worth my attention. ask **one question at a time** and wait. never batch. </what-to-do> <supporting-info> ## the loop — at each judgment decision 1. **locate it against my docs + ruleset.** which unit is this (the `code-style.md → golden path` word — feature/hook/command/…)? where does it belong per `project.md`/`context.md` and the layer rules? find the closest existing thing to **extend, not duplicate**. 2. **explain the concept kiss**, in terms i already know — one or two sentences, plain. anchor a new idea to one i've already used in this repo (\"this is like the `settings` pure/io split you saw\"). 3. **show two concrete variants** via `askuserquestion` — put the real code in each option's `preview`. variant a vs b on the actual decision (e.g. \"pure `check*` + thin fetch\" vs \"one fused function\"; \"extend `features.ts`\" vs \"new module\"). cite `file:symbol` from this repo. 4. **make me pick — and wait.** high friction: do not write the code until i answer. if i pick, that direction is locked; if i'm unsure, teach a bit more and re-offer. this is active recall — the point is that i *decide*, so i learn. 5. **write it my way**, following the ruleset. colocate the `*.test.ts`. then in one or two lines, **teach the mechanism**: how this actually works here (the data flow / lifecycle / who calls it), and **link the exemplar** from the ruleset (\"mirrors `src/…`— open it to see the whole shape\"). 6. **let biome carry the mechanical half** — run `lint:fix` / `verify`; never hand-fix what a rule owns, and never grill me about it. ## what counts as a \"decision\" worth stopping on stop for: **placement** (which layer/file, extend vs new), **shape** (the `judgment` rules — pure/io split, single named return, clone-in-clone-out, re-export vs re-declare), **the unit's golden path** (am i following it or inventing?), and **an abstraction's justification** (yagni — does a second real caller exist yet?). don't stop for anything biome enforces, or for a change that plainly mirrors an exemplar — just note \"following `<exemplar>`\" and move on. ## teaching depth (keep it light, cumulative) per decision: the concept (1–2 lines) → who/when it runs → the exemplar to imitate. over a session this compounds into real understanding of the repo's architecture — you're building my mental model, not narrating keystrokes. if i ask \"why this way?\", give the adr/`code-style.md` rationale, not just the rule. ## never - never coach from memory — re-read `code-style.rules.json` + `context.md` for this change. - never grill me on a rule a tool already enforces (any rule with a real `verify` command) — just follow it. - never write the code before i've confirmed the direction on a judgment decision. - never invent a pattern when a `code-style.md` recipe/exemplar fits — mirror it and tell me which. - never add an abstraction for a second consumer that doesn't exist yet (yagni). </supporting-info> </skill>",
+    "count": 4,
+    "unique_sessions": 4,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "examples": [
+      "<skill>\n<name>grill-me-code-style-coach</name>\n<path>[PATH]/SKILL.md</path>\n---\nname: grill-me-code-style-coach\ndescription: >\n  Coach the user WHILE building or fixing code in a repo that has a code-style.rules.json — at\n  each real style/structure decision, explain the concept concisely (KISS) in terms they already\n  know, show two concrete variants, make them confirm the direction before writing, then teach the\n  mechanism and link the exemplar it mirrors. High-friction on judgment calls; sil",
+      "<skill>\n<name>grill-me-code-style-coach</name>\n<path>[PATH]/SKILL.md</path>\n---\nname: grill-me-code-style-coach\ndescription: >\n  Coach the user WHILE building or fixing code in a repo that has a code-style.rules.json — at\n  each real style/structure decision, explain the concept concisely (KISS) in terms they already\n  know, show two concrete variants, make them confirm the direction before writing, then teach the\n  mechanism and link the exemplar it mirrors. High-friction on judgment calls; sil",
+      "<skill>\n<name>grill-me-code-style-coach</name>\n<path>[PATH]/SKILL.md</path>\n---\nname: grill-me-code-style-coach\ndescription: >\n  Coach the user WHILE building or fixing code in a repo that has a code-style.rules.json — at\n  each real style/structure decision, explain the concept concisely (KISS) in terms they already\n  know, show two concrete variants, make them confirm the direction before writing, then teach the\n  mechanism and link the exemplar it mirrors. High-friction on judgment calls; sil"
+    ]
+  },
+  {
+    "norm": "the structure of codebase does make a sense and logic but i feel like we can make it leaner and thigtehn $grill-me-code-style-with-docs whwat do u recommened?",
+    "count": 4,
+    "unique_sessions": 4,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "examples": [
+      "the structure of codebase does make a sense and logic but i feel like we can make it leaner and thigtehn $grill-me-code-style-with-docs whwat do u recommened?",
+      "the structure of codebase does make a sense and logic but i feel like we can make it leaner and thigtehn $grill-me-code-style-with-docs whwat do u recommened?",
+      "the structure of codebase does make a sense and logic but i feel like we can make it leaner and thigtehn $grill-me-code-style-with-docs whwat do u recommened?"
+    ]
+  },
+  {
+    "norm": "1.its confusing same folder named on other folder e.g. config. so aside of that i agree on all. secondly is that how the code-styl.emd is applying i want to proper $grill-me-code-style-with-docs with what we hvent talked yet and grilled",
+    "count": 4,
+    "unique_sessions": 4,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "examples": [
+      "1.its confusing same folder named on other folder e.g. config. so aside of that i agree on all. secondly is that how the code-styl.emd is applying i want to proper $grill-me-code-style-with-docs with what we hvent talked yet and grilled",
+      "1.its confusing same folder named on other folder e.g. config. so aside of that i agree on all. secondly is that how the code-styl.emd is applying i want to proper $grill-me-code-style-with-docs with what we hvent talked yet and grilled",
+      "1.its confusing same folder named on other folder e.g. config. so aside of that i agree on all. secondly is that how the code-styl.emd is applying i want to proper $grill-me-code-style-with-docs with what we hvent talked yet and grilled"
+    ]
+  },
+  {
+    "norm": "i would like you to preform with me $grill-me-code-style-with-docs from the begining so we can do a full deslop on this entire repo. to change her structure libraires deps etc so it looks cleanly. clean code, obivous structure that make sense and no use of generic and not helping variables like result,payload,body,data,raw etc etc",
+    "count": 4,
+    "unique_sessions": 4,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "examples": [
+      "I would like you to preform with me $grill-me-code-style-with-docs from the begining so we can do a full deslop on this entire repo. to change her structure libraires deps etc so it looks cleanly. clean code, obivous structure that make sense and no use of generic and not helping variables like result,payload,body,data,raw etc etc",
+      "I would like you to preform with me $grill-me-code-style-with-docs from the begining so we can do a full deslop on this entire repo. to change her structure libraires deps etc so it looks cleanly. clean code, obivous structure that make sense and no use of generic and not helping variables like result,payload,body,data,raw etc etc",
+      "I would like you to preform with me $grill-me-code-style-with-docs from the begining so we can do a full deslop on this entire repo. to change her structure libraires deps etc so it looks cleanly. clean code, obivous structure that make sense and no use of generic and not helping variables like result,payload,body,data,raw etc etc"
+    ]
+  },
+  {
+    "norm": "say only hi",
+    "count": 4,
+    "unique_sessions": 4,
+    "agents": [
+      "grok"
+    ],
+    "workspaces": [
+      "/Users/yosefhayimsabag/Desktop/Code"
+    ],
+    "examples": [
+      "Say only hi",
+      "Say only hi",
+      "Say only hi"
+    ]
+  },
+  {
+    "norm": "can you please duplicate every repo we got on our gh? including one from oly-app into the code folder. without installs just duplicate.",
+    "count": 3,
+    "unique_sessions": 3,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "examples": [
+      "Can you please duplicate every repo we got on our gh? including one from Oly-App into the Code folder. without installs just duplicate.",
+      "Can you please duplicate every repo we got on our gh? including one from Oly-App into the Code folder. without installs just duplicate.",
+      "Can you please duplicate every repo we got on our gh? including one from Oly-App into the Code folder. without installs just duplicate."
+    ]
+  },
+  {
+    "norm": "why not history rewrite from duplication of main in another branch that will be the test of this? main already will have all. approval gate is approved",
+    "count": 3,
+    "unique_sessions": 3,
+    "agents": [
+      "grok"
+    ],
+    "workspaces": [
+      "/Users/yosefhayimsabag/Desktop/Code/ebay-mcp",
+      "/Users/yosefhayimsabag/Desktop/Code/launch-store",
+      "/Users/yosefhayimsabag/Desktop/Code/vybekiit"
+    ],
+    "examples": [
+      "why not history rewrite from duplication of main in another branch that will be the test of this? main already will have all.  approval gate is approved",
+      "why not history rewrite from duplication of main in another branch that will be the test of this? main already will have all.  approval gate is approved",
+      "why not history rewrite from duplication of main in another branch that will be the test of this? main already will have all.  approval gate is approved"
+    ]
+  },
+  {
+    "norm": "ive run pnpm i in the repo but it says yosefhayimsabag@yosefs-mbp dufflebag % pnpm i already up to date done in 12ms using pnpm v11.18.0 yosefhayimsabag@yosefs-mbp dufflebag % but then when i do yosefhayimsabag@yosefs-mbp dufflebag % pnpm i already up to date done in 12ms using pnpm v11.18.0 yosefhayimsabag@yosefs-mbp dufflebag % pnpm run dev already up to date done in 14ms using pnpm v11.18.0 $ pnpm cli $ tsx src/cli/main.ts sh: tsx: command not found [elifecycle] command failed. [warn] local package.json exists, but node_modules missing, did you mean to install? [elifecycle] command failed with exit code 1. [warn] local package.json exists, but node_modules missing, did you mean to install? yosefhayimsabag@yosefs-mbp dufflebag % i get or yosefhayimsabag@yosefs-mbp dufflebag % pnpm run cli already up to date done in 13ms using pnpm v11.18.0 $ npx src/cli/main.ts npm error code enotdir npm error syscall open npm error path [path]/main.ts/package.json npm error errno -20 npm error could not read package.json: error: enotdir: not a directory, open '[path]/main.ts/package.json' npm error a complete log of this run can be found in: [path]/_logs/[n]-07-30t21_23_55_183z-debug-0.log [elifecycle] command failed with exit code 236. [warn] local package.json exists, but node_modules missing, did you mean to install? yosefhayimsabag@yosefs-mbp dufflebag %",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "examples": [
+      "Ive run pnpm i in the repo but it says yosefhayimsabag@yosefs-mbp dufflebag % pnpm i\nAlready up to date\nDone in 12ms using pnpm v11.18.0\nyosefhayimsabag@yosefs-mbp dufflebag % but then when i do yosefhayimsabag@yosefs-mbp dufflebag % pnpm i\nAlready up to date\nDone in 12ms using pnpm v11.18.0\nyosefhayimsabag@yosefs-mbp dufflebag % pnpm run dev\nAlready up to date\nDone in 14ms using pnpm v11.18.0\n$ pnpm cli\n$ tsx src/cli/main.ts\nsh: tsx: command not found\n[ELIFECYCLE] Command failed.\n[WARN]  Local ",
+      "Ive run pnpm i in the repo but it says yosefhayimsabag@yosefs-mbp dufflebag % pnpm i\nAlready up to date\nDone in 12ms using pnpm v11.18.0\nyosefhayimsabag@yosefs-mbp dufflebag % but then when i do yosefhayimsabag@yosefs-mbp dufflebag % pnpm i\nAlready up to date\nDone in 12ms using pnpm v11.18.0\nyosefhayimsabag@yosefs-mbp dufflebag % pnpm run dev\nAlready up to date\nDone in 14ms using pnpm v11.18.0\n$ pnpm cli\n$ tsx src/cli/main.ts\nsh: tsx: command not found\n[ELIFECYCLE] Command failed.\n[WARN]  Local "
+    ]
+  },
+  {
+    "norm": "ok now ive installed the dufflebag and we ship it with tts and stt but not work can u double check i installed it correctly ?",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "examples": [
+      "ok now ive installed the dufflebag and we ship it with tts and stt but not work can u double check i installed it correctly ?",
+      "ok now ive installed the dufflebag and we ship it with tts and stt but not work can u double check i installed it correctly ?"
+    ]
+  },
+  {
+    "norm": "ok so i hold the control and i am in cmux maybe that why but it didnt show the animation and the voice and stt me",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "examples": [
+      "ok so i hold the control and i am in cmux maybe that why but it didnt show the animation and the voice and stt me",
+      "ok so i hold the control and i am in cmux maybe that why but it didnt show the animation and the voice and stt me"
+    ]
+  },
+  {
+    "norm": "fix the ignore workspace bug",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "examples": [
+      "fix the ignore workspace bug",
+      "fix the ignore workspace bug"
+    ]
+  },
+  {
+    "norm": "no stale ellete teh 10.33.2 and use the latest pnpm.",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "examples": [
+      "no stale ellete teh 10.33.2 and use the latest pnpm.",
+      "no stale ellete teh 10.33.2 and use the latest pnpm."
+    ]
+  },
+  {
+    "norm": "ok nice now well holding control still not stt me...",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "examples": [
+      "ok nice now  well holding control still not stt me...",
+      "ok nice now  well holding control still not stt me..."
+    ]
+  },
+  {
+    "norm": "hello. hello, so looks like this is working. i need your help with another bug that currently is being i'm applied, i do not see the voice ui appears starting microphone... and i am not sure if the llm modal were using is enough good for this tts for the current machine what small very popular but very good on stt we can implement and use?",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "examples": [
+      "Hello. Hello, so looks like this is working. I need your help with another bug that currently is being I'm applied, I do not see the voice UI appears starting microphone... and I am not sure if the llm modal were using is enough good for this tts for the current machine what small very popular but very good on stt we can implement and use?",
+      "Hello. Hello, so looks like this is working. I need your help with another bug that currently is being I'm applied, I do not see the voice UI appears starting microphone... and I am not sure if the llm modal were using is enough good for this tts for the current machine what small very popular but very good on stt we can implement and use?"
+    ]
+  },
+  {
+    "norm": "can you please duplicate every repo we got on our gh? including one from oly-app",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "examples": [
+      "Can you please duplicate every repo we got on our gh? including one from Oly-App",
+      "Can you please duplicate every repo we got on our gh? including one from Oly-App"
+    ]
+  },
+  {
+    "norm": "please also duplicate our two org e.g. vybekiit and genshot.dev",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "examples": [
+      "please also duplicate our two org e.g. vybekiit and genshot.dev",
+      "please also duplicate our two org e.g. vybekiit and genshot.dev"
+    ]
+  },
+  {
+    "norm": "please also duplicate our two org e.g. vybekiit main repo and the genshot repo from the org",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "examples": [
+      "please also duplicate our two org e.g. vybekiit main repo and the genshot repo from the org",
+      "please also duplicate our two org e.g. vybekiit main repo and the genshot repo from the org"
+    ]
+  },
+  {
+    "norm": "it works nice but why for the tts it keeps say item? and regarding the stt it still misses some text and when i hold the control the ui animation is looking like hot reloading tons of times need fix there",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "examples": [
+      "it works nice but why for the tts it keeps say item? and regarding the stt it still misses some text and when i hold the control the ui animation is looking like hot reloading tons of times need fix there",
+      "it works nice but why for the tts it keeps say item? and regarding the stt it still misses some text and when i hold the control the ui animation is looking like hot reloading tons of times need fix there"
+    ]
+  },
+  {
+    "norm": "/statusline show context dynamic current model context and weekly limit as context <n>% (<n>k) | weekly <n>% (<n>k)",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "examples": [
+      "/statusline show context dynamic current model context and weekly limit as Context <n>% (<n>K) | Weekly <n>% (<n>K)",
+      "/statusline show context dynamic current model context and weekly limit as Context <n>% (<n>K) | Weekly <n>% (<n>K)"
+    ]
+  },
+  {
+    "norm": "ok nice now can u install via pnpm for each repo we got in the code folder except the ones who use npm.",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "examples": [
+      "ok nice now can u install via pnpm for each repo we got in the code folder except the ones who use npm.",
+      "ok nice now can u install via pnpm for each repo we got in the code folder except the ones who use npm."
+    ]
+  },
+  {
+    "norm": "i said hell how r u but it stt 'hello, our leader.' thats annoying and this small things keep happein.g",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "examples": [
+      "I said hell how r u but it stt 'Hello, our leader.' thats annoying and this small things keep happein.g",
+      "I said hell how r u but it stt 'Hello, our leader.' thats annoying and this small things keep happein.g"
+    ]
+  },
+  {
+    "norm": "so for template repo you can delete it completely and for vybekiit install official rustup please",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "examples": [
+      "so for Template repo you can delete it completely and for vybekiit install official rustup please",
+      "so for Template repo you can delete it completely and for vybekiit install official rustup please"
+    ]
+  },
+  {
+    "norm": "i would like to consult with you regarding the current code base of dufferberg and how its structure additionally how the code base is following the code style.md and whether we are following the best practices for this kind of repo hat do you find incossistent and few bugs i find but i am not sure we can call it bugs so one, when i'm working in multiple terminals using cmux, the automatic response hook is applying right away so if i'm running in 50-20 terminals it's going to be like spamming me so i'm thinking if we can modify it so only when i'm entering the terminal window in the cmux only then the response will be triggered and played unless i didn't enter it won't and additionally a key that will make it interrupt and stop so i'm not sure which one should i pick for this but it should be automatically pausing the stt and another feature that i want is maybe toggle on off like i will call it a middle wear but it's actually another model that will basically have a very simple task and it's to refine and sharp the prompt i'm pasting so after i'm pasting its prompts it will basically refine it for a few seconds seconds so it's precise and sharp what i mean and then i can like read it out loud and if it sounds as i want it and i can submit it",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "examples": [
+      "I would like to consult with you Regarding the current code base of Dufferberg and how its structure Additionally how the code base is following the code style.md And whether we are following the best practices for this kind of repo hat do you find incossistent and few bugs i find but i am not sure we can call it bugs So one, when I'm working in multiple terminals using Cmux, The automatic response hook is applying right away so if I'm running in 50-20 terminals it's going to be like spamming me",
+      "I would like to consult with you Regarding the current code base of Dufferberg and how its structure Additionally how the code base is following the code style.md And whether we are following the best practices for this kind of repo hat do you find incossistent and few bugs i find but i am not sure we can call it bugs So one, when I'm working in multiple terminals using Cmux, The automatic response hook is applying right away so if I'm running in 50-20 terminals it's going to be like spamming me"
+    ]
+  },
+  {
+    "norm": "/statusline edit the current one we got with another thing and iti s the current folder we are and the current model is being used. not just context and weekly",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "examples": [
+      "/statusline edit the current one we got with another thing and iti s the current folder we are and the current model is being used. not just context and weekly",
+      "/statusline edit the current one we got with another thing and iti s the current folder we are and the current model is being used. not just context and weekly"
+    ]
+  },
+  {
+    "norm": "show as well the reasoning level right after the model",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "examples": [
+      "show as well the reasoning level right after the model",
+      "show as well the reasoning level right after the model"
+    ]
+  },
+  {
+    "norm": "add in the dufflebag this so we can setup it next time if i need to easily exactly as it is now under a new proper folder but in proper position name statuslines/codex",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "examples": [
+      "add in the dufflebag this so we can setup it next time if i need to easily exactly as it is now under a new proper folder but in proper position name statuslines/codex",
+      "add in the dufflebag this so we can setup it next time if i need to easily exactly as it is now under a new proper folder but in proper position name statuslines/codex"
+    ]
+  },
+  {
+    "norm": "do it all and [image #1] add it and also if u can a bg bg color that fit each word that the model is reading but in the tui so i can follow it while it read and i wont get lost",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "examples": [
+      "do it all and [Image #1] add it and also if u can a bg bg color that fit each word that the model is reading but in the tui so i can follow it while it read and i wont get lost",
+      "do it all and [Image #1] add it and also if u can a bg bg color that fit each word that the model is reading but in the tui so i can follow it while it read and i wont get lost"
+    ]
+  },
+  {
+    "norm": "can you please pull every repo remote branches and pull it locally like sync everything we got from remote gh so were sync share with me how many got added to each repo once done.",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "examples": [
+      "Can you please pull every repo remote branches and pull it locally like sync everything we got from remote gh so were sync share with me how many got added to each repo once done.",
+      "Can you please pull every repo remote branches and pull it locally like sync everything we got from remote gh so were sync share with me how many got added to each repo once done."
+    ]
+  },
+  {
+    "norm": "ok can u remove please the following words while it reads response? e.g. bg blue and text white for every word there are some noise bg appear and that sounds bad just remove it.",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "examples": [
+      "ok can u remove please the following words while it reads response? e.g. bg blue and text white for every word there are some noise bg appear and that sounds bad just remove it.",
+      "ok can u remove please the following words while it reads response? e.g. bg blue and text white for every word there are some noise bg appear and that sounds bad just remove it."
+    ]
+  },
+  {
+    "norm": "ok nice but dorecord voice that let it stt and hear it check the sounds cause there are some crunches appear.",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "examples": [
+      "ok nice but dorecord voice that let it stt and hear it check the sounds cause there are some crunches appear.",
+      "ok nice but dorecord voice that let it stt and hear it check the sounds cause there are some crunches appear."
+    ]
+  },
+  {
+    "norm": "ok git commit push please.",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "examples": [
+      "ok git commit push please.",
+      "ok git commit push please."
+    ]
+  },
+  {
+    "norm": "i think the product should be without the automatic scan and outreach and we will have our own cold outreach email unified crm system that can easily crawl scrape and get emails for different projects we got so we can apply it for each of our saas more unified.",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "examples": [
+      "I think the product should be without the automatic scan and outreach and we will have our own cold outreach email unified crm system that can easily crawl scrape and get emails for different projects we got so we can apply it for each of our saas more unified.",
+      "I think the product should be without the automatic scan and outreach and we will have our own cold outreach email unified crm system that can easily crawl scrape and get emails for different projects we got so we can apply it for each of our saas more unified."
+    ]
+  },
+  {
+    "norm": "i agree with ur recommendation keep public scan but i do want to have better structure for this.",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "examples": [
+      "i agree with ur recommendation keep public scan but i do want to have better structure for this.",
+      "i agree with ur recommendation keep public scan but i do want to have better structure for this."
+    ]
+  },
+  {
+    "norm": "i would like to understand why use cf and open next under this too",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "examples": [
+      "i would like to understand why use cf and open next under this too",
+      "i would like to understand why use cf and open next under this too"
+    ]
+  },
+  {
+    "norm": "just remains her d1 yes.",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "examples": [
+      "just remains her d1 yes.",
+      "just remains her d1 yes."
+    ]
+  },
+  {
+    "norm": "so lets change it to follow the best practices of effect. and make it lean",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "examples": [
+      "so lets change it to follow the best practices of effect. and make it lean",
+      "so lets change it to follow the best practices of effect. and make it lean"
+    ]
+  },
+  {
+    "norm": "write in the current folder root todo.md to deslop every folder mark yosefhayim as done with checkbox and numbered list from first to last",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "examples": [
+      "write in the current folder root TODO.md to deslop every folder mark YosefHayim as done with checkbox and numbered list from first to last",
+      "write in the current folder root TODO.md to deslop every folder mark YosefHayim as done with checkbox and numbered list from first to last"
+    ]
+  },
+  {
+    "norm": "you can remove sow-template i delete it from the remote and _merge-all-[n]-07-31",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "examples": [
+      "you can remove sow-template i delete it from the remote and _merge-all-2026-07-31",
+      "you can remove sow-template i delete it from the remote and _merge-all-2026-07-31"
+    ]
+  },
+  {
+    "norm": "rename chatly to replybase thats the product. u can delete learning unity and mobile-apps-monorepoe. same as shabbat guard and shopify apps",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "examples": [
+      "rename chatly to replybase thats the product. u can delete learning unity and mobile-apps-monorepoe. same as shabbat guard and shopify apps",
+      "rename chatly to replybase thats the product. u can delete learning unity and mobile-apps-monorepoe. same as shabbat guard and shopify apps"
+    ]
+  },
+  {
+    "norm": "explain to me about this repo what it does what deps you see unsued can be removed what is in a middle of merges or stale and if the current structure looks logical to the purpose of this repo structure itself",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "examples": [
+      "Explain to me about this repo what it does what deps you see unsued can be removed what is in a middle of merges or stale and if the current structure looks logical to the purpose of\n  this repo structure itself",
+      "Explain to me about this repo what it does what deps you see unsued can be removed what is in a middle of merges or stale and if the current structure looks logical to the purpose of\n  this repo structure itself"
+    ]
+  },
+  {
+    "norm": "explain to me about this repo what it does what deps you see unsued can be removed what is in a middle of merges or stale and if the current structure looks logical to the purpose of this repo structure itself if its in the same structure that the apple api docs expect so we give the most expierenced and good develoepr expierence",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "examples": [
+      "Explain to me about this repo what it does what deps you see unsued can be removed what is in a middle of merges or stale and if the current structure looks logical to the purpose of\n  this repo structure itself if its in the same structure that the apple api docs expect so we give the most expierenced and good develoepr expierence",
+      "Explain to me about this repo what it does what deps you see unsued can be removed what is in a middle of merges or stale and if the current structure looks logical to the purpose of\n  this repo structure itself if its in the same structure that the apple api docs expect so we give the most expierenced and good develoepr expierence"
+    ]
+  },
+  {
+    "norm": "find all conflicts and fix",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "examples": [
+      "find all conflicts and fix",
+      "find all conflicts and fix"
+    ]
+  },
+  {
+    "norm": "did we handled proper issues exist on gh remote ? please check and confirm",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "examples": [
+      "did we handled proper issues exist on gh remote ? please check and confirm",
+      "did we handled proper issues exist on gh remote ? please check and confirm"
+    ]
+  },
+  {
+    "norm": "fix please before we git commit push",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "examples": [
+      "fix please before we git commit push",
+      "fix please before we git commit push"
+    ]
+  },
+  {
+    "norm": "we got proxy on the cf why is that? and how can we remove it i authorization granted to wrangler can u check that and fix it so we wont need that proxy to make it cleaner",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "examples": [
+      "we got proxy on the cf why is that? and how can we remove it I Authorization granted to Wrangler can u check that and fix it so we wont need that proxy to make it cleaner",
+      "we got proxy on the cf why is that? and how can we remove it I Authorization granted to Wrangler can u check that and fix it so we wont need that proxy to make it cleaner"
+    ]
+  },
+  {
+    "norm": "[image #1] this one here or in other url can u give me it so i create for u",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "examples": [
+      "[Image #1] this one here or in other url can u give me it so i create for u",
+      "[Image #1] this one here or in other url can u give me it so i create for u"
+    ]
+  },
+  {
+    "norm": "try now ive put it",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "examples": [
+      "try now ive put it",
+      "try now ive put it"
+    ]
+  },
+  {
+    "norm": "why i cant launch proejct yosefhayimsabag@yosefs-mbp mypr-app % pnpm run dev [warn] the \"workspaces\" field in package.json is not supported by pnpm. create a \"pnpm-workspace.yaml\" file instead. [error] this project is configured to use npm for help, run: pnpm help run yosefhayimsabag@yosefs-mbp mypr-app %",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "examples": [
+      "why i cant launch proejct yosefhayimsabag@yosefs-mbp MYPR-App % pnpm run dev\n[WARN] The \"workspaces\" field in package.json is not supported by pnpm. Create a \"pnpm-workspace.yaml\" file instead.\n[ERROR] This project is configured to use npm\nFor help, run: pnpm help run\n\nyosefhayimsabag@yosefs-mbp MYPR-App %",
+      "why i cant launch proejct yosefhayimsabag@yosefs-mbp MYPR-App % pnpm run dev\n[WARN] The \"workspaces\" field in package.json is not supported by pnpm. Create a \"pnpm-workspace.yaml\" file instead.\n[ERROR] This project is configured to use npm\nFor help, run: pnpm help run\n\nyosefhayimsabag@yosefs-mbp MYPR-App %"
+    ]
+  },
+  {
+    "norm": "fix yosefhayimsabag@yosefs-mbp mypr-app % npm run dev npm notice run dev npm notice run concurrently --kill-others --names client,api \"npm:dev:client\" \"npm:dev:api\" [api] npm notice run dev:api [api] npm notice run npm run dev --workspace=@mypr/server [client] npm notice run dev:client [client] npm notice run npm run dev --workspace=@mypr/client [api] npm notice run @mypr/server@0.1.0 dev [client] npm notice run @mypr/client@0.1.0 dev [client] npm notice run node --env-file-if-exists=../.env ../node_modules/expo/bin/cli start [api] npm notice run node --watch --watch-preserve-output -r ts-node/register -r tsconfig-paths/register src/main.ts [client] starting project at [path]/mypr-app/client [client] expo autolinking module resolution enabled [client] starting metro bundler [client] [client] waiting on [url] [client] [client] an update for expo is available: 57.0.8 → ~57.0.9 [client] 10 other packages may need updating. run npx expo install --check for details. [client] logs for your project will appear below. [api] [path]/src/index.ts:859 [api] return new tserror(diagnostictext, diagnosticcodes, diagnostics); [api] ^ [api] tserror: ⨯ unable to compile typescript: [api] src/journalists/journalistsservice.ts(331,59): error ts2345: argument of type '{ unset: readonly (keyof pitchtarget)[]; } | undefined' is not assignable to parameter of type '(dboptions & { unset?: readonly (\"id\" | \"status\" | \"updatedat\" | \"createdat\" | \"journalistid\" | \"outreach\" | \"whatsapplinkusedat\" | \"terminalreportedat\" | \"replyexplanation\" | \"journalistresponsekind\" | \"journalistrespondedat\" | \"journalistreadat\" | \"journalistsavedat\")[] | undefined; }) | undefined'. [api] type '{ unset: readonly (keyof pitchtarget)[]; }' is not assignable to type 'dboptions & { unset?: readonly (\"id\" | \"status\" | \"updatedat\" | \"createdat\" | \"journalistid\" | \"outreach\" | \"whatsapplinkusedat\" | \"terminalreportedat\" | \"replyexplanation\" | \"journalistresponsekind\" | \"journalistrespondedat\" | \"journalistreadat\" | \"journalistsavedat\")[] | undefined; }'. [api] type '{ unset: readonly (keyof pitchtarget)[]; }' is not assignable to type '{ unset?: readonly (\"id\" | \"status\" | \"updatedat\" | \"createdat\" | \"journalistid\" | \"outreach\" | \"whatsapplinkusedat\" | \"terminalreportedat\" | \"replyexplanation\" | \"journalistresponsekind\" | \"journalistrespondedat\" | \"journalistreadat\" | \"journalistsavedat\")[] | undefined; }'. [api] types of property 'unset' are incompatible. [api] type 'readonly (keyof pitchtarget)[]' is not assignable to type 'readonly (\"id\" | \"status\" | \"updatedat\" | \"createdat\" | \"journalistid\" | \"outreach\" | \"whatsapplinkusedat\" | \"terminalreportedat\" | \"replyexplanation\" | \"journalistresponsekind\" | \"journalistrespondedat\" | \"journalistreadat\" | \"journalistsavedat\")[]'. [api] type 'keyof pitchtarget' is not assignable to type '\"id\" | \"status\" | \"updatedat\" | \"createdat\" | \"journalistid\" | \"outreach\" | \"whatsapplinkusedat\" | \"terminalreportedat\" | \"replyexplanation\" | \"journalistresponsekind\" | \"journalistrespondedat\" | \"journalistreadat\" | \"journalistsavedat\"'. [api] type '\"owneruserid\"' is not assignable to type '\"id\" | \"status\" | \"updatedat\" | \"createdat\" | \"journalistid\" | \"outreach\" | \"whatsapplinkusedat\" | \"terminalreportedat\" | \"replyexplanation\" | \"journalistresponsekind\" | \"journalistrespondedat\" | \"journalistreadat\" | \"journalistsavedat\"'. [api] [api] at createtserror ([path]/src/index.ts:859:12) [api] at reporttserror ([path]/src/index.ts:863:19) [api] at getoutput ([path]/src/index.ts:[n]:36) [api] at object.compile ([path]/src/index.ts:[n]:41) [api] at module.m._compile ([path]/src/index.ts:[n]:30) [api] at node:internal/modules/cjs/loader:[n]:10 [api] at object.require.extensions.<computed> [as .ts] ([path]/src/index.ts:[n]:12) [api] at module.load (node:internal/modules/cjs/loader:[n]:32) [api] at module._load (node:internal/modules/cjs/loader:[n]:12) [api] at wrapmoduleload (node:internal/modules/cjs/loader:255:19) { [api] diagnosticcodes: [ [n] ] [api] } [api] failed running 'src/main.ts'. waiting for file changes before restarting...",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "examples": [
+      "fix yosefhayimsabag@yosefs-mbp MYPR-App % npm run dev\nnpm notice run dev\nnpm notice run concurrently --kill-others --names client,api \"npm:dev:client\" \"npm:dev:api\"\n[api] npm notice run dev:api\n[api] npm notice run npm run dev --workspace=@mypr/server\n[client] npm notice run dev:client\n[client] npm notice run npm run dev --workspace=@mypr/client\n[api] npm notice run @mypr/server@0.1.0 dev\n[client] npm notice run @mypr/client@0.1.0 dev\n[client] npm notice run node --env-file-if-exists=../.env ../",
+      "fix yosefhayimsabag@yosefs-mbp MYPR-App % npm run dev\nnpm notice run dev\nnpm notice run concurrently --kill-others --names client,api \"npm:dev:client\" \"npm:dev:api\"\n[api] npm notice run dev:api\n[api] npm notice run npm run dev --workspace=@mypr/server\n[client] npm notice run dev:client\n[client] npm notice run npm run dev --workspace=@mypr/client\n[api] npm notice run @mypr/server@0.1.0 dev\n[client] npm notice run @mypr/client@0.1.0 dev\n[client] npm notice run node --env-file-if-exists=../.env ../"
+    ]
+  },
+  {
+    "norm": "kill please all local ports except [n]",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "examples": [
+      "kill please all local ports except 8081",
+      "kill please all local ports except 8081"
+    ]
+  },
+  {
+    "norm": "fix maximum update depth exceeded. this can happen when a component repeatedly calls setstate inside componentwillupdate or componentdidupdate. react limits the number of nested updates to prevent infinite loops. component stack at <anonymous> (client/node_modules/expo-router/build/layouts/withlayoutcontext.js:128:133) at object.assign$argument_0 (client/node_modules/expo-router/build/layouts/stackclient.js:433:34) at webrootlayout (client/app/_layout.web.tsx:100:9) at wrappedscreencomponent (client/node_modules/expo-router/build/usescreens.js:212:37) at baseroute (client/node_modules/expo-router/build/usescreens.js:259:856) at sceneview (client/node_modules/expo-router/build/react-navigation/core/sceneview.js:134:572) at render (client/node_modules/expo-router/build/react-navigation/core/usedescriptors.js:128:45) at routes.reduce$argument_0 (client/node_modules/expo-router/build/react-navigation/core/usedescriptors.js:144:25) at array.reduce (<anonymous>) at usedescriptors (client/node_modules/expo-router/build/react-navigation/core/usedescriptors.js:141:32) at usenavigationbuilder (client/node_modules/expo-router/build/react-navigation/core/usenavigationbuilder.js:630:74) at content (client/node_modules/expo-router/build/exporoot.js:145:88) at contextnavigator (client/node_modules/expo-router/build/exporoot.js:135:566) at exporoot (client/node_modules/expo-router/build/exporoot.js:85:33) at app (client/node_modules/expo-router/build/qualified-entry.js:20:91) at withdevtools (node_modules/expo/src/launch/withdevtools.web.tsx:11:9) call stack at getrootforupdatedfiber (node_modules/react-dom/cjs/react-dom-client.development.js:[n]:11) at enqueueconcurrentrenderforlane (node_modules/react-dom/cjs/react-dom-client.development.js:[n]:14) at forcestorererender (node_modules/react-dom/cjs/react-dom-client.development.js:[n]:18) at subscribe$argument_0 (node_modules/react-dom/cjs/react-dom-client.development.js:[n]:11) at listeners.foreach$argument_0 (client/node_modules/expo-router/build/react-navigation/core/usesyncstate.js:80:45) at array.foreach (<anonymous>) at batchupdates (client/node_modules/expo-router/build/react-navigation/core/usesyncstate.js:80:23) at <anonymous> (client/node_modules/expo-router/build/react-navigation/core/usesyncstate.js:102:19) at latestcallback (client/node_modules/expo-router/build/utils/uselatestcallback.js:52:28) at callcreate.react_stack_bottom_frame (node_modules/react-dom/cjs/react-dom-client.development.js:[n]:20) at runwithfiberindev (node_modules/react-dom/cjs/react-dom-client.development.js:871:30) at commithookeffectlistmount (node_modules/react-dom/cjs/react-dom-client.development.js:[n]:29) at commithooklayouteffects (node_modules/react-dom/cjs/react-dom-client.development.js:[n]:11) at commitlayouteffectonfiber (node_modules/react-dom/cjs/react-dom-client.development.js:[n]:13) at recursivelytraverselayouteffects (node_modules/react-dom/cjs/react-dom-client.development.js:[n]:11) at commitlayouteffectonfiber (node_modules/react-dom/cjs/react-dom-client.development.js:[n]:11) at recursivelytraverselayouteffects (node_modules/react-dom/cjs/react-dom-client.development.js:[n]:11) at commitlayouteffectonfiber (node_modules/react-dom/cjs/react-dom-client.development.js:[n]:11) at recursivelytraverselayouteffects (node_modules/react-dom/cjs/react-dom-client.development.js:[n]:11) at commitlayouteffectonfiber (node_modules/react-dom/cjs/react-dom-client.development.js:[n]:11) at recursivelytraverselayouteffects (node_modules/react-dom/cjs/react-dom-client.development.js:[n]:11) at commitlayouteffectonfiber (node_modules/react-dom/cjs/react-dom-client.development.js:[n]:11) at recursivelytraverselayouteffects (node_modules/react-dom/cjs/react-dom-client.development.js:[n]:11) at commitlayouteffectonfiber (node_modules/react-dom/cjs/react-dom-client.development.js:[n]:11) at recursivelytraverselayouteffects (node_modules/react-dom/cjs/react-dom-client.development.js:[n]:11) at commitlayouteffectonfiber (node_modules/react-dom/cjs/react-dom-client.development.js:[n]:11) at recursivelytraverselayouteffects (node_modules/react-dom/cjs/react-dom-client.development.js:[n]:11) at commitlayouteffectonfiber (node_modules/react-dom/cjs/react-dom-client.development.js:[n]:11) at recursivelytraverselayouteffects (node_modules/react-dom/cjs/react-dom-client.development.js:[n]:11) at commitlayouteffectonfiber (node_modules/react-dom/cjs/react-dom-client.development.js:[n]:11) at recursivelytraverselayouteffects (node_modules/react-dom/cjs/react-dom-client.development.js:[n]:11) at commitlayouteffectonfiber (node_modules/react-dom/cjs/react-dom-client.development.js:[n]:11) at recursivelytraverselayouteffects (node_modules/react-dom/cjs/react-dom-client.development.js:[n]:11) at commitlayouteffectonfiber (node_modules/react-dom/cjs/react-dom-client.development.js:[n]:11) at recursivelytraverselayouteffects (node_modules/react-dom/cjs/react-dom-client.development.js:[n]:11)",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "examples": [
+      "fix Maximum update depth exceeded. This can happen when a component repeatedly calls setState inside componentWillUpdate or componentDidUpdate. React limits the number of nested updates to prevent infinite loops.\n\nComponent Stack\n  at <anonymous> (client/node_modules/expo-router/build/layouts/withLayoutContext.js:128:133)\n  at Object.assign$argument_0 (client/node_modules/expo-router/build/layouts/StackClient.js:433:34)\n  at WebRootLayout (client/app/_layout.web.tsx:100:9)\n  at WrappedScreenComp",
+      "fix Maximum update depth exceeded. This can happen when a component repeatedly calls setState inside componentWillUpdate or componentDidUpdate. React limits the number of nested updates to prevent infinite loops.\n\nComponent Stack\n  at <anonymous> (client/node_modules/expo-router/build/layouts/withLayoutContext.js:128:133)\n  at Object.assign$argument_0 (client/node_modules/expo-router/build/layouts/StackClient.js:433:34)\n  at WebRootLayout (client/app/_layout.web.tsx:100:9)\n  at WrappedScreenComp"
+    ]
+  },
+  {
+    "norm": "two tasks 1. we got in mypr [image #1] [url] a notifications settings can u confirm if we actually verify it works e2e production ready? 2. admin has jump messages when they show up in app for regular user and admin can config them when and how we got 60 something of these can u confirm if that is propely e2e tested too verified worked ? between demo user to admin demo changes modificatiosn to verify it trully works every single one of them and as well appear properly? like if tomorrow he adds something new we can verify works",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "examples": [
+      "two tasks 1. we got in mypr [Image #1] [URL]  a notifications settings can u confirm if we actually verify it works e2e production readY?\n\n2. admin has jump messages when they show up in app for regular user and admin can config them when and how we got 60 something of these can u confirm if that is propely e2e tested too verified worked ? between demo user to admin demo changes modificatiosn to verify it trully works every single one of them and as well appear properly? like if tomorrow he adds",
+      "two tasks 1. we got in mypr [Image #1] [URL]  a notifications settings can u confirm if we actually verify it works e2e production readY?\n\n2. admin has jump messages when they show up in app for regular user and admin can config them when and how we got 60 something of these can u confirm if that is propely e2e tested too verified worked ? between demo user to admin demo changes modificatiosn to verify it trully works every single one of them and as well appear properly? like if tomorrow he adds"
+    ]
+  },
+  {
+    "norm": "b but no ??",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "examples": [
+      "b but no ??",
+      "b but no ??"
+    ]
+  },
+  {
+    "norm": "ok but i forbid as well generic words like payload,response,data,raw,result etc",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "examples": [
+      "ok but i forbid as well generic words like payload,response,data,raw,result etc",
+      "ok but i forbid as well generic words like payload,response,data,raw,result etc"
+    ]
+  },
+  {
+    "norm": "i dont midn else as long as it serve the purpose of its self. e.g. the function",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "examples": [
+      "i dont midn else as long as it serve the purpose of its self. e.g. the function",
+      "i dont midn else as long as it serve the purpose of its self. e.g. the function"
+    ]
+  },
+  {
+    "norm": "understand purpose of this repo.",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "examples": [
+      "understand purpose of this repo.",
+      "understand purpose of this repo."
+    ]
+  },
+  {
+    "norm": "a schema should already validate this for us no need to do this conditions checks",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "examples": [
+      "a schema should already validate this for us no need to do this conditions checks",
+      "a schema should already validate this for us no need to do this conditions checks"
+    ]
+  },
+  {
+    "norm": "i would like you to fix how it generate .bridge no matter from where i am launching it should be written to ssot root .bridge folder and not to the position the agent is initing it. cause that causing a lot of noises same for when it triggers download folder. i would like you to delete all what u found regarding this includng .gitignore cause it should not serve this",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "examples": [
+      "I would like you to fix how it generate .bridge no matter from where i am launching it should be written to ssot root .bridge folder and not to the position the agent is initing it. cause that causing a lot of noises same for when it triggers download folder. i would like you to delete all what u found regarding this includng .gitignore cause it should not serve this",
+      "I would like you to fix how it generate .bridge no matter from where i am launching it should be written to ssot root .bridge folder and not to the position the agent is initing it. cause that causing a lot of noises same for when it triggers download folder. i would like you to delete all what u found regarding this includng .gitignore cause it should not serve this"
+    ]
+  },
+  {
+    "norm": "ok so did u doubled modified it so it does work",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "examples": [
+      "ok so did u doubled modified it so it does work",
+      "ok so did u doubled modified it so it does work"
+    ]
+  },
+  {
+    "norm": "yes i do",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "examples": [
+      "yes i do",
+      "yes i do"
+    ]
+  },
+  {
+    "norm": "implement those fixes next",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "examples": [
+      "implement those fixes next",
+      "implement those fixes next"
+    ]
+  },
+  {
+    "norm": "change i dont like it show other options.",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "examples": [
+      "change i dont like it show other options.",
+      "change i dont like it show other options."
+    ]
+  },
+  {
+    "norm": "i would say that we need to seperate it based on the business logic so they are easy to modify if we want so. e.g. followig uncle bob rules.",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "examples": [
+      "i would say that we need to seperate it based on the business logic so they are easy to modify if we want so. e.g. followig uncle bob rules.",
+      "i would say that we need to seperate it based on the business logic so they are easy to modify if we want so. e.g. followig uncle bob rules."
+    ]
+  },
+  {
+    "norm": "yes agree",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "examples": [
+      "yes agree",
+      "yes agree"
+    ]
+  },
+  {
+    "norm": "did u do some tests to verify it ?e.g. launch",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "examples": [
+      "did u do some tests to verify it ?e.g. launch",
+      "did u do some tests to verify it ?e.g. launch"
+    ]
+  },
+  {
+    "norm": "read olly-yogo and identify what are the differences on starting yoga session pose identify the differences so we can pull it to the oly-app and modify it so launch it via metro on my local device iphone 12 pro iphone yosef so i see if there are a lot of differences in detecting it but before apply share with me.",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "examples": [
+      "Read olly-yogo and identify what are the differences on starting yoga session pose identify the differences so we can pull it to the Oly-App and modify it so launch it via metro on my local device iphone 12 pro iphone yosef so i see if there are a lot of differences in detecting it but before apply share with me.",
+      "Read olly-yogo and identify what are the differences on starting yoga session pose identify the differences so we can pull it to the Oly-App and modify it so launch it via metro on my local device iphone 12 pro iphone yosef so i see if there are a lot of differences in detecting it but before apply share with me."
+    ]
+  },
+  {
+    "norm": "ok nice so look for other stale files now or things can be safely deleted and share with me before",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "examples": [
+      "ok nice so look for other stale files now or things can be safely deleted and share with me before",
+      "ok nice so look for other stale files now or things can be safely deleted and share with me before"
+    ]
+  },
+  {
+    "norm": "yes i mean a",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "examples": [
+      "yes i mean a",
+      "yes i mean a"
+    ]
+  },
+  {
+    "norm": "agreed. no need hard cap of loc it per purpose purly",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "examples": [
+      "agreed. no need hard cap of loc it per purpose purly",
+      "agreed. no need hard cap of loc it per purpose purly"
+    ]
+  },
+  {
+    "norm": "agreed do it",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "examples": [
+      "agreed do it",
+      "agreed do it"
+    ]
+  },
+  {
+    "norm": "agreed with all",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "examples": [
+      "agreed with all",
+      "agreed with all"
+    ]
+  },
+  {
+    "norm": "what about the ci cd of github action? for instance' we are running multiple vtap actions on different node versions and that's feeling to me very dumb. make it more smart and efficient than running it on multiple different environments. how should look the updated one",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "examples": [
+      "What about the CI CD of GitHub Action? For instance' we are running multiple VTAP actions on different node versions and that's feeling to me very dumb. Make it more smart and efficient than running it on multiple different environments. how should look the updated one",
+      "What about the CI CD of GitHub Action? For instance' we are running multiple VTAP actions on different node versions and that's feeling to me very dumb. Make it more smart and efficient than running it on multiple different environments. how should look the updated one"
+    ]
+  },
+  {
+    "norm": "just angry.",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "examples": [
+      "Just angry.",
+      "Just angry."
+    ]
+  },
+  {
+    "norm": "yes i agree",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "examples": [
+      "yes i agree",
+      "yes i agree"
+    ]
+  },
+  {
+    "norm": "yes only by what is cannot be undersatabdle via the variables function name or parmaters that why we need very good picks",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "examples": [
+      "yes only by what is cannot be undersatabdle via the variables function name or parmaters that why we need very good picks",
+      "yes only by what is cannot be undersatabdle via the variables function name or parmaters that why we need very good picks"
+    ]
+  },
+  {
+    "norm": "can u please also update the dufflebag ci-cd workflows template we got (one levelup) so it follows that too",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "workspaces": [],
+    "examples": [
+      "can u please also update the dufflebag ci-cd workflows template we got (one levelup) so it follows that too",
+      "can u please also update the dufflebag ci-cd workflows template we got (one levelup) so it follows that too"
+    ]
+  }
+]
