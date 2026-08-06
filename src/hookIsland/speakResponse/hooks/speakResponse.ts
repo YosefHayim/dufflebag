@@ -122,6 +122,17 @@ const agentReplyOrigin = (): AgentReplyOrigin => {
   };
 };
 
+const contentToken = (markdown: string) => {
+  // Stable FNV-1a 64-bit — matches the Rust worker so empty response_ids still dedupe.
+  let hash = 0xcbf29ce484222325n;
+  const bytes = Buffer.from(markdown, "utf8");
+  for (const byte of bytes) {
+    hash ^= BigInt(byte);
+    hash = BigInt.asUintN(64, hash * 0x100000001b3n);
+  }
+  return `${hash.toString(16).padStart(16, "0")}:${markdown.length}`;
+};
+
 const queueAgentReply = (request: {
   readonly markdown: string;
   readonly source: string;
@@ -129,6 +140,9 @@ const queueAgentReply = (request: {
 }) => {
   const inbox = path.join(voiceStateHome(), "inbox");
   mkdirSync(inbox, { recursive: true });
+  const token = contentToken(request.markdown);
+  // Prefer a stable reply id; fall back to content so repeated Stop hooks don't re-queue.
+  const agentReplyId = request.agentReplyId.trim() || token;
   const id = `${Date.now()}-${randomUUID()}`;
   const destination = path.join(inbox, `${id}.json`);
   const temporary = path.join(inbox, `.${id}.tmp`);
@@ -138,7 +152,7 @@ const queueAgentReply = (request: {
       markdown: request.markdown,
       origin: agentReplyOrigin(),
       received_at: Date.now() / 1_000,
-      agent_reply_id: request.agentReplyId,
+      agent_reply_id: agentReplyId,
       source: request.source,
     }),
     { encoding: "utf8", mode: 0o600 },
@@ -147,9 +161,10 @@ const queueAgentReply = (request: {
 };
 
 const startWorker = () => {
-  const voicePath = path.join(path.dirname(path.dirname(fileURLToPath(import.meta.url))), "voice.py");
-  const worker = spawn("uv", ["run", "--frozen", "--script", voicePath, "start"], {
-    cwd: path.dirname(voicePath),
+  const runtimeRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
+  const binaryPath = path.join(runtimeRoot, "dufflebag-voice");
+  const worker = spawn(binaryPath, ["start"], {
+    cwd: runtimeRoot,
     detached: true,
     stdio: "ignore",
     windowsHide: true,

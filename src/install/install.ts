@@ -1625,28 +1625,34 @@ const restoreWholeFile = (input: {
     );
   }
 
-  if (input.snapshot._tag !== "file" || hashBytes(input.snapshot.bytes) !== input.artifact.ownership.installedHash) {
-    return Either.left(
-      new InstallError({ issue: `Receipted artifact ${input.artifact.path} changed after installation.` }),
-    );
+  const ownership = input.artifact.ownership;
+  const matchesInstalled =
+    input.snapshot._tag === "file" && hashBytes(input.snapshot.bytes) === ownership.installedHash;
+
+  // We created this path from nothing: uninstall must not stick on drift, upgrades, or prior deletion.
+  // expectedCurrent still binds the transaction to the bytes we observed at plan time.
+  if (ownership.previous._tag === "missing") {
+    return validateArtifactOperation({
+      _tag: "remove",
+      artifact: input.artifact,
+      unownedBytes: new Uint8Array(),
+      expectedCurrent: expectedCurrent(input.snapshot),
+    });
   }
 
-  const operation =
-    input.artifact.ownership.previous._tag === "missing"
-      ? {
-          _tag: "remove",
-          artifact: input.artifact,
-          unownedBytes: new Uint8Array(),
-          expectedCurrent: expectedCurrent(input.snapshot),
-        }
-      : {
-          _tag: "restore",
-          artifact: input.artifact,
-          bytes: input.artifact.ownership.previous.bytes,
-          expectedCurrent: expectedCurrent(input.snapshot),
-        };
+  // Replaced a prior host file: restore when current matches installed, or when the path is gone.
+  if (matchesInstalled || input.snapshot._tag === "missing") {
+    return validateArtifactOperation({
+      _tag: "restore",
+      artifact: input.artifact,
+      bytes: ownership.previous.bytes,
+      expectedCurrent: expectedCurrent(input.snapshot),
+    });
+  }
 
-  return validateArtifactOperation(operation);
+  return Either.left(
+    new InstallError({ issue: `Receipted artifact ${input.artifact.path} changed after installation.` }),
+  );
 };
 
 const restoreInstructionFile = (input: {

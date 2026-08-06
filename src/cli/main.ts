@@ -24,7 +24,7 @@ import { CliUsageError } from "./scopeOptions.js";
 import * as TerminalUI from "./TerminalUI.js";
 import { uninstallCommand } from "./uninstallCommand.js";
 import { updateCommand } from "./updateCommand.js";
-import { voiceCommand } from "./voiceCommand.js";
+import { sttCommand, ttsCommand, voiceCommand } from "./voiceCommand.js";
 
 // An unreadable or malformed package.json is indistinguishable from an absent
 // one here: both mean "keep walking up", so both surface as undefined.
@@ -74,6 +74,8 @@ const dufflebag = Command.make("dufflebag").pipe(
     doctorCommand,
     dedupCommand,
     workflowCommand,
+    sttCommand,
+    ttsCommand,
     voiceCommand,
   ]),
 );

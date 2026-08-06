@@ -17,5 +17,12 @@
     "verbatimModuleSyntax": true
   },
   "include": ["src/**/*.ts", "scripts/**/*.ts"],
-  "exclude": ["node_modules", "dist", "src/skills/pngToCode", "src/**/*.test.ts"]
+  "exclude": [
+    "node_modules",
+    "dist",
+    "src/skills/pngToCode",
+    "src/**/*.test.ts",
+    "src/hookIsland/speakResponse/voice/target",
+    "src/hookIsland/speakResponse/voice/**/target"
+  ]
 }

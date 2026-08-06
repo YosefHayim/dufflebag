@@ -78,7 +78,8 @@
     "@effect/platform-node": "0.108.0",
     "effect": "3.22.0",
     "jsonc-parser": "3.3.1",
-    "yaml": "2.9.0"
+    "yaml": "2.9.0",
+    "ys-dufflebag": "link:"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.2",
