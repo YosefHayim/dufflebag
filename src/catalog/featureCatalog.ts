@@ -864,6 +864,22 @@ export const featureCatalog = Schema.decodeUnknownSync(featureCatalogSchema, {
     runtime: { _tag: "none" },
   },
   {
+    id: "kill-ports-local-dev",
+    sourceDirectory: "killPortsLocalDev",
+    installedSkill: {
+      _tag: "skill",
+      id: "kill-ports-local-dev",
+      shippedPaths: ["SKILL.md"],
+    },
+    title: "Kill ports (local dev)",
+    summary:
+      "List and free local TCP listeners (default keep Metro 8081) so the next dev launch is not blocked by stale processes.",
+    selectedByDefault: false,
+    dependencies: [],
+    platform: "any",
+    runtime: { _tag: "none" },
+  },
+  {
     id: "capture-workflow",
     sourceDirectory: "captureWorkflow",
     installedSkill: {
