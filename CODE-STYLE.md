@@ -944,6 +944,21 @@ A **feature** is dufflebag's unit of extension: a catalog entry plus the artifac
 
 ## Recipes
 
+### Branching & PR
+
+[rule:git.feature-branch] · verify: judgment
+
+All product changes land from a named topic branch via a focused PR or branch push, never as direct product commits on the default branch.
+
+```text
+// ✓ git switch -c feat/42-catalog-skill
+// ✓ .worktrees/feat-42-catalog-skill + gh pr create --body "Fixes #42"
+// ✗ commit product work on main
+// ✗ git push --delete origin feat/… after ship (unless user asked)
+```
+
+Why: keeps main releasable, reviews scoped, and parallel agents isolated. Refactors and refinements still get their own branch; remote branches are not deleted unless the user asks. Skills: `finish-and-ship`, `organized-commits`, `coordinate-worktrees`.
+
 ### Adding a CLI command
 
 1. Define the request Schema and the thin command adapter in `src/cli/`, returning an Effect.
