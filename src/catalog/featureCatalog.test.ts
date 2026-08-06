@@ -47,6 +47,7 @@ const expectedFeatureIds = [
   "deploy-and-prove",
   "coordinate-worktrees",
   "kill-ports-local-dev",
+  "workspace-bootstrap",
   "capture-workflow",
   "finish-agent-sessions",
 ];
@@ -87,6 +88,7 @@ const expectedSourceDirectories = [
   "deployAndProve",
   "coordinateWorktrees",
   "killPortsLocalDev",
+  "workspaceBootstrap",
   "captureWorkflow",
   "finishAgentSessions",
 ];
@@ -211,6 +213,7 @@ describe("featureCatalog", () => {
       ["deploy-and-prove", ["SKILL.md"]],
       ["coordinate-worktrees", ["SKILL.md"]],
       ["kill-ports-local-dev", ["SKILL.md"]],
+      ["workspace-bootstrap", ["SKILL.md"]],
       ["capture-workflow", ["SKILL.md"]],
       ["finish-agent-sessions", ["SKILL.md"]],
     ]);
