@@ -22,8 +22,8 @@ Modes:
 
 from __future__ import annotations
 
-import contextlib
 import argparse
+import contextlib
 import json
 import re
 import sys
