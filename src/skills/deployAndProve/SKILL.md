@@ -1,6 +1,6 @@
 ---
 name: deploy-and-prove
-description: Use when the user asks to deploy, publish, release, promote, or confirm that the latest version is live, especially when success must be proven from the production provider and real runtime rather than local state.
+description: Use when the user asks to deploy, redeploy/redploy, publish a worker/site/service, multi-site or multi-domain deploy, cf:deploy / wrangler deploy, or prove production/live (curl smoke, webhook, e2e production ready, "is it live"). Especially when success must be proven from the production provider and real runtime rather than local state. Do not use for "do not deploy / run local only", or for "promote" meaning lift types/schemas into a shared package.
 type: flow
 ---
 
