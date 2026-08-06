@@ -98,7 +98,12 @@ const copyFile = (input: { source: string; destination: string }) =>
     const path = yield* Path.Path;
     yield* fileSystem.makeDirectory(path.dirname(input.destination), { recursive: true });
     const bytes = yield* fileSystem.readFile(input.source);
-    yield* fileSystem.writeFile(input.destination, bytes);
+    const executable = path.basename(input.source) === "dufflebag-voice";
+    yield* fileSystem.writeFile(input.destination, bytes, executable ? { mode: 0o755 } : undefined);
+    if (executable) {
+      // Some platforms ignore write mode; force the worker bit after the write.
+      yield* fileSystem.chmod(input.destination, 0o755);
+    }
   });
 
 // Never stage install junk even when a catalog path is a directory allowlist.
@@ -210,9 +215,14 @@ const stageRuntimeFeature = (input: {
     for (const shippedPath of input.shippedPaths) {
       const source = path.join(authoredFeatureRoot, shippedPath);
       if (!(yield* fileSystem.exists(source))) {
-        return yield* new StagePackageError({
-          issue: `Catalog-shipped runtime path ${shippedPath} is missing under ${authoredFeatureRoot}.`,
-        });
+        if (shippedPath === "dufflebag-voice") {
+          yield* ensureVoiceBinaryBuilt(input.packageRoot);
+        }
+        if (!(yield* fileSystem.exists(source))) {
+          return yield* new StagePackageError({
+            issue: `Catalog-shipped runtime path ${shippedPath} is missing under ${authoredFeatureRoot}.`,
+          });
+        }
       }
 
       yield* copyTree({
@@ -220,6 +230,36 @@ const stageRuntimeFeature = (input: {
         destination: path.join(stagedFeatureRoot, shippedPath),
       });
     }
+  });
+
+const ensureVoiceBinaryBuilt = (packageRoot: string) =>
+  Effect.gen(function* () {
+    const path = yield* Path.Path;
+    const script = path.join(packageRoot, "scripts", "buildVoice.sh");
+    const fileSystem = yield* FileSystem.FileSystem;
+    if (!(yield* fileSystem.exists(script))) {
+      return yield* new StagePackageError({
+        issue: `Native voice worker is missing and ${script} was not found to build it.`,
+      });
+    }
+
+    yield* Effect.tryPromise({
+      try: async () => {
+        const { spawnSync } = await import("node:child_process");
+        const result = spawnSync("bash", [script], {
+          cwd: packageRoot,
+          encoding: "utf8",
+          env: process.env,
+        });
+        if (result.status !== 0) {
+          throw new Error(result.stderr || result.stdout || `buildVoice exited ${String(result.status)}`);
+        }
+      },
+      catch: (error) =>
+        new StagePackageError({
+          issue: `Could not build dufflebag-voice: ${error instanceof Error ? error.message : String(error)}`,
+        }),
+    });
   });
 
 const stageSkillFeature = (input: {

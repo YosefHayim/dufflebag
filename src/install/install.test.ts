@@ -6,7 +6,7 @@ import { expect, layer } from "@effect/vitest";
 import { Effect, Schema } from "effect";
 
 import { defaultBagConfig } from "../config/bagConfigSchema.js";
-import { install, installRequestSchema, reconcileInstallation } from "./install.js";
+import { install, installRequestSchema, materializeArtifactRestorations, reconcileInstallation } from "./install.js";
 
 const textEncoder = new TextEncoder();
 
@@ -621,6 +621,84 @@ layer(NodeContext.layer)("install", (it) => {
         const settings = yield* fileSystem.readFileString(path.join(realRoot, ".claude/settings.json"));
         expect(settings).toContain(realRoot);
         expect(settings).not.toContain(linkedRoot);
+      }),
+    ),
+  );
+
+  it.effect("removes installer-created whole files even when they drifted or vanished", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const fileSystem = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const root = yield* fileSystem.makeTempDirectoryScoped({ prefix: "dufflebag-restore-drift-" });
+        const driftedPath = ".claude/dufflebag/runtime/speakResponse/hooks/speakResponse.js";
+        const missingPath = ".claude/dufflebag/runtime/speakResponse/voice.py";
+        const exactPath = ".claude/dufflebag/runtime/speakResponse/cmux_focus.py";
+        const exactBytes = textEncoder.encode("exact\n");
+        const installedHash = createHash("sha256").update(exactBytes).digest("hex");
+        const driftedHash = createHash("sha256").update("old\n").digest("hex");
+
+        yield* fileSystem.makeDirectory(path.dirname(path.join(root, driftedPath)), { recursive: true });
+        yield* fileSystem.writeFileString(path.join(root, driftedPath), "drifted after install\n");
+        yield* fileSystem.writeFile(path.join(root, exactPath), exactBytes);
+
+        const wholeFile = (filePath: string, hash: string) => ({
+          owner: { _tag: "application" as const },
+          path: filePath,
+          kind: { _tag: "runtime" as const },
+          ownership: {
+            _tag: "wholeFile" as const,
+            installedHash: hash,
+            previous: { _tag: "missing" as const },
+          },
+        });
+
+        const restorations = yield* materializeArtifactRestorations({
+          root,
+          artifacts: [
+            wholeFile(driftedPath, driftedHash),
+            wholeFile(missingPath, driftedHash),
+            wholeFile(exactPath, installedHash),
+          ],
+        });
+
+        expect(restorations).toHaveLength(3);
+        expect(restorations.every((operation) => operation._tag === "remove")).toBe(true);
+      }),
+    ),
+  );
+
+  it.effect("still refuses to restore a prior host file that drifted after install", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const fileSystem = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const root = yield* fileSystem.makeTempDirectoryScoped({ prefix: "dufflebag-restore-prior-drift-" });
+        const relativePath = "owned.txt";
+        const priorBytes = textEncoder.encode("prior\n");
+        const installedBytes = textEncoder.encode("installed\n");
+        yield* fileSystem.writeFileString(path.join(root, relativePath), "user edited\n");
+
+        const result = yield* materializeArtifactRestorations({
+          root,
+          artifacts: [
+            {
+              owner: { _tag: "application" },
+              path: relativePath,
+              kind: { _tag: "runtime" },
+              ownership: {
+                _tag: "wholeFile",
+                installedHash: createHash("sha256").update(installedBytes).digest("hex"),
+                previous: { _tag: "priorFile", bytes: priorBytes },
+              },
+            },
+          ],
+        }).pipe(Effect.either);
+
+        expect(result._tag).toBe("Left");
+        if (result._tag === "Left") {
+          expect(result.left.message).toContain("changed after installation");
+        }
       }),
     ),
   );

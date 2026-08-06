@@ -49,7 +49,22 @@ const queued = (home: string) => {
 
 afterEach(() => {
   for (const home of temporaryHomes.splice(0)) {
-    rmSync(home, { recursive: true, force: true });
+    // The hook may have detached dufflebag-voice into this state home; stop it before rmdir.
+    const pidPath = path.join(home, "worker.pid");
+    try {
+      const pid = Number(readFileSync(pidPath, "utf8").trim());
+      if (Number.isFinite(pid) && pid > 0) {
+        try {
+          process.kill(pid, "SIGTERM");
+        } catch {
+          // already gone
+        }
+      }
+    } catch {
+      // no worker
+    }
+    writeFileSync(path.join(home, "stop"), "");
+    rmSync(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
   }
 });
 

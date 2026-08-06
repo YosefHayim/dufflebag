@@ -29,6 +29,8 @@ const configSettings = [
   "speech-read-along",
   "prompt-refinement-mode",
   "dictation-replacements",
+  "dictation-mic-off-delay-ms",
+  "dictation-language",
   "dedup-enforcement",
   "dedup-skip-directories",
   "debug-enabled",
@@ -55,6 +57,7 @@ const numericSettings = [
   "autorun-poll-interval-seconds",
   "autorun-idle-threshold-seconds",
   "speech-words-per-minute",
+  "dictation-mic-off-delay-ms",
 ] as const;
 
 const booleanSettings = ["speech-read-along", "debug-enabled"] as const;
@@ -65,6 +68,7 @@ const stringSettings = [
   "speech-response-mode",
   "prompt-refinement-mode",
   "dictation-replacements",
+  "dictation-language",
   "dedup-enforcement",
   "dedup-skip-directories",
 ] as const;
@@ -89,6 +93,8 @@ const configSettingKeys: Record<ConfigSetting, ConfigKey> = {
   "speech-read-along": "speechReadAlong",
   "prompt-refinement-mode": "promptRefinementMode",
   "dictation-replacements": "dictationReplacements",
+  "dictation-mic-off-delay-ms": "dictationMicOffDelayMs",
+  "dictation-language": "dictationLanguage",
   "dedup-enforcement": "dedupEnforcement",
   "dedup-skip-directories": "dedupSkipDirectories",
   "debug-enabled": "debugEnabled",
@@ -108,6 +114,8 @@ const configLabels: Record<ConfigKey, string> = {
   speechReadAlong: "speech read-along",
   promptRefinementMode: "prompt refinement mode",
   dictationReplacements: "dictation replacements",
+  dictationMicOffDelayMs: "dictation mic-off delay (ms)",
+  dictationLanguage: "dictation language (en|he)",
   dedupEnforcement: "dedup enforcement",
   dedupSkipDirectories: "dedup skip directories",
   debugEnabled: "debug diagnostics",

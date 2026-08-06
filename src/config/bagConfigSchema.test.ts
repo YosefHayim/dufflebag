@@ -40,6 +40,8 @@ describe("bagConfigSchema", () => {
       speechReadAlong: true,
       promptRefinementMode: "off",
       dictationReplacements: "",
+      dictationMicOffDelayMs: 200,
+      dictationLanguage: "en",
       dedupEnforcement: "deny",
       dedupSkipDirectories: "",
       debugEnabled: false,
@@ -61,6 +63,8 @@ describe("bagConfigSchema", () => {
     expectDescription(bagConfigSchema.from.fields.speechReadAlong);
     expectDescription(bagConfigSchema.from.fields.promptRefinementMode);
     expectDescription(bagConfigSchema.from.fields.dictationReplacements);
+    expectDescription(bagConfigSchema.from.fields.dictationMicOffDelayMs);
+    expectDescription(bagConfigSchema.from.fields.dictationLanguage);
     expectDescription(bagConfigSchema.from.fields.dedupEnforcement);
     expectDescription(bagConfigSchema.from.fields.dedupSkipDirectories);
     expectDescription(bagConfigSchema.from.fields.debugEnabled);
@@ -88,6 +92,8 @@ describe("bagConfigSchema", () => {
     "speechReadAlong",
     "promptRefinementMode",
     "dictationReplacements",
+    "dictationMicOffDelayMs",
+    "dictationLanguage",
     "dedupEnforcement",
     "dedupSkipDirectories",
     "debugEnabled",
@@ -105,6 +111,7 @@ describe("bagConfigSchema", () => {
         autorunPollIntervalSeconds: 1,
         autorunIdleThresholdSeconds: 600,
         speechWordsPerMinute: 80,
+        dictationMicOffDelayMs: 0,
       }),
     ).toMatchObject({
       contextWarnFraction: 0.01,
@@ -114,6 +121,7 @@ describe("bagConfigSchema", () => {
       autorunPollIntervalSeconds: 1,
       autorunIdleThresholdSeconds: 600,
       speechWordsPerMinute: 80,
+      dictationMicOffDelayMs: 0,
     });
   });
 
@@ -132,6 +140,8 @@ describe("bagConfigSchema", () => {
     ["autorunIdleThresholdSeconds above", { autorunIdleThresholdSeconds: 600.001 }],
     ["speechWordsPerMinute below", { speechWordsPerMinute: 79.999 }],
     ["speechWordsPerMinute above", { speechWordsPerMinute: 720.001 }],
+    ["dictationMicOffDelayMs below", { dictationMicOffDelayMs: -0.001 }],
+    ["dictationMicOffDelayMs above", { dictationMicOffDelayMs: 2000.001 }],
   ])("rejects rather than clamps %s", (_case, input) => {
     expect(() => decodeBagConfig(input)).toThrow();
   });
@@ -311,6 +321,6 @@ describe("bagConfigJsonSchema", () => {
     const json = Schema.encodeSync(bagConfigJsonSchema)(defaultBagConfig);
 
     expect(JSON.parse(json)).toEqual(defaultBagConfig);
-    expect(Object.keys(JSON.parse(json))).toHaveLength(16);
+    expect(Object.keys(JSON.parse(json))).toHaveLength(18);
   });
 });

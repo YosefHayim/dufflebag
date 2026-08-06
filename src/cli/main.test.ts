@@ -55,6 +55,8 @@ describe("CLI help", () => {
       expect(execution.stdout).toContain("catalog");
       expect(execution.stdout).toContain("workflow scaffold");
       expect(execution.stdout).toContain("voice speak");
+      expect(execution.stdout).toContain("stt");
+      expect(execution.stdout).toContain("tts");
       expect(execution.stdout).not.toContain("voice example");
       expect(execution.stdout).not.toContain("--wizard");
       expect(execution.stdout).not.toContain("--log-level");
@@ -72,6 +74,27 @@ describe("CLI help", () => {
       expect(execution.stdout).toContain("speak");
       expect(execution.stdout).toContain("--source claude-code | codex | grok | devin | manual");
       expect(execution.stdout).not.toContain("--example");
+    },
+    CLI_TEST_TIMEOUT,
+  );
+
+  it(
+    "documents stt and tts on/off toggles",
+    async () => {
+      const stt = await runCli(["stt", "--help"]);
+      const tts = await runCli(["tts", "--help"]);
+
+      expect(stt.exitCode).toBe(0);
+      expect(stt.stdout).toContain("on");
+      expect(stt.stdout).toContain("off");
+      expect(stt.stdout).toContain("mic-off-delay");
+      expect(stt.stdout).toContain("lang");
+      expect(stt.stdout.toLowerCase()).toMatch(/dictation|speech-to-text|hold control/);
+
+      expect(tts.exitCode).toBe(0);
+      expect(tts.stdout).toContain("on");
+      expect(tts.stdout).toContain("off");
+      expect(tts.stdout.toLowerCase()).toMatch(/narration|text-to-speech|speech-response-mode/);
     },
     CLI_TEST_TIMEOUT,
   );
