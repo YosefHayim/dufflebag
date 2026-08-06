@@ -46,6 +46,7 @@ const expectedFeatureIds = [
   "rtl-ui-audit",
   "deploy-and-prove",
   "coordinate-worktrees",
+  "kill-ports-local-dev",
   "capture-workflow",
   "finish-agent-sessions",
 ];
@@ -85,6 +86,7 @@ const expectedSourceDirectories = [
   "rtlUiAudit",
   "deployAndProve",
   "coordinateWorktrees",
+  "killPortsLocalDev",
   "captureWorkflow",
   "finishAgentSessions",
 ];
@@ -208,6 +210,7 @@ describe("featureCatalog", () => {
       ["rtl-ui-audit", ["SKILL.md"]],
       ["deploy-and-prove", ["SKILL.md"]],
       ["coordinate-worktrees", ["SKILL.md"]],
+      ["kill-ports-local-dev", ["SKILL.md"]],
       ["capture-workflow", ["SKILL.md"]],
       ["finish-agent-sessions", ["SKILL.md"]],
     ]);
