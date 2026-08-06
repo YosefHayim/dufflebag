@@ -889,6 +889,20 @@ const preCommitCommand = "pnpm generate-readme && git add README.md";
 
 Why: a commit hook must report stale artifacts without silently changing the commit the author reviewed.
 
+### Feature branch for product work
+[rule:git.feature-branch] · verify: judgment
+
+All product changes land from a named topic branch via a focused PR or branch push, never as direct product commits on the default branch.
+
+```ts
+// ✓ git switch -c feat/42-catalog-skill
+// ✓ .worktrees/feat-42-catalog-skill + gh pr create --body "Fixes #42"
+// ✗ commit product work on main
+// ✗ git push --delete origin feat/… after ship (unless user asked)
+```
+
+Why: keeps main releasable, reviews scoped, and parallel agents isolated.
+
 ## Canonical example
 
 The dependency-free `dedupGuard` slice is the litmus test for policy/mechanism separation: one private boundary decoder, one pure decision, one outer fail-open catch, and subprocess tests for the executable contract.
@@ -946,18 +960,7 @@ A **feature** is dufflebag's unit of extension: a catalog entry plus the artifac
 
 ### Branching & PR
 
-[rule:git.feature-branch] · verify: judgment
-
-All product changes land from a named topic branch via a focused PR or branch push, never as direct product commits on the default branch.
-
-```text
-// ✓ git switch -c feat/42-catalog-skill
-// ✓ .worktrees/feat-42-catalog-skill + gh pr create --body "Fixes #42"
-// ✗ commit product work on main
-// ✗ git push --delete origin feat/… after ship (unless user asked)
-```
-
-Why: keeps main releasable, reviews scoped, and parallel agents isolated. Refactors and refinements still get their own branch; remote branches are not deleted unless the user asks. Skills: `finish-and-ship`, `organized-commits`, `coordinate-worktrees`.
+See rule `git.feature-branch` under **Rules**. Skills: `finish-and-ship`, `organized-commits`, `coordinate-worktrees`. Remote branches stay unless the user explicitly asks to delete them.
 
 ### Adding a CLI command
 
