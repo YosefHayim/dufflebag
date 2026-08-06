@@ -912,6 +912,22 @@ export const featureCatalog = Schema.decodeUnknownSync(featureCatalogSchema, {
     runtime: { _tag: "none" },
   },
   {
+    id: "messy-repo-orchestrator",
+    sourceDirectory: "messyRepoOrchestrator",
+    installedSkill: {
+      _tag: "skill",
+      id: "messy-repo-orchestrator",
+      shippedPaths: ["SKILL.md"],
+    },
+    title: "Messy repo orchestrator",
+    summary:
+      "Backup main, then fan out one sub-agent per feature for safe refactors/deslop/fixes with issue + PR to main for human review.",
+    selectedByDefault: false,
+    dependencies: ["coordinate-worktrees", "finish-and-ship", "organized-commits"],
+    platform: "any",
+    runtime: { _tag: "none" },
+  },
+  {
     id: "capture-workflow",
     sourceDirectory: "captureWorkflow",
     installedSkill: {
