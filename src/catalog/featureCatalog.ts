@@ -928,6 +928,22 @@ export const featureCatalog = Schema.decodeUnknownSync(featureCatalogSchema, {
     runtime: { _tag: "none" },
   },
   {
+    id: "skill-from-feedback",
+    sourceDirectory: "skillFromFeedback",
+    installedSkill: {
+      _tag: "skill",
+      id: "skill-from-feedback",
+      shippedPaths: ["SKILL.md"],
+    },
+    title: "Skill from feedback",
+    summary:
+      "Patch an existing skill from concrete user or session feedback: triggers, routing, safety, verification — then validate and re-sync.",
+    selectedByDefault: false,
+    dependencies: [],
+    platform: "any",
+    runtime: { _tag: "none" },
+  },
+  {
     id: "capture-workflow",
     sourceDirectory: "captureWorkflow",
     installedSkill: {
