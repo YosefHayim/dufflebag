@@ -896,6 +896,22 @@ export const featureCatalog = Schema.decodeUnknownSync(featureCatalogSchema, {
     runtime: { _tag: "none" },
   },
   {
+    id: "cloudflare-ops",
+    sourceDirectory: "cloudflareOps",
+    installedSkill: {
+      _tag: "skill",
+      id: "cloudflare-ops",
+      shippedPaths: ["SKILL.md"],
+    },
+    title: "Cloudflare ops",
+    summary:
+      "Wrangler/D1/KV/R2 operational wiring and safe migrations — distinct from deploy-and-prove live production proof.",
+    selectedByDefault: false,
+    dependencies: [],
+    platform: "any",
+    runtime: { _tag: "none" },
+  },
+  {
     id: "capture-workflow",
     sourceDirectory: "captureWorkflow",
     installedSkill: {
