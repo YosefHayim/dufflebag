@@ -335,14 +335,15 @@ export const featureCatalog = Schema.decodeUnknownSync(featureCatalogSchema, {
     installedSkill: { _tag: "none" },
     title: "Speak responses (TTS)",
     summary:
-      "Read complete agent responses with local speech, push-to-talk dictation, Cmux focus gating, active-word highlighting, and optional on-device prompt refinement on macOS.",
+      "Read complete agent responses with local speech, hold-Control dictation via whisper.cpp large-v3-turbo (Metal), Cmux focus gating, and optional on-device prompt refinement on macOS.",
     selectedByDefault: false,
     dependencies: [],
     platform: "any",
     runtime: {
       _tag: "hook",
       sourceEntrypoint: "hooks/speakResponse.ts",
-      shippedPaths: ["cmux_focus.py", "prompt_refinement.py", "voice.py", "voice.py.lock"],
+      // Native STT worker (built by scripts/buildVoice.sh) plus optional Python helpers.
+      shippedPaths: ["dufflebag-voice", "cmux_focus.py", "prompt_refinement.py", "tts_bridge.py", "tts_bridge.py.lock"],
       registrations: [
         {
           event: "Stop",
