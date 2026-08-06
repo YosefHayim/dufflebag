@@ -757,11 +757,11 @@ export const featureCatalog = Schema.decodeUnknownSync(featureCatalogSchema, {
     installedSkill: {
       _tag: "skill",
       id: "agent-session-auditor",
-      shippedPaths: ["SKILL.md"],
+      shippedPaths: ["SKILL.md", "scripts"],
     },
     title: "Agent session auditor",
     summary:
-      "Privacy-safe local session coverage, prompt extraction, fuzzy clustering, and evidence-backed skill prioritization.",
+      "Privacy-safe local session coverage, prompt extraction, fuzzy clustering, and evidence-backed skill prioritization — one-command script plus optional multi-agent review.",
     selectedByDefault: false,
     dependencies: [],
     platform: "any",
