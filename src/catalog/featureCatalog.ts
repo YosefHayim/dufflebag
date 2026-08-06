@@ -944,6 +944,22 @@ export const featureCatalog = Schema.decodeUnknownSync(featureCatalogSchema, {
     runtime: { _tag: "none" },
   },
   {
+    id: "agent-benchmark",
+    sourceDirectory: "agentBenchmark",
+    installedSkill: {
+      _tag: "skill",
+      id: "agent-benchmark",
+      shippedPaths: ["SKILL.md", "REFERENCE.md"],
+    },
+    title: "Agent benchmark",
+    summary:
+      "Design and run dynamic same-task agent/skill/tool benchmarks with tokens, turns, latency, cost, and success — evidence over stars.",
+    selectedByDefault: false,
+    dependencies: [],
+    platform: "any",
+    runtime: { _tag: "none" },
+  },
+  {
     id: "capture-workflow",
     sourceDirectory: "captureWorkflow",
     installedSkill: {
