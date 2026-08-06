@@ -49,6 +49,7 @@ const expectedFeatureIds = [
   "kill-ports-local-dev",
   "workspace-bootstrap",
   "cloudflare-ops",
+  "messy-repo-orchestrator",
   "capture-workflow",
   "finish-agent-sessions",
 ];
@@ -91,6 +92,7 @@ const expectedSourceDirectories = [
   "killPortsLocalDev",
   "workspaceBootstrap",
   "cloudflareOps",
+  "messyRepoOrchestrator",
   "captureWorkflow",
   "finishAgentSessions",
 ];
@@ -217,6 +219,7 @@ describe("featureCatalog", () => {
       ["kill-ports-local-dev", ["SKILL.md"]],
       ["workspace-bootstrap", ["SKILL.md"]],
       ["cloudflare-ops", ["SKILL.md"]],
+      ["messy-repo-orchestrator", ["SKILL.md"]],
       ["capture-workflow", ["SKILL.md"]],
       ["finish-agent-sessions", ["SKILL.md"]],
     ]);
@@ -367,6 +370,7 @@ describe("featureCatalog", () => {
       ["make-a-trailer", ["planpage"]],
       ["finish-and-ship", ["organized-commits"]],
       ["coordinate-worktrees", ["organized-commits"]],
+      ["messy-repo-orchestrator", ["coordinate-worktrees", "finish-and-ship", "organized-commits"]],
       ["finish-agent-sessions", ["finish-and-ship", "agent-session-auditor"]],
     ]);
     expect(
