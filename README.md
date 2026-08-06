@@ -221,6 +221,7 @@ Override one launched agent without changing persistent config, for example
 | **coordinate-worktrees** | Setup parallel feature lanes under .worktrees/ (issue + branch + PR) or land overlapping worktrees with backups, intent-aware integration, and reachability proof — never delete remotes unless asked. | 🟢 any OS |
 | **kill-ports-local-dev** | List and free local TCP listeners (default keep Metro 8081) so the next dev launch is not blocked by stale processes. | 🟢 any OS |
 | **workspace-bootstrap** | Clone or sync GitHub user/org repos into a Code folder, optional bulk package installs, and pull-all delta reports. | 🟢 any OS |
+| **cloudflare-ops** | Wrangler/D1/KV/R2 operational wiring and safe migrations — distinct from deploy-and-prove live production proof. | 🟢 any OS |
 | **capture-workflow** | Turn a proven task into the smallest reusable skill, script, template, test, or runbook and replay it cleanly. | 🟢 any OS |
 | **finish-agent-sessions** | Reconcile interrupted work across agent histories with current repositories, then finish or honestly classify every task. | 🟢 any OS |
 <!-- AUTO:FEATURES:END -->
