@@ -178,8 +178,8 @@ def serve(default_voice: str) -> int:
             "voice": default_voice.upper() if re.fullmatch(r"[MF][1-5]", default_voice.upper() or "") else "F4",
         }
     )
-    for raw in sys.stdin:
-        line = raw.strip()
+    for stdin_line in sys.stdin:
+        line = stdin_line.strip()
         if not line:
             continue
         try:
