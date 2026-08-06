@@ -960,6 +960,22 @@ export const featureCatalog = Schema.decodeUnknownSync(featureCatalogSchema, {
     runtime: { _tag: "none" },
   },
   {
+    id: "mobile-release",
+    sourceDirectory: "mobileRelease",
+    installedSkill: {
+      _tag: "skill",
+      id: "mobile-release",
+      shippedPaths: ["SKILL.md"],
+    },
+    title: "Mobile release",
+    summary:
+      "Ship Expo/React Native store releases with Launch-first build/upload, provenance (git SHA, version, build numbers), and optional EAS fallback.",
+    selectedByDefault: false,
+    dependencies: [],
+    platform: "any",
+    runtime: { _tag: "none" },
+  },
+  {
     id: "capture-workflow",
     sourceDirectory: "captureWorkflow",
     installedSkill: {
