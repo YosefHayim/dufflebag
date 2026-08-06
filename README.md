@@ -212,7 +212,7 @@ Override one launched agent without changing persistent config, for example
 | **finish-and-ship** | Close implementation, verification, Git history, push, hosted checks, and handoff without hidden leftovers. | 🟢 any OS |
 | **preview-and-prove** | Launch the real product surface and prove a user-visible flow through browser, network, and persisted-state evidence. | 🟢 any OS |
 | **reuse-first-audit** | Search internal code, platform primitives, and primary ecosystem sources before deciding to build new surface. | 🟢 any OS |
-| **agent-session-auditor** | Privacy-safe local session coverage, prompt extraction, fuzzy clustering, and evidence-backed skill prioritization. | 🟢 any OS |
+| **agent-session-auditor** | Privacy-safe local session coverage, prompt extraction, fuzzy clustering, and evidence-backed skill prioritization — one-command script plus optional multi-agent review. | 🟢 any OS |
 | **sync-agent-skills** | Synchronize canonical skills through receipt-backed native formats and prove parity across detected supported agents. | 🟢 any OS |
 | **env-config-contract** | Consolidate environment reads into fail-loud schema boundaries without leaking secrets across trust zones. | 🟢 any OS |
 | **mcp-oauth-onboarding** | Install an MCP at the intended scope, complete OAuth, reload the agent, and prove it with a harmless tool call. | 🟢 any OS |

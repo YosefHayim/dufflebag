@@ -207,7 +207,7 @@ describe("featureCatalog", () => {
       ["finish-and-ship", ["SKILL.md"]],
       ["preview-and-prove", ["SKILL.md"]],
       ["reuse-first-audit", ["SKILL.md"]],
-      ["agent-session-auditor", ["SKILL.md"]],
+      ["agent-session-auditor", ["SKILL.md", "scripts"]],
       ["sync-agent-skills", ["SKILL.md"]],
       ["env-config-contract", ["SKILL.md"]],
       ["mcp-oauth-onboarding", ["SKILL.md"]],
