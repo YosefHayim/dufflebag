@@ -2,7 +2,7 @@
 
 ## What this is
 
-`dufflebag` is a personal toolbelt, not a platform: a TypeScript/Node CLI that installs, updates, and surgically uninstalls a curated bag of coding-agent guardrails, skills, and copyable CI/publish workflow templates. Installed TypeScript hooks form a separate dependency-free Node runtime, and local narration/refinement includes a locked Python voice-runtime island.
+`dufflebag` is a personal toolbelt, not a platform: a TypeScript/Node CLI that installs, updates, and surgically uninstalls a curated bag of coding-agent guardrails, skills, and copyable CI/publish workflow templates. Installed TypeScript hooks form a separate dependency-free Node runtime. Local voice is a native Rust worker (`dufflebag-voice`, whisper.cpp large-v3-turbo) with thin Python bridges only for Supertonic TTS and Apple prompt refinement.
 
 ## Actors
 

@@ -38,12 +38,21 @@ dufflebag
 │   └── reset [setting] [--scope global|project] [--yes]
 ├── workflow
 │   └── scaffold [workspace] [--overwrite]
+├── stt
+│   ├── on|off [--scope global|project]
+│   └── mic-off-delay [milliseconds] [--scope global|project]
+├── tts
+│   └── on|off [--scope global|project]
 └── voice
     ├── on|off|status [--scope global|project]
     ├── speak <text> [--source claude-code|codex|grok|devin|manual]
     ├── refine <prompt> [--speak]
     └── devin [-- <devin-arguments...>]
 ```
+
+`stt on|off` starts or stops hold-Control dictation (the local voice worker).
+`tts on|off` sets `speech-response-mode` to `auto` or `off` (and ensures the worker is up for `tts on`).
+`voice` remains the full surface for status, one-shot speak, refine, and Devin.
 
 - Bare invocation always prints help; `menu` is the only interactive selector.
 - Scope is one decoded literal and defaults to global.
