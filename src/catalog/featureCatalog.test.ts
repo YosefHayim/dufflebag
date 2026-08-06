@@ -50,6 +50,7 @@ const expectedFeatureIds = [
   "workspace-bootstrap",
   "cloudflare-ops",
   "messy-repo-orchestrator",
+  "skill-from-feedback",
   "capture-workflow",
   "finish-agent-sessions",
 ];
@@ -93,6 +94,7 @@ const expectedSourceDirectories = [
   "workspaceBootstrap",
   "cloudflareOps",
   "messyRepoOrchestrator",
+  "skillFromFeedback",
   "captureWorkflow",
   "finishAgentSessions",
 ];
@@ -220,6 +222,7 @@ describe("featureCatalog", () => {
       ["workspace-bootstrap", ["SKILL.md"]],
       ["cloudflare-ops", ["SKILL.md"]],
       ["messy-repo-orchestrator", ["SKILL.md"]],
+      ["skill-from-feedback", ["SKILL.md"]],
       ["capture-workflow", ["SKILL.md"]],
       ["finish-agent-sessions", ["SKILL.md"]],
     ]);
