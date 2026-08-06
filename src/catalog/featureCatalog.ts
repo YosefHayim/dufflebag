@@ -857,7 +857,7 @@ export const featureCatalog = Schema.decodeUnknownSync(featureCatalogSchema, {
     },
     title: "Coordinate worktrees",
     summary:
-      "Safely reconcile overlapping branches and worktrees with backups, intent-aware integration, and reachability proof.",
+      "Setup parallel feature lanes under .worktrees/ (issue + branch + PR) or land overlapping worktrees with backups, intent-aware integration, and reachability proof — never delete remotes unless asked.",
     selectedByDefault: false,
     dependencies: ["organized-commits"],
     platform: "any",

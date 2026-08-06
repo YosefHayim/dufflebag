@@ -1,6 +1,6 @@
 ---
 name: sync-agent-skills
-description: Use when the user asks to install, reinstall, update, or synchronize skills globally or per-project across Claude Code, Codex, Kiro, Kimi, Cursor, Gemini, OpenCode, Grok, or every detected coding agent.
+description: Use when the user asks to install, reinstall, update, or synchronize skills globally or per-project across Claude Code, Codex, Kiro, Kimi, Cursor, Gemini, OpenCode, Grok, or every detected coding agent — including proving dual-agent discovery (Codex $skill vs Grok freeform/slash) after copy, not folder existence alone.
 type: flow
 ---
 

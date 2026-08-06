@@ -256,6 +256,11 @@
       "id": "tooling.git-hooks-verify",
       "statement": "Git hooks run deterministic checks and never rewrite or stage repository files.",
       "verify": "judgment"
+    },
+    {
+      "id": "git.feature-branch",
+      "statement": "All product changes land from a named topic branch via a focused PR or branch push, never as direct product commits on the default branch.",
+      "verify": "judgment"
     }
   ],
   "protectedPaths": [

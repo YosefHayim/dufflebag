@@ -70,6 +70,11 @@ Hard rules agents must hold every turn. Full prescription: [`CODE-STYLE.md`](COD
 - **Shape** — capability-owned paths; camelCase authored directories; PascalCase UI files; kebab-case public IDs/flags. One command path; `TerminalUI` owns presentation; non-TTY never prompts.
 - **Local tooling** — gitignored `scripts/dev/` for personal/one-off scripts. All maintained build/verify tools live under root `scripts/` (not under `src/`).
 - **Git hooks** — pre-commit runs `pnpm verify`; hooks report drift and never rewrite or stage files.
+- **Branching** — never commit product work on `main`/default; use a topic branch (`feat/…`, `fix/…`, `refactor/…`, `chore/…`). Refinements to an existing feature still get their own branch.
+- **Remote branches** — do not delete remote branches unless the user explicitly asks; leave them for handoff/CI after push or PR.
+- **Parallel features** — one task per worktree under `.worktrees/`; issue + branch + PR to default with `Fixes #n` / `Closes #n`. Use `coordinate-worktrees` (setup-lanes / land-lanes).
+- **Messy whole-repo cleanup** — backup default branch first, then one sub-agent per feature with PRs for human review (`messy-repo-orchestrator`); never damage main history.
+- **Ship** — verify gate green before push/PR; no force-push to protected branches; merge to default only when asked.
 
 ## Validate changes
 

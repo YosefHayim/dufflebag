@@ -490,12 +490,15 @@ When a dimension is language-specific, a note like `[TS/JS only]` appears in the
   <!-- endif -->
   - Generic: function length cap, cognitive complexity cap, banned identifier patterns.
 
-- **Git & collaboration** — [2–3 picks]
+- **Git & collaboration** — [2–3 picks; recommend defaults unless the repo proves otherwise]
   - Commit message format — conventional commits (`feat:` / `fix:` / `chore:`) vs free-form.
-  - Branch naming — `feature/xxx`, `fix/xxx`, kebab-case? Prefixed with ticket ID?
+  - Branch naming — `feat|fix|refactor|chore/<issue?>-<kebab>` vs free-form; **default recommend: never product commits on main/default**.
+  - Remote branch lifecycle — **default recommend: do not delete remote branches unless explicitly asked** (keep for handoff/CI).
+  - Parallel work — worktrees under `REPO/.worktrees/`, one task per lane; issue + PR linked (`Fixes #n`). Point agents at `coordinate-worktrees`.
   - PR size policy — small & focused vs batched.
   - Merge strategy — squash (default recommendation), merge, rebase.
-  - When to open a PR vs commit directly to the working branch.
+  - When to open a PR vs commit directly to the working branch (default: PR to default branch; no merge unless asked).
+  - Land the agreed branching policy as a **CODE-STYLE recipe** + a tight **AGENTS.md Working contract** digest line (not only tribal knowledge).
 
 - **Documentation lifecycle** — [2 picks]
   - When does new work need an ADR? (any decision an agent would otherwise guess at)
