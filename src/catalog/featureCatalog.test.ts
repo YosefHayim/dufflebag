@@ -48,6 +48,7 @@ const expectedFeatureIds = [
   "coordinate-worktrees",
   "kill-ports-local-dev",
   "workspace-bootstrap",
+  "cloudflare-ops",
   "capture-workflow",
   "finish-agent-sessions",
 ];
@@ -89,6 +90,7 @@ const expectedSourceDirectories = [
   "coordinateWorktrees",
   "killPortsLocalDev",
   "workspaceBootstrap",
+  "cloudflareOps",
   "captureWorkflow",
   "finishAgentSessions",
 ];
@@ -214,6 +216,7 @@ describe("featureCatalog", () => {
       ["coordinate-worktrees", ["SKILL.md"]],
       ["kill-ports-local-dev", ["SKILL.md"]],
       ["workspace-bootstrap", ["SKILL.md"]],
+      ["cloudflare-ops", ["SKILL.md"]],
       ["capture-workflow", ["SKILL.md"]],
       ["finish-agent-sessions", ["SKILL.md"]],
     ]);
