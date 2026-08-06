@@ -922,7 +922,7 @@ export const featureCatalog = Schema.decodeUnknownSync(featureCatalogSchema, {
     },
     title: "Messy repo orchestrator",
     summary:
-      "Backup main, then fan out one sub-agent per feature for safe refactors/deslop/fixes with issue + PR to main for human review.",
+      "Backup main, then fan out one sub-agent per feature for safe refactors/deslop/fixes with issue + PR to main for human review. Ask host mode: background subagents, cmux terminal per lane (watch/join/continue), or briefs only.",
     selectedByDefault: false,
     dependencies: ["coordinate-worktrees", "finish-and-ship", "organized-commits"],
     platform: "any",

@@ -222,7 +222,7 @@ Override one launched agent without changing persistent config, for example
 | **kill-ports-local-dev** | List and free local TCP listeners (default keep Metro 8081) so the next dev launch is not blocked by stale processes. | 🟢 any OS |
 | **workspace-bootstrap** | Clone or sync GitHub user/org repos into a Code folder, optional bulk package installs, and pull-all delta reports. | 🟢 any OS |
 | **cloudflare-ops** | Wrangler/D1/KV/R2 operational wiring and safe migrations — distinct from deploy-and-prove live production proof. | 🟢 any OS |
-| **messy-repo-orchestrator** | Backup main, then fan out one sub-agent per feature for safe refactors/deslop/fixes with issue + PR to main for human review. | 🟢 any OS |
+| **messy-repo-orchestrator** | Backup main, then fan out one sub-agent per feature for safe refactors/deslop/fixes with issue + PR to main for human review. Ask host mode: background subagents, cmux terminal per lane (watch/join/continue), or briefs only. | 🟢 any OS |
 | **skill-from-feedback** | Patch an existing skill from concrete user or session feedback: triggers, routing, safety, verification — then validate and re-sync. | 🟢 any OS |
 | **agent-benchmark** | Design and run dynamic same-task agent/skill/tool benchmarks with tokens, turns, latency, cost, and success — evidence over stars. | 🟢 any OS |
 | **mobile-release** | Ship Expo/React Native store releases with Launch-first build/upload, provenance (git SHA, version, build numbers), and optional EAS fallback. | 🟢 any OS |
