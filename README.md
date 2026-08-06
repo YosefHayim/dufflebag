@@ -218,7 +218,7 @@ Override one launched agent without changing persistent config, for example
 | **mcp-oauth-onboarding** | Install an MCP at the intended scope, complete OAuth, reload the agent, and prove it with a harmless tool call. | 🟢 any OS |
 | **rtl-ui-audit** | Audit and verify real right-to-left layout, bidi content, directional assets, interaction, and accessibility. | 🟢 any OS |
 | **deploy-and-prove** | Deploy or publish an immutable source identity and prove the provider, live runtime, and changed behavior serve it. | 🟢 any OS |
-| **coordinate-worktrees** | Safely reconcile overlapping branches and worktrees with backups, intent-aware integration, and reachability proof. | 🟢 any OS |
+| **coordinate-worktrees** | Setup parallel feature lanes under .worktrees/ (issue + branch + PR) or land overlapping worktrees with backups, intent-aware integration, and reachability proof — never delete remotes unless asked. | 🟢 any OS |
 | **capture-workflow** | Turn a proven task into the smallest reusable skill, script, template, test, or runbook and replay it cleanly. | 🟢 any OS |
 | **finish-agent-sessions** | Reconcile interrupted work across agent histories with current repositories, then finish or honestly classify every task. | 🟢 any OS |
 <!-- AUTO:FEATURES:END -->
@@ -230,7 +230,7 @@ These skills ship in the bag for convenience — installable the same way (`npx 
 
 | Skill | What it does | By |
 | --- | --- | --- |
-| **deslop** | Reviews code readability first, then applies approved cleanup that makes the full pipeline understandable in seconds. Use when the user says "deslop", "make this readable", "make this less AI", "second pass", "clean this up", "rename for clarity", "show before and after", or asks to improve code comprehension across React, TypeScript, backend, folders, imports, hooks, or functions. | [Mike Cann](https://github.com/mikecann/agent-skills) |
+| **deslop** | Reviews code readability first, then applies approved cleanup that makes the full pipeline understandable in seconds. Use when the user says "deslop" for readability (not structure lean-out), "make this readable", "make this less AI", "second pass", "clean this up", "rename for clarity", "show before and after", or asks to improve code comprehension across React, TypeScript, backend, folders, imports, hooks, or functions. If the real ask is full-repo lean / ban wrappers / kill ceremony / over-engineering, use deslop-v2 (optionally after grill-me-code-style-with-docs). | [Mike Cann](https://github.com/mikecann/agent-skills) |
 | **grill-me** | Interview the user relentlessly about a plan or design until reaching shared understanding, resolving each branch of the decision tree. Use when user wants to stress-test a plan, get grilled on their design, or mentions "grill me". | [Matt Pocock](https://github.com/mattpocock/skills) |
 | **grill-with-docs** | Grilling session that challenges your plan against the existing domain model, sharpens terminology, and updates documentation (CONTEXT.md, ADRs) inline as decisions crystallise. Use when user wants to stress-test a plan against their project's language and documented decisions. | [Matt Pocock](https://github.com/mattpocock/skills) |
 
