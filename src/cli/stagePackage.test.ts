@@ -43,7 +43,7 @@ describe("stagePackage", () => {
 
         const voiceRoot = path.join(staged.root, "runtime/speakResponse");
         // Every authored voice asset must reach the staged tree byte-for-byte.
-        for (const asset of ["cmux_focus.py", "prompt_refinement.py", "voice.py", "voice.py.lock"]) {
+        for (const asset of ["cmux_focus.py", "prompt_refinement.py", "tts_bridge.py", "tts_bridge.py.lock"]) {
           expect(readFileSync(path.join(voiceRoot, asset))).toEqual(
             readFileSync(path.join(packageRoot, "src/hookIsland/speakResponse", asset)),
           );

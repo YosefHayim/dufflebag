@@ -380,16 +380,28 @@ const captureTargets = (request: CaptureTargetsRequest) =>
     }),
   );
 
+const isExecutableRuntimeArtifact = (targetPath: string): boolean =>
+  targetPath.endsWith("/dufflebag-voice") || targetPath.endsWith("\\dufflebag-voice");
+
 const stageTargets = (stagedPlan: StagedPlan) =>
   Effect.gen(function* () {
     const fileSystem = yield* FileSystem.FileSystem;
 
     yield* Effect.forEach(
       stagedPlan.artifacts,
-      (artifact) =>
-        artifact.operation._tag === "remove"
-          ? Effect.void
-          : fileSystem.writeFile(artifact.stagedPath, artifact.operation.bytes),
+      (artifact) => {
+        if (artifact.operation._tag === "remove") {
+          return Effect.void;
+        }
+        const bytes = artifact.operation.bytes;
+        return Effect.gen(function* () {
+          const executable = isExecutableRuntimeArtifact(artifact.targetPath);
+          yield* fileSystem.writeFile(artifact.stagedPath, bytes, executable ? { mode: 0o755 } : undefined);
+          if (executable) {
+            yield* fileSystem.chmod(artifact.stagedPath, 0o755);
+          }
+        });
+      },
       { discard: true },
     );
 
