@@ -1,0 +1,323 @@
+[
+  {
+    "intent": "unclassified",
+    "prompt_count": 841,
+    "unique_sessions": 188,
+    "agents": [
+      "codex",
+      "grok"
+    ],
+    "existing_skills": [],
+    "recommendation": "leave",
+    "why": "Mixed one-offs; no stable job encoded yet",
+    "examples": [
+      "fix it so it follows the up to date pnpm we",
+      "ok so i did",
+      "fix the ignore workspace bug",
+      "no stale ellete teh 10.33.2 and use the latest pnpm.",
+      "Nooooooo"
+    ]
+  },
+  {
+    "intent": "finish_ship_commit_push",
+    "prompt_count": 146,
+    "unique_sessions": 130,
+    "agents": [
+      "codex",
+      "grok"
+    ],
+    "existing_skills": [
+      "finish-and-ship",
+      "organized-commits"
+    ],
+    "recommendation": "improve",
+    "why": "High repetition despite existing skill — check freeform triggers",
+    "examples": [
+      "ok now ive installed the dufflebag and we ship it with tts and stt but not work can u double check i installed it correctly ?",
+      "ok git commit push please.",
+      "please git commit push to main",
+      "fix please before we git commit push",
+      "ok nice git commit push"
+    ]
+  },
+  {
+    "intent": "code_style_docs",
+    "prompt_count": 151,
+    "unique_sessions": 109,
+    "agents": [
+      "codex",
+      "grok"
+    ],
+    "existing_skills": [
+      "grill-me-code-style-with-docs",
+      "grill-me-code-style"
+    ],
+    "recommendation": "improve",
+    "why": "High repetition despite existing skill — check freeform triggers",
+    "examples": [
+      "1.its confusing same folder named on other folder e.g. config. so aside of that i agree on all. secondly is that how the code-styl.emd is applying i want to proper [$grill-me-code-style-with-docs]([PATH]/grill-me-code-style-with-docs/SKILL.md) with what we hvent talked yet and gr",
+      "I would like you to preform with me [$grill-me-code-style-with-docs]([PATH]/grill-me-code-style-with-docs/SKILL.md) from the begining so we can do a full deslop on this entire repo. to change her structure libraires deps etc so it looks cleanly. clean code, obivous structure that",
+      "I would like you to preform with me $grill-me-code-\n  style-with-docs from the begining so we can do a full\n  deslop on this entire repo. to change her structure\n  libraires deps etc so it looks cleanly. clean code,\n  obivous structure that make sense and no use of generic\n  and ",
+      "1.Cannot find name 'process'. Do you need to install type definitions for node? Try `npm i --save-dev @types/node` and then add 'node' to the types field in your tsconfig.ts(2591) make sure it is part of dev deps so we have smooth dev process. \n2. replace all emojis with proper i",
+      "the structure of codebase does make a sense and logic but i feel like we can make it leaner and thigtehn [$grill-me-code-style-with-docs]([PATH]/grill-me-code-style-with-docs/SKILL.md) whwat do u recommened?"
+    ]
+  },
+  {
+    "intent": "readme_agent_docs",
+    "prompt_count": 96,
+    "unique_sessions": 86,
+    "agents": [
+      "codex",
+      "grok"
+    ],
+    "existing_skills": [
+      "readme-editor",
+      "refresh-agent-docs"
+    ],
+    "recommendation": "improve",
+    "why": "High repetition despite existing skill — check freeform triggers",
+    "examples": [
+      "1.converts scripts folder to fully ts scripts plus \n2. tons of imports with as in the import that is forbidden remove. and fix e.g. clean imports \n3.[PATH]/report/assetsBrand.ts can be in the file its used delete files that are being used in just one single file they can be used ",
+      "# AGENTS.md instructions for [PATH]/Code/dufflebag\n\n<INSTRUCTIONS>\n# AGENTS.md\n\nEntrypoint for coding agents and maintainers. `CLAUDE.md` and `GEMINI.md` are symlinks to this file so Claude, Gemini, Codex, Cursor, Kiro, and other AGENTS-aware tools share one contract.\n\n## What th",
+      "# AGENTS.md instructions for [PATH]/Code/alg\n\n<INSTRUCTIONS>\n# AGENTS.md — alg (lean target)\n\nCompact contract for every agent. Prefer this file over tool-specific copies.\n\n## Product\n\nAccessibility **widget** after setup + yearly sub. Operator CLI finds **call targets** (D1 only",
+      "# AGENTS.md instructions for [PATH]/Code/MYPR-App\n\n<INSTRUCTIONS>\n# MYPR agent guide\n\nMYPR is one product: a private, compliant journalist-outreach journey. Keep the\nclient, API, shared contracts, and Cloudflare deployment focused on that product.\n\n## Read first\n\n1. `PROJECT.md` ",
+      "# AGENTS.md instructions for [PATH]/Code/replybase\n\n<INSTRUCTIONS>\n# AGENTS.md\n\n> Agent onboarding. Read this first, then CODE-STYLE.md for the full guide.\n\n## Quick Start\n\n```bash\npnpm install # install all workspace deps\npnpm dev # starts all apps in dev mode (turbo)\npnpm build"
+    ]
+  },
+  {
+    "intent": "preview_and_prove",
+    "prompt_count": 98,
+    "unique_sessions": 78,
+    "agents": [
+      "codex",
+      "grok"
+    ],
+    "existing_skills": [
+      "preview-and-prove"
+    ],
+    "recommendation": "improve",
+    "why": "High repetition despite existing skill — check freeform triggers",
+    "examples": [
+      "two tasks 1. we got in mypr [Image #1] [URL]  a notifications settings can u confirm if we actually verify it works e2e production readY?\n\n2. admin has jump messages when they show up in app for regular user and admin can config them when and how we got 60 something of these can ",
+      "now do qa fix via playwright on why the colors ui ux on web not proper launch like in native.",
+      "that was on what repo exactly? cause i dont get it why we have repo 'Oly-App-origin-main-preview' like wtf.",
+      "what can be run without put in package json should not e.g. wrangler or playwright but yes.",
+      "after finish all what i said please [$organized-commits]([PATH]/organized-commits/SKILL.md) launch local, delete stale files or folders exist e.g. root ignored files or folders so i see everything before we redploy and sync. also did u backup d1 to drop and re init it properly?"
+    ]
+  },
+  {
+    "intent": "deslop",
+    "prompt_count": 89,
+    "unique_sessions": 76,
+    "agents": [
+      "codex",
+      "grok"
+    ],
+    "existing_skills": [
+      "deslop-v2",
+      "deslop"
+    ],
+    "recommendation": "improve",
+    "why": "High repetition despite existing skill — check freeform triggers",
+    "examples": [
+      "I need your help with doing a huge deslop on the entire cord base, changing its structure and making the entire project more logical on how it's currently structured. This means, I believe, maybe doing a new gridme, including code styles, structure, files, folders, what technolog",
+      "so lets change it to follow the best practices of effect. and make it lean",
+      "write in the current folder root TODO.md to deslop every folder mark YosefHayim as done with checkbox and numbered list from first to last",
+      "do you think we can have better codebase structure,file names ,and cli for this to make it 0 ai slop and 100% desloped correctly? like better naming for variables and forbidden Files that are naming like payload or response body or data",
+      "I would like you to preform with me [$grill-me-code-style-with-docs]([PATH]/grill-me-code-style-with-docs/SKILL.md) from the begining so we can do a full deslop on this entire repo. to change her structure libraires deps etc so it looks cleanly. clean code, obivous structure that"
+    ]
+  },
+  {
+    "intent": "grill_me_family",
+    "prompt_count": 53,
+    "unique_sessions": 53,
+    "agents": [
+      "codex",
+      "grok"
+    ],
+    "existing_skills": [
+      "grill-me",
+      "grill-me-code-style-with-docs",
+      "grill-me-code-style"
+    ],
+    "recommendation": "improve",
+    "why": "High repetition despite existing skill — check freeform triggers",
+    "examples": [
+      "I need your help with doing a huge deslop on the entire cord base, changing its structure and making the entire project more logical on how it's currently structured. This means, I believe, maybe doing a new gridme, including code styles, structure, files, folders, what technolog",
+      "1.its confusing same folder named on other folder e.g. config. so aside of that i agree on all. secondly is that how the code-styl.emd is applying i want to proper [$grill-me-code-style-with-docs]([PATH]/grill-me-code-style-with-docs/SKILL.md) with what we hvent talked yet and gr",
+      "I would like you to preform with me [$grill-me-code-style-with-docs]([PATH]/grill-me-code-style-with-docs/SKILL.md) from the begining so we can do a full deslop on this entire repo. to change her structure libraires deps etc so it looks cleanly. clean code, obivous structure that",
+      "I would like you to preform with me $grill-me-code-\n  style-with-docs from the begining so we can do a full\n  deslop on this entire repo. to change her structure\n  libraires deps etc so it looks cleanly. clean code,\n  obivous structure that make sense and no use of generic\n  and ",
+      "1.Cannot find name 'process'. Do you need to install type definitions for node? Try `npm i --save-dev @types/node` and then add 'node' to the types field in your tsconfig.ts(2591) make sure it is part of dev deps so we have smooth dev process. \n2. replace all emojis with proper i"
+    ]
+  },
+  {
+    "intent": "cloudflare_ops",
+    "prompt_count": 62,
+    "unique_sessions": 43,
+    "agents": [
+      "codex",
+      "grok"
+    ],
+    "existing_skills": [
+      "cloudflare-ops",
+      "deploy-and-prove"
+    ],
+    "recommendation": "improve",
+    "why": "High repetition despite existing skill — check freeform triggers",
+    "examples": [
+      "I need your help with doing a huge deslop on the entire cord base, changing its structure and making the entire project more logical on how it's currently structured. This means, I believe, maybe doing a new gridme, including code styles, structure, files, folders, what technolog",
+      "just remains her d1 yes.",
+      "we got proxy on the cf why is that? and how can we remove it I Authorization granted to Wrangler can u check that and fix it so we wont need that proxy to make it cleaner",
+      "what can be run without put in package json should not e.g. wrangler or playwright but yes.",
+      "after finish all what i said please [$organized-commits]([PATH]/organized-commits/SKILL.md) launch local, delete stale files or folders exist e.g. root ignored files or folders so i see everything before we redploy and sync. also did u backup d1 to drop and re init it properly?"
+    ]
+  },
+  {
+    "intent": "deploy_and_prove",
+    "prompt_count": 55,
+    "unique_sessions": 41,
+    "agents": [
+      "codex",
+      "grok"
+    ],
+    "existing_skills": [
+      "deploy-and-prove"
+    ],
+    "recommendation": "improve",
+    "why": "High repetition despite existing skill — check freeform triggers",
+    "examples": [
+      "two tasks 1. we got in mypr [Image #1] [URL]  a notifications settings can u confirm if we actually verify it works e2e production readY?\n\n2. admin has jump messages when they show up in app for regular user and admin can config them when and how we got 60 something of these can ",
+      "great job now do [$organized-commits]([PATH]/organized-commits/SKILL.md) then push and ship (redploy)",
+      "production demo not load when i enter entry-178b1b5ee12254…eaee668f781d.js:121 Uncaught Error: Minified React error #185; visit [URL] for the full message or use the non-minified dev environment for full errors and additional helpful warnings.\n    at Br (entry-178b1b5ee12254…8f78",
+      "please help me proper decide regarding this thats part of a chat response and request i sent to notebook lm thinking on how can we improve the model here with custom train of us or maybe use exist one not sure if its worth help me before do anything how can i use the model yogaco",
+      "after finish all what i said please [$organized-commits]([PATH]/organized-commits/SKILL.md) launch local, delete stale files or folders exist e.g. root ignored files or folders so i see everything before we redploy and sync. also did u backup d1 to drop and re init it properly?"
+    ]
+  },
+  {
+    "intent": "voice_dufflebag",
+    "prompt_count": 31,
+    "unique_sessions": 14,
+    "agents": [
+      "codex",
+      "grok"
+    ],
+    "existing_skills": [],
+    "recommendation": "create",
+    "why": "No matching skill; repeated job may warrant new skill",
+    "examples": [
+      "ok now ive installed the dufflebag and we ship it with tts and stt but not work can u double check i installed it correctly ?",
+      "ok so i hold the control and i am in cmux maybe that why but it didnt show the animation and the voice and stt me",
+      "ok nice now  well holding control still not stt me...",
+      "Hello. Hello, so looks like this is working. I need your help with another bug that currently is being I'm applied, I do not see the voice UI appears starting microphone... and I am not sure if the llm modal were using is enough good for this tts for the current machine what smal",
+      "it works nice but why for the tts it keeps say item? and regarding the stt it still misses some text and when i hold the control the ui animation is looking like hot reloading tons of times need fix there"
+    ]
+  },
+  {
+    "intent": "kill_ports_local_dev",
+    "prompt_count": 18,
+    "unique_sessions": 14,
+    "agents": [
+      "codex",
+      "grok"
+    ],
+    "existing_skills": [
+      "kill-ports-local-dev"
+    ],
+    "recommendation": "improve",
+    "why": "High repetition despite existing skill — check freeform triggers",
+    "examples": [
+      "kill please all local ports except 8081",
+      "please kill all local ports except metro and launch genshot local",
+      "please kill all local ports except metro",
+      "kill all local ports except metro",
+      "# AGENTS.md instructions for [PATH]/Code/replybase\n\n<INSTRUCTIONS>\n# AGENTS.md\n\n> Agent onboarding. Read this first, then CODE-STYLE.md for the full guide.\n\n## Quick Start\n\n```bash\npnpm install # install all workspace deps\npnpm dev # starts all apps in dev mode (turbo)\npnpm build"
+    ]
+  },
+  {
+    "intent": "web_best_practices",
+    "prompt_count": 14,
+    "unique_sessions": 13,
+    "agents": [
+      "codex",
+      "grok"
+    ],
+    "existing_skills": [
+      "web-best-practices",
+      "web-perf-ci"
+    ],
+    "recommendation": "improve",
+    "why": "High repetition despite existing skill — check freeform triggers",
+    "examples": [
+      "# AGENTS.md instructions for [PATH]/Code/alg\n\n<INSTRUCTIONS>\n# AGENTS.md — alg (lean target)\n\nCompact contract for every agent. Prefer this file over tool-specific copies.\n\n## Product\n\nAccessibility **widget** after setup + yearly sub. Operator CLI finds **call targets** (D1 only",
+      "Specialist: web performance + accessibility + best practices repetition.\n\nRead intent-refined (web_best_practices, web_perf) and job-like prompts under [PATH]/session-audit-2026-08-06/\nSkills: webBestPractices, webPerfCi SKILL.md\n\nRecommend improve triggers or leave. Note if free",
+      "In [PATH]/Code/launch-store fix TypeScript errors in store-related files only from the readonly type migration. Do not commit.\n\n## Errors to fix (store + related)\n\n```\nsrc/core/store/accessibility.ts - Cannot assign to readonly support flags / related (normalizeSupport building)\n",
+      "ok now if u do do some lighthouse tests u see still flaky css leak in middle of load when u clean cache that looks like nothing loaded.",
+      "MYPR monorepo at [PATH]/Code/MYPR-App.\n\n## Mission\nRemove redundant identity/DTO mappers. contracts.meaningful-mapping.\n\n## Your ONLY paths\n`client/src/features/landing/**`\n`client/src/features/welcome/**`\n`client/src/features/accessibility/**`\n\n## Do\nHunt to*/identity mappers. N"
+    ]
+  },
+  {
+    "intent": "workspace_bootstrap",
+    "prompt_count": 11,
+    "unique_sessions": 10,
+    "agents": [
+      "codex",
+      "grok"
+    ],
+    "existing_skills": [
+      "workspace-bootstrap"
+    ],
+    "recommendation": "improve",
+    "why": "High repetition despite existing skill — check freeform triggers",
+    "examples": [
+      "Can you please duplicate every repo we got on our gh? including one from Oly-App",
+      "ok nice now can u install via pnpm for each repo we got in the code folder except the ones who use npm.",
+      "please help me proper decide regarding this thats part of a chat response and request i sent to notebook lm thinking on how can we improve the model here with custom train of us or maybe use exist one not sure if its worth help me before do anything how can i use the model yogaco",
+      "Specialist: bulk multi-repo operations on ~/Desktop/Code — clone/duplicate all GH repos, pnpm install each, kill ports, statusline install.\n\nEvidence in job-like-prompts.jsonl under [PATH]/session-audit-2026-08-06/\n\nFor each job: count-like evidence, create skill?, safety concern",
+      "Specialist for NEW SKILL GAPS (no existing skill or weak coverage).\n\nRead:\n- [PATH]/session-audit-2026-08-06/intent-refined.json\n- [PATH]/session-audit-2026-08-06/job-like-prompts.jsonl\n- [PATH]/session-audit-2026-08-06/installed-skills.json\n- [PATH]/session-audit-2026-08-06/cove"
+    ]
+  },
+  {
+    "intent": "session_ops",
+    "prompt_count": 9,
+    "unique_sessions": 9,
+    "agents": [
+      "codex",
+      "grok"
+    ],
+    "existing_skills": [
+      "finish-agent-sessions",
+      "agent-session-auditor"
+    ],
+    "recommendation": "improve_or_trigger",
+    "why": "Skill exists; freeform vs named invoke gap possible",
+    "examples": [
+      "proceed from where interrupted",
+      "I would like you to proceed from where devin paused. Resume this session with `devin -r maple-dogwood`, or run `devin -r` to view recent sessions",
+      "I would like you to proceed from where devin paused Resume this session with `devin -r traveling-harrier`, or run `devin -r` to view recent sessions",
+      "Specialist: session resume / finish incomplete / continue from interrupted.\n\nRead finishAgentSessions and agentSessionAuditor skills under [PATH]/skills/\nAnd prompts mentioning resume/continue/interrupted/stale/finish session in [PATH]/session-audit-2026-08-06/job-like-prompts.js"
+    ]
+  },
+  {
+    "intent": "skill_authoring",
+    "prompt_count": 10,
+    "unique_sessions": 8,
+    "agents": [
+      "codex",
+      "grok"
+    ],
+    "existing_skills": [
+      "sync-agent-skills",
+      "agent-session-auditor",
+      "capture-workflow"
+    ],
+    "recommendation": "improve_or_trigger",
+    "why": "Skill exists; freeform vs named invoke gap possible",
+    "examples": [
+      "ok nice now regroup on how ot genreated into the scraped-yt so if we run agent to create skill it also create skill in the scraped-yt/agents/<agent-name>/the caption file plus the skill.md created and a json of getting the output tokens,input tokens, tools calls, reosurces used, ",
+      "Specialist: bulk multi-repo operations on ~/Desktop/Code — clone/duplicate all GH repos, pnpm install each, kill ports, statusline install.\n\nEvidence in job-like-prompts.jsonl under [PATH]/session-audit-2026-08-06/\n\nFor each job: count-like evidence, create skill?, safety concern",
+      "Specialist: dufflebag install + TTS/STT/voice/cmux control-hold loops.\n\nSearch job-like-prompts.jsonl and clean-prompts under [PATH]/session-audit-2026-08-06/ for: dufflebag, tts, stt, voice, control, cmux, dictation, statusline.\n\nIs this a skill opportunity or product bugfix wor",
+      "Specialist: Codex vs Grok usage differences for skill design.\n\nRead coverage-manifest.json, clean-prompts.jsonl (or job-like), intent-refined.json under [PATH]/session-audit-2026-08-06/\n\nAnswer:\n- Which jobs are codex-heavy vs grok-heavy?\n- Dictation/voice artifacts (dufflebag/cm",
+      "Hi i need your help so basically i want to modify the current skills we got in dufflebag. So I've been seeing a lot of repetitive prompts, I would say, in the last few weeks, I would say a week, because this is a new mac And I need your help with spawning some I would say 10 agen"
+    ]
+  }
+]

@@ -34,3 +34,5 @@ src/skills/pngToCode/scripts/.playwright/
 
 # .agents installed node_modules
 .agents/skills/**/node_modules/
+src/hookIsland/speakResponse/dufflebag-voice
+src/hookIsland/speakResponse/voice/target/

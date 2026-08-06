@@ -1,6 +1,6 @@
 ---
 name: preview-and-prove
-description: Use when the user asks to launch, preview, QA, or verify an app or browser-visible flow in the real UI, especially checkout, authentication, onboarding, forms, extensions, or responsive behavior.
+description: Use when the user wants a real local or UI proof — launch local, relaunch, run local, "do not deploy / run local", QA via playwright, e2e in browser/app, tunnel for test mode, "did you verify/check it works" on a visible flow, preview, or responsive QA. Prefer this over deploy-and-prove when they say run local or do not deploy. Especially checkout, authentication, onboarding, forms, extensions, or responsive behavior.
 type: flow
 ---
 

@@ -1,0 +1,2249 @@
+[
+  {
+    "id": "c0092",
+    "member_norms": 3,
+    "prompt_count": 25,
+    "unique_sessions": 25,
+    "agents": [
+      "codex"
+    ],
+    "top_terms": [
+      "docs",
+      "grill",
+      "full",
+      "preform",
+      "deslop",
+      "generic",
+      "change",
+      "variables"
+    ],
+    "examples": [
+      "I would like you to preform with me $grill-me-code-\n    style-with-docs from the begining so we can do a full\n    deslop on this entire repo. to change her structure\n    libraires deps etc so it looks cleanly. clean code,\n    obivous structure that make sense and no use of\n  generic\n    and not helping variables like\n    result,payload,body,data,raw etc etc",
+      "I would like you to preform with me $grill-me-code-style-with-docs from the begining so we can do a full deslop on this entire repo. to change her structure libraires deps etc so it looks cleanly. clean code, obivous structure that make sense and no use of generic and not helping variables like result,payload,body,data,raw etc etc",
+      "I would like you to preform with me [$grill-me-code-style-with-docs]([PATH]/grill-me-code-style-with-docs/SKILL.md) from the begining so we can do a full deslop on this entire repo. to change her structure libraires deps etc so it looks cleanly. clean code, obivous structure that make sense and no use of generic and not helping variables like result,payload,body,data,raw etc etc"
+    ],
+    "confidence": "high"
+  },
+  {
+    "id": "c0330",
+    "member_norms": 3,
+    "prompt_count": 9,
+    "unique_sessions": 8,
+    "agents": [
+      "codex"
+    ],
+    "top_terms": [
+      "runs",
+      "locales",
+      "export",
+      "dry",
+      "docs",
+      "flags",
+      "legal",
+      "html"
+    ],
+    "examples": [
+      "# AGENTS.md instructions for [PATH]/Code/alg\n\n<INSTRUCTIONS>\n# AGENTS.md — alg (lean target)\n\nCompact contract for every agent. Prefer this file over tool-specific copies.\n\n## Product\n\nAccessibility **widget** after setup + yearly sub. Operator CLI finds **call targets** (D1 only). No cold outreach in this repo.\n\n## Read order\n\n1. This file\n2. `docs/lean-target.md` — schema, cutover, passwords, UI",
+      "# AGENTS.md instructions for [PATH]/Code/alg\n\n<INSTRUCTIONS>\n# AGENTS.md — alg (lean target)\n\nCompact contract for every agent. Prefer this file over tool-specific copies.\n\n## Product\n\nAccessibility **widget** after setup + yearly sub. Operator CLI finds **call targets** (D1 only). No cold outreach in this repo.\n\n## Read order\n\n1. This file\n2. `docs/lean-target.md` — schema, cutover, passwords, UI",
+      "# AGENTS.md instructions for [PATH]/Code/alg\n\n<INSTRUCTIONS>\n# AGENTS.md — alg (lean target)\n\nCompact contract for every agent. Prefer this file over tool-specific copies.\n\n## Product\n\nAccessibility **widget** after setup + yearly sub. Operator CLI finds **call targets** (D1 only). No cold outreach in this repo.\n\n## Read order\n\n1. This file\n2. `docs/lean-target.md` — schema, cutover, passwords, UI"
+    ],
+    "confidence": "high"
+  },
+  {
+    "id": "c0482",
+    "member_norms": 8,
+    "prompt_count": 8,
+    "unique_sessions": 8,
+    "agents": [
+      "grok"
+    ],
+    "top_terms": [
+      "remove",
+      "identity",
+      "src",
+      "changed",
+      "files",
+      "keep",
+      "slim",
+      "kept"
+    ],
+    "examples": [
+      "MYPR monorepo at [PATH]/Code/MYPR-App.\n\n## Mission\nRemove/slim identity mappers. contracts.meaningful-mapping.\n\n## Your ONLY paths\n`server/src/affiliates/**`\n`server/src/whatsapp/**`\n`server/src/journalists/**`\n`server/src/chat/**`\n\n## Do\n`toPartnerResponse`, `toConversionResponse`, `toWhatsappError`, photo helpers.\nKEEP real transforms. Slim field-for-field DTO copies.\n\n## Report\nFiles changed, k",
+      "MYPR monorepo at [PATH]/Code/MYPR-App.\n\n## Mission\nRemove/slim identity mappers. contracts.meaningful-mapping.\n\n## Your ONLY paths\n`server/src/notifications/**`\n`server/src/popups/**`\n`server/src/sync/**`\n\n## Do\n`toNotificationResponse`, `toClientPopup`, `toMillis`, shellSerialize helpers.\nKEEP Date→ms, gender/locale personalization, dual-map renames (messageText).\nRemove pure identity copies.\n\n##",
+      "MYPR monorepo at [PATH]/Code/MYPR-App.\n\n## Mission\nRemove/slim identity mappers. contracts.meaningful-mapping.\n\n## Your ONLY paths\n`server/src/blog/**`\n`server/src/support/**`\n`server/src/rss/**`\n\n## Do\n`toBlogResponse`, `toSupportContentResponse`, etc.\nKEEP Date→ms, cover URL derivation, slug/redaction.\nSLIM pure field lists with spread+date overrides where types allow.\n\n## Report\nFiles changed, ",
+      "MYPR monorepo at [PATH]/Code/MYPR-App.\n\n## Mission\nRemove/slim identity mappers. contracts.meaningful-mapping.\n\n## Your ONLY paths\n`server/src/billing/**`\n\n## Do\n`toWireLemonConfig`, `toDiscountCampaignResponse`, `toTargetResponse`, `toSubscriptionPlan`, `toLemonCreatePayload`, etc.\nKEEP provider payload shaping and Date→ms.\nREMOVE pure field copies. Slim with spread where safe.\nRun billing unit t"
+    ],
+    "confidence": "high"
+  },
+  {
+    "id": "c0240",
+    "member_norms": 4,
+    "prompt_count": 8,
+    "unique_sessions": 6,
+    "agents": [
+      "codex"
+    ],
+    "top_terms": [
+      "local",
+      "ports",
+      "kill",
+      "except",
+      "metro",
+      "genshot",
+      "launch"
+    ],
+    "examples": [
+      "kill please all local ports except 8081",
+      "please kill all local ports except metro and launch genshot local",
+      "please kill all local ports except metro",
+      "kill all local ports except metro"
+    ],
+    "confidence": "high"
+  },
+  {
+    "id": "c0340",
+    "member_norms": 3,
+    "prompt_count": 7,
+    "unique_sessions": 6,
+    "agents": [
+      "codex"
+    ],
+    "top_terms": [
+      "throw",
+      "architecture",
+      "train",
+      "docs",
+      "flags",
+      "draft",
+      "project",
+      "preflight"
+    ],
+    "examples": [
+      "# AGENTS.md instructions for [PATH]/Code/launch-store\n\n<INSTRUCTIONS>\n# AGENTS.md\n\nWorking rules for AI agents and contributors editing **Launch**. This file holds only what you **can't infer** from the code and configs: module ownership, conventions a linter can't catch, and the validation gate every change must pass. Usage lives in [README.md](./README.md); style depth lives in [CODE-STYLE.md](.",
+      "# AGENTS.md instructions for [PATH]/Code/launch-store\n\n<INSTRUCTIONS>\n# AGENTS.md\n\nWorking rules for AI agents and contributors editing **Launch**. This file holds only what you **can't infer** from the code and configs: module ownership, conventions a linter can't catch, and the validation gate every change must pass. Usage lives in [README.md](./README.md); style depth lives in [CODE-STYLE.md](.",
+      "# AGENTS.md instructions for [PATH]/Code/launch-store\n\n<INSTRUCTIONS>\n# AGENTS.md\n\nWorking rules for AI agents and contributors editing **Launch**. This file holds only what you **can't infer** from the code and configs: module ownership, conventions a linter can't catch, and the validation gate every change must pass. Usage lives in [README.md](./README.md); style depth lives in [CODE-STYLE.md](."
+    ],
+    "confidence": "high"
+  },
+  {
+    "id": "c0331",
+    "member_norms": 2,
+    "prompt_count": 6,
+    "unique_sessions": 6,
+    "agents": [
+      "codex"
+    ],
+    "top_terms": [
+      "features",
+      "docs",
+      "deleting",
+      "may",
+      "run",
+      "must",
+      "current",
+      "plus"
+    ],
+    "examples": [
+      "# AGENTS.md instructions for [PATH]/Code/MYPR-App\n\n<INSTRUCTIONS>\n# MYPR agent guide\n\nMYPR is one product: a private, compliant journalist-outreach journey. Keep the\nclient, API, shared contracts, and Cloudflare deployment focused on that product.\n\n## Read first\n\n1. `PROJECT.md` for the product boundary.\n2. `docs/reference/CONTEXT.md` for domain terms and relationships.\n3. `docs/reference/LANGUAGE",
+      "# AGENTS.md instructions for [PATH]/Code/MYPR-App\n\n<INSTRUCTIONS>\n# MYPR agent guide\n\nMYPR is one product: a private, compliant journalist-outreach journey. Keep the\nclient, API, shared contracts, and Cloudflare deployment focused on that product.\n\n## Read first\n\n1. `PROJECT.md` for the product boundary.\n2. `docs/reference/CONTEXT.md` for domain terms and relationships.\n3. `docs/reference/LANGUAGE"
+    ],
+    "confidence": "high"
+  },
+  {
+    "id": "c0515",
+    "member_norms": 6,
+    "prompt_count": 6,
+    "unique_sessions": 6,
+    "agents": [
+      "grok"
+    ],
+    "top_terms": [
+      "remove",
+      "identity",
+      "src",
+      "dto",
+      "changed",
+      "files",
+      "client",
+      "why"
+    ],
+    "examples": [
+      "MYPR monorepo at [PATH]/Code/MYPR-App.\n\n## Mission\nRemove redundant identity/DTO mappers. contracts.meaningful-mapping.\n\n## Your ONLY paths\n`client/src/services/**`\n`client/src/news/**`\n`client/src/sync/**`\n`client/src/subscription/**`\n`client/src/account/**`\n`client/src/notifications/**` if present\n\n## Do\ne.g. `toTrendingHeadlines` — KEEP if it filters/sorts/decodes (real presentation). Remove fi",
+      "MYPR monorepo at [PATH]/Code/MYPR-App.\n\n## Mission\nRemove redundant identity/DTO mappers (`toX` field-for-field copies, parallel Record types). CODE-STYLE contracts.meaningful-mapping.\n\n## Your ONLY paths\n`client/src/features/journalist/**`\n`client/src/features/discovery/**`\n`client/src/features/match/**`\nAlso check: `client/src/journalists/**` if present.\n\n## Do\nSearch and delete identity mappers",
+      "MYPR monorepo at [PATH]/Code/MYPR-App.\n\n## Mission\nRemove redundant identity/DTO mappers. contracts.meaningful-mapping.\n\n## Your ONLY paths\n`client/src/features/membership/**`\n`client/src/features/media-coverage/**`\n`client/src/features/tracking/**`\n`client/src/features/support/**`\n`client/src/features/settings/**`\n`client/src/features/workspace/**`\n\n## Do\nSearch to*/identity DTO rebuilds; remove;",
+      "MYPR monorepo at [PATH]/Code/MYPR-App.\n\n## Mission\nRemove redundant identity/DTO mappers. contracts.meaningful-mapping.\n\n## Your ONLY paths\n`client/src/features/chat/**`\n`client/src/features/chats/**`\n\n## Do\nFind to*/from* field-for-field API clones; remove; use wire types. Keep real UI transforms. Implement + local tests.\n\n## Report\nFiles changed, removed, kept(+why)."
+    ],
+    "confidence": "high"
+  },
+  {
+    "id": "c0027",
+    "member_norms": 4,
+    "prompt_count": 6,
+    "unique_sessions": 5,
+    "agents": [
+      "codex"
+    ],
+    "top_terms": [
+      "commit",
+      "git",
+      "push",
+      "main",
+      "nice"
+    ],
+    "examples": [
+      "ok git commit push please.",
+      "git commit push please",
+      "please git commit push to main",
+      "ok nice git commit push"
+    ],
+    "confidence": "high"
+  },
+  {
+    "id": "c0327",
+    "member_norms": 3,
+    "prompt_count": 6,
+    "unique_sessions": 5,
+    "agents": [
+      "codex"
+    ],
+    "top_terms": [
+      "second",
+      "remember",
+      "architecture",
+      "docs",
+      "flags",
+      "may",
+      "html",
+      "draft"
+    ],
+    "examples": [
+      "# AGENTS.md instructions for [PATH]/Code/dufflebag\n\n<INSTRUCTIONS>\n# AGENTS.md\n\nEntrypoint for coding agents and maintainers. `CLAUDE.md` and `GEMINI.md` are symlinks to this file so Claude, Gemini, Codex, Cursor, Kiro, and other AGENTS-aware tools share one contract.\n\n## What this is\n\n**dufflebag** is a TypeScript CLI that installs, updates, uninstalls, diagnoses, configures, and scaffolds an own",
+      "# AGENTS.md instructions for [PATH]/Code/dufflebag\n\n<INSTRUCTIONS>\n# AGENTS.md\n\nEntrypoint for coding agents and maintainers. `CLAUDE.md` and `GEMINI.md` are symlinks to this file so Claude, Gemini, Codex, Cursor, Kiro, and other AGENTS-aware tools share one contract.\n\n## What this is\n\n**dufflebag** is a TypeScript CLI that installs, updates, uninstalls, diagnoses, configures, and scaffolds an own",
+      "# AGENTS.md instructions for [PATH]/Code/dufflebag\n\n<INSTRUCTIONS>\n# AGENTS.md\n\nEntrypoint for coding agents and maintainers. `CLAUDE.md` and `GEMINI.md` are symlinks to this file so Claude, Gemini, Codex, Cursor, Kiro, and other AGENTS-aware tools share one contract.\n\n## What this is\n\n**dufflebag** is a TypeScript CLI that installs, updates, uninstalls, diagnoses, configures, and scaffolds an own"
+    ],
+    "confidence": "high"
+  },
+  {
+    "id": "c0007",
+    "member_norms": 2,
+    "prompt_count": 5,
+    "unique_sessions": 5,
+    "agents": [
+      "codex"
+    ],
+    "top_terms": [
+      "one",
+      "app",
+      "repo",
+      "oly",
+      "duplicate",
+      "every",
+      "including",
+      "installs"
+    ],
+    "examples": [
+      "Can you please duplicate every repo we got on our gh? including one from Oly-App into the Code folder. without installs just duplicate.",
+      "Can you please duplicate every repo we got on our gh? including one from Oly-App"
+    ],
+    "confidence": "high"
+  },
+  {
+    "id": "c0028",
+    "member_norms": 1,
+    "prompt_count": 5,
+    "unique_sessions": 5,
+    "agents": [
+      "codex"
+    ],
+    "top_terms": [
+      "styles",
+      "going",
+      "architecture",
+      "deslop",
+      "proper",
+      "better",
+      "project",
+      "running"
+    ],
+    "examples": [
+      "I need your help with doing a huge deslop on the entire cord base, changing its structure and making the entire project more logical on how it's currently structured. This means, I believe, maybe doing a new gridme, including code styles, structure, files, folders, what technology we are going to use, et cetera, et cetera, like building this entire project from start. This includes static assets i"
+    ],
+    "confidence": "medium"
+  },
+  {
+    "id": "c0046",
+    "member_norms": 1,
+    "prompt_count": 5,
+    "unique_sessions": 5,
+    "agents": [
+      "codex"
+    ],
+    "top_terms": [
+      "slop",
+      "naming",
+      "forbidden",
+      "correctly",
+      "better",
+      "think",
+      "desloped",
+      "codebase"
+    ],
+    "examples": [
+      "do you think we can have better codebase structure,file names ,and cli for this to make it 0 ai slop and 100% desloped correctly? like better naming for variables and forbidden Files that are naming like payload or response body or data"
+    ],
+    "confidence": "medium"
+  },
+  {
+    "id": "c0048",
+    "member_norms": 1,
+    "prompt_count": 5,
+    "unique_sessions": 5,
+    "agents": [
+      "codex"
+    ],
+    "top_terms": [
+      "files",
+      "one",
+      "structure",
+      "tree",
+      "prposed",
+      "show",
+      "folder"
+    ],
+    "examples": [
+      "and what about structure of files/folder tree show the prposed one"
+    ],
+    "confidence": "medium"
+  },
+  {
+    "id": "c0051",
+    "member_norms": 2,
+    "prompt_count": 5,
+    "unique_sessions": 5,
+    "agents": [
+      "codex"
+    ],
+    "top_terms": [
+      "emd",
+      "secondly",
+      "docs",
+      "grill",
+      "agree",
+      "yet",
+      "proper",
+      "config"
+    ],
+    "examples": [
+      "1.its confusing same folder named on other folder e.g. config. so aside of that i agree on all. secondly is that how the code-styl.emd is applying i want to proper $grill-me-code-style-with-docs with what we hvent talked yet and grilled",
+      "1.its confusing same folder named on other folder e.g. config. so aside of that i agree on all. secondly is that how the code-styl.emd is applying i want to proper [$grill-me-code-style-with-docs]([PATH]/grill-me-code-style-with-docs/SKILL.md) with what we hvent talked yet and grilled"
+    ],
+    "confidence": "high"
+  },
+  {
+    "id": "c0139",
+    "member_norms": 1,
+    "prompt_count": 5,
+    "unique_sessions": 5,
+    "agents": [
+      "codex"
+    ],
+    "top_terms": [
+      "fully",
+      "widget",
+      "repo",
+      "practices",
+      "next",
+      "best"
+    ],
+    "examples": [
+      "i would say repo with just widget and fully next.js. best practices"
+    ],
+    "confidence": "medium"
+  },
+  {
+    "id": "c0140",
+    "member_norms": 1,
+    "prompt_count": 5,
+    "unique_sessions": 5,
+    "agents": [
+      "codex"
+    ],
+    "top_terms": [
+      "practices",
+      "next",
+      "best"
+    ],
+    "examples": [
+      "i would say next.js best practices."
+    ],
+    "confidence": "medium"
+  },
+  {
+    "id": "c0222",
+    "member_norms": 2,
+    "prompt_count": 5,
+    "unique_sessions": 5,
+    "agents": [
+      "codex"
+    ],
+    "top_terms": [
+      "proper",
+      "add",
+      "tons",
+      "ascii",
+      "services",
+      "aaware",
+      "see",
+      "files"
+    ],
+    "examples": [
+      "1.Cannot find name 'process'. Do you need to install type definitions for node? Try `npm i --save-dev @types/node` and then add 'node' to the types field in your tsconfig.ts(2591) make sure it is part of dev deps so we have smooth dev process. \n2. replace all emojis with proper inline text or ascii e.g. checkmark without emoji or x without emoji so its cleanler. \n3.thats looks duplicate hardcode v",
+      "1.Cannot find name 'process'. Do you need to install type definitions for node? Try `npm i --save-dev @types/node` and then add 'node' to the types field in your tsconfig.ts(2591) make sure it is part of dev deps so we have smooth dev process. \n2. replace all emojis with proper inline text or ascii e.g. checkmark without emoji or x without emoji so its cleanler. \n3.thats looks duplicate hardcode v"
+    ],
+    "confidence": "high"
+  },
+  {
+    "id": "c0223",
+    "member_norms": 2,
+    "prompt_count": 5,
+    "unique_sessions": 5,
+    "agents": [
+      "codex"
+    ],
+    "top_terms": [
+      "docs",
+      "grill",
+      "codebase",
+      "whwat",
+      "leaner",
+      "code",
+      "feel",
+      "sense"
+    ],
+    "examples": [
+      "the structure of codebase does make a sense and logic but i feel like we can make it leaner and thigtehn $grill-me-code-style-with-docs whwat do u recommened?",
+      "the structure of codebase does make a sense and logic but i feel like we can make it leaner and thigtehn [$grill-me-code-style-with-docs]([PATH]/grill-me-code-style-with-docs/SKILL.md) whwat do u recommened?"
+    ],
+    "confidence": "high"
+  },
+  {
+    "id": "c0251",
+    "member_norms": 2,
+    "prompt_count": 5,
+    "unique_sessions": 5,
+    "agents": [
+      "codex"
+    ],
+    "top_terms": [
+      "slop",
+      "cleanup",
+      "docs",
+      "grill",
+      "proper",
+      "conventions",
+      "generic",
+      "isrecord"
+    ],
+    "examples": [
+      "Help me do a proper cleanup and $grill-me-code-style-with-docs on this repo so we are have proper following order code-style.md and clean and professional codebase. filenames conventions etc no generic result,response,data,payload,body, isRecord (ai slop functions) etc unified uses for ui or utils etc i am just thorwing here some of what i got in mind",
+      "Help me do a proper cleanup and [$grill-me-code-style-with-docs]([PATH]/grill-me-code-style-with-docs/SKILL.md) on this repo so we are have proper following order code-style.md and clean and professional codebase. filenames conventions etc no generic result,response,data,payload,body, isRecord (ai slop functions) etc unified uses for ui or utils etc i am just thorwing here some of what i got in mi"
+    ],
+    "confidence": "high"
+  },
+  {
+    "id": "c0343",
+    "member_norms": 2,
+    "prompt_count": 5,
+    "unique_sessions": 5,
+    "agents": [
+      "codex"
+    ],
+    "top_terms": [
+      "architecture",
+      "docs",
+      "project",
+      "result",
+      "ownership",
+      "cdp",
+      "paths",
+      "over"
+    ],
+    "examples": [
+      "# AGENTS.md instructions for [PATH]/Code/ai-browser-bridge\n\n<INSTRUCTIONS>\n# AGENTS.md — ai-browser-bridge\n\nDurable repo instructions for Codex, Cursor, and other agents that read\n`AGENTS.md`. Keep this file short: it is the routing map and working contract,\nnot a copied style guide.\n\n## Project Contract\n\n- This repo is a terminal CLI that drives ChatGPT, Gemini, Claude, DeepSeek,\n  Grok, or Perpl",
+      "# AGENTS.md instructions for [PATH]/Code/ai-browser-bridge\n\n<INSTRUCTIONS>\n# AGENTS.md — ai-browser-bridge\n\nDurable repo instructions for Codex, Cursor, and other agents that read\n`AGENTS.md`. Keep this file short: it is the routing map and working contract,\nnot a copied style guide.\n\n## Project Contract\n\n- This repo is a terminal CLI that drives ChatGPT, Gemini, Claude, DeepSeek,\n  Grok, or Perpl"
+    ],
+    "confidence": "high"
+  },
+  {
+    "id": "c0333",
+    "member_norms": 2,
+    "prompt_count": 5,
+    "unique_sessions": 4,
+    "agents": [
+      "codex"
+    ],
+    "top_terms": [
+      "throw",
+      "max",
+      "architecture",
+      "docs",
+      "flags",
+      "may",
+      "color",
+      "project"
+    ],
+    "examples": [
+      "# AGENTS.md instructions for [PATH]/Code/replybase\n\n<INSTRUCTIONS>\n# AGENTS.md\n\n> Agent onboarding. Read this first, then CODE-STYLE.md for the full guide.\n\n## Quick Start\n\n```bash\npnpm install # install all workspace deps\npnpm dev # starts all apps in dev mode (turbo)\npnpm build # builds everything\npnpm check # biome format + lint (auto-fix)\npnpm test # runs vitest across packages\n```\n\n**Local pl",
+      "# AGENTS.md instructions for [PATH]/Code/replybase\n\n<INSTRUCTIONS>\n# AGENTS.md\n\n> Agent onboarding. Read this first, then CODE-STYLE.md for the full guide.\n\n## Quick Start\n\n```bash\npnpm install # install all workspace deps\npnpm dev # starts all apps in dev mode (turbo)\npnpm build # builds everything\npnpm check # biome format + lint (auto-fix)\npnpm test # runs vitest across packages\n```\n\n**Local pl"
+    ],
+    "confidence": "medium"
+  },
+  {
+    "id": "c0335",
+    "member_norms": 2,
+    "prompt_count": 5,
+    "unique_sessions": 4,
+    "agents": [
+      "codex"
+    ],
+    "top_terms": [
+      "second",
+      "dry",
+      "docs",
+      "flags",
+      "may",
+      "reserved",
+      "rather",
+      "supabase"
+    ],
+    "examples": [
+      "# AGENTS.md instructions for [PATH]/Code/vybekiit\n\n<INSTRUCTIONS>\n# AGENTS.md — VybeKiit (maintainer layer)\n\n> **Single source of truth** for any agent working on **this monorepo** (building/maintaining the\n> kit itself). `CLAUDE.md`, Copilot, Codex, and `.cursor/rules/vybekiit.mdc` (Cursor) are thin\n> pointers to this file — keep guidance here, not duplicated, or it drifts. Cursor also loads\n> `.",
+      "# AGENTS.md instructions for [PATH]/Code/vybekiit\n\n<INSTRUCTIONS>\n# AGENTS.md — VybeKiit (maintainer layer)\n\n> **Single source of truth** for any agent working on **this monorepo** (building/maintaining the\n> kit itself). `CLAUDE.md`, Copilot, Codex, and `.cursor/rules/vybekiit.mdc` (Cursor) are thin\n> pointers to this file — keep guidance here, not duplicated, or it drifts. Cursor also loads\n> `."
+    ],
+    "confidence": "medium"
+  },
+  {
+    "id": "c0336",
+    "member_norms": 2,
+    "prompt_count": 5,
+    "unique_sessions": 4,
+    "agents": [
+      "codex"
+    ],
+    "top_terms": [
+      "second",
+      "throw",
+      "dry",
+      "docs",
+      "throws",
+      "reference",
+      "business",
+      "content"
+    ],
+    "examples": [
+      "# AGENTS.md instructions for [PATH]/Code/wedding-digital-invites\n\n<INSTRUCTIONS>\n# AGENTS.md\n\nInstructions for coding agents working in this repo.\n\nRead [CONTEXT.md](CONTEXT.md) and [CONVENTIONS.md](CONVENTIONS.md) before making non-trivial changes.\n\n## Engineering principles\n\nApply these on every change:\n\n| Principle | Rule |\n|-----------|------|\n| **Single source of truth** | Business data lives",
+      "# AGENTS.md instructions for [PATH]/Code/wedding-digital-invites\n\n<INSTRUCTIONS>\n# AGENTS.md\n\nInstructions for coding agents working in this repo.\n\nRead [CONTEXT.md](CONTEXT.md) and [CONVENTIONS.md](CONVENTIONS.md) before making non-trivial changes.\n\n## Engineering principles\n\nApply these on every change:\n\n| Principle | Rule |\n|-----------|------|\n| **Single source of truth** | Business data lives"
+    ],
+    "confidence": "medium"
+  },
+  {
+    "id": "c0353",
+    "member_norms": 2,
+    "prompt_count": 5,
+    "unique_sessions": 4,
+    "agents": [
+      "codex"
+    ],
+    "top_terms": [
+      "architecture",
+      "docs",
+      "flags",
+      "may",
+      "reserved",
+      "esm",
+      "exempt",
+      "transport"
+    ],
+    "examples": [
+      "# AGENTS.md instructions for [PATH]/Code/ebay-mcp\n\n<INSTRUCTIONS>\n# AGENTS.md\n\nGuidance for coding agents (and humans) working **on** this repo. For using the server, see [README.md](README.md).\n\n## What this is\n\nA local [MCP]([URL]) server exposing 298 tools across 100% of eBay's Sell APIs. TypeScript/Node.js (ESM), built with `@modelcontextprotocol/sdk`, Effect-backed validation, a Zod SDK adapt",
+      "# AGENTS.md instructions for [PATH]/Code/ebay-mcp\n\n<INSTRUCTIONS>\n# AGENTS.md\n\nGuidance for coding agents (and humans) working **on** this repo. For using the server, see [README.md](README.md).\n\n## What this is\n\nA local [MCP]([URL]) server exposing 298 tools across 100% of eBay's Sell APIs. TypeScript/Node.js (ESM), built with `@modelcontextprotocol/sdk`, Effect-backed validation, a Zod SDK adapt"
+    ],
+    "confidence": "medium"
+  },
+  {
+    "id": "c0037",
+    "member_norms": 2,
+    "prompt_count": 4,
+    "unique_sessions": 4,
+    "agents": [
+      "codex"
+    ],
+    "top_terms": [
+      "current",
+      "see",
+      "purpose",
+      "repo",
+      "explain",
+      "merges",
+      "stale",
+      "does"
+    ],
+    "examples": [
+      "Explain to me about this repo what it does what deps you see unsued can be removed what is in a middle of merges or stale and if the current structure looks logical to the purpose of\n  this repo structure itself",
+      "Explain to me about this repo what it does what deps you see unsued can be removed what is in a middle of merges or stale and if the current structure looks logical to the purpose of\n  this repo structure itself if its in the same structure that the apple api docs expect so we give the most expierenced and good develoepr expierence"
+    ],
+    "confidence": "medium"
+  },
+  {
+    "id": "c0203",
+    "member_norms": 1,
+    "prompt_count": 4,
+    "unique_sessions": 4,
+    "agents": [
+      "codex"
+    ],
+    "top_terms": [
+      "proceed",
+      "interrupted"
+    ],
+    "examples": [
+      "proceed from where interrupted"
+    ],
+    "confidence": "medium"
+  },
+  {
+    "id": "c0213",
+    "member_norms": 2,
+    "prompt_count": 4,
+    "unique_sessions": 4,
+    "agents": [
+      "codex"
+    ],
+    "top_terms": [
+      "devin",
+      "paused",
+      "view",
+      "session",
+      "run",
+      "sessions",
+      "recent",
+      "resume"
+    ],
+    "examples": [
+      "I would like you to proceed from where devin paused. Resume this session with `devin -r maple-dogwood`, or run `devin -r` to view recent sessions",
+      "I would like you to proceed from where devin paused Resume this session with `devin -r traveling-harrier`, or run `devin -r` to view recent sessions"
+    ],
+    "confidence": "medium"
+  },
+  {
+    "id": "c0271",
+    "member_norms": 2,
+    "prompt_count": 4,
+    "unique_sessions": 4,
+    "agents": [
+      "codex"
+    ],
+    "top_terms": [
+      "one",
+      "remaining",
+      "questions",
+      "ask",
+      "shot",
+      "planpage"
+    ],
+    "examples": [
+      "ask all remaining questions in planpage so i can one shot",
+      "› ask all remaining questions in planpage so i can one shot"
+    ],
+    "confidence": "medium"
+  },
+  {
+    "id": "c0277",
+    "member_norms": 2,
+    "prompt_count": 4,
+    "unique_sessions": 4,
+    "agents": [
+      "codex"
+    ],
+    "top_terms": [
+      "approve",
+      "recommendtation"
+    ],
+    "examples": [
+      "approve all recommendtation",
+      "› approve all recommendtation"
+    ],
+    "confidence": "medium"
+  },
+  {
+    "id": "c0337",
+    "member_norms": 3,
+    "prompt_count": 5,
+    "unique_sessions": 3,
+    "agents": [
+      "codex"
+    ],
+    "top_terms": [
+      "second",
+      "rhffield",
+      "max",
+      "architecture",
+      "scanning",
+      "dry",
+      "docs",
+      "memo"
+    ],
+    "examples": [
+      "# AGENTS.md instructions for [PATH]/Code/Oly-App\n\n<INSTRUCTIONS>\n# Oly-App\n\nAgent contract for this repo. **Normative** for coding agents (Codex, Cursor, Claude via adapter, Gemini via adapter, etc.). Long-form rationale lives in `docs/adr/`.\n\n## Source-of-truth map\n\n| Doc | Role |\n| --- | --- |\n| **This file (`AGENTS.md`)** | Always-on agent contract (digest + gates + safety) — SSOT for Codex, Cu",
+      "# AGENTS.md instructions for [PATH]/Code/Oly-App\n\n<INSTRUCTIONS>\n# Oly-App\n\nAgent contract for this repo. **Normative** for coding agents (Codex, Cursor, Claude via adapter, Gemini via adapter, etc.). Long-form rationale lives in `docs/adr/`.\n\n## Source-of-truth map\n\n| Doc | Role |\n| --- | --- |\n| **This file (`AGENTS.md`)** | Always-on agent contract (digest + gates + safety) — SSOT for Codex, Cu",
+      "# AGENTS.md instructions for [PATH]/Code/Oly-App\n\n<INSTRUCTIONS>\n# Oly-App\n\nAgent contract for this repo. **Normative** for coding agents (Codex, Cursor, Claude via adapter, Gemini via adapter, etc.). Long-form rationale lives in `docs/adr/`.\n\n## Source-of-truth map\n\n| Doc | Role |\n| --- | --- |\n| **This file (`AGENTS.md`)** | Always-on agent contract (digest + gates + safety) — SSOT for Codex, Cu"
+    ],
+    "confidence": "medium"
+  },
+  {
+    "id": "c0387",
+    "member_norms": 3,
+    "prompt_count": 3,
+    "unique_sessions": 3,
+    "agents": [
+      "grok"
+    ],
+    "top_terms": [
+      "reply",
+      "effort",
+      "only",
+      "low",
+      "high",
+      "medium"
+    ],
+    "examples": [
+      "Reply with only: effort-low",
+      "Reply with only: effort-high",
+      "Reply with only: effort-medium"
+    ],
+    "confidence": "medium"
+  },
+  {
+    "id": "c0436",
+    "member_norms": 1,
+    "prompt_count": 3,
+    "unique_sessions": 3,
+    "agents": [
+      "grok"
+    ],
+    "top_terms": [
+      "already",
+      "gate",
+      "approved",
+      "duplication",
+      "approval",
+      "branch",
+      "rewrite",
+      "why"
+    ],
+    "examples": [
+      "why not history rewrite from duplication of main in another branch that will be the test of this? main already will have all.  approval gate is approved"
+    ],
+    "confidence": "medium"
+  },
+  {
+    "id": "c0082",
+    "member_norms": 2,
+    "prompt_count": 4,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "top_terms": [
+      "docx",
+      "other",
+      "here",
+      "now",
+      "tracking",
+      "motion",
+      "fixes",
+      "experience"
+    ],
+    "examples": [
+      "ok nice it worked now for other thing need here multiple fixes and adjustments OLY Motion Tracking Experience (1).docx",
+      "ok nice it worked now for other thing need here multiple fixes and adjustments OLY Motion\n  Tracking Experience (1).docx read this file from Downloads folder share with me what need to be fixed properly. u got the silhotte too human-silhouette-transparent.png"
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0325",
+    "member_norms": 2,
+    "prompt_count": 4,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "top_terms": [
+      "scraped",
+      "json",
+      "mapped",
+      "agent",
+      "run",
+      "getting",
+      "deep",
+      "precisly"
+    ],
+    "examples": [
+      "ok nice now regroup on how ot genreated into the scraped-yt so if we run agent to create skill it also create skill in the scraped-yt/agents/<agent-name>/the caption file plus the skill.md created and a json of getting the output tokens,input tokens, tools calls, reosurces used, time took, model used , context window etc. this needs to be mapped to the official resource of each so i want u to do  ",
+      "ok nice now regroup on how ot genreated into the scraped-yt so if we run agent to create skill it also create skill in the scraped-yt/agents/<agent-name>/the caption file plus the skill.md created and a json of getting the output tokens,input tokens, tools calls, reosurces used, time took, model used , context window etc. this needs to be mapped to the official resource of each so i want u to do  "
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0021",
+    "member_norms": 2,
+    "prompt_count": 3,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "top_terms": [
+      "image",
+      "reading",
+      "add",
+      "color",
+      "fit",
+      "read",
+      "while",
+      "wont"
+    ],
+    "examples": [
+      "do it all and [Image #1] add it and also if u can a bg bg color that fit each word that the model is reading but in the tui so i can follow it while it read and i wont get lost",
+      "<image name=[Image #1] path=\"/var/folders/1b/0zhz4fn11w5gpjqczstysy5m0000gn/T/TemporaryItems/NSIRD_screencaptureui_edn0P8/Screenshot 2026-07-31 at 1.47.41.png\">\n</image>\ndo it all and [Image #1] add it and also if u can a bg bg color that fit each word that the model is reading but in the tui so i can follow it while it read and i wont get lost"
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0052",
+    "member_norms": 2,
+    "prompt_count": 3,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "top_terms": [
+      "image",
+      "jump",
+      "regular",
+      "tomorrow",
+      "demo",
+      "properly",
+      "well",
+      "config"
+    ],
+    "examples": [
+      "two tasks 1. we got in mypr [Image #1] [URL]  a notifications settings can u confirm if we actually verify it works e2e production readY?\n\n2. admin has jump messages when they show up in app for regular user and admin can config them when and how we got 60 something of these can u confirm if that is propely e2e tested too verified worked ? between demo user to admin demo changes modificatiosn to v",
+      "<image name=[Image #1] path=\"/var/folders/1b/0zhz4fn11w5gpjqczstysy5m0000gn/T/TemporaryItems/NSIRD_screencaptureui_jvKR3N/Screenshot 2026-08-02 at 3.43.26.png\">\n</image>\ntwo tasks 1. we got in mypr [Image #1] [URL]  a notifications settings can u confirm if we actually verify it works e2e production readY?\n\n2. admin has jump messages when they show up in app for regular user and admin can config t"
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0105",
+    "member_norms": 2,
+    "prompt_count": 3,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "top_terms": [
+      "image",
+      "checked",
+      "home",
+      "run",
+      "proper",
+      "cause",
+      "works",
+      "casue"
+    ],
+    "examples": [
+      "u checked it works proper and init? get the web api request it need to works cause i run and got casue on the web it still redirect to [Image #1] and not to the home still.",
+      "<image name=[Image #1] path=\"/var/folders/1b/0zhz4fn11w5gpjqczstysy5m0000gn/T/TemporaryItems/NSIRD_screencaptureui_HTChvx/Screenshot 2026-08-02 at 19.09.16.png\">\n</image>\nu checked it works proper and init? get the web api request it need to works cause i run and got casue on the web it still redirect to [Image #1] and not to the home still."
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0113",
+    "member_norms": 2,
+    "prompt_count": 3,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "top_terms": [
+      "image",
+      "fix",
+      "view",
+      "seeing",
+      "start",
+      "silhoutte",
+      "gif",
+      "static"
+    ],
+    "examples": [
+      "[Image #1] i am not seeing the silhoutte at start of pose and not the gif or static se and accracu y need fix in the web view",
+      "<image name=[Image #1] path=\"/var/folders/1b/0zhz4fn11w5gpjqczstysy5m0000gn/T/TemporaryItems/NSIRD_screencaptureui_nYztfB/Screenshot 2026-08-02 at 19.28.58.png\">\n</image>\n[Image #1] i am not seeing the silhoutte at start of pose and not the gif or static se and accracu y need fix in the web view"
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0123",
+    "member_norms": 2,
+    "prompt_count": 3,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "top_terms": [
+      "looks",
+      "image",
+      "check",
+      "now",
+      "still",
+      "teh",
+      "logs",
+      "cause"
+    ],
+    "examples": [
+      "check logs now cause looks like skeleton still not launch or visible in teh web ui plus [Image #1]",
+      "<image name=[Image #1] path=\"[PATH]/Desktop/Screenshot 2026-08-02 at 20.03.49.png\">\n</image>\ncheck logs now cause looks like skeleton still not launch or visible in teh web ui plus [Image #1]"
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0148",
+    "member_norms": 2,
+    "prompt_count": 3,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "top_terms": [
+      "image",
+      "why",
+      "render",
+      "gif",
+      "too",
+      "suppost",
+      "pose",
+      "its"
+    ],
+    "examples": [
+      "[Image #1] ok nice but i do not see the gif pose in web why ? its suppost to be render too.",
+      "<image name=[Image #1] path=\"/var/folders/1b/0zhz4fn11w5gpjqczstysy5m0000gn/T/TemporaryItems/NSIRD_screencaptureui_rOA0Y2/Screenshot 2026-08-03 at 1.21.43.png\">\n</image>\n[Image #1] ok nice but i do not see the gif pose in web why ? its suppost to be render too."
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0159",
+    "member_norms": 2,
+    "prompt_count": 3,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "top_terms": [
+      "image",
+      "properly",
+      "right",
+      "proper",
+      "green",
+      "see",
+      "detector",
+      "hiding"
+    ],
+    "examples": [
+      "[Image #1]   what do u see in the image? this need fix e.g. the pink detector need proper position right now it hiding the chips and the angles not properly lock when i am in the green join position.",
+      "<image name=[Image #1] path=\"/var/folders/1b/0zhz4fn11w5gpjqczstysy5m0000gn/T/clipboard-2026-08-03-013157-29C12862.png\">\n</image>\n[Image #1]   what do u see in the image? this need fix e.g. the pink detector need proper position right now it hiding the chips and the angles not properly lock when i am in the green join position."
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0165",
+    "member_norms": 2,
+    "prompt_count": 3,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "top_terms": [
+      "docx",
+      "image",
+      "violate",
+      "file",
+      "find",
+      "something",
+      "oly",
+      "downloads"
+    ],
+    "examples": [
+      "[Image #1] ok nice but do u find from image something that violate the docx file from Downloads of oly ?",
+      "<image name=[Image #1] path=\"/var/folders/1b/0zhz4fn11w5gpjqczstysy5m0000gn/T/TemporaryItems/NSIRD_screencaptureui_odsR6p/Screenshot 2026-08-03 at 1.47.32.png\">\n</image>\n[Image #1] ok nice but do u find from image something that violate the docx file from Downloads of oly ?"
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0001",
+    "member_norms": 1,
+    "prompt_count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "top_terms": [
+      "check",
+      "now",
+      "tts",
+      "stt",
+      "work",
+      "installed",
+      "double",
+      "correctly"
+    ],
+    "examples": [
+      "ok now ive installed the dufflebag and we ship it with tts and stt but not work can u double check i installed it correctly ?"
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0002",
+    "member_norms": 1,
+    "prompt_count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "top_terms": [
+      "voice",
+      "stt",
+      "maybe",
+      "why",
+      "control",
+      "didnt",
+      "show",
+      "animation"
+    ],
+    "examples": [
+      "ok so i hold the control and i am in cmux maybe that why but it didnt show the animation and the voice and stt me"
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0003",
+    "member_norms": 1,
+    "prompt_count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "top_terms": [
+      "fix",
+      "workspace",
+      "bug",
+      "ignore"
+    ],
+    "examples": [
+      "fix the ignore workspace bug"
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0004",
+    "member_norms": 1,
+    "prompt_count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "top_terms": [
+      "latest",
+      "ellete",
+      "teh",
+      "pnpm",
+      "stale"
+    ],
+    "examples": [
+      "no stale ellete teh 10.33.2 and use the latest pnpm."
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0005",
+    "member_norms": 1,
+    "prompt_count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "top_terms": [
+      "now",
+      "stt",
+      "holding",
+      "still",
+      "well",
+      "control",
+      "nice"
+    ],
+    "examples": [
+      "ok nice now  well holding control still not stt me..."
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0006",
+    "member_norms": 1,
+    "prompt_count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "top_terms": [
+      "good",
+      "voice",
+      "appears",
+      "very",
+      "starting",
+      "machine",
+      "current",
+      "bug"
+    ],
+    "examples": [
+      "Hello. Hello, so looks like this is working. I need your help with another bug that currently is being I'm applied, I do not see the voice UI appears starting microphone... and I am not sure if the llm modal were using is enough good for this tts for the current machine what small very popular but very good on stt we can implement and use?"
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0009",
+    "member_norms": 1,
+    "prompt_count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "top_terms": [
+      "org",
+      "two",
+      "genshot",
+      "duplicate",
+      "vybekiit",
+      "dev"
+    ],
+    "examples": [
+      "please also duplicate our two org e.g. vybekiit and genshot.dev"
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0010",
+    "member_norms": 1,
+    "prompt_count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "top_terms": [
+      "org",
+      "two",
+      "main",
+      "genshot",
+      "repo",
+      "duplicate",
+      "vybekiit"
+    ],
+    "examples": [
+      "please also duplicate our two org e.g. vybekiit main repo and the genshot repo from the org"
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0011",
+    "member_norms": 1,
+    "prompt_count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "top_terms": [
+      "reloading",
+      "control",
+      "tons",
+      "hold",
+      "nice",
+      "works",
+      "tts",
+      "why"
+    ],
+    "examples": [
+      "it works nice but why for the tts it keeps say item? and regarding the stt it still misses some text and when i hold the control the ui animation is looking like hot reloading tons of times need fix there"
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0012",
+    "member_norms": 1,
+    "prompt_count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "top_terms": [
+      "model",
+      "statusline",
+      "dynamic",
+      "limit",
+      "context",
+      "current",
+      "show",
+      "weekly"
+    ],
+    "examples": [
+      "/statusline show context dynamic current model context and weekly limit as Context <n>% (<n>K) | Weekly <n>% (<n>K)"
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0013",
+    "member_norms": 1,
+    "prompt_count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "top_terms": [
+      "ones",
+      "who",
+      "folder",
+      "now",
+      "via",
+      "install",
+      "each",
+      "pnpm"
+    ],
+    "examples": [
+      "ok nice now can u install via pnpm for each repo we got in the code folder except the ones who use npm."
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0014",
+    "member_norms": 1,
+    "prompt_count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "top_terms": [
+      "keep",
+      "happein",
+      "hello",
+      "stt",
+      "things",
+      "thats",
+      "leader",
+      "said"
+    ],
+    "examples": [
+      "I said hell how r u but it stt 'Hello, our leader.' thats annoying and this small things keep happein.g"
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0015",
+    "member_norms": 1,
+    "prompt_count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "top_terms": [
+      "rustup",
+      "delete",
+      "install",
+      "repo",
+      "official",
+      "template",
+      "vybekiit",
+      "completely"
+    ],
+    "examples": [
+      "so for Template repo you can delete it completely and for vybekiit install official rustup please"
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0017",
+    "member_norms": 1,
+    "prompt_count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "top_terms": [
+      "going",
+      "spamming",
+      "current",
+      "running",
+      "call",
+      "actually",
+      "off",
+      "one"
+    ],
+    "examples": [
+      "I would like to consult with you Regarding the current code base of Dufferberg and how its structure Additionally how the code base is following the code style.md And whether we are following the best practices for this kind of repo hat do you find incossistent and few bugs i find but i am not sure we can call it bugs So one, when I'm working in multiple terminals using Cmux, The automatic respons"
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0018",
+    "member_norms": 1,
+    "prompt_count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "top_terms": [
+      "current",
+      "statusline",
+      "another",
+      "weekly",
+      "one",
+      "model",
+      "thing",
+      "used"
+    ],
+    "examples": [
+      "/statusline edit the current one we got with another thing and iti s the current folder we are and the current model is being used. not just context and weekly"
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0019",
+    "member_norms": 1,
+    "prompt_count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "top_terms": [
+      "model",
+      "well",
+      "level",
+      "right",
+      "after",
+      "show",
+      "reasoning"
+    ],
+    "examples": [
+      "show as well the reasoning level right after the model"
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0020",
+    "member_norms": 1,
+    "prompt_count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "top_terms": [
+      "proper",
+      "add",
+      "under",
+      "dufflebag",
+      "new",
+      "exactly",
+      "easily",
+      "statuslines"
+    ],
+    "examples": [
+      "add in the dufflebag this so we can setup it next time if i need to easily exactly as it is now under a new proper folder but in proper position name statuslines/codex"
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0023",
+    "member_norms": 1,
+    "prompt_count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "top_terms": [
+      "added",
+      "sync",
+      "remote",
+      "many",
+      "once",
+      "branches",
+      "repo",
+      "every"
+    ],
+    "examples": [
+      "Can you please pull every repo remote branches and pull it locally like sync everything we got from remote gh so were sync share with me how many got added to each repo once done."
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0025",
+    "member_norms": 1,
+    "prompt_count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "top_terms": [
+      "remove",
+      "blue",
+      "following",
+      "there",
+      "response",
+      "while",
+      "every",
+      "noise"
+    ],
+    "examples": [
+      "ok can u remove please the following words while it reads response? e.g. bg blue and text white for every word there are some noise bg appear and that sounds bad just remove it."
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0026",
+    "member_norms": 1,
+    "prompt_count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "top_terms": [
+      "voice",
+      "check",
+      "stt",
+      "dorecord",
+      "hear",
+      "there",
+      "sounds",
+      "cause"
+    ],
+    "examples": [
+      "ok nice but dorecord voice that let it stt and hear it check the sounds cause there are some crunches appear."
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0029",
+    "member_norms": 1,
+    "prompt_count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "top_terms": [
+      "saas",
+      "automatic",
+      "think",
+      "product",
+      "own",
+      "outreach",
+      "crawl",
+      "different"
+    ],
+    "examples": [
+      "I think the product should be without the automatic scan and outreach and we will have our own cold outreach email unified crm system that can easily crawl scrape and get emails for different projects we got so we can apply it for each of our saas more unified."
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0030",
+    "member_norms": 1,
+    "prompt_count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "top_terms": [
+      "keep",
+      "structure",
+      "public",
+      "agree",
+      "recommendation",
+      "better",
+      "scan"
+    ],
+    "examples": [
+      "i agree with ur recommendation keep public scan but i do want to have better structure for this."
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0031",
+    "member_norms": 1,
+    "prompt_count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "top_terms": [
+      "understand",
+      "why",
+      "too",
+      "under",
+      "next",
+      "open"
+    ],
+    "examples": [
+      "i would like to understand why use cf and open next under this too"
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0032",
+    "member_norms": 1,
+    "prompt_count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "top_terms": [
+      "her",
+      "remains",
+      "yes"
+    ],
+    "examples": [
+      "just remains her d1 yes."
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0033",
+    "member_norms": 1,
+    "prompt_count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "top_terms": [
+      "follow",
+      "practices",
+      "lean",
+      "effect",
+      "best",
+      "change",
+      "lets"
+    ],
+    "examples": [
+      "so lets change it to follow the best practices of effect. and make it lean"
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0034",
+    "member_norms": 1,
+    "prompt_count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "top_terms": [
+      "deslop",
+      "checkbox",
+      "current",
+      "list",
+      "todo",
+      "mark",
+      "every",
+      "yosefhayim"
+    ],
+    "examples": [
+      "write in the current folder root TODO.md to deslop every folder mark YosefHayim as done with checkbox and numbered list from first to last"
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0035",
+    "member_norms": 1,
+    "prompt_count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "top_terms": [
+      "remote",
+      "sow",
+      "delete",
+      "merge",
+      "remove",
+      "template"
+    ],
+    "examples": [
+      "you can remove sow-template i delete it from the remote and _merge-all-2026-07-31"
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0036",
+    "member_norms": 1,
+    "prompt_count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "top_terms": [
+      "shopify",
+      "apps",
+      "delete",
+      "learning",
+      "unity",
+      "thats",
+      "chatly",
+      "same"
+    ],
+    "examples": [
+      "rename chatly to replybase thats the product. u can delete learning unity and mobile-apps-monorepoe. same as shabbat guard and shopify apps"
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0039",
+    "member_norms": 1,
+    "prompt_count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "top_terms": [
+      "fix",
+      "find",
+      "conflicts"
+    ],
+    "examples": [
+      "find all conflicts and fix"
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0041",
+    "member_norms": 1,
+    "prompt_count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "top_terms": [
+      "remote",
+      "handled",
+      "check",
+      "did",
+      "issues",
+      "confirm",
+      "proper",
+      "exist"
+    ],
+    "examples": [
+      "did we handled proper issues exist on gh remote ? please check and confirm"
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0042",
+    "member_norms": 1,
+    "prompt_count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "top_terms": [
+      "commit",
+      "fix",
+      "before",
+      "git",
+      "push"
+    ],
+    "examples": [
+      "fix please before we git commit push"
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0044",
+    "member_norms": 1,
+    "prompt_count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "top_terms": [
+      "cleaner",
+      "check",
+      "fix",
+      "why",
+      "proxy",
+      "remove",
+      "granted",
+      "wrangler"
+    ],
+    "examples": [
+      "we got proxy on the cf why is that? and how can we remove it I Authorization granted to Wrangler can u check that and fix it so we wont need that proxy to make it cleaner"
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0045",
+    "member_norms": 1,
+    "prompt_count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "top_terms": [
+      "other",
+      "one",
+      "image",
+      "here",
+      "give",
+      "create",
+      "url"
+    ],
+    "examples": [
+      "[Image #1] this one here or in other url can u give me it so i create for u"
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0047",
+    "member_norms": 1,
+    "prompt_count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "top_terms": [
+      "field",
+      "configured",
+      "json",
+      "pnpm",
+      "yaml",
+      "run",
+      "create",
+      "project"
+    ],
+    "examples": [
+      "why i cant launch proejct yosefhayimsabag@yosefs-mbp MYPR-App % pnpm run dev\n[WARN] The \"workspaces\" field in package.json is not supported by pnpm. Create a \"pnpm-workspace.yaml\" file instead.\n[ERROR] This project is configured to use npm\nFor help, run: pnpm help run\n\nyosefhayimsabag@yosefs-mbp MYPR-App %"
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0053",
+    "member_norms": 1,
+    "prompt_count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "top_terms": [
+      "etc",
+      "words",
+      "data",
+      "payload",
+      "result",
+      "well",
+      "raw",
+      "forbid"
+    ],
+    "examples": [
+      "ok but i forbid as well generic words like payload,response,data,raw,result etc"
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0054",
+    "member_norms": 1,
+    "prompt_count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "top_terms": [
+      "purpose",
+      "long",
+      "self",
+      "function",
+      "dont",
+      "else",
+      "midn",
+      "its"
+    ],
+    "examples": [
+      "i dont midn else as long as it serve the purpose of its self. e.g. the function"
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0055",
+    "member_norms": 1,
+    "prompt_count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "top_terms": [
+      "repo",
+      "understand",
+      "purpose"
+    ],
+    "examples": [
+      "understand purpose of this repo."
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0056",
+    "member_norms": 1,
+    "prompt_count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "top_terms": [
+      "already",
+      "conditions",
+      "schema",
+      "validate",
+      "checks"
+    ],
+    "examples": [
+      "a schema should already validate this for us no need to do this conditions checks"
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0057",
+    "member_norms": 1,
+    "prompt_count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "top_terms": [
+      "causing",
+      "agent",
+      "initing",
+      "cause",
+      "matter",
+      "noises",
+      "triggers",
+      "delete"
+    ],
+    "examples": [
+      "I would like you to fix how it generate .bridge no matter from where i am launching it should be written to ssot root .bridge folder and not to the position the agent is initing it. cause that causing a lot of noises same for when it triggers download folder. i would like you to delete all what u found regarding this includng .gitignore cause it should not serve this"
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0059",
+    "member_norms": 1,
+    "prompt_count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "top_terms": [
+      "did",
+      "modified",
+      "work",
+      "doubled",
+      "does"
+    ],
+    "examples": [
+      "ok so did u doubled modified it so it does work"
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0060",
+    "member_norms": 1,
+    "prompt_count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "top_terms": [
+      "those",
+      "fixes",
+      "next",
+      "implement"
+    ],
+    "examples": [
+      "implement those fixes next"
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0061",
+    "member_norms": 1,
+    "prompt_count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "top_terms": [
+      "other",
+      "options",
+      "dont",
+      "show",
+      "change"
+    ],
+    "examples": [
+      "change i dont like it show other options."
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0062",
+    "member_norms": 1,
+    "prompt_count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "top_terms": [
+      "bob",
+      "based",
+      "logic",
+      "rules",
+      "followig",
+      "uncle",
+      "easy",
+      "modify"
+    ],
+    "examples": [
+      "i would say that we need to seperate it based on the business logic so they are easy to modify if we want so. e.g. followig uncle bob rules."
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0063",
+    "member_norms": 1,
+    "prompt_count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "top_terms": [
+      "tests",
+      "did",
+      "verify",
+      "launch",
+      "some"
+    ],
+    "examples": [
+      "did u do some tests to verify it ?e.g. launch"
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0065",
+    "member_norms": 1,
+    "prompt_count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "top_terms": [
+      "starting",
+      "pose",
+      "see",
+      "launch",
+      "yosef",
+      "read",
+      "before",
+      "there"
+    ],
+    "examples": [
+      "Read olly-yogo and identify what are the differences on starting yoga session pose identify the differences so we can pull it to the Oly-App and modify it so launch it via metro on my local device iphone 12 pro iphone yosef so i see if there are a lot of differences in detecting it but before apply share with me."
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0066",
+    "member_norms": 1,
+    "prompt_count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "top_terms": [
+      "files",
+      "other",
+      "now",
+      "safely",
+      "share",
+      "things",
+      "before",
+      "stale"
+    ],
+    "examples": [
+      "ok nice so look for other stale files now or things can be safely deleted and share with me before"
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0067",
+    "member_norms": 1,
+    "prompt_count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "top_terms": [
+      "cap",
+      "purpose",
+      "agreed",
+      "purly",
+      "per",
+      "hard",
+      "loc"
+    ],
+    "examples": [
+      "agreed. no need hard cap of loc it per purpose purly"
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0068",
+    "member_norms": 1,
+    "prompt_count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "top_terms": [
+      "environments",
+      "node",
+      "very",
+      "look",
+      "running",
+      "action",
+      "feeling",
+      "different"
+    ],
+    "examples": [
+      "What about the CI CD of GitHub Action? For instance' we are running multiple VTAP actions on different node versions and that's feeling to me very dumb. Make it more smart and efficient than running it on multiple different environments. how should look the updated one"
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0069",
+    "member_norms": 2,
+    "prompt_count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "top_terms": [
+      "now",
+      "commits",
+      "push",
+      "organized",
+      "job",
+      "great",
+      "ship",
+      "redploy"
+    ],
+    "examples": [
+      "great job now do [$organized-commits]([PATH]/organized-commits/SKILL.md) then push and ship (redploy)",
+      "great job now do $organized-commits then push and ship (redploy)"
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0070",
+    "member_norms": 1,
+    "prompt_count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "top_terms": [
+      "good",
+      "name",
+      "via",
+      "why",
+      "function",
+      "very",
+      "picks",
+      "undersatabdle"
+    ],
+    "examples": [
+      "yes only by what is cannot be undersatabdle via the variables function name or parmaters that why we need very good picks"
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0071",
+    "member_norms": 1,
+    "prompt_count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "top_terms": [
+      "one",
+      "too",
+      "dufflebag",
+      "template",
+      "levelup",
+      "follows",
+      "workflows",
+      "update"
+    ],
+    "examples": [
+      "can u please also update the dufflebag ci-cd workflows template we got (one levelup) so it follows that too"
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0072",
+    "member_norms": 1,
+    "prompt_count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "top_terms": [
+      "agent",
+      "root",
+      "ssot",
+      "agents"
+    ],
+    "examples": [
+      "agent.md is the ssot root for our agents"
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0073",
+    "member_norms": 1,
+    "prompt_count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "top_terms": [
+      "developer",
+      "mode",
+      "why",
+      "job",
+      "great",
+      "same",
+      "wifi",
+      "detected"
+    ],
+    "examples": [
+      "ok great job i am on same wifi why not detected? developer mode is on"
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0074",
+    "member_norms": 1,
+    "prompt_count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "top_terms": [
+      "commit",
+      "now",
+      "git",
+      "push",
+      "nice"
+    ],
+    "examples": [
+      "nice now please git commit push"
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0075",
+    "member_norms": 1,
+    "prompt_count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "top_terms": [
+      "check",
+      "now",
+      "launch",
+      "done"
+    ],
+    "examples": [
+      "done check now and launch it"
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0076",
+    "member_norms": 1,
+    "prompt_count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "top_terms": [
+      "works",
+      "login",
+      "demo",
+      "let"
+    ],
+    "examples": [
+      "no no no let the demo login works.."
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0077",
+    "member_norms": 1,
+    "prompt_count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "top_terms": [
+      "env",
+      "added"
+    ],
+    "examples": [
+      "i am in do it. also added .env"
+    ],
+    "confidence": "low"
+  },
+  {
+    "id": "c0078",
+    "member_norms": 1,
+    "prompt_count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "top_terms": [
+      "architecture",
+      "signup",
+      "screen",
+      "yet",
+      "cause",
+      "think",
+      "again",
+      "keep"
+    ],
+    "examples": [
+      "i logged in but it redirect me again to the first screen after splash signup/login this is cause of the architecture-v2 we applied i think but it not yet merged to main so why this still keep happening"
+    ],
+    "confidence": "low"
+  }
+]

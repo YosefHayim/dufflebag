@@ -1,0 +1,1832 @@
+[
+  {
+    "norm": "i would like you to preform with me $grill-me-code- style-with-docs from the begining so we can do a full deslop on this entire repo. to change her structure libraires deps etc so it looks cleanly. clean code, obivous structure that make sense and no use of generic and not helping variables like result,payload,body,data,raw etc etc",
+    "count": 20,
+    "unique_sessions": 20,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "I would like you to preform with me $grill-me-code-\n  style-with-docs from the begining so we can do a full\n  deslop on this entire repo. to change her structure\n  libraires deps etc so it looks cleanly. clean code,\n  obivous structure that make sense and no use of generic\n  and not helping variables like\n  result,payload,body,data,raw etc etc",
+      "I would like you to preform with me $grill-me-code-\n    style-with-docs from the begining so we can do a full\n    deslop on this entire repo. to change her structure\n    libraires deps etc so it looks cleanly. clean code,\n    obivous structure that make sense and no use of\n  generic\n    and not helping variables like\n    result,payload,body,data,raw etc etc",
+      "I would like you to preform with me $grill-me-code-\n    style-with-docs from the begining so we can do a full\n    deslop on this entire repo. to change her structure\n    libraires deps etc so it looks cleanly. clean code,\n    obivous structure that make sense and no use of\n  generic\n    and not helping variables like\n    result,payload,body,data,raw etc etc"
+    ]
+  },
+  {
+    "norm": "i need your help with doing a huge deslop on the entire cord base, changing its structure and making the entire project more logical on how it's currently structured. this means, i believe, maybe doing a new gridme, including code styles, structure, files, folders, what technology we are going to use, et cetera, et cetera, like building this entire project from start. this includes static assets i have a two-bucket and d1 architecture of the dp over the architecture of how everything is currentl",
+    "count": 5,
+    "unique_sessions": 5,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "I need your help with doing a huge deslop on the entire cord base, changing its structure and making the entire project more logical on how it's currently structured. This means, I believe, maybe doing a new gridme, including code styles, structure, files, folders, what technology we are going to use, et cetera, et cetera, like building this entire project from start. This includes static assets i",
+      "I need your help with doing a huge deslop on the entire cord base, changing its structure and making the entire project more logical on how it's currently structured. This means, I believe, maybe doing a new gridme, including code styles, structure, files, folders, what technology we are going to use, et cetera, et cetera, like building this entire project from start. This includes static assets i",
+      "I need your help with doing a huge deslop on the entire cord base, changing its structure and making the entire project more logical on how it's currently structured. This means, I believe, maybe doing a new gridme, including code styles, structure, files, folders, what technology we are going to use, et cetera, et cetera, like building this entire project from start. This includes static assets i"
+    ]
+  },
+  {
+    "norm": "do you think we can have better codebase structure,file names ,and cli for this to make it 0 ai slop and 100% desloped correctly? like better naming for variables and forbidden files that are naming like payload or response body or data",
+    "count": 5,
+    "unique_sessions": 5,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "do you think we can have better codebase structure,file names ,and cli for this to make it 0 ai slop and 100% desloped correctly? like better naming for variables and forbidden Files that are naming like payload or response body or data",
+      "do you think we can have better codebase structure,file names ,and cli for this to make it 0 ai slop and 100% desloped correctly? like better naming for variables and forbidden Files that are naming like payload or response body or data",
+      "do you think we can have better codebase structure,file names ,and cli for this to make it 0 ai slop and 100% desloped correctly? like better naming for variables and forbidden Files that are naming like payload or response body or data"
+    ]
+  },
+  {
+    "norm": "and what about structure of files/folder tree show the prposed one",
+    "count": 5,
+    "unique_sessions": 5,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "and what about structure of files/folder tree show the prposed one",
+      "and what about structure of files/folder tree show the prposed one",
+      "and what about structure of files/folder tree show the prposed one"
+    ]
+  },
+  {
+    "norm": "i would say repo with just widget and fully next.js. best practices",
+    "count": 5,
+    "unique_sessions": 5,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "i would say repo with just widget and fully next.js. best practices",
+      "i would say repo with just widget and fully next.js. best practices",
+      "i would say repo with just widget and fully next.js. best practices"
+    ]
+  },
+  {
+    "norm": "i would say next.js best practices.",
+    "count": 5,
+    "unique_sessions": 5,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "i would say next.js best practices.",
+      "i would say next.js best practices.",
+      "i would say next.js best practices."
+    ]
+  },
+  {
+    "norm": "yes agreed.",
+    "count": 5,
+    "unique_sessions": 5,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "yes agreed.",
+      "yes agreed.",
+      "yes agreed."
+    ]
+  },
+  {
+    "norm": "agreed do it.",
+    "count": 4,
+    "unique_sessions": 4,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "agreed do it.",
+      "agreed do it.",
+      "agreed do it."
+    ]
+  },
+  {
+    "norm": "try now.",
+    "count": 4,
+    "unique_sessions": 4,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "try now.",
+      "try now.",
+      "try now."
+    ]
+  },
+  {
+    "norm": "keep going",
+    "count": 4,
+    "unique_sessions": 4,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "keep going",
+      "keep going",
+      "keep going"
+    ]
+  },
+  {
+    "norm": "proceed from where interrupted",
+    "count": 4,
+    "unique_sessions": 4,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "proceed from where interrupted",
+      "proceed from where interrupted",
+      "proceed from where interrupted"
+    ]
+  },
+  {
+    "norm": "agrede. b",
+    "count": 4,
+    "unique_sessions": 4,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "agrede. b",
+      "agrede. b",
+      "agrede. b"
+    ]
+  },
+  {
+    "norm": "# agents.md instructions for [path]/code/alg <instructions> # agents.md — alg (lean target) compact contract for every agent. prefer this file over tool-specific copies. ## product accessibility **widget** after setup + yearly sub. operator cli finds **call targets** (d1 only). no cold outreach in this repo. ## read order 1. this file 2. `docs/lean-target.md` — schema, cutover, passwords, ui surface 3. `docs/grill-style-map.md` — target code shape 4. `docs/decisions.md` — product why 5. `context",
+    "count": 4,
+    "unique_sessions": 4,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "# AGENTS.md instructions for [PATH]/Code/alg\n\n<INSTRUCTIONS>\n# AGENTS.md — alg (lean target)\n\nCompact contract for every agent. Prefer this file over tool-specific copies.\n\n## Product\n\nAccessibility **widget** after setup + yearly sub. Operator CLI finds **call targets** (D1 only). No cold outreach in this repo.\n\n## Read order\n\n1. This file\n2. `docs/lean-target.md` — schema, cutover, passwords, UI",
+      "# AGENTS.md instructions for [PATH]/Code/alg\n\n<INSTRUCTIONS>\n# AGENTS.md — alg (lean target)\n\nCompact contract for every agent. Prefer this file over tool-specific copies.\n\n## Product\n\nAccessibility **widget** after setup + yearly sub. Operator CLI finds **call targets** (D1 only). No cold outreach in this repo.\n\n## Read order\n\n1. This file\n2. `docs/lean-target.md` — schema, cutover, passwords, UI",
+      "# AGENTS.md instructions for [PATH]/Code/alg\n\n<INSTRUCTIONS>\n# AGENTS.md — alg (lean target)\n\nCompact contract for every agent. Prefer this file over tool-specific copies.\n\n## Product\n\nAccessibility **widget** after setup + yearly sub. Operator CLI finds **call targets** (D1 only). No cold outreach in this repo.\n\n## Read order\n\n1. This file\n2. `docs/lean-target.md` — schema, cutover, passwords, UI"
+    ]
+  },
+  {
+    "norm": "# agents.md instructions for [path]/code/mypr-app <instructions> # mypr agent guide mypr is one product: a private, compliant journalist-outreach journey. keep the client, api, shared contracts, and cloudflare deployment focused on that product. ## read first 1. `project.md` for the product boundary. 2. `docs/reference/context.md` for domain terms and relationships. 3. `docs/reference/language.md` for product and copy language. 4. `code-style.md` for code structure and verification. ## working r",
+    "count": 4,
+    "unique_sessions": 4,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "# AGENTS.md instructions for [PATH]/Code/MYPR-App\n\n<INSTRUCTIONS>\n# MYPR agent guide\n\nMYPR is one product: a private, compliant journalist-outreach journey. Keep the\nclient, API, shared contracts, and Cloudflare deployment focused on that product.\n\n## Read first\n\n1. `PROJECT.md` for the product boundary.\n2. `docs/reference/CONTEXT.md` for domain terms and relationships.\n3. `docs/reference/LANGUAGE",
+      "# AGENTS.md instructions for [PATH]/Code/MYPR-App\n\n<INSTRUCTIONS>\n# MYPR agent guide\n\nMYPR is one product: a private, compliant journalist-outreach journey. Keep the\nclient, API, shared contracts, and Cloudflare deployment focused on that product.\n\n## Read first\n\n1. `PROJECT.md` for the product boundary.\n2. `docs/reference/CONTEXT.md` for domain terms and relationships.\n3. `docs/reference/LANGUAGE",
+      "# AGENTS.md instructions for [PATH]/Code/MYPR-App\n\n<INSTRUCTIONS>\n# MYPR agent guide\n\nMYPR is one product: a private, compliant journalist-outreach journey. Keep the\nclient, API, shared contracts, and Cloudflare deployment focused on that product.\n\n## Read first\n\n1. `PROJECT.md` for the product boundary.\n2. `docs/reference/CONTEXT.md` for domain terms and relationships.\n3. `docs/reference/LANGUAGE"
+    ]
+  },
+  {
+    "norm": "help me do a proper cleanup and $grill-me-code-style-with-docs on this repo so we are have proper following order code-style.md and clean and professional codebase. filenames conventions etc no generic result,response,data,payload,body, isrecord (ai slop functions) etc unified uses for ui or utils etc i am just thorwing here some of what i got in mind",
+    "count": 4,
+    "unique_sessions": 4,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "Help me do a proper cleanup and $grill-me-code-style-with-docs on this repo so we are have proper following order code-style.md and clean and professional codebase. filenames conventions etc no generic result,response,data,payload,body, isRecord (ai slop functions) etc unified uses for ui or utils etc i am just thorwing here some of what i got in mind",
+      "Help me do a proper cleanup and $grill-me-code-style-with-docs on this repo so we are have proper following order code-style.md and clean and professional codebase. filenames conventions etc no generic result,response,data,payload,body, isRecord (ai slop functions) etc unified uses for ui or utils etc i am just thorwing here some of what i got in mind",
+      "Help me do a proper cleanup and $grill-me-code-style-with-docs on this repo so we are have proper following order code-style.md and clean and professional codebase. filenames conventions etc no generic result,response,data,payload,body, isRecord (ai slop functions) etc unified uses for ui or utils etc i am just thorwing here some of what i got in mind"
+    ]
+  },
+  {
+    "norm": "# agents.md instructions for [path]/code/replybase <instructions> # agents.md > agent onboarding. read this first, then code-style.md for the full guide. ## quick start ```bash pnpm install # install all workspace deps pnpm dev # starts all apps in dev mode (turbo) pnpm build # builds everything pnpm check # biome format + lint (auto-fix) pnpm test # runs vitest across packages ``` **local platform data (default):** `apps/chatworker` wrangler binds d1 / r2 / vectorize with `remote: true`, so the",
+    "count": 4,
+    "unique_sessions": 4,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "# AGENTS.md instructions for [PATH]/Code/replybase\n\n<INSTRUCTIONS>\n# AGENTS.md\n\n> Agent onboarding. Read this first, then CODE-STYLE.md for the full guide.\n\n## Quick Start\n\n```bash\npnpm install # install all workspace deps\npnpm dev # starts all apps in dev mode (turbo)\npnpm build # builds everything\npnpm check # biome format + lint (auto-fix)\npnpm test # runs vitest across packages\n```\n\n**Local pl",
+      "# AGENTS.md instructions for [PATH]/Code/replybase\n\n<INSTRUCTIONS>\n# AGENTS.md\n\n> Agent onboarding. Read this first, then CODE-STYLE.md for the full guide.\n\n## Quick Start\n\n```bash\npnpm install # install all workspace deps\npnpm dev # starts all apps in dev mode (turbo)\npnpm build # builds everything\npnpm check # biome format + lint (auto-fix)\npnpm test # runs vitest across packages\n```\n\n**Local pl",
+      "# AGENTS.md instructions for [PATH]/Code/replybase\n\n<INSTRUCTIONS>\n# AGENTS.md\n\n> Agent onboarding. Read this first, then CODE-STYLE.md for the full guide.\n\n## Quick Start\n\n```bash\npnpm install # install all workspace deps\npnpm dev # starts all apps in dev mode (turbo)\npnpm build # builds everything\npnpm check # biome format + lint (auto-fix)\npnpm test # runs vitest across packages\n```\n\n**Local pl"
+    ]
+  },
+  {
+    "norm": "# agents.md instructions for [path]/code/vybekiit <instructions> # agents.md — vybekiit (maintainer layer) > **single source of truth** for any agent working on **this monorepo** (building/maintaining the > kit itself). `claude.md`, copilot, codex, and `.cursor/rules/vybekiit.mdc` (cursor) are thin > pointers to this file — keep guidance here, not duplicated, or it drifts. cursor also loads > `.cursor/rules/patterns.mdc` as a maintainer pattern summary (not ssot). > > **audience:** us / our agen",
+    "count": 4,
+    "unique_sessions": 4,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "# AGENTS.md instructions for [PATH]/Code/vybekiit\n\n<INSTRUCTIONS>\n# AGENTS.md — VybeKiit (maintainer layer)\n\n> **Single source of truth** for any agent working on **this monorepo** (building/maintaining the\n> kit itself). `CLAUDE.md`, Copilot, Codex, and `.cursor/rules/vybekiit.mdc` (Cursor) are thin\n> pointers to this file — keep guidance here, not duplicated, or it drifts. Cursor also loads\n> `.",
+      "# AGENTS.md instructions for [PATH]/Code/vybekiit\n\n<INSTRUCTIONS>\n# AGENTS.md — VybeKiit (maintainer layer)\n\n> **Single source of truth** for any agent working on **this monorepo** (building/maintaining the\n> kit itself). `CLAUDE.md`, Copilot, Codex, and `.cursor/rules/vybekiit.mdc` (Cursor) are thin\n> pointers to this file — keep guidance here, not duplicated, or it drifts. Cursor also loads\n> `.",
+      "# AGENTS.md instructions for [PATH]/Code/vybekiit\n\n<INSTRUCTIONS>\n# AGENTS.md — VybeKiit (maintainer layer)\n\n> **Single source of truth** for any agent working on **this monorepo** (building/maintaining the\n> kit itself). `CLAUDE.md`, Copilot, Codex, and `.cursor/rules/vybekiit.mdc` (Cursor) are thin\n> pointers to this file — keep guidance here, not duplicated, or it drifts. Cursor also loads\n> `."
+    ]
+  },
+  {
+    "norm": "# agents.md instructions for [path]/code/wedding-digital-invites <instructions> # agents.md instructions for coding agents working in this repo. read [context.md](context.md) and [conventions.md](conventions.md) before making non-trivial changes. ## engineering principles apply these on every change: | principle | rule | |-----------|------| | **single source of truth** | business data lives in one place — see the ssot table in `context.md`. edit the owner file; don't copy values into components",
+    "count": 4,
+    "unique_sessions": 4,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "# AGENTS.md instructions for [PATH]/Code/wedding-digital-invites\n\n<INSTRUCTIONS>\n# AGENTS.md\n\nInstructions for coding agents working in this repo.\n\nRead [CONTEXT.md](CONTEXT.md) and [CONVENTIONS.md](CONVENTIONS.md) before making non-trivial changes.\n\n## Engineering principles\n\nApply these on every change:\n\n| Principle | Rule |\n|-----------|------|\n| **Single source of truth** | Business data lives",
+      "# AGENTS.md instructions for [PATH]/Code/wedding-digital-invites\n\n<INSTRUCTIONS>\n# AGENTS.md\n\nInstructions for coding agents working in this repo.\n\nRead [CONTEXT.md](CONTEXT.md) and [CONVENTIONS.md](CONVENTIONS.md) before making non-trivial changes.\n\n## Engineering principles\n\nApply these on every change:\n\n| Principle | Rule |\n|-----------|------|\n| **Single source of truth** | Business data lives",
+      "# AGENTS.md instructions for [PATH]/Code/wedding-digital-invites\n\n<INSTRUCTIONS>\n# AGENTS.md\n\nInstructions for coding agents working in this repo.\n\nRead [CONTEXT.md](CONTEXT.md) and [CONVENTIONS.md](CONVENTIONS.md) before making non-trivial changes.\n\n## Engineering principles\n\nApply these on every change:\n\n| Principle | Rule |\n|-----------|------|\n| **Single source of truth** | Business data lives"
+    ]
+  },
+  {
+    "norm": "# agents.md instructions for [path]/code/launch-store <instructions> # agents.md working rules for ai agents and contributors editing **launch**. this file holds only what you **can't infer** from the code and configs: module ownership, conventions a linter can't catch, and the validation gate every change must pass. usage lives in [readme.md](./readme.md); style depth lives in [code-style.md](./code-style.md). > claude code reads this through [claude.md](./claude.md), which imports this file wi",
+    "count": 4,
+    "unique_sessions": 4,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "# AGENTS.md instructions for [PATH]/Code/launch-store\n\n<INSTRUCTIONS>\n# AGENTS.md\n\nWorking rules for AI agents and contributors editing **Launch**. This file holds only what you **can't infer** from the code and configs: module ownership, conventions a linter can't catch, and the validation gate every change must pass. Usage lives in [README.md](./README.md); style depth lives in [CODE-STYLE.md](.",
+      "# AGENTS.md instructions for [PATH]/Code/launch-store\n\n<INSTRUCTIONS>\n# AGENTS.md\n\nWorking rules for AI agents and contributors editing **Launch**. This file holds only what you **can't infer** from the code and configs: module ownership, conventions a linter can't catch, and the validation gate every change must pass. Usage lives in [README.md](./README.md); style depth lives in [CODE-STYLE.md](.",
+      "# AGENTS.md instructions for [PATH]/Code/launch-store\n\n<INSTRUCTIONS>\n# AGENTS.md\n\nWorking rules for AI agents and contributors editing **Launch**. This file holds only what you **can't infer** from the code and configs: module ownership, conventions a linter can't catch, and the validation gate every change must pass. Usage lives in [README.md](./README.md); style depth lives in [CODE-STYLE.md](."
+    ]
+  },
+  {
+    "norm": "1.cannot find name 'process'. do you need to install type definitions for node? try `npm i --save-dev @types/node` and then add 'node' to the types field in your tsconfig.ts([n]) make sure it is part of dev deps so we have smooth dev process. 2. replace all emojis with proper inline text or ascii e.g. checkmark without emoji or x without emoji so its cleanler. 3.thats looks duplicate hardcode values so why we need it?... [path]/services/screenshotassets.ts 4. a lot of files has at the top a nois",
+    "count": 4,
+    "unique_sessions": 4,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "1.Cannot find name 'process'. Do you need to install type definitions for node? Try `npm i --save-dev @types/node` and then add 'node' to the types field in your tsconfig.ts(2591) make sure it is part of dev deps so we have smooth dev process. \n2. replace all emojis with proper inline text or ascii e.g. checkmark without emoji or x without emoji so its cleanler. \n3.thats looks duplicate hardcode v",
+      "1.Cannot find name 'process'. Do you need to install type definitions for node? Try `npm i --save-dev @types/node` and then add 'node' to the types field in your tsconfig.ts(2591) make sure it is part of dev deps so we have smooth dev process. \n2. replace all emojis with proper inline text or ascii e.g. checkmark without emoji or x without emoji so its cleanler. \n3.thats looks duplicate hardcode v",
+      "1.Cannot find name 'process'. Do you need to install type definitions for node? Try `npm i --save-dev @types/node` and then add 'node' to the types field in your tsconfig.ts(2591) make sure it is part of dev deps so we have smooth dev process. \n2. replace all emojis with proper inline text or ascii e.g. checkmark without emoji or x without emoji so its cleanler. \n3.thats looks duplicate hardcode v"
+    ]
+  },
+  {
+    "norm": "# agents.md instructions for [path]/code/ai-browser-bridge <instructions> # agents.md — ai-browser-bridge durable repo instructions for codex, cursor, and other agents that read `agents.md`. keep this file short: it is the routing map and working contract, not a copied style guide. ## project contract - this repo is a terminal cli that drives chatgpt, gemini, claude, deepseek, grok, or perplexity in chrome and exposes sandboxed local repo tools over mcp. - chatgpt can use the inbound mcp tool se",
+    "count": 4,
+    "unique_sessions": 4,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "# AGENTS.md instructions for [PATH]/Code/ai-browser-bridge\n\n<INSTRUCTIONS>\n# AGENTS.md — ai-browser-bridge\n\nDurable repo instructions for Codex, Cursor, and other agents that read\n`AGENTS.md`. Keep this file short: it is the routing map and working contract,\nnot a copied style guide.\n\n## Project Contract\n\n- This repo is a terminal CLI that drives ChatGPT, Gemini, Claude, DeepSeek,\n  Grok, or Perpl",
+      "# AGENTS.md instructions for [PATH]/Code/ai-browser-bridge\n\n<INSTRUCTIONS>\n# AGENTS.md — ai-browser-bridge\n\nDurable repo instructions for Codex, Cursor, and other agents that read\n`AGENTS.md`. Keep this file short: it is the routing map and working contract,\nnot a copied style guide.\n\n## Project Contract\n\n- This repo is a terminal CLI that drives ChatGPT, Gemini, Claude, DeepSeek,\n  Grok, or Perpl",
+      "# AGENTS.md instructions for [PATH]/Code/ai-browser-bridge\n\n<INSTRUCTIONS>\n# AGENTS.md — ai-browser-bridge\n\nDurable repo instructions for Codex, Cursor, and other agents that read\n`AGENTS.md`. Keep this file short: it is the routing map and working contract,\nnot a copied style guide.\n\n## Project Contract\n\n- This repo is a terminal CLI that drives ChatGPT, Gemini, Claude, DeepSeek,\n  Grok, or Perpl"
+    ]
+  },
+  {
+    "norm": "the structure of codebase does make a sense and logic but i feel like we can make it leaner and thigtehn $grill-me-code-style-with-docs whwat do u recommened?",
+    "count": 4,
+    "unique_sessions": 4,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "the structure of codebase does make a sense and logic but i feel like we can make it leaner and thigtehn $grill-me-code-style-with-docs whwat do u recommened?",
+      "the structure of codebase does make a sense and logic but i feel like we can make it leaner and thigtehn $grill-me-code-style-with-docs whwat do u recommened?",
+      "the structure of codebase does make a sense and logic but i feel like we can make it leaner and thigtehn $grill-me-code-style-with-docs whwat do u recommened?"
+    ]
+  },
+  {
+    "norm": "# agents.md instructions for [path]/code/dufflebag <instructions> # agents.md entrypoint for coding agents and maintainers. `claude.md` and `gemini.md` are symlinks to this file so claude, gemini, codex, cursor, kiro, and other agents-aware tools share one contract. ## what this is **dufflebag** is a typescript cli that installs, updates, uninstalls, diagnoses, configures, and scaffolds an owned set of agent skills, dependency-free hooks, agent configuration, and reusable ci/publish workflow tem",
+    "count": 4,
+    "unique_sessions": 4,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "# AGENTS.md instructions for [PATH]/Code/dufflebag\n\n<INSTRUCTIONS>\n# AGENTS.md\n\nEntrypoint for coding agents and maintainers. `CLAUDE.md` and `GEMINI.md` are symlinks to this file so Claude, Gemini, Codex, Cursor, Kiro, and other AGENTS-aware tools share one contract.\n\n## What this is\n\n**dufflebag** is a TypeScript CLI that installs, updates, uninstalls, diagnoses, configures, and scaffolds an own",
+      "# AGENTS.md instructions for [PATH]/Code/dufflebag\n\n<INSTRUCTIONS>\n# AGENTS.md\n\nEntrypoint for coding agents and maintainers. `CLAUDE.md` and `GEMINI.md` are symlinks to this file so Claude, Gemini, Codex, Cursor, Kiro, and other AGENTS-aware tools share one contract.\n\n## What this is\n\n**dufflebag** is a TypeScript CLI that installs, updates, uninstalls, diagnoses, configures, and scaffolds an own",
+      "# AGENTS.md instructions for [PATH]/Code/dufflebag\n\n<INSTRUCTIONS>\n# AGENTS.md\n\nEntrypoint for coding agents and maintainers. `CLAUDE.md` and `GEMINI.md` are symlinks to this file so Claude, Gemini, Codex, Cursor, Kiro, and other AGENTS-aware tools share one contract.\n\n## What this is\n\n**dufflebag** is a TypeScript CLI that installs, updates, uninstalls, diagnoses, configures, and scaffolds an own"
+    ]
+  },
+  {
+    "norm": "1.its confusing same folder named on other folder e.g. config. so aside of that i agree on all. secondly is that how the code-styl.emd is applying i want to proper $grill-me-code-style-with-docs with what we hvent talked yet and grilled",
+    "count": 4,
+    "unique_sessions": 4,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "1.its confusing same folder named on other folder e.g. config. so aside of that i agree on all. secondly is that how the code-styl.emd is applying i want to proper $grill-me-code-style-with-docs with what we hvent talked yet and grilled",
+      "1.its confusing same folder named on other folder e.g. config. so aside of that i agree on all. secondly is that how the code-styl.emd is applying i want to proper $grill-me-code-style-with-docs with what we hvent talked yet and grilled",
+      "1.its confusing same folder named on other folder e.g. config. so aside of that i agree on all. secondly is that how the code-styl.emd is applying i want to proper $grill-me-code-style-with-docs with what we hvent talked yet and grilled"
+    ]
+  },
+  {
+    "norm": "# agents.md instructions for [path]/code/ebay-mcp <instructions> # agents.md guidance for coding agents (and humans) working **on** this repo. for using the server, see [readme.md](readme.md). ## what this is a local [mcp]([url]) server exposing 298 tools across 100% of ebay's sell apis. typescript/node.js (esm), built with `@modelcontextprotocol/sdk`, effect-backed validation, a zod sdk adapter, and openapi-generated types. - **entry points:** `src/index.ts` (stdio transport — default) and `src",
+    "count": 4,
+    "unique_sessions": 4,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "# AGENTS.md instructions for [PATH]/Code/ebay-mcp\n\n<INSTRUCTIONS>\n# AGENTS.md\n\nGuidance for coding agents (and humans) working **on** this repo. For using the server, see [README.md](README.md).\n\n## What this is\n\nA local [MCP]([URL]) server exposing 298 tools across 100% of eBay's Sell APIs. TypeScript/Node.js (ESM), built with `@modelcontextprotocol/sdk`, Effect-backed validation, a Zod SDK adapt",
+      "# AGENTS.md instructions for [PATH]/Code/ebay-mcp\n\n<INSTRUCTIONS>\n# AGENTS.md\n\nGuidance for coding agents (and humans) working **on** this repo. For using the server, see [README.md](README.md).\n\n## What this is\n\nA local [MCP]([URL]) server exposing 298 tools across 100% of eBay's Sell APIs. TypeScript/Node.js (ESM), built with `@modelcontextprotocol/sdk`, Effect-backed validation, a Zod SDK adapt",
+      "# AGENTS.md instructions for [PATH]/Code/ebay-mcp\n\n<INSTRUCTIONS>\n# AGENTS.md\n\nGuidance for coding agents (and humans) working **on** this repo. For using the server, see [README.md](README.md).\n\n## What this is\n\nA local [MCP]([URL]) server exposing 298 tools across 100% of eBay's Sell APIs. TypeScript/Node.js (ESM), built with `@modelcontextprotocol/sdk`, Effect-backed validation, a Zod SDK adapt"
+    ]
+  },
+  {
+    "norm": "# agents.md instructions for [path]/code/alg <instructions> # agents.md — alg (lean target) compact contract for every agent. prefer this file over tool-specific copies. ## product accessibility **widget** after setup + yearly sub. operator cli finds **call targets** (d1 only). no cold outreach in this repo. ## read order 1. this file 2. `docs/lean-target.md` — schema, cutover, passwords, ui surface 3. `docs/grill-style-map.md` — target code shape 4. `docs/decisions.md` — product why 5. `context",
+    "count": 4,
+    "unique_sessions": 4,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "# AGENTS.md instructions for [PATH]/Code/alg\n\n<INSTRUCTIONS>\n# AGENTS.md — alg (lean target)\n\nCompact contract for every agent. Prefer this file over tool-specific copies.\n\n## Product\n\nAccessibility **widget** after setup + yearly sub. Operator CLI finds **call targets** (D1 only). No cold outreach in this repo.\n\n## Read order\n\n1. This file\n2. `docs/lean-target.md` — schema, cutover, passwords, UI",
+      "# AGENTS.md instructions for [PATH]/Code/alg\n\n<INSTRUCTIONS>\n# AGENTS.md — alg (lean target)\n\nCompact contract for every agent. Prefer this file over tool-specific copies.\n\n## Product\n\nAccessibility **widget** after setup + yearly sub. Operator CLI finds **call targets** (D1 only). No cold outreach in this repo.\n\n## Read order\n\n1. This file\n2. `docs/lean-target.md` — schema, cutover, passwords, UI",
+      "# AGENTS.md instructions for [PATH]/Code/alg\n\n<INSTRUCTIONS>\n# AGENTS.md — alg (lean target)\n\nCompact contract for every agent. Prefer this file over tool-specific copies.\n\n## Product\n\nAccessibility **widget** after setup + yearly sub. Operator CLI finds **call targets** (D1 only). No cold outreach in this repo.\n\n## Read order\n\n1. This file\n2. `docs/lean-target.md` — schema, cutover, passwords, UI"
+    ]
+  },
+  {
+    "norm": "i would like you to preform with me $grill-me-code-style-with-docs from the begining so we can do a full deslop on this entire repo. to change her structure libraires deps etc so it looks cleanly. clean code, obivous structure that make sense and no use of generic and not helping variables like result,payload,body,data,raw etc etc",
+    "count": 4,
+    "unique_sessions": 4,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "I would like you to preform with me $grill-me-code-style-with-docs from the begining so we can do a full deslop on this entire repo. to change her structure libraires deps etc so it looks cleanly. clean code, obivous structure that make sense and no use of generic and not helping variables like result,payload,body,data,raw etc etc",
+      "I would like you to preform with me $grill-me-code-style-with-docs from the begining so we can do a full deslop on this entire repo. to change her structure libraires deps etc so it looks cleanly. clean code, obivous structure that make sense and no use of generic and not helping variables like result,payload,body,data,raw etc etc",
+      "I would like you to preform with me $grill-me-code-style-with-docs from the begining so we can do a full deslop on this entire repo. to change her structure libraires deps etc so it looks cleanly. clean code, obivous structure that make sense and no use of generic and not helping variables like result,payload,body,data,raw etc etc"
+    ]
+  },
+  {
+    "norm": "say only hi",
+    "count": 4,
+    "unique_sessions": 4,
+    "agents": [
+      "grok"
+    ],
+    "examples": [
+      "Say only hi",
+      "Say only hi",
+      "Say only hi"
+    ]
+  },
+  {
+    "norm": "can you please duplicate every repo we got on our gh? including one from oly-app into the code folder. without installs just duplicate.",
+    "count": 3,
+    "unique_sessions": 3,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "Can you please duplicate every repo we got on our gh? including one from Oly-App into the Code folder. without installs just duplicate.",
+      "Can you please duplicate every repo we got on our gh? including one from Oly-App into the Code folder. without installs just duplicate.",
+      "Can you please duplicate every repo we got on our gh? including one from Oly-App into the Code folder. without installs just duplicate."
+    ]
+  },
+  {
+    "norm": "why not history rewrite from duplication of main in another branch that will be the test of this? main already will have all. approval gate is approved",
+    "count": 3,
+    "unique_sessions": 3,
+    "agents": [
+      "grok"
+    ],
+    "examples": [
+      "why not history rewrite from duplication of main in another branch that will be the test of this? main already will have all.  approval gate is approved",
+      "why not history rewrite from duplication of main in another branch that will be the test of this? main already will have all.  approval gate is approved",
+      "why not history rewrite from duplication of main in another branch that will be the test of this? main already will have all.  approval gate is approved"
+    ]
+  },
+  {
+    "norm": "ok now ive installed the dufflebag and we ship it with tts and stt but not work can u double check i installed it correctly ?",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "ok now ive installed the dufflebag and we ship it with tts and stt but not work can u double check i installed it correctly ?",
+      "ok now ive installed the dufflebag and we ship it with tts and stt but not work can u double check i installed it correctly ?"
+    ]
+  },
+  {
+    "norm": "ok so i hold the control and i am in cmux maybe that why but it didnt show the animation and the voice and stt me",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "ok so i hold the control and i am in cmux maybe that why but it didnt show the animation and the voice and stt me",
+      "ok so i hold the control and i am in cmux maybe that why but it didnt show the animation and the voice and stt me"
+    ]
+  },
+  {
+    "norm": "fix the ignore workspace bug",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "fix the ignore workspace bug",
+      "fix the ignore workspace bug"
+    ]
+  },
+  {
+    "norm": "no stale ellete teh 10.33.2 and use the latest pnpm.",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "no stale ellete teh 10.33.2 and use the latest pnpm.",
+      "no stale ellete teh 10.33.2 and use the latest pnpm."
+    ]
+  },
+  {
+    "norm": "ok nice now well holding control still not stt me...",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "ok nice now  well holding control still not stt me...",
+      "ok nice now  well holding control still not stt me..."
+    ]
+  },
+  {
+    "norm": "hello. hello, so looks like this is working. i need your help with another bug that currently is being i'm applied, i do not see the voice ui appears starting microphone... and i am not sure if the llm modal were using is enough good for this tts for the current machine what small very popular but very good on stt we can implement and use?",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "Hello. Hello, so looks like this is working. I need your help with another bug that currently is being I'm applied, I do not see the voice UI appears starting microphone... and I am not sure if the llm modal were using is enough good for this tts for the current machine what small very popular but very good on stt we can implement and use?",
+      "Hello. Hello, so looks like this is working. I need your help with another bug that currently is being I'm applied, I do not see the voice UI appears starting microphone... and I am not sure if the llm modal were using is enough good for this tts for the current machine what small very popular but very good on stt we can implement and use?"
+    ]
+  },
+  {
+    "norm": "can you please duplicate every repo we got on our gh? including one from oly-app",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "Can you please duplicate every repo we got on our gh? including one from Oly-App",
+      "Can you please duplicate every repo we got on our gh? including one from Oly-App"
+    ]
+  },
+  {
+    "norm": "please also duplicate our two org e.g. vybekiit and genshot.dev",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "please also duplicate our two org e.g. vybekiit and genshot.dev",
+      "please also duplicate our two org e.g. vybekiit and genshot.dev"
+    ]
+  },
+  {
+    "norm": "please also duplicate our two org e.g. vybekiit main repo and the genshot repo from the org",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "please also duplicate our two org e.g. vybekiit main repo and the genshot repo from the org",
+      "please also duplicate our two org e.g. vybekiit main repo and the genshot repo from the org"
+    ]
+  },
+  {
+    "norm": "it works nice but why for the tts it keeps say item? and regarding the stt it still misses some text and when i hold the control the ui animation is looking like hot reloading tons of times need fix there",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "it works nice but why for the tts it keeps say item? and regarding the stt it still misses some text and when i hold the control the ui animation is looking like hot reloading tons of times need fix there",
+      "it works nice but why for the tts it keeps say item? and regarding the stt it still misses some text and when i hold the control the ui animation is looking like hot reloading tons of times need fix there"
+    ]
+  },
+  {
+    "norm": "/statusline show context dynamic current model context and weekly limit as context <n>% (<n>k) | weekly <n>% (<n>k)",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "/statusline show context dynamic current model context and weekly limit as Context <n>% (<n>K) | Weekly <n>% (<n>K)",
+      "/statusline show context dynamic current model context and weekly limit as Context <n>% (<n>K) | Weekly <n>% (<n>K)"
+    ]
+  },
+  {
+    "norm": "ok nice now can u install via pnpm for each repo we got in the code folder except the ones who use npm.",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "ok nice now can u install via pnpm for each repo we got in the code folder except the ones who use npm.",
+      "ok nice now can u install via pnpm for each repo we got in the code folder except the ones who use npm."
+    ]
+  },
+  {
+    "norm": "i said hell how r u but it stt 'hello, our leader.' thats annoying and this small things keep happein.g",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "I said hell how r u but it stt 'Hello, our leader.' thats annoying and this small things keep happein.g",
+      "I said hell how r u but it stt 'Hello, our leader.' thats annoying and this small things keep happein.g"
+    ]
+  },
+  {
+    "norm": "so for template repo you can delete it completely and for vybekiit install official rustup please",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "so for Template repo you can delete it completely and for vybekiit install official rustup please",
+      "so for Template repo you can delete it completely and for vybekiit install official rustup please"
+    ]
+  },
+  {
+    "norm": "i would like to consult with you regarding the current code base of dufferberg and how its structure additionally how the code base is following the code style.md and whether we are following the best practices for this kind of repo hat do you find incossistent and few bugs i find but i am not sure we can call it bugs so one, when i'm working in multiple terminals using cmux, the automatic response hook is applying right away so if i'm running in 50-20 terminals it's going to be like spamming me",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "I would like to consult with you Regarding the current code base of Dufferberg and how its structure Additionally how the code base is following the code style.md And whether we are following the best practices for this kind of repo hat do you find incossistent and few bugs i find but i am not sure we can call it bugs So one, when I'm working in multiple terminals using Cmux, The automatic respons",
+      "I would like to consult with you Regarding the current code base of Dufferberg and how its structure Additionally how the code base is following the code style.md And whether we are following the best practices for this kind of repo hat do you find incossistent and few bugs i find but i am not sure we can call it bugs So one, when I'm working in multiple terminals using Cmux, The automatic respons"
+    ]
+  },
+  {
+    "norm": "/statusline edit the current one we got with another thing and iti s the current folder we are and the current model is being used. not just context and weekly",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "/statusline edit the current one we got with another thing and iti s the current folder we are and the current model is being used. not just context and weekly",
+      "/statusline edit the current one we got with another thing and iti s the current folder we are and the current model is being used. not just context and weekly"
+    ]
+  },
+  {
+    "norm": "show as well the reasoning level right after the model",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "show as well the reasoning level right after the model",
+      "show as well the reasoning level right after the model"
+    ]
+  },
+  {
+    "norm": "add in the dufflebag this so we can setup it next time if i need to easily exactly as it is now under a new proper folder but in proper position name statuslines/codex",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "add in the dufflebag this so we can setup it next time if i need to easily exactly as it is now under a new proper folder but in proper position name statuslines/codex",
+      "add in the dufflebag this so we can setup it next time if i need to easily exactly as it is now under a new proper folder but in proper position name statuslines/codex"
+    ]
+  },
+  {
+    "norm": "do it all and [image #1] add it and also if u can a bg bg color that fit each word that the model is reading but in the tui so i can follow it while it read and i wont get lost",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "do it all and [Image #1] add it and also if u can a bg bg color that fit each word that the model is reading but in the tui so i can follow it while it read and i wont get lost",
+      "do it all and [Image #1] add it and also if u can a bg bg color that fit each word that the model is reading but in the tui so i can follow it while it read and i wont get lost"
+    ]
+  },
+  {
+    "norm": "can you please pull every repo remote branches and pull it locally like sync everything we got from remote gh so were sync share with me how many got added to each repo once done.",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "Can you please pull every repo remote branches and pull it locally like sync everything we got from remote gh so were sync share with me how many got added to each repo once done.",
+      "Can you please pull every repo remote branches and pull it locally like sync everything we got from remote gh so were sync share with me how many got added to each repo once done."
+    ]
+  },
+  {
+    "norm": "ok can u remove please the following words while it reads response? e.g. bg blue and text white for every word there are some noise bg appear and that sounds bad just remove it.",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "ok can u remove please the following words while it reads response? e.g. bg blue and text white for every word there are some noise bg appear and that sounds bad just remove it.",
+      "ok can u remove please the following words while it reads response? e.g. bg blue and text white for every word there are some noise bg appear and that sounds bad just remove it."
+    ]
+  },
+  {
+    "norm": "ok nice but dorecord voice that let it stt and hear it check the sounds cause there are some crunches appear.",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "ok nice but dorecord voice that let it stt and hear it check the sounds cause there are some crunches appear.",
+      "ok nice but dorecord voice that let it stt and hear it check the sounds cause there are some crunches appear."
+    ]
+  },
+  {
+    "norm": "ok git commit push please.",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "ok git commit push please.",
+      "ok git commit push please."
+    ]
+  },
+  {
+    "norm": "i think the product should be without the automatic scan and outreach and we will have our own cold outreach email unified crm system that can easily crawl scrape and get emails for different projects we got so we can apply it for each of our saas more unified.",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "I think the product should be without the automatic scan and outreach and we will have our own cold outreach email unified crm system that can easily crawl scrape and get emails for different projects we got so we can apply it for each of our saas more unified.",
+      "I think the product should be without the automatic scan and outreach and we will have our own cold outreach email unified crm system that can easily crawl scrape and get emails for different projects we got so we can apply it for each of our saas more unified."
+    ]
+  },
+  {
+    "norm": "i agree with ur recommendation keep public scan but i do want to have better structure for this.",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "i agree with ur recommendation keep public scan but i do want to have better structure for this.",
+      "i agree with ur recommendation keep public scan but i do want to have better structure for this."
+    ]
+  },
+  {
+    "norm": "i would like to understand why use cf and open next under this too",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "i would like to understand why use cf and open next under this too",
+      "i would like to understand why use cf and open next under this too"
+    ]
+  },
+  {
+    "norm": "just remains her d1 yes.",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "just remains her d1 yes.",
+      "just remains her d1 yes."
+    ]
+  },
+  {
+    "norm": "so lets change it to follow the best practices of effect. and make it lean",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "so lets change it to follow the best practices of effect. and make it lean",
+      "so lets change it to follow the best practices of effect. and make it lean"
+    ]
+  },
+  {
+    "norm": "write in the current folder root todo.md to deslop every folder mark yosefhayim as done with checkbox and numbered list from first to last",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "write in the current folder root TODO.md to deslop every folder mark YosefHayim as done with checkbox and numbered list from first to last",
+      "write in the current folder root TODO.md to deslop every folder mark YosefHayim as done with checkbox and numbered list from first to last"
+    ]
+  },
+  {
+    "norm": "you can remove sow-template i delete it from the remote and _merge-all-[n]-07-31",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "you can remove sow-template i delete it from the remote and _merge-all-2026-07-31",
+      "you can remove sow-template i delete it from the remote and _merge-all-2026-07-31"
+    ]
+  },
+  {
+    "norm": "rename chatly to replybase thats the product. u can delete learning unity and mobile-apps-monorepoe. same as shabbat guard and shopify apps",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "rename chatly to replybase thats the product. u can delete learning unity and mobile-apps-monorepoe. same as shabbat guard and shopify apps",
+      "rename chatly to replybase thats the product. u can delete learning unity and mobile-apps-monorepoe. same as shabbat guard and shopify apps"
+    ]
+  },
+  {
+    "norm": "explain to me about this repo what it does what deps you see unsued can be removed what is in a middle of merges or stale and if the current structure looks logical to the purpose of this repo structure itself",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "Explain to me about this repo what it does what deps you see unsued can be removed what is in a middle of merges or stale and if the current structure looks logical to the purpose of\n  this repo structure itself",
+      "Explain to me about this repo what it does what deps you see unsued can be removed what is in a middle of merges or stale and if the current structure looks logical to the purpose of\n  this repo structure itself"
+    ]
+  },
+  {
+    "norm": "explain to me about this repo what it does what deps you see unsued can be removed what is in a middle of merges or stale and if the current structure looks logical to the purpose of this repo structure itself if its in the same structure that the apple api docs expect so we give the most expierenced and good develoepr expierence",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "Explain to me about this repo what it does what deps you see unsued can be removed what is in a middle of merges or stale and if the current structure looks logical to the purpose of\n  this repo structure itself if its in the same structure that the apple api docs expect so we give the most expierenced and good develoepr expierence",
+      "Explain to me about this repo what it does what deps you see unsued can be removed what is in a middle of merges or stale and if the current structure looks logical to the purpose of\n  this repo structure itself if its in the same structure that the apple api docs expect so we give the most expierenced and good develoepr expierence"
+    ]
+  },
+  {
+    "norm": "find all conflicts and fix",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "find all conflicts and fix",
+      "find all conflicts and fix"
+    ]
+  },
+  {
+    "norm": "did we handled proper issues exist on gh remote ? please check and confirm",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "did we handled proper issues exist on gh remote ? please check and confirm",
+      "did we handled proper issues exist on gh remote ? please check and confirm"
+    ]
+  },
+  {
+    "norm": "fix please before we git commit push",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "fix please before we git commit push",
+      "fix please before we git commit push"
+    ]
+  },
+  {
+    "norm": "we got proxy on the cf why is that? and how can we remove it i authorization granted to wrangler can u check that and fix it so we wont need that proxy to make it cleaner",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "we got proxy on the cf why is that? and how can we remove it I Authorization granted to Wrangler can u check that and fix it so we wont need that proxy to make it cleaner",
+      "we got proxy on the cf why is that? and how can we remove it I Authorization granted to Wrangler can u check that and fix it so we wont need that proxy to make it cleaner"
+    ]
+  },
+  {
+    "norm": "[image #1] this one here or in other url can u give me it so i create for u",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "[Image #1] this one here or in other url can u give me it so i create for u",
+      "[Image #1] this one here or in other url can u give me it so i create for u"
+    ]
+  },
+  {
+    "norm": "try now ive put it",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "try now ive put it",
+      "try now ive put it"
+    ]
+  },
+  {
+    "norm": "why i cant launch proejct yosefhayimsabag@yosefs-mbp mypr-app % pnpm run dev [warn] the \"workspaces\" field in package.json is not supported by pnpm. create a \"pnpm-workspace.yaml\" file instead. [error] this project is configured to use npm for help, run: pnpm help run yosefhayimsabag@yosefs-mbp mypr-app %",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "why i cant launch proejct yosefhayimsabag@yosefs-mbp MYPR-App % pnpm run dev\n[WARN] The \"workspaces\" field in package.json is not supported by pnpm. Create a \"pnpm-workspace.yaml\" file instead.\n[ERROR] This project is configured to use npm\nFor help, run: pnpm help run\n\nyosefhayimsabag@yosefs-mbp MYPR-App %",
+      "why i cant launch proejct yosefhayimsabag@yosefs-mbp MYPR-App % pnpm run dev\n[WARN] The \"workspaces\" field in package.json is not supported by pnpm. Create a \"pnpm-workspace.yaml\" file instead.\n[ERROR] This project is configured to use npm\nFor help, run: pnpm help run\n\nyosefhayimsabag@yosefs-mbp MYPR-App %"
+    ]
+  },
+  {
+    "norm": "kill please all local ports except [n]",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "kill please all local ports except 8081",
+      "kill please all local ports except 8081"
+    ]
+  },
+  {
+    "norm": "two tasks 1. we got in mypr [image #1] [url] a notifications settings can u confirm if we actually verify it works e2e production ready? 2. admin has jump messages when they show up in app for regular user and admin can config them when and how we got 60 something of these can u confirm if that is propely e2e tested too verified worked ? between demo user to admin demo changes modificatiosn to verify it trully works every single one of them and as well appear properly? like if tomorrow he adds s",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "two tasks 1. we got in mypr [Image #1] [URL]  a notifications settings can u confirm if we actually verify it works e2e production readY?\n\n2. admin has jump messages when they show up in app for regular user and admin can config them when and how we got 60 something of these can u confirm if that is propely e2e tested too verified worked ? between demo user to admin demo changes modificatiosn to v",
+      "two tasks 1. we got in mypr [Image #1] [URL]  a notifications settings can u confirm if we actually verify it works e2e production readY?\n\n2. admin has jump messages when they show up in app for regular user and admin can config them when and how we got 60 something of these can u confirm if that is propely e2e tested too verified worked ? between demo user to admin demo changes modificatiosn to v"
+    ]
+  },
+  {
+    "norm": "b but no ??",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "b but no ??",
+      "b but no ??"
+    ]
+  },
+  {
+    "norm": "ok but i forbid as well generic words like payload,response,data,raw,result etc",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "ok but i forbid as well generic words like payload,response,data,raw,result etc",
+      "ok but i forbid as well generic words like payload,response,data,raw,result etc"
+    ]
+  },
+  {
+    "norm": "i dont midn else as long as it serve the purpose of its self. e.g. the function",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "i dont midn else as long as it serve the purpose of its self. e.g. the function",
+      "i dont midn else as long as it serve the purpose of its self. e.g. the function"
+    ]
+  },
+  {
+    "norm": "understand purpose of this repo.",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "understand purpose of this repo.",
+      "understand purpose of this repo."
+    ]
+  },
+  {
+    "norm": "a schema should already validate this for us no need to do this conditions checks",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "a schema should already validate this for us no need to do this conditions checks",
+      "a schema should already validate this for us no need to do this conditions checks"
+    ]
+  },
+  {
+    "norm": "i would like you to fix how it generate .bridge no matter from where i am launching it should be written to ssot root .bridge folder and not to the position the agent is initing it. cause that causing a lot of noises same for when it triggers download folder. i would like you to delete all what u found regarding this includng .gitignore cause it should not serve this",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "I would like you to fix how it generate .bridge no matter from where i am launching it should be written to ssot root .bridge folder and not to the position the agent is initing it. cause that causing a lot of noises same for when it triggers download folder. i would like you to delete all what u found regarding this includng .gitignore cause it should not serve this",
+      "I would like you to fix how it generate .bridge no matter from where i am launching it should be written to ssot root .bridge folder and not to the position the agent is initing it. cause that causing a lot of noises same for when it triggers download folder. i would like you to delete all what u found regarding this includng .gitignore cause it should not serve this"
+    ]
+  },
+  {
+    "norm": "ok so did u doubled modified it so it does work",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "ok so did u doubled modified it so it does work",
+      "ok so did u doubled modified it so it does work"
+    ]
+  },
+  {
+    "norm": "yes i do",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "yes i do",
+      "yes i do"
+    ]
+  },
+  {
+    "norm": "implement those fixes next",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "implement those fixes next",
+      "implement those fixes next"
+    ]
+  },
+  {
+    "norm": "change i dont like it show other options.",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "change i dont like it show other options.",
+      "change i dont like it show other options."
+    ]
+  },
+  {
+    "norm": "i would say that we need to seperate it based on the business logic so they are easy to modify if we want so. e.g. followig uncle bob rules.",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "i would say that we need to seperate it based on the business logic so they are easy to modify if we want so. e.g. followig uncle bob rules.",
+      "i would say that we need to seperate it based on the business logic so they are easy to modify if we want so. e.g. followig uncle bob rules."
+    ]
+  },
+  {
+    "norm": "yes agree",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "yes agree",
+      "yes agree"
+    ]
+  },
+  {
+    "norm": "did u do some tests to verify it ?e.g. launch",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "did u do some tests to verify it ?e.g. launch",
+      "did u do some tests to verify it ?e.g. launch"
+    ]
+  },
+  {
+    "norm": "read olly-yogo and identify what are the differences on starting yoga session pose identify the differences so we can pull it to the oly-app and modify it so launch it via metro on my local device iphone 12 pro iphone yosef so i see if there are a lot of differences in detecting it but before apply share with me.",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "Read olly-yogo and identify what are the differences on starting yoga session pose identify the differences so we can pull it to the Oly-App and modify it so launch it via metro on my local device iphone 12 pro iphone yosef so i see if there are a lot of differences in detecting it but before apply share with me.",
+      "Read olly-yogo and identify what are the differences on starting yoga session pose identify the differences so we can pull it to the Oly-App and modify it so launch it via metro on my local device iphone 12 pro iphone yosef so i see if there are a lot of differences in detecting it but before apply share with me."
+    ]
+  },
+  {
+    "norm": "ok nice so look for other stale files now or things can be safely deleted and share with me before",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "ok nice so look for other stale files now or things can be safely deleted and share with me before",
+      "ok nice so look for other stale files now or things can be safely deleted and share with me before"
+    ]
+  },
+  {
+    "norm": "yes i mean a",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "yes i mean a",
+      "yes i mean a"
+    ]
+  },
+  {
+    "norm": "agreed. no need hard cap of loc it per purpose purly",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "agreed. no need hard cap of loc it per purpose purly",
+      "agreed. no need hard cap of loc it per purpose purly"
+    ]
+  },
+  {
+    "norm": "agreed do it",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "agreed do it",
+      "agreed do it"
+    ]
+  },
+  {
+    "norm": "agreed with all",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "agreed with all",
+      "agreed with all"
+    ]
+  },
+  {
+    "norm": "what about the ci cd of github action? for instance' we are running multiple vtap actions on different node versions and that's feeling to me very dumb. make it more smart and efficient than running it on multiple different environments. how should look the updated one",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "What about the CI CD of GitHub Action? For instance' we are running multiple VTAP actions on different node versions and that's feeling to me very dumb. Make it more smart and efficient than running it on multiple different environments. how should look the updated one",
+      "What about the CI CD of GitHub Action? For instance' we are running multiple VTAP actions on different node versions and that's feeling to me very dumb. Make it more smart and efficient than running it on multiple different environments. how should look the updated one"
+    ]
+  },
+  {
+    "norm": "just angry.",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "Just angry.",
+      "Just angry."
+    ]
+  },
+  {
+    "norm": "yes i agree",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "yes i agree",
+      "yes i agree"
+    ]
+  },
+  {
+    "norm": "yes only by what is cannot be undersatabdle via the variables function name or parmaters that why we need very good picks",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "yes only by what is cannot be undersatabdle via the variables function name or parmaters that why we need very good picks",
+      "yes only by what is cannot be undersatabdle via the variables function name or parmaters that why we need very good picks"
+    ]
+  },
+  {
+    "norm": "can u please also update the dufflebag ci-cd workflows template we got (one levelup) so it follows that too",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "can u please also update the dufflebag ci-cd workflows template we got (one levelup) so it follows that too",
+      "can u please also update the dufflebag ci-cd workflows template we got (one levelup) so it follows that too"
+    ]
+  },
+  {
+    "norm": "agent.md is the ssot root for our agents",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "agent.md is the ssot root for our agents",
+      "agent.md is the ssot root for our agents"
+    ]
+  },
+  {
+    "norm": "ok great job i am on same wifi why not detected? developer mode is on",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "ok great job i am on same wifi why not detected? developer mode is on",
+      "ok great job i am on same wifi why not detected? developer mode is on"
+    ]
+  },
+  {
+    "norm": "nice now please git commit push",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "nice now please git commit push",
+      "nice now please git commit push"
+    ]
+  },
+  {
+    "norm": "done check now and launch it",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "done check now and launch it",
+      "done check now and launch it"
+    ]
+  },
+  {
+    "norm": "no no no let the demo login works..",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "no no no let the demo login works..",
+      "no no no let the demo login works.."
+    ]
+  },
+  {
+    "norm": "i am in do it.",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "i am in do it.",
+      "i am in do it."
+    ]
+  },
+  {
+    "norm": "i am in do it. also added .env",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "i am in do it. also added .env",
+      "i am in do it. also added .env"
+    ]
+  },
+  {
+    "norm": "i logged in but it redirect me again to the first screen after splash signup/login this is cause of the architecture-v2 we applied i think but it not yet merged to main so why this still keep happening",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "i logged in but it redirect me again to the first screen after splash signup/login this is cause of the architecture-v2 we applied i think but it not yet merged to main so why this still keep happening",
+      "i logged in but it redirect me again to the first screen after splash signup/login this is cause of the architecture-v2 we applied i think but it not yet merged to main so why this still keep happening"
+    ]
+  },
+  {
+    "norm": "still not usure u open on the correct metro one",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "still not  usure u open on the correct metro one",
+      "still not  usure u open on the correct metro one"
+    ]
+  },
+  {
+    "norm": "still not redirect homepage",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "still not redirect homepage",
+      "still not redirect homepage"
+    ]
+  },
+  {
+    "norm": "ok right before session start its not scrolleable to see the the button fix .",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "ok right before session start its not scrolleable to see the the button fix .",
+      "ok right before session start its not scrolleable to see the the button fix ."
+    ]
+  },
+  {
+    "norm": "ok nice it worked now for other thing need here multiple fixes and adjustments oly motion tracking experience (1).docx",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "ok nice it worked now for other thing need here multiple fixes and adjustments OLY Motion Tracking Experience (1).docx",
+      "ok nice it worked now for other thing need here multiple fixes and adjustments OLY Motion Tracking Experience (1).docx"
+    ]
+  },
+  {
+    "norm": "ok nice it worked now for other thing need here multiple fixes and adjustments oly motion tracking experience (1).docx read this file from downloads folder share with me what need to be fixed properly. u got the silhotte too human-silhouette-transparent.png",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "ok nice it worked now for other thing need here multiple fixes and adjustments OLY Motion\n  Tracking Experience (1).docx read this file from Downloads folder share with me what need to be fixed properly. u got the silhotte too human-silhouette-transparent.png",
+      "ok nice it worked now for other thing need here multiple fixes and adjustments OLY Motion\n  Tracking Experience (1).docx read this file from Downloads folder share with me what need to be fixed properly. u got the silhotte too human-silhouette-transparent.png"
+    ]
+  },
+  {
+    "norm": "apply it.",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "apply it.",
+      "apply it."
+    ]
+  },
+  {
+    "norm": "ok nice now u sure u have handled every section mention in that docx ?",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "ok nice now u sure u have handled every section mention in that docx ?",
+      "ok nice now u sure u have handled every section mention in that docx ?"
+    ]
+  },
+  {
+    "norm": "implement all. please fully complette. include the debug one",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "implement all. please fully complette. include the debug one",
+      "implement all. please fully complette. include the debug one"
+    ]
+  },
+  {
+    "norm": "production demo not load when i enter entry-178b1b5ee12254…eaee668f781d.js:121 uncaught error: minified react error #185; visit [url] for the full message or use the non-minified dev environment for full errors and additional helpful warnings. at br (entry-178b1b5ee12254…8f781d.js:121:[n]) at vr (entry-178b1b5ee12254…8f781d.js:121:[n]) at fo (entry-178b1b5ee12254…8f781d.js:121:[n]) at entry-178b1b5ee12254…8f781d.js:121:[n] at entry-178b1b5ee12254…68f781d.js:384:[n] at array.foreach (<anonymous>)",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "production demo not load when i enter entry-178b1b5ee12254…eaee668f781d.js:121 Uncaught Error: Minified React error #185; visit [URL] for the full message or use the non-minified dev environment for full errors and additional helpful warnings.\n    at Br (entry-178b1b5ee12254…8f781d.js:121:33910)\n    at Vr (entry-178b1b5ee12254…8f781d.js:121:33483)\n    at Fo (entry-178b1b5ee12254…8f781d.js:121:5848",
+      "production demo not load when i enter entry-178b1b5ee12254…eaee668f781d.js:121 Uncaught Error: Minified React error #185; visit [URL] for the full message or use the non-minified dev environment for full errors and additional helpful warnings.\n    at Br (entry-178b1b5ee12254…8f781d.js:121:33910)\n    at Vr (entry-178b1b5ee12254…8f781d.js:121:33483)\n    at Fo (entry-178b1b5ee12254…8f781d.js:121:5848"
+    ]
+  },
+  {
+    "norm": "i would like you to do a research if we are using the correct media pipe vision task for this application and whether we should customize the model and retrain it on our specific poses so it can detect it purely without the need to do cross verifications on the angles and joints to increase accuracy and green/red etc did u understand waht i am asking from you ? [url] like how can i know which one is the most fit right now the owners not happy and its based on the feedback docx find in the downlo",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "I would like you to do a research if we are using the correct media pipe vision task for this application and whether we should customize the model and retrain it on our specific poses so it can detect it purely without the need to do cross verifications on the angles and joints to increase accuracy and green/red etc did u understand waht i am asking from you ? [URL] like how can i know which one ",
+      "I would like you to do a research if we are using the correct media pipe vision task for this application and whether we should customize the model and retrain it on our specific poses so it can detect it purely without the need to do cross verifications on the angles and joints to increase accuracy and green/red etc did u understand waht i am asking from you ? [URL] like how can i know which one "
+    ]
+  },
+  {
+    "norm": "git commit push please",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "git commit push please",
+      "git commit push please"
+    ]
+  },
+  {
+    "norm": "git commit push all unerleated locals chanes please",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "git commit push all unerleated locals chanes please",
+      "git commit push all unerleated locals chanes please"
+    ]
+  },
+  {
+    "norm": "can u implement that in debug mode dev only so we can run each of this visible in the ui of what model currently run proper write logs so u can read it and get to the right one which is fit",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "can u implement that in debug mode dev only so we can run each of this visible in the ui of what model currently run proper write logs so u can read it and get to the right one which is fit",
+      "can u implement that in debug mode dev only so we can run each of this visible in the ui of what model currently run proper write logs so u can read it and get to the right one which is fit"
+    ]
+  },
+  {
+    "norm": "a but ban build or to or resolve",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "a but ban build or to or resolve",
+      "a but ban build or to or resolve"
+    ]
+  },
+  {
+    "norm": "yes agreed",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "yes agreed",
+      "yes agreed"
+    ]
+  },
+  {
+    "norm": "no dont keep stale",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "no dont keep stale",
+      "no dont keep stale"
+    ]
+  },
+  {
+    "norm": "no purly as what the product needs to be we will have unified system for cron jobs etc.",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "no purly as what the product needs to be we will have unified system for cron jobs etc.",
+      "no purly as what the product needs to be we will have unified system for cron jobs etc."
+    ]
+  },
+  {
+    "norm": "please help me proper decide regarding this thats part of a chat response and request i sent to notebook lm thinking on how can we improve the model here with custom train of us or maybe use exist one not sure if its worth help me before do anything how can i use the model yogaconvo2d thoughts yogaconvo2d is a custom convolutional neural network (cnn) architecture designed specifically for yoga pose classification . it is typically deployed in a hybrid pipeline where google mediapipe pose acts a",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "please help me proper decide regarding this thats part of a chat response and request i sent to notebook lm thinking on how can we improve the model here with custom train of us or maybe use exist one not sure if its worth help me before do anything how can i use the model yogaconvo2d\n\n\nThoughts\nYogaConvo2d is a custom Convolutional Neural Network (CNN) architecture designed specifically for yoga ",
+      "please help me proper decide regarding this thats part of a chat response and request i sent to notebook lm thinking on how can we improve the model here with custom train of us or maybe use exist one not sure if its worth help me before do anything how can i use the model yogaconvo2d\n\n\nThoughts\nYogaConvo2d is a custom Convolutional Neural Network (CNN) architecture designed specifically for yoga "
+    ]
+  },
+  {
+    "norm": "agreed so we remove effect and follwo zod.",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "agreed so we remove effect and follwo zod.",
+      "agreed so we remove effect and follwo zod."
+    ]
+  },
+  {
+    "norm": "but scan_budget doesnt needs to be a table. can just be .env that is set up max to a price spent we set",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "but scan_budget doesnt needs to be a table. can just be .env that is set up max to a price spent we set",
+      "but scan_budget doesnt needs to be a table. can just be .env that is set up max to a price spent we set"
+    ]
+  },
+  {
+    "norm": "firstly that funtion not clear for me what it does so i prefer early guard clauses but proper variables fit.",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "firstly that funtion not clear for me what it does so i prefer early guard clauses but proper variables fit.",
+      "firstly that funtion not clear for me what it does so i prefer early guard clauses but proper variables fit."
+    ]
+  },
+  {
+    "norm": "also if that the case can we implement that in a specific web too? e.g. if i run oly in the web metro that means we can implement the equilevent of th media pipe just for web? so i can see and use it precisly as we have the configurations for ios already so we can reuse the same just for web no ?",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "also if that the case can we implement that in a specific web too? e.g. if i run oly in the web metro that means we can implement the equilevent of th media pipe just for web? so i can see and use it precisly as we have the configurations for ios already so we can reuse the same just for web no ?",
+      "also if that the case can we implement that in a specific web too? e.g. if i run oly in the web metro that means we can implement the equilevent of th media pipe just for web? so i can see and use it precisly as we have the configurations for ios already so we can reuse the same just for web no ?"
+    ]
+  },
+  {
+    "norm": "that function in general doesnt explain to me what it does. ban ?? or ||",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "that function in general doesnt explain to me what it does. ban ?? or ||",
+      "that function in general doesnt explain to me what it does. ban ?? or ||"
+    ]
+  },
+  {
+    "norm": "avoid a thats bad same for ternary opreators nested ones. and avoid let",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "avoid a thats bad same for ternary opreators nested ones. and avoid let",
+      "avoid a thats bad same for ternary opreators nested ones. and avoid let"
+    ]
+  },
+  {
+    "norm": "ok but why billing_events why not subscriptions?",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "ok but why billing_events why not subscriptions?",
+      "ok but why billing_events why not subscriptions?"
+    ]
+  },
+  {
+    "norm": "i want ssot root minimum lean tables and not adding more",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "i want ssot root minimum lean tables and not adding more",
+      "i want ssot root minimum lean tables and not adding more"
+    ]
+  },
+  {
+    "norm": "u checked it works proper and init? get the web api request it need to works cause i run and got casue on the web it still redirect to [image #1] and not to the home still.",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "u checked it works proper and init? get the web api request it need to works cause i run and got casue on the web it still redirect to [Image #1] and not to the home still.",
+      "u checked it works proper and init? get the web api request it need to works cause i run and got casue on the web it still redirect to [Image #1] and not to the home still."
+    ]
+  },
+  {
+    "norm": "what better shapes fit",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "what better shapes fit",
+      "what better shapes fit"
+    ]
+  },
+  {
+    "norm": "agreed,b",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "agreed,b",
+      "agreed,b"
+    ]
+  },
+  {
+    "norm": "i want to avoid of this prop of algdb too it should be loaded alraedy in runtime.",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "i want to avoid of this prop of algdb too it should be loaded alraedy in runtime.",
+      "i want to avoid of this prop of algdb too it should be loaded alraedy in runtime."
+    ]
+  },
+  {
+    "norm": "i would say same as the structure of how the api expect to be structured",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "i would say same as the structure of how the api expect  to be structured",
+      "i would say same as the structure of how the api expect  to be structured"
+    ]
+  },
+  {
+    "norm": "i agree but the signature of the function still looks wrong for me",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "i agree but the signature of the function still looks wrong for me",
+      "i agree but the signature of the function still looks wrong for me"
+    ]
+  },
+  {
+    "norm": "we got the open api generated scheams which get converetd so i would say a",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "we got the open api generated scheams which get converetd so i would say a",
+      "we got the open api generated scheams which get converetd so i would say a"
+    ]
+  },
+  {
+    "norm": "thats bad the ?? avoid that if its invalid or missing we return error. and ssot root config for all what needed in runtime too",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "thats bad the ?? avoid that if its invalid or missing we return error. and ssot root config for all what needed in runtime too",
+      "thats bad the ?? avoid that if its invalid or missing we return error. and ssot root config for all what needed in runtime too"
+    ]
+  },
+  {
+    "norm": "avoid backward compabilities exports. and b.",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "avoid backward compabilities exports. and b.",
+      "avoid backward compabilities exports. and b."
+    ]
+  },
+  {
+    "norm": "[image #1] i am not seeing the silhoutte at start of pose and not the gif or static se and accracu y need fix in the web view",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "[Image #1] i am not seeing the silhoutte at start of pose and not the gif or static se and accracu y need fix in the web view",
+      "[Image #1] i am not seeing the silhoutte at start of pose and not the gif or static se and accracu y need fix in the web view"
+    ]
+  },
+  {
+    "norm": "en is mm dd then yyyy but yes. looks target ok",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "en is mm dd then yyyy but yes. looks target ok",
+      "en is mm dd then yyyy but yes. looks target ok"
+    ]
+  },
+  {
+    "norm": "if it serve it purpose doesnt need to be hard cap loc a is fine",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "if it serve it purpose doesnt need to be hard cap loc a is fine",
+      "if it serve it purpose doesnt need to be hard cap loc a is fine"
+    ]
+  },
+  {
+    "norm": "thats fine but i dont understand what is this function servepurpose.",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "thats fine but i dont understand what is this function servepurpose.",
+      "thats fine but i dont understand what is this function servepurpose."
+    ]
+  },
+  {
+    "norm": "agreed keep going depper",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "agreed  keep going depper",
+      "agreed  keep going depper"
+    ]
+  },
+  {
+    "norm": "agreed with it yes",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "agreed with it yes",
+      "agreed with it yes"
+    ]
+  },
+  {
+    "norm": "avoid hardcoded ready responses",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "avoid hardcoded ready responses",
+      "avoid hardcoded ready responses"
+    ]
+  },
+  {
+    "norm": "agreed and avoid pipe",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "agreed and avoid pipe",
+      "agreed and avoid pipe"
+    ]
+  },
+  {
+    "norm": "do it but need alias imports",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "do it but need alias imports",
+      "do it but need alias imports"
+    ]
+  },
+  {
+    "norm": "agreed please change the entire repo structure i do not want monorepoe structure.",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "agreed please change the entire repo structure i do not want monorepoe structure.",
+      "agreed please change the entire repo structure i do not want monorepoe structure."
+    ]
+  },
+  {
+    "norm": "looks good but if content is assets too go in public.",
+    "count": 2,
+    "unique_sessions": 2,
+    "agents": [
+      "codex"
+    ],
+    "examples": [
+      "looks good but if content is assets too go in public.",
+      "looks good but if content is assets too go in public."
+    ]
+  }
+]

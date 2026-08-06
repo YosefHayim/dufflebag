@@ -1,0 +1,64 @@
+{
+  "generated_at": "2026-08-06T08:58:37.253303+00:00",
+  "scope": {
+    "machine": "local",
+    "home": "/Users/yosefhayimsabag",
+    "agents": [
+      "codex",
+      "grok"
+    ]
+  },
+  "coverage": {
+    "codex_history": {
+      "found": 960,
+      "extracted": 409,
+      "skipped": 551,
+      "errors": 0
+    },
+    "codex_sessions": {
+      "found": 930,
+      "extracted": 930,
+      "skipped": 1208,
+      "errors": 0,
+      "files": 77
+    },
+    "grok_sessions": {
+      "found": 380,
+      "extracted": 380,
+      "skipped": 1363,
+      "errors": 0,
+      "sessions": 479
+    },
+    "claude": {
+      "found": 0,
+      "extracted": 0,
+      "note": "no session store auto-discovered"
+    },
+    "cursor": {
+      "found": 0,
+      "note": "not scanned unless present"
+    }
+  },
+  "totals": {
+    "prompts_extracted": 1265,
+    "by_agent": {
+      "codex": 886,
+      "grok": 379
+    },
+    "exact_multi_session_prompts": 377,
+    "fuzzy_clusters": 320
+  },
+  "extraction_rules": [
+    "user-authored only",
+    "strip <user_query> wrappers",
+    "skip synthetic/system reminders and environment_context",
+    "skip acks and stack-heavy noise",
+    "redact secrets, URLs, UUIDs, home paths",
+    "normalize: lower, collapse ws, placeholder numbers"
+  ],
+  "clustering": {
+    "exact": "normalized string equality across sessions",
+    "fuzzy": "token Jaccard 0.55 + bigram Jaccard 0.45; thr 0.42/0.55",
+    "intent": "keyword rule buckets mapped to skill ids"
+  }
+}

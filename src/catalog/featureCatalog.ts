@@ -335,14 +335,21 @@ export const featureCatalog = Schema.decodeUnknownSync(featureCatalogSchema, {
     installedSkill: { _tag: "none" },
     title: "Speak responses (TTS)",
     summary:
-      "Read complete agent responses with local speech, push-to-talk dictation, Cmux focus gating, active-word highlighting, and optional on-device prompt refinement on macOS.",
+      "Read complete agent responses with local speech, hold-Control dictation via whisper.cpp large-v3-turbo (Metal), Cmux focus gating, and optional on-device prompt refinement on macOS.",
     selectedByDefault: false,
     dependencies: [],
     platform: "any",
     runtime: {
       _tag: "hook",
       sourceEntrypoint: "hooks/speakResponse.ts",
-      shippedPaths: ["cmux_focus.py", "prompt_refinement.py", "voice.py", "voice.py.lock"],
+      // Native STT worker (built by scripts/buildVoice.sh) plus optional Python helpers.
+      shippedPaths: [
+        "dufflebag-voice",
+        "cmux_focus.py",
+        "prompt_refinement.py",
+        "tts_bridge.py",
+        "tts_bridge.py.lock",
+      ],
       registrations: [
         {
           event: "Stop",
@@ -757,11 +764,59 @@ export const featureCatalog = Schema.decodeUnknownSync(featureCatalogSchema, {
     installedSkill: {
       _tag: "skill",
       id: "agent-session-auditor",
-      shippedPaths: ["SKILL.md"],
+      shippedPaths: ["SKILL.md", "scripts"],
     },
     title: "Agent session auditor",
     summary:
-      "Privacy-safe local session coverage, prompt extraction, fuzzy clustering, and evidence-backed skill prioritization.",
+      "Privacy-safe local session coverage, prompt extraction, fuzzy clustering, and evidence-backed skill prioritization — one-command script plus optional multi-agent review.",
+    selectedByDefault: false,
+    dependencies: [],
+    platform: "any",
+    runtime: { _tag: "none" },
+  },
+  {
+    id: "kill-ports-local-dev",
+    sourceDirectory: "killPortsLocalDev",
+    installedSkill: {
+      _tag: "skill",
+      id: "kill-ports-local-dev",
+      shippedPaths: ["SKILL.md"],
+    },
+    title: "Kill ports (local dev)",
+    summary:
+      "List and free local TCP listeners (default keep Metro 8081) so the next dev launch is not blocked by stale processes.",
+    selectedByDefault: false,
+    dependencies: [],
+    platform: "any",
+    runtime: { _tag: "none" },
+  },
+  {
+    id: "workspace-bootstrap",
+    sourceDirectory: "workspaceBootstrap",
+    installedSkill: {
+      _tag: "skill",
+      id: "workspace-bootstrap",
+      shippedPaths: ["SKILL.md"],
+    },
+    title: "Workspace bootstrap",
+    summary:
+      "Clone or sync GitHub user/org repos into a Code folder, optional bulk package installs, and pull-all delta reports.",
+    selectedByDefault: false,
+    dependencies: [],
+    platform: "any",
+    runtime: { _tag: "none" },
+  },
+  {
+    id: "cloudflare-ops",
+    sourceDirectory: "cloudflareOps",
+    installedSkill: {
+      _tag: "skill",
+      id: "cloudflare-ops",
+      shippedPaths: ["SKILL.md"],
+    },
+    title: "Cloudflare ops",
+    summary:
+      "Wrangler/D1/KV/R2 operational wiring and safe migrations — distinct from deploy-and-prove live production proof.",
     selectedByDefault: false,
     dependencies: [],
     platform: "any",
@@ -848,6 +903,22 @@ export const featureCatalog = Schema.decodeUnknownSync(featureCatalogSchema, {
     runtime: { _tag: "none" },
   },
   {
+    id: "mobile-release",
+    sourceDirectory: "mobileRelease",
+    installedSkill: {
+      _tag: "skill",
+      id: "mobile-release",
+      shippedPaths: ["SKILL.md"],
+    },
+    title: "Mobile release",
+    summary:
+      "Ship Expo/React Native store releases with Launch-first build/upload, provenance (git SHA, version, build numbers), and optional EAS fallback.",
+    selectedByDefault: false,
+    dependencies: [],
+    platform: "any",
+    runtime: { _tag: "none" },
+  },
+  {
     id: "coordinate-worktrees",
     sourceDirectory: "coordinateWorktrees",
     installedSkill: {
@@ -857,9 +928,57 @@ export const featureCatalog = Schema.decodeUnknownSync(featureCatalogSchema, {
     },
     title: "Coordinate worktrees",
     summary:
-      "Safely reconcile overlapping branches and worktrees with backups, intent-aware integration, and reachability proof.",
+      "Setup parallel feature lanes under .worktrees/ (issue + branch + PR) or land overlapping worktrees with backups, intent-aware integration, and reachability proof — never delete remotes unless asked.",
     selectedByDefault: false,
     dependencies: ["organized-commits"],
+    platform: "any",
+    runtime: { _tag: "none" },
+  },
+  {
+    id: "messy-repo-orchestrator",
+    sourceDirectory: "messyRepoOrchestrator",
+    installedSkill: {
+      _tag: "skill",
+      id: "messy-repo-orchestrator",
+      shippedPaths: ["SKILL.md"],
+    },
+    title: "Messy repo orchestrator",
+    summary:
+      "Backup main, then fan out one sub-agent per feature for safe refactors/deslop/fixes with issue + PR to main for human review.",
+    selectedByDefault: false,
+    dependencies: ["coordinate-worktrees", "finish-and-ship", "organized-commits"],
+    platform: "any",
+    runtime: { _tag: "none" },
+  },
+  {
+    id: "skill-from-feedback",
+    sourceDirectory: "skillFromFeedback",
+    installedSkill: {
+      _tag: "skill",
+      id: "skill-from-feedback",
+      shippedPaths: ["SKILL.md"],
+    },
+    title: "Skill from feedback",
+    summary:
+      "Patch an existing skill from concrete user or session feedback: triggers, routing, safety, verification — then validate and re-sync.",
+    selectedByDefault: false,
+    dependencies: [],
+    platform: "any",
+    runtime: { _tag: "none" },
+  },
+  {
+    id: "agent-benchmark",
+    sourceDirectory: "agentBenchmark",
+    installedSkill: {
+      _tag: "skill",
+      id: "agent-benchmark",
+      shippedPaths: ["SKILL.md", "REFERENCE.md"],
+    },
+    title: "Agent benchmark",
+    summary:
+      "Design and run dynamic same-task agent/skill/tool benchmarks with tokens, turns, latency, cost, and success — evidence over stars.",
+    selectedByDefault: false,
+    dependencies: [],
     platform: "any",
     runtime: { _tag: "none" },
   },

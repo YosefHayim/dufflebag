@@ -91,10 +91,33 @@ Version 0.14 intentionally removes the old pre-1.0 grammar instead of carrying h
 
 ### Natural voice and dictation
 
-Turn on complete-response narration and play a first example:
+STT (dictation) and TTS (agent narration) are separate toggles:
 
 ```bash
-dufflebag voice on
+# Dictation only — hold Control to speak; agent replies stay silent
+dufflebag stt on
+dufflebag tts off
+
+# Narration on (also starts the worker so hooks can speak)
+dufflebag tts on
+
+# Full stop
+dufflebag stt off
+```
+
+| Command | Effect |
+| --- | --- |
+| `dufflebag stt on` | Install + start the local worker (hold-Control dictation) |
+| `dufflebag stt off` | Stop the worker and remove the voice feature |
+| `dufflebag stt mic-off-delay [ms]` | Show or set the post-release mic open time (0–2000 ms, default 200) |
+| `dufflebag tts on` | Start the worker if needed; set `speech-response-mode` to `auto` |
+| `dufflebag tts off` | Set `speech-response-mode` to `off` (dictation keeps running) |
+
+`dufflebag voice on|off|status|speak|…` still works for the full surface (manual speak, refine, Devin).
+
+Play a one-shot narration:
+
+```bash
 dufflebag voice speak "Read this number one. Now read this number two." --source manual
 ```
 
@@ -114,15 +137,29 @@ spoken. Turn it off with `dufflebag config set speech-read-along false`.
 Inside Cmux, each response is bound to its originating workspace and surface. A
 background response remains silent until that surface is focused and Cmux is the
 frontmost app; older unread responses from the same surface coalesce into the
-latest one. Use `dufflebag config set speech-response-mode immediate` for the old global behavior or
-`dufflebag config set speech-response-mode off` to suppress narration without uninstalling voice.
+latest one. Use `dufflebag config set speech-response-mode immediate` for the old global behavior, or
+`dufflebag tts off` to suppress narration without stopping dictation.
 
-Tap Control to stop narration. Hold Control for 120 ms to dictate locally into
-the active caret. A small
-bottom-center pill moves through **Starting microphone**, **Listening**, and
-**Finishing**; release Control to finish the phrase. Dufflebag keeps a short
-release tail so the final word is not clipped. Say punctuation and structure
-directly, for example:
+**Control gestures** (safe inside chat/input fields — no letter keys):
+
+| Gesture | Action |
+| --- | --- |
+| **Hold Control** | Dictate into the focused caret |
+| **Single-tap Control** | Soft-stop TTS of the current agent reply |
+| **Double-tap Control** | Hard-stop TTS; if nothing is speaking, **mute/unmute** auto-narration for this session (or refine clipboard when `prompt-refinement-mode review`) |
+
+Prefer `dufflebag tts off` / `dufflebag tts on` over hand-editing `speech-response-mode`.
+
+A small bottom-center pill moves through **Connecting**, **Recording**, and
+**Decoding**; release Control to finish the phrase. Dufflebag keeps a short
+**mic-off-delay** (release tail) so the final word is not clipped — default
+200 ms; raise it if words get cut when you let go of Control:
+
+```bash
+dufflebag stt mic-off-delay 400
+```
+
+Say punctuation and structure directly, for example:
 
 ```text
 hello comma my name is Joseph period
@@ -155,11 +192,11 @@ is unavailable. Disable the gesture with `dufflebag config set prompt-refinement
 ```bash
 dufflebag voice status
 dufflebag voice speak "Release status: Devin is ready." --source devin
-dufflebag voice off
+dufflebag stt off
 ```
 
 Narration and dictation support macOS, Windows, and Linux and require only
-[`uv`](https://docs.astral.sh/uv/). `dufflebag voice on` uses the adjacent lockfile
+[`uv`](https://docs.astral.sh/uv/). `dufflebag stt on` / `dufflebag tts on` uses the adjacent lockfile
 to prepare a compatible Python, pinned packages, and both local speech models
 before starting the worker. Later runs reuse uv and model caches; narration and
 transcription stay on the machine.
@@ -190,7 +227,7 @@ Override one launched agent without changing persistent config, for example
 | --- | --- | --- |
 | **context-guard** | Guard long sessions near their context cap and optionally compact idle Claude Code, Codex, or Grok sessions in their exact Ghostty terminal. | 🟢 any OS |
 | **autonomous-loop** | A skill that arms the context-guard SessionStart daemon to auto-/compact and resume hands-free once context nears the guardrail and a fresh handoff exists. macOS + Ghostty only (it types into your terminal window). Hook runtime lives under context-guard. | 🔴 macOS + Ghostty |
-| **speak-response** | Read complete agent responses with local speech, push-to-talk dictation, Cmux focus gating, active-word highlighting, and optional on-device prompt refinement on macOS. | 🟢 any OS |
+| **speak-response** | Read complete agent responses with local speech, hold-Control dictation via whisper.cpp large-v3-turbo (Metal), Cmux focus gating, and optional on-device prompt refinement on macOS. | 🟢 any OS |
 | **dedup-guard** | Block a Write/Edit that pastes a function body or interface/type shape already defined elsewhere in the repo — DRY enforced at the moment of the write. Uses the repo's own TypeScript; deny by default (tune with dufflebagDedupEnforcement). Also wires Cursor (warn) + an AGENTS.md rule for Codex. | 🟢 any OS |
 | **png-to-code** | A skill that turns a PNG design (illustration, logo, UI mockup) into SVG/HTML/CSS that measurably converges to a 1:1 match — a decompose → reuse-or-build → render → screenshot-diff → refine loop, plus a rig-first doctrine for animation. Pure skill (no hooks); its diff harness needs Node + Playwright. | 🟢 any OS |
 | **github-repo-metadata** | A skill that writes and audits GitHub repository About metadata: concise descriptions, homepage/demo links, and topics/tags grounded in official GitHub guidance. Pure skill (no hooks). | 🟢 any OS |
@@ -212,13 +249,20 @@ Override one launched agent without changing persistent config, for example
 | **finish-and-ship** | Close implementation, verification, Git history, push, hosted checks, and handoff without hidden leftovers. | 🟢 any OS |
 | **preview-and-prove** | Launch the real product surface and prove a user-visible flow through browser, network, and persisted-state evidence. | 🟢 any OS |
 | **reuse-first-audit** | Search internal code, platform primitives, and primary ecosystem sources before deciding to build new surface. | 🟢 any OS |
-| **agent-session-auditor** | Privacy-safe local session coverage, prompt extraction, fuzzy clustering, and evidence-backed skill prioritization. | 🟢 any OS |
+| **agent-session-auditor** | Privacy-safe local session coverage, prompt extraction, fuzzy clustering, and evidence-backed skill prioritization — one-command script plus optional multi-agent review. | 🟢 any OS |
+| **kill-ports-local-dev** | List and free local TCP listeners (default keep Metro 8081) so the next dev launch is not blocked by stale processes. | 🟢 any OS |
+| **workspace-bootstrap** | Clone or sync GitHub user/org repos into a Code folder, optional bulk package installs, and pull-all delta reports. | 🟢 any OS |
+| **cloudflare-ops** | Wrangler/D1/KV/R2 operational wiring and safe migrations — distinct from deploy-and-prove live production proof. | 🟢 any OS |
 | **sync-agent-skills** | Synchronize canonical skills through receipt-backed native formats and prove parity across detected supported agents. | 🟢 any OS |
 | **env-config-contract** | Consolidate environment reads into fail-loud schema boundaries without leaking secrets across trust zones. | 🟢 any OS |
 | **mcp-oauth-onboarding** | Install an MCP at the intended scope, complete OAuth, reload the agent, and prove it with a harmless tool call. | 🟢 any OS |
 | **rtl-ui-audit** | Audit and verify real right-to-left layout, bidi content, directional assets, interaction, and accessibility. | 🟢 any OS |
 | **deploy-and-prove** | Deploy or publish an immutable source identity and prove the provider, live runtime, and changed behavior serve it. | 🟢 any OS |
-| **coordinate-worktrees** | Safely reconcile overlapping branches and worktrees with backups, intent-aware integration, and reachability proof. | 🟢 any OS |
+| **mobile-release** | Ship Expo/React Native store releases with Launch-first build/upload, provenance (git SHA, version, build numbers), and optional EAS fallback. | 🟢 any OS |
+| **coordinate-worktrees** | Setup parallel feature lanes under .worktrees/ (issue + branch + PR) or land overlapping worktrees with backups, intent-aware integration, and reachability proof — never delete remotes unless asked. | 🟢 any OS |
+| **messy-repo-orchestrator** | Backup main, then fan out one sub-agent per feature for safe refactors/deslop/fixes with issue + PR to main for human review. | 🟢 any OS |
+| **skill-from-feedback** | Patch an existing skill from concrete user or session feedback: triggers, routing, safety, verification — then validate and re-sync. | 🟢 any OS |
+| **agent-benchmark** | Design and run dynamic same-task agent/skill/tool benchmarks with tokens, turns, latency, cost, and success — evidence over stars. | 🟢 any OS |
 | **capture-workflow** | Turn a proven task into the smallest reusable skill, script, template, test, or runbook and replay it cleanly. | 🟢 any OS |
 | **finish-agent-sessions** | Reconcile interrupted work across agent histories with current repositories, then finish or honestly classify every task. | 🟢 any OS |
 <!-- AUTO:FEATURES:END -->
@@ -230,7 +274,7 @@ These skills ship in the bag for convenience — installable the same way (`npx 
 
 | Skill | What it does | By |
 | --- | --- | --- |
-| **deslop** | Reviews code readability first, then applies approved cleanup that makes the full pipeline understandable in seconds. Use when the user says "deslop", "make this readable", "make this less AI", "second pass", "clean this up", "rename for clarity", "show before and after", or asks to improve code comprehension across React, TypeScript, backend, folders, imports, hooks, or functions. | [Mike Cann](https://github.com/mikecann/agent-skills) |
+| **deslop** | Reviews code readability first, then applies approved cleanup that makes the full pipeline understandable in seconds. Use when the user says "deslop" for readability (not structure lean-out), "make this readable", "make this less AI", "second pass", "clean this up", "rename for clarity", "show before and after", or asks to improve code comprehension across React, TypeScript, backend, folders, imports, hooks, or functions. If the real ask is full-repo lean / ban wrappers / kill ceremony / over-engineering, use deslop-v2 (optionally after grill-me-code-style-with-docs). | [Mike Cann](https://github.com/mikecann/agent-skills) |
 | **grill-me** | Interview the user relentlessly about a plan or design until reaching shared understanding, resolving each branch of the decision tree. Use when user wants to stress-test a plan, get grilled on their design, or mentions "grill me". | [Matt Pocock](https://github.com/mattpocock/skills) |
 | **grill-with-docs** | Grilling session that challenges your plan against the existing domain model, sharpens terminology, and updates documentation (CONTEXT.md, ADRs) inline as decisions crystallise. Use when user wants to stress-test a plan against their project's language and documented decisions. | [Matt Pocock](https://github.com/mattpocock/skills) |
 

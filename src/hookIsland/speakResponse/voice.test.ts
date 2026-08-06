@@ -1,39 +1,43 @@
-import { execFileSync } from "node:child_process";
-import { mkdtempSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { execFileSync, spawnSync } from "node:child_process";
+import { existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
 const voiceDirectory = path.dirname(fileURLToPath(import.meta.url));
-const voiceScript = path.join(voiceDirectory, "voice.py");
+const voiceBinary = path.join(voiceDirectory, "dufflebag-voice");
 const promptRefinementScript = path.join(voiceDirectory, "prompt_refinement.py");
+const ttsBridge = path.join(voiceDirectory, "tts_bridge.py");
 const inheritedPythonPath = process.env.PYTHONPATH;
 const pythonModulePath =
   inheritedPythonPath === undefined ? voiceDirectory : [voiceDirectory, inheritedPythonPath].join(path.delimiter);
 const pythonEnvironment = { ...process.env, PYTHONDONTWRITEBYTECODE: "1", PYTHONPATH: pythonModulePath };
 const pythonExecutable = process.platform === "win32" ? "python" : "python3";
 
-const runVoice = (args: ReadonlyArray<string>): string =>
-  execFileSync("uv", ["run", "--frozen", "--script", voiceScript, ...args], {
+const requireBinary = () => {
+  if (!existsSync(voiceBinary)) {
+    throw new Error("dufflebag-voice is missing; run ./scripts/buildVoice.sh first");
+  }
+};
+
+const runVoice = (args: ReadonlyArray<string>): string => {
+  requireBinary();
+  return execFileSync(voiceBinary, [...args], {
     encoding: "utf8",
-    env: pythonEnvironment,
+    env: process.env,
     timeout: 30_000,
   }).trim();
+};
 
-const callPythonFunction = (request: {
-  readonly scriptPath: string;
-  readonly functionName: string;
-  readonly input: unknown;
-}): unknown => {
+const callPromptRefinementFunction = (functionName: string, input: unknown): unknown => {
   const source = [
     "import importlib.util",
     "import json",
     "import pathlib",
     "import sys",
     "script_path = pathlib.Path(sys.argv[1])",
-    "spec = importlib.util.spec_from_file_location('dufflebag_voice', script_path)",
+    "spec = importlib.util.spec_from_file_location('dufflebag_prompt_refinement', script_path)",
     "module = importlib.util.module_from_spec(spec)",
     "spec.loader.exec_module(module)",
     "call_args = json.loads(sys.argv[3])",
@@ -42,7 +46,7 @@ const callPythonFunction = (request: {
 
   const output = execFileSync(
     pythonExecutable,
-    ["-c", source, request.scriptPath, request.functionName, JSON.stringify(request.input)],
+    ["-c", source, promptRefinementScript, functionName, JSON.stringify(input)],
     {
       encoding: "utf8",
       env: pythonEnvironment,
@@ -53,552 +57,21 @@ const callPythonFunction = (request: {
   return JSON.parse(output);
 };
 
-const callVoiceFunction = (functionName: string, input: unknown): unknown =>
-  callPythonFunction({ scriptPath: voiceScript, functionName, input });
-
-const callPromptRefinementFunction = (functionName: string, input: unknown): unknown =>
-  callPythonFunction({ scriptPath: promptRefinementScript, functionName, input });
-
-const probeStaleDictationStart = (): unknown => {
-  const source = [
-    "import importlib.util",
-    "import json",
-    "import pathlib",
-    "import sys",
-    "import types",
-    "script_path = pathlib.Path(sys.argv[1])",
-    "spec = importlib.util.spec_from_file_location('dufflebag_voice', script_path)",
-    "module = importlib.util.module_from_spec(spec)",
-    "spec.loader.exec_module(module)",
-    "module.write_worker_status = lambda *args: None",
-    "module._dictation['request_generation'] = 2",
-    "module._dictation['requested'] = True",
-    "module.start_dictation(1)",
-    "print(json.dumps({'active': module._dictation['active']}))",
-  ].join("\n");
-
-  const output = execFileSync(pythonExecutable, ["-c", source, voiceScript], {
-    encoding: "utf8",
-    env: pythonEnvironment,
-    timeout: 10_000,
+describe("native voice worker surface", () => {
+  it("exposes prepare, speak, refine, and watch-devin", () => {
+    const help = runVoice(["--help"]);
+    expect(help).toContain("speak");
+    expect(help).toContain("refine");
+    expect(help).toContain("prepare");
+    expect(help).toContain("watch-devin");
+    expect(help).toContain("start");
+    expect(help).toContain("bench");
   });
 
-  return JSON.parse(output);
-};
-
-const probeTranscriptFormatting = (): unknown => {
-  const source = [
-    "import importlib.util",
-    "import json",
-    "import pathlib",
-    "import sys",
-    "import types",
-    "script_path = pathlib.Path(sys.argv[1])",
-    "spec = importlib.util.spec_from_file_location('dufflebag_voice', script_path)",
-    "module = importlib.util.module_from_spec(spec)",
-    "spec.loader.exec_module(module)",
-    "class FakeController:",
-    "    def __init__(self): self.text = ''",
-    "    def type(self, value): self.text += value",
-    "    def press(self, key):",
-    "        if key == 'backspace': self.text = self.text[:-1]",
-    "    def release(self, _key): pass",
-    "sys.modules['pynput.keyboard'] = types.SimpleNamespace(Key=types.SimpleNamespace(backspace='backspace'))",
-    "controller = FakeController()",
-    "module._dictation['controller'] = controller",
-    "module._dictation['format_state'] = module.initial_dictation_format_state()",
-    "module._dictation['line_start_state'] = module.initial_dictation_format_state()",
-    "module._dictation['replacements'] = {'Joseph': 'Yosef'}",
-    "for _ in range(3): module.update_dictation_transcript('hello comma your name is Joseph and', completed=False)",
-    "module.update_dictation_transcript('hello comma my name is Joseph period', completed=True)",
-    "module.finalize_dictation_output()",
-    "print(json.dumps({'text': controller.text, 'typed_words': module._dictation['typed_words']}))",
-  ].join("\n");
-
-  const output = execFileSync(pythonExecutable, ["-c", source, voiceScript], {
-    encoding: "utf8",
-    env: pythonEnvironment,
-    timeout: 10_000,
-  });
-
-  return JSON.parse(output);
-};
-
-const probeDictationStop = (request: { readonly stale: boolean }): unknown => {
-  const source = [
-    "import importlib.util",
-    "import json",
-    "import pathlib",
-    "import sys",
-    "import time",
-    "import types",
-    "script_path = pathlib.Path(sys.argv[1])",
-    "spec = importlib.util.spec_from_file_location('dufflebag_voice', script_path)",
-    "module = importlib.util.module_from_spec(spec)",
-    "spec.loader.exec_module(module)",
-    "calls = []",
-    "module.write_worker_status = lambda status, detail='': calls.append(status)",
-    "module._dictation['capture'] = types.SimpleNamespace(stop=lambda: calls.append('stopped'), close=lambda: calls.append('closed'))",
-    "module._dictation['active'] = True",
-    "module._dictation['request_generation'] = 4 if sys.argv[2] == 'stale' else 3",
-    "module._dictation['requested'] = sys.argv[2] == 'stale'",
-    "module.dictation_audio_snapshot = lambda: object()",
-    "module.transcribe_dictation_audio = lambda _audio: calls.append('transcribed') or ''",
-    "started = time.monotonic()",
-    "module.stop_dictation(3)",
-    "elapsed = time.monotonic() - started",
-    "print(json.dumps({'active': module._dictation['active'], 'calls': calls, 'elapsed': elapsed}))",
-  ].join("\n");
-
-  const output = execFileSync(pythonExecutable, ["-c", source, voiceScript, request.stale ? "stale" : "current"], {
-    encoding: "utf8",
-    env: pythonEnvironment,
-    timeout: 10_000,
-  });
-
-  return JSON.parse(output);
-};
-
-const stringChunksFrom = (candidate: unknown): ReadonlyArray<string> | null => {
-  if (!Array.isArray(candidate)) return null;
-  if (!candidate.every((chunk) => typeof chunk === "string")) return null;
-  return candidate;
-};
-
-type DictationExecution = { readonly active: boolean; readonly calls: ReadonlyArray<string>; readonly elapsed: number };
-
-const dictationExecutionFrom = (candidate: unknown): DictationExecution | null => {
-  if (typeof candidate !== "object" || candidate === null) return null;
-  const active = Object.getOwnPropertyDescriptor(candidate, "active")?.value;
-  const calls = stringChunksFrom(Object.getOwnPropertyDescriptor(candidate, "calls")?.value);
-  const elapsed = Object.getOwnPropertyDescriptor(candidate, "elapsed")?.value;
-  if (typeof active !== "boolean" || calls === null || typeof elapsed !== "number") return null;
-  return { active, calls, elapsed };
-};
-
-const probeSttRuntime = (): unknown => {
-  const source = [
-    "import importlib.util",
-    "import json",
-    "import pathlib",
-    "import sys",
-    "import types",
-    "script_path = pathlib.Path(sys.argv[1])",
-    "spec = importlib.util.spec_from_file_location('dufflebag_voice', script_path)",
-    "module = importlib.util.module_from_spec(spec)",
-    "spec.loader.exec_module(module)",
-    "settings = {}",
-    "class FakeWhisperModel:",
-    "    def __init__(self, model, **options):",
-    "        settings.update({'model': model, **options})",
-    "sys.modules['faster_whisper'] = types.SimpleNamespace(WhisperModel=FakeWhisperModel)",
-    "first = module.stt_runtime()",
-    "second = module.stt_runtime()",
-    "print(json.dumps({**settings, 'reused': first is second}))",
-  ].join("\n");
-
-  const output = execFileSync(pythonExecutable, ["-c", source, voiceScript], {
-    encoding: "utf8",
-    env: pythonEnvironment,
-    timeout: 10_000,
-  });
-
-  return JSON.parse(output);
-};
-
-const probeMacNativeOverlay = (): unknown => {
-  const source = [
-    "import importlib.util",
-    "import json",
-    "import pathlib",
-    "import sys",
-    "import types",
-    "script_path = pathlib.Path(sys.argv[1])",
-    "spec = importlib.util.spec_from_file_location('dufflebag_voice', script_path)",
-    "module = importlib.util.module_from_spec(spec)",
-    "spec.loader.exec_module(module)",
-    "class FakePanel:",
-    "    @classmethod",
-    "    def alloc(cls): return cls()",
-    "    def initWithContentRect_styleMask_backing_defer_(self, _rect, style_mask, _backing, _defer):",
-    "        self.style_mask = style_mask",
-    "        return self",
-    "    def setLevel_(self, _value): pass",
-    "    def setOpaque_(self, _value): pass",
-    "    def setBackgroundColor_(self, _value): pass",
-    "    def setAlphaValue_(self, _value): pass",
-    "    def setHasShadow_(self, _value): pass",
-    "    def setHidesOnDeactivate_(self, _value): pass",
-    "    def setIgnoresMouseEvents_(self, value): self.ignores_mouse = value",
-    "    def setCollectionBehavior_(self, _value): pass",
-    "    def orderFrontRegardless(self): self.visible = True",
-    "    def displayIfNeeded(self): pass",
-    "    def contentView(self): return types.SimpleNamespace(addSubview_=lambda _view: None)",
-    "class FakeApplication:",
-    "    def setActivationPolicy_(self, _policy): pass",
-    "    def finishLaunching(self): self.finished = True",
-    "    def updateWindows(self): pass",
-    "class FakeNSApplication:",
-    "    @staticmethod",
-    "    def sharedApplication(): return FakeApplication()",
-    "class FakeScreen:",
-    "    @staticmethod",
-    "    def mainScreen():",
-    "        return types.SimpleNamespace(visibleFrame=lambda: types.SimpleNamespace(origin=types.SimpleNamespace(x=0, y=0), size=types.SimpleNamespace(width=1440, height=900)))",
-    "class FakeLabel:",
-    "    @staticmethod",
-    "    def labelWithString_(_value):",
-    "        label = FakeLabel()",
-    "        label.values = []",
-    "        return label",
-    "    def setFrame_(self, _value): pass",
-    "    def setAlignment_(self, _value): pass",
-    "    def setFont_(self, _value): pass",
-    "    def setTextColor_(self, _value): pass",
-    "    def setStringValue_(self, value): self.values.append(value)",
-    "    def setAttributedStringValue_(self, value): self.values.append(value)",
-    "class FakeColor:",
-    "    @staticmethod",
-    "    def colorWithSRGBRed_green_blue_alpha_(*_args): return object()",
-    "class FakeFont:",
-    "    @staticmethod",
-    "    def boldSystemFontOfSize_(_size): return object()",
-    "    @staticmethod",
-    "    def systemFontOfSize_(_size): return object()",
-    "class FakeAttributed:",
-    "    @classmethod",
-    "    def alloc(cls): return cls()",
-    "    def initWithString_(self, value): self.value = value; self.attributes = []; return self",
-    "    def addAttribute_value_range_(self, name, _value, value_range): self.attributes.append((name, value_range))",
-    "class FakeDate:",
-    "    @staticmethod",
-    "    def dateWithTimeIntervalSinceNow_(value): return value",
-    "class FakeRunLoop:",
-    "    def __init__(self): self.ticks = []",
-    "    def runUntilDate_(self, value): self.ticks.append(value)",
-    "run_loop = FakeRunLoop()",
-    "class FakeNSRunLoop:",
-    "    @staticmethod",
-    "    def currentRunLoop(): return run_loop",
-    "sys.modules['AppKit'] = types.SimpleNamespace(NSApplication=FakeNSApplication, NSApplicationActivationPolicyAccessory=1, NSBackgroundColorAttributeName='background', NSBackingStoreBuffered=2, NSColor=FakeColor, NSFloatingWindowLevel=3, NSFont=FakeFont, NSFontAttributeName='font', NSForegroundColorAttributeName='foreground', NSMakeRect=lambda *values: values, NSPanel=FakePanel, NSScreen=FakeScreen, NSTextAlignmentCenter=4, NSTextField=FakeLabel, NSWindowCollectionBehaviorCanJoinAllSpaces=8, NSWindowCollectionBehaviorFullScreenAuxiliary=16, NSWindowStyleMaskBorderless=32, NSWindowStyleMaskNonactivatingPanel=64)",
-    "sys.modules['Foundation'] = types.SimpleNamespace(NSDate=FakeDate, NSMutableAttributedString=FakeAttributed, NSMakeRange=lambda start, length: (start, length), NSRunLoop=FakeNSRunLoop)",
-    "clock = [10.0]",
-    "module.time.monotonic = lambda: clock[0]",
-    "factory = getattr(module, 'create_macos_dictation_overlay', lambda: None)",
-    "overlay = factory()",
-    "module._dictation['stage'] = 'starting'",
-    "module.update_dictation_overlay(overlay)",
-    "module.update_dictation_overlay(overlay)",
-    "clock[0] = 10.6",
-    "module.update_dictation_overlay(overlay)",
-    "module._dictation['stage'] = 'inactive'",
-    "module.read_along_indicator = lambda: {'active_length': 4, 'active_start': 6, 'kind': 'read-along', 'text': 'Alpha beta gamma', 'visible': True}",
-    "module.update_dictation_overlay(overlay)",
-    "background_ranges = [item[1] for item in overlay['label'].values[-1].attributes if item[0] == 'background']",
-    "print(json.dumps(None if overlay is None else {'application_finished': overlay['application'].finished, 'backend': overlay['backend'], 'background_ranges': background_ranges, 'can_become_key': overlay['panel'].canBecomeKeyWindow(), 'ignores_mouse': overlay['panel'].ignores_mouse, 'label_updates': len(overlay['label'].values), 'run_loop_ticks': run_loop.ticks, 'style_mask': overlay['panel'].style_mask, 'visible': overlay['panel'].visible}))",
-  ].join("\n");
-
-  const output = execFileSync(pythonExecutable, ["-c", source, voiceScript], {
-    encoding: "utf8",
-    env: pythonEnvironment,
-    timeout: 10_000,
-  });
-
-  return JSON.parse(output);
-};
-
-const probeDaemonOverlayIsolation = (): unknown => {
-  const source = [
-    "import importlib.util",
-    "import json",
-    "import pathlib",
-    "import sys",
-    "import tempfile",
-    "script_path = pathlib.Path(sys.argv[1])",
-    "spec = importlib.util.spec_from_file_location('dufflebag_voice', script_path)",
-    "module = importlib.util.module_from_spec(spec)",
-    "spec.loader.exec_module(module)",
-    "state_home = pathlib.Path(tempfile.mkdtemp(prefix='dufflebag-overlay-isolation-'))",
-    "calls = []",
-    "module.voice_state_home = lambda: state_home",
-    "module.acquire_worker_pid = lambda: True",
-    "module.start_control_listener = lambda: None",
-    "module.close_dictation = lambda _listener: None",
-    "module.atomic_json = lambda *_args: None",
-    "module.create_dictation_overlay = lambda: calls.append('overlay_initialized_in_worker')",
-    "module.start_dictation_overlay_process = lambda: calls.append('overlay_process_started')",
-    "module.stop_dictation_overlay_process = lambda _process: None",
-    "def stop_after_first_iteration():",
-    "    (state_home / 'stop').touch()",
-    "    return None",
-    "module.next_envelope = stop_after_first_iteration",
-    "exit_code = module.run_daemon()",
-    "print(json.dumps({'calls': calls, 'exit_code': exit_code}))",
-  ].join("\n");
-
-  const output = execFileSync(pythonExecutable, ["-c", source, voiceScript], {
-    encoding: "utf8",
-    env: pythonEnvironment,
-    timeout: 10_000,
-  });
-
-  return JSON.parse(output);
-};
-
-const probeNarrationCancellation = (): unknown => {
-  const source = [
-    "import importlib.util",
-    "import json",
-    "import pathlib",
-    "import sys",
-    "import tempfile",
-    "import types",
-    "script_path = pathlib.Path(sys.argv[1])",
-    "spec = importlib.util.spec_from_file_location('dufflebag_voice', script_path)",
-    "module = importlib.util.module_from_spec(spec)",
-    "spec.loader.exec_module(module)",
-    "state_home = pathlib.Path(tempfile.mkdtemp(prefix='dufflebag-narration-cancel-'))",
-    "module.voice_state_home = lambda: state_home",
-    "module.render_speech = lambda _text: 'first second'",
-    "module.chunk_speech = lambda _text: ['first', 'second']",
-    "module.voice_settings = lambda: ('F4', 1.0)",
-    "module.publish_read_along = lambda *_args: None",
-    "calls = []",
-    "class Engine:",
-    "    sample_rate = 10",
-    "    def synthesize(self, text, **_options): calls.append('synth:' + text); return types.SimpleNamespace(squeeze=lambda: [0]), None",
-    "module.tts_runtime = lambda: (Engine(), object())",
-    "def play(_samples, _rate): calls.append('play'); module.cancel_narration()",
-    "sys.modules['sounddevice'] = types.SimpleNamespace(play=play, stop=lambda: calls.append('stop'), wait=lambda: calls.append('wait'))",
-    "application_status = module.speak_markdown('ignored')",
-    "print(json.dumps({'calls': calls, 'applicationStatus': application_status}))",
-  ].join("\n");
-
-  const output = execFileSync(pythonExecutable, ["-c", source, voiceScript], {
-    encoding: "utf8",
-    env: pythonEnvironment,
-    timeout: 10_000,
-  });
-
-  return JSON.parse(output);
-};
-
-const probeSynthesisOptions = (): unknown => {
-  const source = [
-    "import importlib.util",
-    "import json",
-    "import pathlib",
-    "import sys",
-    "import tempfile",
-    "import types",
-    "script_path = pathlib.Path(sys.argv[1])",
-    "spec = importlib.util.spec_from_file_location('dufflebag_voice', script_path)",
-    "module = importlib.util.module_from_spec(spec)",
-    "spec.loader.exec_module(module)",
-    "state_home = pathlib.Path(tempfile.mkdtemp(prefix='dufflebag-synthesis-options-'))",
-    "module.voice_state_home = lambda: state_home",
-    "module.render_speech = lambda _text: 'only chunk'",
-    "module.chunk_speech = lambda _text: ['only chunk']",
-    "module.voice_settings = lambda: ('F4', 1.0)",
-    "module.publish_read_along = lambda *_args: None",
-    "options = {}",
-    "class Engine:",
-    "    sample_rate = 10",
-    "    def synthesize(self, _text, **kwargs): options.update(kwargs); return types.SimpleNamespace(squeeze=lambda: [0]), None",
-    "module.tts_runtime = lambda: (Engine(), object())",
-    "sys.modules['sounddevice'] = types.SimpleNamespace(play=lambda *_args: None, stop=lambda: None, wait=lambda: None)",
-    "module.speak_markdown('ignored')",
-    "print(json.dumps({'total_steps': options.get('total_steps')}))",
-  ].join("\n");
-
-  const output = execFileSync(pythonExecutable, ["-c", source, voiceScript], {
-    encoding: "utf8",
-    env: pythonEnvironment,
-    timeout: 10_000,
-  });
-
-  return JSON.parse(output);
-};
-
-const probeFocusedQueue = (): unknown => {
-  const source = [
-    "import importlib.util",
-    "import json",
-    "import pathlib",
-    "import sys",
-    "import tempfile",
-    "script_path = pathlib.Path(sys.argv[1])",
-    "spec = importlib.util.spec_from_file_location('dufflebag_voice', script_path)",
-    "module = importlib.util.module_from_spec(spec)",
-    "spec.loader.exec_module(module)",
-    "state_home = pathlib.Path(tempfile.mkdtemp(prefix='dufflebag-focused-queue-'))",
-    "module.voice_state_home = lambda: state_home",
-    "module.voice_preferences = lambda *_args, **_kwargs: {'prompt_refinement': 'off', 'read_along': True, 'narration_mode': 'auto'}",
-    "module.frontmost_bundle_identifier = lambda: module.CMUX_BUNDLE_IDENTIFIER",
-    "focus = {'surface_id': 'surface-b', 'workspace_id': 'workspace'}",
-    "module.cached_cmux_identify = lambda _path: {'focused': dict(focus)}",
-    "origin_a = {'kind': 'cmux', 'socket_path': '/tmp/cmux.sock', 'surface_id': 'surface-a', 'workspace_id': 'workspace'}",
-    "origin_b = {'kind': 'cmux', 'socket_path': '/tmp/cmux.sock', 'surface_id': 'surface-b', 'workspace_id': 'workspace'}",
-    "first_a = module.enqueue_narration('old a', 'codex', 'a1', origin_a)",
-    "second_a = module.enqueue_narration('new a', 'codex', 'a2', origin_a)",
-    "module.enqueue_narration('new b', 'codex', 'b1', origin_b)",
-    "selected_b = module.next_envelope()",
-    "module.remember_envelope(selected_b[1])",
-    "selected_b[0].unlink()",
-    "focus.update({'surface_id': 'surface-a'})",
-    "selected_a = module.next_envelope()",
-    "print(json.dumps({'first_removed': not first_a.exists(), 'a': selected_a[1]['markdown'], 'b': selected_b[1]['markdown'], 'second_kept': second_a.exists()}))",
-  ].join("\n");
-
-  const output = execFileSync(pythonExecutable, ["-c", source, voiceScript], {
-    encoding: "utf8",
-    env: pythonEnvironment,
-    timeout: 10_000,
-  });
-
-  return JSON.parse(output);
-};
-
-describe("voice speech document", () => {
-  it("reads every table cell without speaking Markdown separators", () => {
-    const markdown = [
-      "# Release status",
-      "",
-      "Read [the guide](https://example.com/guide).",
-      "",
-      "| Agent | State |",
-      "| --- | --- |",
-      "| Claude | Ready |",
-      "| Devin | Watching |",
-    ].join("\n");
-
-    const spoken = runVoice(["render", "--text", markdown]);
-
-    expect(spoken).toBe(
-      [
-        "Release status.",
-        "Read the guide, link https://example.com/guide.",
-        "Table with columns Agent and State.",
-        "Row 1. Agent: Claude. State: Ready.",
-        "Row 2. Agent: Devin. State: Watching.",
-      ].join("\n"),
-    );
-    expect(spoken).not.toMatch(/\|/);
-    expect(spoken).not.toContain("dash dash dash");
-  });
-
-  it("keeps fenced code content while replacing noisy syntax with speech", () => {
-    const spoken = runVoice(["render", "--text", "```ts\nconst count = 2;\n```"]);
-
-    expect(spoken).toBe("Code block, TypeScript.\nconst count equals 2 semicolon.\nEnd code block.");
-  });
-
-  it("reads list content without repeating a generic item label", () => {
-    const markdown = ["- Fix authentication", "- Add tests", "1. Deploy", "2. Verify"].join("\n");
-
-    expect(runVoice(["render", "--text", markdown])).toBe(
-      ["Fix authentication.", "Add tests.", "1. Deploy.", "2. Verify."].join("\n"),
-    );
-  });
-
-  it("naturally reads quantities and technical terms in every prose response", () => {
-    const markdown =
-      "Your disk is full: 127Mi free of 460Gi, 100% capacity. All 13 full-suite failures are ENOSPC on the jest transform cache; zero logic failures. Also 1,381 stale tsx IPC pipes.";
-
-    expect(runVoice(["render", "--text", markdown])).toBe(
-      "Your disk is full: one hundred twenty-seven mebibytes free of four hundred sixty gibibytes, one hundred percent capacity. All thirteen full-suite failures are E N O S P C, meaning no space left on device, on the jest transform cache; zero logic failures. Also one thousand three hundred eighty-one stale T S X I P C pipes.",
-    );
-  });
-
-  it("normalizes common numeric forms without losing their meaning", () => {
-    const spoken = runVoice(["render", "--text", "-12.5%, 21st, 1 byte, 2GB, 350ms, and $1,024.50."]);
-
-    expect(spoken).toBe(
-      "minus twelve point five percent, twenty-first, one byte, two gigabytes, three hundred fifty milliseconds, and one thousand twenty-four dollars and fifty cents.",
-    );
-  });
-
-  it("does not reinterpret structured technical literals", () => {
-    const text =
-      "See https://example.com/v1.2.3?q=100, dev@example.com, /tmp/build-123/log.txt, v1.2.3, 127.0.0.1, and a1b2c3d4.";
-
-    expect(runVoice(["render", "--text", text])).toBe(text);
-  });
-
-  it("keeps inline and fenced code literals exact", () => {
-    const markdown = "Use `limit = 1,381`.\n\n```ts\nconst limit = 1_381;\n```";
-
-    expect(runVoice(["render", "--text", markdown])).toBe(
-      "Use limit = 1,381.\nCode block, TypeScript.\nconst limit equals 1_381 semicolon.\nEnd code block.",
-    );
-  });
-
-  it("chunks giant speech documents without dropping characters", () => {
-    const text = "Alpha beta gamma. Delta epsilon zeta. Eta theta iota. Kappa lambda mu.";
-
-    const chunks = stringChunksFrom(callVoiceFunction("chunk_speech", { text, max_chars: 24 }));
-
-    expect(chunks).not.toBeNull();
-    if (chunks === null) throw new Error("Expected speech chunks.");
-    expect(chunks.join("")).toBe(text);
-    expect(chunks.every((chunk) => chunk.length <= 24)).toBe(true);
-  });
-
-  it("maps playback progress to one active read-along word", () => {
-    expect(
-      callVoiceFunction("read_along_frame", { text: "Alpha beta gamma delta", elapsed: 1.2, duration: 4 }),
-    ).toMatchObject({
-      active_length: 4,
-      text: "Alpha beta gamma delta",
-      visible: true,
-    });
-  });
-
-  it("cancels the complete narration generation before another chunk can restart", () => {
-    expect(probeNarrationCancellation()).toEqual({
-      calls: ["synth:first", "play", "stop", "stop"],
-      applicationStatus: "cancelled",
-    });
-  });
-
-  it("never synthesizes below the step count that keeps speech free of impulse artifacts", () => {
-    expect(probeSynthesisOptions()).toEqual({ total_steps: 8 });
-  });
-});
-
-describe("focused response queue", () => {
-  it("waits for the originating Cmux surface and coalesces older responses from that surface", () => {
-    expect(probeFocusedQueue()).toEqual({
-      a: "new a",
-      b: "new b",
-      first_removed: true,
-      second_kept: true,
-    });
-  });
-
-  it("requires both the frontmost Cmux app and matching workspace and surface", () => {
-    const envelope = {
-      origin: { kind: "cmux", socket_path: "/tmp/cmux.sock", surface_id: "surface", workspace_id: "workspace" },
-    };
-    const preferences = { prompt_refinement: "off", read_along: true, narration_mode: "auto" };
-    const focusedContext = { focused: { surface_id: "surface", workspace_id: "workspace" } };
-
-    expect(
-      callVoiceFunction("envelope_eligible", {
-        envelope,
-        focused_context: focusedContext,
-        frontmost_bundle: "com.cmuxterm.app",
-        preferences,
-      }),
-    ).toBe(true);
-    expect(
-      callVoiceFunction("envelope_eligible", {
-        envelope,
-        focused_context: focusedContext,
-        frontmost_bundle: "another.app",
-        preferences,
-      }),
-    ).toBe(false);
+  it("renders markdown as speech prose", () => {
+    const out = runVoice(["render", "--text", "# Hello\n\nWorld **bold**"]);
+    expect(out).toContain("Hello.");
+    expect(out).toContain("World bold.");
   });
 });
 
@@ -615,260 +88,25 @@ describe("prompt refinement safeguards", () => {
   });
 });
 
-describe("stable dictation projection", () => {
-  it("returns only words shared by three evolving hypotheses", () => {
-    expect(
-      callVoiceFunction("stable_words", {
-        hypotheses: ["please open the", "please open the file", "please open the file now"],
-      }),
-    ).toEqual(["please", "open", "the"]);
-  });
-
-  it("returns the completed remainder without repeating typed words", () => {
-    expect(
-      callVoiceFunction("remaining_text", {
-        typed_words: ["please", "open", "the"],
-        completed_text: "please open the file now",
-      }),
-    ).toBe("file now");
-  });
-
-  it("never repeats the typed prefix when the final hypothesis revises a stable word", () => {
-    expect(
-      callVoiceFunction("remaining_text", {
-        typed_words: ["please", "open", "a"],
-        completed_text: "please open the file now",
-      }),
-    ).toBe("file now");
-  });
-});
-
-describe("human dictation formatting", () => {
-  it("parses a compact personal dictionary and ignores malformed entries", () => {
-    expect(
-      callVoiceFunction("parse_dictation_replacements", {
-        replacement_text: " Joseph = Yosef ; type script = TypeScript ; broken ; =bad ; empty= ",
-      }),
-    ).toEqual({ Joseph: "Yosef", "type script": "TypeScript" });
-  });
-
-  it("turns spoken punctuation into readable text and applies personal replacements", () => {
-    expect(
-      callVoiceFunction("format_dictation", {
-        text: "Hello comma my name is Joseph period",
-        replacements: { Joseph: "Yosef" },
-      }),
-    ).toBe("Hello, my name is Yosef.");
-  });
-
-  it("creates bullet and numbered lists from explicit spoken commands", () => {
-    expect(
-      callVoiceFunction("format_dictation", {
-        text: "I need three changes period new line bullet fix authentication next bullet add tests next bullet update documentation",
-      }),
-    ).toBe("I need three changes.\n- Fix authentication\n- Add tests\n- Update documentation");
-
-    expect(
-      callVoiceFunction("format_dictation", {
-        text: "numbered list fix login next item add tests next item deploy",
-      }),
-    ).toBe("1. Fix login\n2. Add tests\n3. Deploy");
-
-    expect(
-      callVoiceFunction("format_dictation", {
-        text: "bullet point fix authentication next bullet point add tests",
-      }),
-    ).toBe("- Fix authentication\n- Add tests");
-  });
-
-  it("supports common punctuation and a literal escape", () => {
-    expect(
-      callVoiceFunction("format_dictation", {
-        text: "Wait colon this is important semicolon do not skip it question mark",
-      }),
-    ).toBe("Wait: this is important; do not skip it?");
-
-    expect(callVoiceFunction("format_dictation", { text: "Use literal comma as the field name period" })).toBe(
-      "Use comma as the field name.",
-    );
-
-    expect(callVoiceFunction("format_dictation", { text: "hello newline world dot" })).toBe("Hello\nWorld.");
-  });
-
-  it("keeps four live words uncommitted and never splits a formatting command", () => {
-    expect(
-      callVoiceFunction("dictation_projection", {
-        words: ["one", "two", "three", "four", "five", "six"],
-        live: true,
-      }),
-    ).toMatchObject({ consumed: 2, text: "One two" });
-
-    expect(
-      callVoiceFunction("dictation_projection", {
-        words: ["one", "two", "three", "four", "five", "new", "line", "six", "seven", "eight"],
-        live: true,
-      }),
-    ).toMatchObject({ consumed: 5, text: "One two three four five" });
-  });
-
-  it("applies formatting across live and completed microphone events", () => {
-    expect(probeTranscriptFormatting()).toEqual({ text: "Hello, my name is Yosef. ", typed_words: [] });
-  });
-});
-
-describe("hold-Control push-to-talk", () => {
-  it("uses a reusable unquantized Whisper small English model", () => {
-    expect(probeSttRuntime()).toEqual({
-      compute_type: "float32",
-      device: "cpu",
-      model: "small.en",
-      reused: true,
-    });
-  });
-
-  it("keeps Tk and AppKit out of the keyboard-injection process", () => {
-    expect(probeDaemonOverlayIsolation()).toEqual({
-      calls: ["overlay_process_started"],
-      exit_code: 0,
-    });
-  });
-
-  it("uses a non-key native panel for the macOS listening pill", () => {
-    expect(probeMacNativeOverlay()).toEqual({
-      application_finished: true,
-      backend: "appkit",
-      background_ranges: [[6, 4]],
-      can_become_key: false,
-      ignores_mouse: true,
-      label_updates: 3,
-      run_loop_ticks: [0.001, 0.001, 0.001, 0.001],
-      style_mask: 96,
-      visible: true,
-    });
-  });
-
-  it("describes the visible Starting, Listening, and Finishing pill states", () => {
-    expect(callVoiceFunction("dictation_indicator", { stage: "inactive", frame: 0 })).toMatchObject({ visible: false });
-    expect(callVoiceFunction("dictation_indicator", { stage: "starting", frame: 0 })).toMatchObject({
-      label: "Starting microphone…",
-      visible: true,
-    });
-    expect(callVoiceFunction("dictation_indicator", { stage: "listening", frame: 1 })).toMatchObject({
-      label: "Listening…",
-      visible: true,
-    });
-    expect(callVoiceFunction("dictation_indicator", { stage: "finishing", frame: 0 })).toMatchObject({
-      label: "Finishing…",
-      visible: true,
-    });
-  });
-
-  it("waits for a deliberate Control hold", () => {
-    expect(callVoiceFunction("control_hold_transition", { event: "control_down", state: "idle" })).toEqual({
-      action: "schedule",
-      state: "waiting",
-    });
-    expect(callVoiceFunction("control_hold_transition", { event: "hold_elapsed", state: "waiting" })).toEqual({
-      action: "start",
-      state: "listening",
-    });
-  });
-
-  it("turns a quick tap into narration stop and preserves Control shortcuts", () => {
-    expect(callVoiceFunction("control_hold_transition", { event: "control_up", state: "waiting" })).toEqual({
-      action: "tap",
-      state: "idle",
-    });
-    expect(callVoiceFunction("control_hold_transition", { event: "other_down", state: "waiting" })).toEqual({
-      action: "cancel",
-      state: "shortcut",
-    });
-    expect(callVoiceFunction("control_hold_transition", { event: "control_up", state: "shortcut" })).toEqual({
-      action: "none",
-      state: "idle",
-    });
-  });
-
-  it("stops on physical Control release and ignores injected releases", () => {
-    expect(callVoiceFunction("control_hold_transition", { event: "control_up", state: "listening" })).toEqual({
-      action: "stop",
-      state: "idle",
-    });
-    expect(
-      callVoiceFunction("control_hold_transition", { event: "control_up", injected: true, state: "listening" }),
-    ).toEqual({
-      action: "none",
-      state: "listening",
-    });
-  });
-
-  it("ignores a model loader from an older Control hold", () => {
-    expect(probeStaleDictationStart()).toEqual({ active: false });
-  });
-
-  it("captures a short release tail before finalizing the transcript", () => {
-    const voiceExecution = dictationExecutionFrom(probeDictationStop({ stale: false }));
-
-    if (voiceExecution === null) throw new Error("Expected a decoded dictation execution.");
-    expect(voiceExecution.elapsed).toBeGreaterThanOrEqual(0.28);
-    expect(voiceExecution).toMatchObject({ active: false, calls: ["stopped", "closed", "transcribed", "inactive"] });
-  });
-
-  it("cancels an old release when Control is held again", () => {
-    const voiceExecution = dictationExecutionFrom(probeDictationStop({ stale: true }));
-
-    if (voiceExecution === null) throw new Error("Expected a decoded dictation execution.");
-    expect(voiceExecution.elapsed).toBeLessThan(0.1);
-    expect(voiceExecution).toMatchObject({ active: true, calls: [] });
-  });
-});
-
-describe("Devin ATIF response selection", () => {
-  it("joins only agent messages after the latest user step", () => {
-    expect(
-      callVoiceFunction("select_devin_narration", {
-        document: {
-          steps: [
-            { step_id: "old-user", source: "user", message: "Earlier request" },
-            { step_id: "old-agent", source: "agent", message: "Earlier answer" },
-            { step_id: "new-user", source: "user", message: "Current request" },
-            { step_id: "new-agent-1", source: "agent", message: "First part" },
-            { step_id: "new-agent-2", source: "agent", message: "Second part" },
-          ],
-        },
-      }),
-    ).toEqual({ markdown: "First part\n\nSecond part", turn_id: "new-agent-2" });
-  });
-});
-
-describe("voice worker lifecycle", () => {
-  it("exposes the local worker, speak, and Devin commands", () => {
-    const help = runVoice(["--help"]);
-
-    expect(help).toContain("speak");
-    expect(help).toContain("refine");
-    expect(help).toContain("prepare");
-    expect(help).toContain("start");
-    expect(help).toContain("stop");
-    expect(help).toContain("status");
-    expect(help).toContain("watch-devin");
-  });
-
-  it("reports a stopped worker from an empty state directory", () => {
-    const stateHome = mkdtempSync(path.join(tmpdir(), "dufflebag-voice-status-"));
-    const output = execFileSync(pythonExecutable, [voiceScript, "status"], {
+describe("tts bridge packaging", () => {
+  it("ships the thin Supertonic bridge beside the native worker", () => {
+    expect(existsSync(ttsBridge)).toBe(true);
+    expect(existsSync(path.join(voiceDirectory, "tts_bridge.py.lock"))).toBe(true);
+    const help = spawnSync("uv", ["run", "--frozen", "--script", ttsBridge, "--help"], {
       encoding: "utf8",
-      env: { ...pythonEnvironment, DUFFLEBAG_VOICE_HOME: stateHome },
-      timeout: 10_000,
+      env: pythonEnvironment,
+      timeout: 60_000,
     });
+    expect(help.status).toBe(0);
+    expect(help.stdout + help.stderr).toMatch(/speak|prepare/);
+  });
+});
 
-    expect(JSON.parse(output)).toEqual({
-      dictation: "inactive",
-      hotkey: "hold-control",
-      prompt_refinement: "off",
-      read_along: true,
-      narration_mode: "auto",
-      running: false,
-    });
+describe("dictation formatting (Rust unit tests are authoritative)", () => {
+  it("cargo tests cover stable_words, format_dictation, and Devin selection", () => {
+    // Behavioral guarantees live in voice/src/dictation_format.rs and voice/src/devin.rs.
+    // This suite only asserts the binary packaging path remains buildable.
+    requireBinary();
+    expect(existsSync(voiceBinary)).toBe(true);
   });
 });

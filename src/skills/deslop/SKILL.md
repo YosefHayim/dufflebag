@@ -1,6 +1,6 @@
 ---
 name: deslop
-description: Reviews code readability first, then applies approved cleanup that makes the full pipeline understandable in seconds. Use when the user says "deslop", "make this readable", "make this less AI", "second pass", "clean this up", "rename for clarity", "show before and after", or asks to improve code comprehension across React, TypeScript, backend, folders, imports, hooks, or functions.
+description: Reviews code readability first, then applies approved cleanup that makes the full pipeline understandable in seconds. Use when the user says "deslop" for readability (not structure lean-out), "make this readable", "make this less AI", "second pass", "clean this up", "rename for clarity", "show before and after", or asks to improve code comprehension across React, TypeScript, backend, folders, imports, hooks, or functions. If the real ask is full-repo lean / ban wrappers / kill ceremony / over-engineering, use deslop-v2 (optionally after grill-me-code-style-with-docs).
 ---
 
 # Deslop

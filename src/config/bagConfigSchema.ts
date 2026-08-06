@@ -147,6 +147,29 @@ export const bagConfigSchema = Schema.Struct({
     ),
     { default: () => "", exact: true },
   ),
+  dictationMicOffDelayMs: Schema.optionalWith(
+    Schema.Number.pipe(
+      Schema.between(0, 2000, {
+        message: () => "Dictation mic-off delay must be between 0 and 2000 milliseconds.",
+      }),
+      Schema.annotations({
+        description:
+          "Milliseconds to keep the microphone open after Control is released so trailing words are not clipped.",
+      }),
+    ),
+    { default: () => 200, exact: true },
+  ),
+  dictationLanguage: Schema.optionalWith(
+    Schema.Trim.pipe(
+      Schema.compose(
+        Schema.Literal("en", "he").annotations({
+          description:
+            "Dictation speech language: en (default whisper.cpp) or he (ivrit.ai Hebrew whisper-large-v3-turbo ggml).",
+        }),
+      ),
+    ),
+    { default: () => "en", exact: true },
+  ),
   dedupEnforcement: Schema.optionalWith(
     Schema.Trim.pipe(
       Schema.compose(
@@ -256,6 +279,14 @@ export const legacyBagConfigEnvironmentSchema = Schema.Struct({
     default: () => defaultBagConfig.dictationReplacements,
     exact: true,
   }).pipe(Schema.fromKey("dufflebagDictationReplacements")),
+  dictationMicOffDelayMs: Schema.optionalWith(
+    legacyNumberStringSchema.pipe(Schema.compose(bagConfigSchema.from.fields.dictationMicOffDelayMs.from)),
+    { default: () => defaultBagConfig.dictationMicOffDelayMs, exact: true },
+  ).pipe(Schema.fromKey("dufflebagDictationMicOffDelayMs")),
+  dictationLanguage: Schema.optionalWith(bagConfigSchema.from.fields.dictationLanguage.from, {
+    default: () => defaultBagConfig.dictationLanguage,
+    exact: true,
+  }).pipe(Schema.fromKey("dufflebagDictationLanguage")),
   dedupEnforcement: Schema.optionalWith(bagConfigSchema.from.fields.dedupEnforcement.from, {
     default: () => defaultBagConfig.dedupEnforcement,
     exact: true,
