@@ -880,6 +880,22 @@ export const featureCatalog = Schema.decodeUnknownSync(featureCatalogSchema, {
     runtime: { _tag: "none" },
   },
   {
+    id: "workspace-bootstrap",
+    sourceDirectory: "workspaceBootstrap",
+    installedSkill: {
+      _tag: "skill",
+      id: "workspace-bootstrap",
+      shippedPaths: ["SKILL.md"],
+    },
+    title: "Workspace bootstrap",
+    summary:
+      "Clone or sync GitHub user/org repos into a Code folder, optional bulk package installs, and pull-all delta reports.",
+    selectedByDefault: false,
+    dependencies: [],
+    platform: "any",
+    runtime: { _tag: "none" },
+  },
+  {
     id: "capture-workflow",
     sourceDirectory: "captureWorkflow",
     installedSkill: {
