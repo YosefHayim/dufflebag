@@ -214,21 +214,39 @@ const stageRuntimeFeature = (input: {
     // Stage every catalog-declared runtime asset authored beside the compiled island.
     for (const shippedPath of input.shippedPaths) {
       const source = path.join(authoredFeatureRoot, shippedPath);
-      const sourceExists = yield* fileSystem.exists(source);
-      if (!sourceExists && shippedPath === "dufflebag-voice") {
-        yield* ensureVoiceBinaryBuilt(input.packageRoot);
-      }
-      if (!(yield* fileSystem.exists(source))) {
-        return yield* new StagePackageError({
-          issue: `Catalog-shipped runtime path ${shippedPath} is missing under ${authoredFeatureRoot}.`,
-        });
-      }
-
+      yield* ensureShippedRuntimeSource({
+        source,
+        shippedPath,
+        authoredFeatureRoot,
+        packageRoot: input.packageRoot,
+      });
       yield* copyTree({
         source,
         destination: path.join(stagedFeatureRoot, shippedPath),
       });
     }
+  });
+
+const ensureShippedRuntimeSource = (input: {
+  source: string;
+  shippedPath: string;
+  authoredFeatureRoot: string;
+  packageRoot: string;
+}) =>
+  Effect.gen(function* () {
+    const fileSystem = yield* FileSystem.FileSystem;
+    if (yield* fileSystem.exists(input.source)) {
+      return;
+    }
+    if (input.shippedPath === "dufflebag-voice") {
+      yield* ensureVoiceBinaryBuilt(input.packageRoot);
+    }
+    if (yield* fileSystem.exists(input.source)) {
+      return;
+    }
+    return yield* new StagePackageError({
+      issue: `Catalog-shipped runtime path ${input.shippedPath} is missing under ${input.authoredFeatureRoot}.`,
+    });
   });
 
 const ensureVoiceBinaryBuilt = (packageRoot: string) =>
@@ -245,17 +263,13 @@ const ensureVoiceBinaryBuilt = (packageRoot: string) =>
     yield* Effect.tryPromise({
       try: async () => {
         const { spawnSync } = await import("node:child_process");
-        const buildVoiceProcess = spawnSync("bash", [script], {
+        const voiceBuild = spawnSync("bash", [script], {
           cwd: packageRoot,
           encoding: "utf8",
           env: process.env,
         });
-        if (buildVoiceProcess.status !== 0) {
-          throw new Error(
-            buildVoiceProcess.stderr ||
-              buildVoiceProcess.stdout ||
-              `buildVoice exited ${String(buildVoiceProcess.status)}`,
-          );
+        if (voiceBuild.status !== 0) {
+          throw new Error(voiceBuild.stderr || voiceBuild.stdout || `buildVoice exited ${String(voiceBuild.status)}`);
         }
       },
       catch: (error) =>

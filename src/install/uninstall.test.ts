@@ -137,9 +137,11 @@ layer(NodeContext.layer)("uninstall", (it) => {
     ),
   );
 
-  it.effect("fails before commit when a replaced prior host file changed after install", () =>
+  it.effect("still removes installer-created files when their bytes drifted after install", () =>
     Effect.scoped(
       Effect.gen(function* () {
+        // Runtime hooks were created from missing: uninstall force-removes them even if edited.
+        // Drift still blocks only when a prior host file must be restored (wholeFile previous present).
         const fileSystem = yield* FileSystem.FileSystem;
         const path = yield* Path.Path;
         const root = yield* fileSystem.makeTempDirectoryScoped({ prefix: "dufflebag-uninstall-conflict-root-" });
@@ -147,22 +149,15 @@ layer(NodeContext.layer)("uninstall", (it) => {
         const runtimePath = path.join(root, ".claude/dufflebag/runtime/contextGuard/hooks/ctxWatchSpawn.js");
         const receiptPath = path.join(root, ".claude/dufflebag/receipt.json");
 
-        // Seed a prior host file so ownership.previous is not "missing". Whole-file
-        // drift is only a hard conflict when uninstall would restore a prior file.
-        yield* fileSystem.makeDirectory(path.dirname(runtimePath), { recursive: true });
-        yield* fileSystem.writeFileString(runtimePath, "prior host content\n");
-
         yield* stagePackage(stagedRoot);
         yield* install(installRequest({ root, stagedRoot }));
-        const receiptBytes = yield* fileSystem.readFile(receiptPath);
         yield* fileSystem.writeFileString(runtimePath, "user changed this\n");
 
-        const error = yield* Effect.flip(uninstall(uninstallRequest(root)));
+        const uninstallation = yield* uninstall(uninstallRequest(root));
 
-        expect(error._tag).toBe("UninstallError");
-        expect(error.issue).not.toContain("Cannot install dufflebag");
-        expect(yield* fileSystem.readFile(receiptPath)).toEqual(receiptBytes);
-        expect(yield* fileSystem.readFileString(runtimePath)).toBe("user changed this\n");
+        expect(uninstallation).toEqual({ _tag: "uninstalled", scope: "project", interaction: { _tag: "scripted" } });
+        expect(yield* fileSystem.exists(runtimePath)).toBe(false);
+        expect(yield* fileSystem.exists(receiptPath)).toBe(false);
       }),
     ),
   );
