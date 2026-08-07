@@ -114,6 +114,7 @@ func processAlive(_ pid: Int32) -> Bool {
 struct Status {
     var stage: String
     var preview: String
+    var detail: String
 }
 
 func readStatus() -> Status {
@@ -121,12 +122,14 @@ func readStatus() -> Status {
         let data = try? Data(contentsOf: URL(fileURLWithPath: statusPath)),
         let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
     else {
-        return Status(stage: "inactive", preview: "")
+        return Status(stage: "inactive", preview: "", detail: "")
     }
     let stage = json["dictation"] as? String ?? "inactive"
     let preview = (json["preview"] as? String ?? "")
         .trimmingCharacters(in: .whitespacesAndNewlines)
-    return Status(stage: stage, preview: preview)
+    let detail = (json["detail"] as? String ?? "")
+        .trimmingCharacters(in: .whitespacesAndNewlines)
+    return Status(stage: stage, preview: preview, detail: detail)
 }
 
 func labelColor(for stage: String) -> NSColor {
@@ -135,7 +138,7 @@ func labelColor(for stage: String) -> NSColor {
         return NSColor(srgbRed: 0.98, green: 0.94, blue: 0.94, alpha: 1)
     case "starting":
         return NSColor(srgbRed: 1.0, green: 0.90, blue: 0.50, alpha: 1)
-    case "finishing":
+    case "finishing", "refining", "typing":
         return NSColor(srgbRed: 0.80, green: 0.88, blue: 1.0, alpha: 1)
     case "unavailable":
         return NSColor(srgbRed: 1.0, green: 0.55, blue: 0.55, alpha: 1)
@@ -156,6 +159,15 @@ func bodyText(for status: Status) -> String {
         return "Recording"
     case "finishing":
         return "Working"
+    case "typing":
+        return "Pasting…"
+    case "refining":
+        // Show short detail when present (e.g. model id); keep pill readable.
+        if !status.detail.isEmpty {
+            let d = status.detail
+            return d.count > 42 ? String(d.prefix(40)) + "…" : d
+        }
+        return "Refining…"
     case "unavailable":
         return "Mic unavailable"
     default:
@@ -221,7 +233,7 @@ func apply(stage: String, body: String) {
         dot.isHidden = false
         dot.layer?.backgroundColor = NSColor(srgbRed: 0.98, green: 0.75, blue: 0.18, alpha: 1).cgColor
         resizePill(body: body, leading: 32)
-    case "finishing":
+    case "finishing", "refining", "typing":
         stopCalmPulse()
         dot.isHidden = true
         spinner.isHidden = false
@@ -249,11 +261,21 @@ Timer.scheduledTimer(withTimeInterval: 0.08, repeats: true) { timer in
         return
     }
     let status = readStatus()
-    let body = bodyText(for: status)
+    // Hard hide for idle stages even if a stale detail string is present.
+    let idleStages: Set<String> = ["inactive", "idle", "ready", ""]
+    let body: String
+    if idleStages.contains(status.stage) {
+        body = ""
+    } else {
+        body = bodyText(for: status)
+    }
     if body.isEmpty {
         if visible {
             stopCalmPulse()
             spinner.stopAnimation(nil)
+            spinner.isHidden = true
+            dot.isHidden = true
+            label.stringValue = ""
             panel.orderOut(nil)
             visible = false
             lastStage = ""
@@ -264,8 +286,8 @@ Timer.scheduledTimer(withTimeInterval: 0.08, repeats: true) { timer in
     if status.stage != lastStage {
         apply(stage: status.stage, body: body)
         lastStage = status.stage
-    } else if status.stage == "listening" {
-        resizePill(body: body, leading: 32)
+    } else if status.stage == "listening" || status.stage == "refining" || status.stage == "typing" {
+        resizePill(body: body, leading: status.stage == "listening" ? 32 : 34)
     }
 
     label.stringValue = body
