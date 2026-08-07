@@ -26,11 +26,11 @@ Read the argument and shell out to the one control plane:
 
 ```bash
 # arm (bare or a number N)
-node "/Users/yosefhayimsabag/Desktop/Code/dufflebag/.claude/dufflebag/hooks/ctxLoopCtl.js" arm "$N"
+node "${HOME}/.claude/dufflebag/runtime/contextGuard/hooks/ctxLoopCtl.js" arm "$N"
 # pause
-node "/Users/yosefhayimsabag/Desktop/Code/dufflebag/.claude/dufflebag/hooks/ctxLoopCtl.js" stop
+node "${HOME}/.claude/dufflebag/runtime/contextGuard/hooks/ctxLoopCtl.js" stop
 # shut the daemon down
-node "/Users/yosefhayimsabag/Desktop/Code/dufflebag/.claude/dufflebag/hooks/ctxLoopCtl.js" exit
+node "${HOME}/.claude/dufflebag/runtime/contextGuard/hooks/ctxLoopCtl.js" exit
 ```
 
 - If the argument is a number (e.g. `/autorun 5`), run `arm 5`. Bare `/autorun` → `arm`

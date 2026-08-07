@@ -36,3 +36,6 @@ src/skills/pngToCode/scripts/.playwright/
 .agents/skills/**/node_modules/
 src/hookIsland/speakResponse/dufflebag-voice
 src/hookIsland/speakResponse/voice/target/
+
+# Local/private agent session dumps (never ship)
+docs/session-audit-*/

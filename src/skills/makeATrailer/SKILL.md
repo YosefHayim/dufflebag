@@ -26,12 +26,12 @@ Point this at any project and it ships a cinematic vertical trailer for social �
 | Assemble animatic, cut, caption, master, reframe | **ffmpeg** | `scripts/assembleCut.mjs` (`--mode animatic\|rough\|final`), `scripts/reframe.mjs` |
 | Approval gates | **planpage** | **static animatic** + motion rough-cut review |
 
-`ai-browser-bridge` CLI: `/Users/yosefhayimsabag/Desktop/Code/ai-browser-bridge/dist/bridge.js`. Exact commands, the manifest schema, and the audio chain live in **`reference/pipeline.md`**; cinematic shot/prompt vocabulary in **`reference/shot-language.md`**. ChatGPT & Gemini can *play* video/audio in-UI but the bridge has no export path for either — that's a v2 bridge change, not this skill.
+`ai-browser-bridge` CLI: set `BRIDGE` to your local build (e.g. path to `ai-browser-bridge/dist/bridge.js`). Exact commands, the manifest schema, and the audio chain live in **`reference/pipeline.md`**; cinematic shot/prompt vocabulary in **`reference/shot-language.md`**. ChatGPT & Gemini can *play* video/audio in-UI but the bridge has no export path for either — that's a v2 bridge change, not this skill.
 
 ## Preflight (once per machine / session)
 
 ```bash
-BRIDGE=/Users/yosefhayimsabag/Desktop/Code/ai-browser-bridge/dist/bridge.js
+BRIDGE="${BRIDGE:?set BRIDGE to your ai-browser-bridge/dist/bridge.js}"
 # quit your normal Chrome first — the bridge drives its own profile
 node "$BRIDGE" chrome start --provider chatgpt   # then sign in once
 node "$BRIDGE" ask --help                         # confirm --model --attach --images --conversation --timeout
