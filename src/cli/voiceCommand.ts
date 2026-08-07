@@ -352,8 +352,32 @@ const onCommand = CliCommand.make(
           ? `TTS narration: ${config.speechResponseMode} (toggle with \`dufflebag tts on|off\`).`
           : "TTS narration: off (enable with `dufflebag tts on`).",
       );
-      if (config.promptRefinementMode === "review") {
+      if (config.promptRefinementMode === "review" || config.promptRefinementMode === "both") {
         yield* TerminalUI.detail("Double-tap Control to refine the copied prompt, then press ⌘V to paste it.");
+      }
+      if (config.promptRefinementMode === "stt" || config.promptRefinementMode === "both") {
+        let delivery = "caret";
+        if (config.promptRefinementDelivery === "cmux-new") {
+          delivery = "new cmux workspace";
+        } else if (config.promptRefinementDelivery === "cmux-resume") {
+          delivery = "focused cmux session";
+        }
+        let effort = "";
+        if (config.promptRefinementReasoningEffort) {
+          effort = ` effort=${config.promptRefinementReasoningEffort}`;
+        }
+        const flagParts: string[] = [];
+        if (config.promptRefinementShowRawFirst) {
+          flagParts.push("raw-first");
+        }
+        if (config.promptRefinementAutoSubmit) {
+          flagParts.push("auto-Enter");
+        }
+        const flags = flagParts.join(", ");
+        const flagSuffix = flags.length > 0 ? ` (${flags})` : "";
+        yield* TerminalUI.detail(
+          `STT refine: ${config.promptRefinementBackend}/${config.promptRefinementModel}${effort} → ${delivery}${flagSuffix}.`,
+        );
       }
       yield* TerminalUI.outro("Ready.");
     }),

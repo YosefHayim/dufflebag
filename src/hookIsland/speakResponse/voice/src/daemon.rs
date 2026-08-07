@@ -544,7 +544,7 @@ fn handle_control_tap(control: &Arc<Mutex<SharedControl>>) {
             return;
         }
         let prefs = voice_preferences();
-        if prefs.prompt_refinement == "review" {
+        if prefs.review_refine_enabled() {
             thread::spawn(|| {
                 if let Err(error) = refine_clipboard_prompt() {
                     eprintln!("prompt refine: {error}");
@@ -587,9 +587,17 @@ fn handle_control_tap(control: &Arc<Mutex<SharedControl>>) {
 }
 
 fn refine_clipboard_prompt() -> Result<(), String> {
-    write_refinement_status("refining", "Refining copied prompt locally…", 0.0);
+    let prefs = voice_preferences();
+    write_refinement_status(
+        "refining",
+        &format!(
+            "Refining copied prompt ({}/{})…",
+            prefs.prompt_refinement_backend, prefs.prompt_refinement_model
+        ),
+        0.0,
+    );
     let original = macos_clipboard_text()?;
-    let refined = run_prompt_refinement(&original)?;
+    let refined = crate::refine::refine_with_prefs(&original, &prefs)?;
     write_macos_clipboard(&refined)?;
     write_refinement_status(
         "ready",
@@ -640,45 +648,6 @@ fn write_macos_clipboard(text: &str) -> Result<(), String> {
         return Err("pbcopy failed".into());
     }
     Ok(())
-}
-
-fn run_prompt_refinement(text: &str) -> Result<String, String> {
-    let candidates = [
-        std::env::current_exe()
-            .ok()
-            .and_then(|p| p.parent().map(|d| d.join("prompt_refinement.py"))),
-        Some(std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../prompt_refinement.py")),
-    ];
-    let script = candidates
-        .into_iter()
-        .flatten()
-        .find(|p| p.is_file())
-        .ok_or_else(|| "prompt_refinement.py not found beside worker".to_string())?;
-    run_prompt_refinement_module(&script, text)
-}
-
-fn run_prompt_refinement_module(script: &std::path::Path, text: &str) -> Result<String, String> {
-    let parent = script.parent().unwrap_or(std::path::Path::new("."));
-    let code = format!(
-        "import sys; sys.path.insert(0, {parent:?}); from prompt_refinement import refine_prompt; print(refine_prompt(sys.argv[1]))",
-        parent = parent.display().to_string()
-    );
-    let output = Command::new("uv")
-        .args([
-            "run",
-            "--with",
-            "apple-fm-sdk==0.2.1",
-            "python",
-            "-c",
-            &code,
-            text,
-        ])
-        .output()
-        .map_err(|e| format!("spawn refinement module: {e}"))?;
-    if !output.status.success() {
-        return Err(String::from_utf8_lossy(&output.stderr).trim().to_string());
-    }
-    Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
 }
 
 fn spawn_overlay(worker_pid: u32) {
