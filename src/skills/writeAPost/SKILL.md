@@ -17,7 +17,7 @@ Run this from the portfolio repo root. Key paths:
 - Scaffolder: `scripts/dev/new-post.mjs` — appends a new post from flags (gitignored dev tool).
 - Covers: `clientV3/public/blog/<slug>.png` (16:9).
 - Likeness photo ("how I look"): `clientV3/public/images-of-me/hero-image.png`.
-- ai-browser-bridge CLI: `/Users/yosefhayimsabag/Desktop/Code/ai-browser-bridge/dist/bridge.js`.
+- ai-browser-bridge CLI: set `BRIDGE` to your local build (e.g. path to `ai-browser-bridge/dist/bridge.js`).
 
 ## The voice (non-negotiable)
 
@@ -65,7 +65,7 @@ The cover MUST match the existing set: **the same recurring character** (so it's
 First, confirm the CLI surface (it changes across versions):
 
 ```bash
-BRIDGE=/Users/yosefhayimsabag/Desktop/Code/ai-browser-bridge/dist/bridge.js
+BRIDGE="${BRIDGE:?set BRIDGE to your ai-browser-bridge/dist/bridge.js}"
 node "$BRIDGE" --help
 node "$BRIDGE" ask --help        # confirm --attach, --images, --conversation, --timeout
 node "$BRIDGE" chat --help       # to find/list an existing image conversation to continue
@@ -85,7 +85,7 @@ Attach the likeness photo ("how I look") **and** an existing cover as a style ex
 
 ```bash
 node "$BRIDGE" ask "Generate exactly one image. <SCENE> <IDENTITY> <DEVICES> <STYLE> <NEG>" \
-  --repo /Users/yosefhayimsabag/Desktop/Code/portfolio \
+  --repo "${PORTFOLIO_REPO:?set PORTFOLIO_REPO to your portfolio checkout}" \
   --attach clientV3/public/images-of-me/hero-image.png clientV3/public/blog/agentic-workflows.png \
   --images 1 --timeout 300
 ```
