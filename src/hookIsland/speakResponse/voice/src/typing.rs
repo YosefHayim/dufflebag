@@ -1,5 +1,6 @@
 //! Insert text at the active caret.
-//! Prefer clipboard + ⌘V on macOS (reliable without fighting Control); fall back to enigo.
+//! Prefer direct key injection for STT-length text (avoids bare `v` from failed ⌘V).
+//! Clipboard paste is reserved for long multi-line payloads.
 
 use enigo::{Direction, Enigo, Key, Keyboard, Settings};
 use std::io::Write;
@@ -12,36 +13,86 @@ use std::time::Duration;
 #[cfg(target_os = "macos")]
 const MAC_KEYCODE_V: u32 = 0x09;
 
+/// Above this length, prefer clipboard paste (faster for long refined prompts).
+const CLIPBOARD_PREFERS_CHARS: usize = 800;
+
 /// Insert `text` into the focused field. Returns Ok after a successful path.
 pub fn type_text(text: &str) -> Result<(), String> {
     if text.is_empty() {
         return Ok(());
     }
-    // Wait for Control to fully release so ⌘V is not modified into a bare `v`.
-    ensure_control_released(800)?;
+    // Wait for Control to fully release so modifiers do not corrupt injection.
+    ensure_control_released(900)?;
 
-    // 1) Clipboard paste — most reliable for multi-line / long text in focused inputs.
-    //    Refuse Cmd+V while Control is still down (that path produces a lone `v`).
+    let char_len = text.chars().count();
+    let control_down = crate::hotkey::control_modifier_down();
+
+    // Short/medium STT text: type characters directly. This avoids the classic
+    // hold-Control bug where Meta+V loses Command and only `v` appears in the caret
+    // while the HUD shows the full transcript.
+    if char_len <= CLIPBOARD_PREFERS_CHARS || control_down {
+        match type_via_enigo_text(text) {
+            Ok(()) => {
+                log_type_path("enigo.text", char_len);
+                return Ok(());
+            }
+            Err(error) => {
+                log_type_path(&format!("enigo.text failed: {error}"), char_len);
+                eprintln!("enigo.text failed: {error}; trying clipboard paste");
+            }
+        }
+    }
+
+    // Long text (or enigo.text failed): clipboard + ⌘V.
     if !crate::hotkey::control_modifier_down() {
         match paste_via_clipboard(text) {
-            Ok(()) => return Ok(()),
+            Ok(()) => {
+                log_type_path("clipboard", char_len);
+                return Ok(());
+            }
             Err(error) => {
-                eprintln!("clipboard paste failed: {error}; trying enigo.text");
+                log_type_path(&format!("clipboard failed: {error}"), char_len);
+                eprintln!("clipboard paste failed: {error}; last-resort enigo.text");
             }
         }
     } else {
-        eprintln!("control still held after wait; skipping Cmd+V, using enigo.text");
+        log_type_path("skip clipboard (control held)", char_len);
     }
 
-    // 2) Direct keyboard injection (does not need Command).
-    let mut enigo = Enigo::new(&Settings::default()).map_err(|e| format!("enigo: {e}"))?;
-    enigo.text(text).map_err(|e| {
+    // Last resort.
+    type_via_enigo_text(text).map_err(|e| {
         format!(
-            "type failed ({e}). Grant Accessibility to dufflebag-voice in \
-             System Settings → Privacy & Security → Accessibility"
+            "type failed ({e}). Grant Accessibility (+ Input Monitoring) to dufflebag-voice in \
+             System Settings → Privacy & Security"
         )
     })?;
+    log_type_path("enigo.text last-resort", char_len);
     Ok(())
+}
+
+fn type_via_enigo_text(text: &str) -> Result<(), String> {
+    let mut enigo = Enigo::new(&Settings::default()).map_err(|e| format!("enigo: {e}"))?;
+    // Small settle so the focused app accepts key events after Control release.
+    thread::sleep(Duration::from_millis(25));
+    enigo.text(text).map_err(|e| format!("enigo.text: {e}"))
+}
+
+fn log_type_path(detail: &str, char_len: usize) {
+    let path = crate::state::voice_state_home().join("dictation.log");
+    let line = format!(
+        "{:.3} type_path chars={char_len} {detail}\n",
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs_f64())
+            .unwrap_or(0.0)
+    );
+    if let Ok(mut file) = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(path)
+    {
+        let _ = file.write_all(line.as_bytes());
+    }
 }
 
 /// Replace `previous` (just typed into the caret) with `next` without ⌘A.
