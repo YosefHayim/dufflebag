@@ -1,5 +1,6 @@
 import { spawnSync } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -21,12 +22,12 @@ type CliExecution = {
   readonly exitCode: number;
 };
 
-const runCli = (args: ReadonlyArray<string>): CliExecution => {
+const runCli = (args: ReadonlyArray<string>, env: NodeJS.ProcessEnv = {}): CliExecution => {
   const invocation = spawnSync(process.execPath, ["--import", "tsx", CLI_ENTRY, ...args], {
     cwd: REPO_ROOT,
     encoding: "utf8",
     timeout: 60_000,
-    env: { ...process.env, FORCE_COLOR: "0" },
+    env: { ...process.env, FORCE_COLOR: "0", ...env },
   });
   return {
     stdout: invocation.stdout,
@@ -155,9 +156,17 @@ describe("CLI exit codes", () => {
   it(
     "uses exit 2 for an invalid managed setting value",
     async () => {
-      const execution = await runCli(["config", "set", "speech-read-along", "sometimes"]);
+      // Isolate HOME so a machine-local managed config cannot change the parse path.
+      const homeRoot = mkdtempSync(path.join(tmpdir(), "dufflebag-cli-home-"));
+      try {
+        const execution = await runCli(["config", "set", "speech-read-along", "sometimes"], {
+          HOME: homeRoot,
+        });
 
-      expect(execution.exitCode).toBe(2);
+        expect(execution.exitCode).toBe(2);
+      } finally {
+        rmSync(homeRoot, { recursive: true, force: true });
+      }
     },
     CLI_TEST_TIMEOUT,
   );

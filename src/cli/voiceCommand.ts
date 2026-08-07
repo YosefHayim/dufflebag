@@ -18,7 +18,7 @@ import * as TerminalUI from "./TerminalUI.js";
 
 const voiceFeatureId = "speak-response";
 type VoiceSource = "claude-code" | "codex" | "grok" | "devin" | "manual";
-type NarrationMode = BagConfig["speechResponseMode"];
+type SpeechNarrationPolicy = BagConfig["speechResponseMode"];
 
 const voiceSources: ReadonlyArray<VoiceSource> = ["claude-code", "codex", "grok", "devin", "manual"];
 
@@ -46,7 +46,7 @@ export const nextVoiceFeatures = (selection: {
 export const normalizeVoiceId = (voice: string): string =>
   /^[MF][1-5]$/i.test(voice.trim()) ? voice.trim().toUpperCase() : "F4";
 
-export const isTtsNarrationEnabled = (mode: NarrationMode): boolean => mode !== "off";
+export const isTtsNarrationEnabled = (mode: SpeechNarrationPolicy): boolean => mode !== "off";
 
 /** Normalize CLI/user dictation language tokens to bag config values. */
 export const normalizeDictationLanguage = (languageToken: string): "en" | "he" | null => {
@@ -244,11 +244,11 @@ const stopInstalledVoiceWorker = (root: string) =>
     return true;
   });
 
-const purgeSpeakRuntimeDirectory = (root: string) =>
+const wipeInstalledVoiceRuntime = (installationRoot: string) =>
   Effect.gen(function* () {
     const fileSystem = yield* FileSystem.FileSystem;
     const path = yield* Path.Path;
-    const runtimeDirectory = path.join(root, runtimePath, "speakResponse");
+    const runtimeDirectory = path.join(installationRoot, runtimePath, "speakResponse");
     if (yield* fileSystem.exists(runtimeDirectory)) {
       yield* fileSystem.remove(runtimeDirectory, { recursive: true, force: true });
     }
@@ -265,7 +265,7 @@ export const disableVoiceWorker = (scope: CliScope) =>
     const snapshot = yield* readArtifactReceiptSnapshot(path.join(location.destination.root, receiptPath));
     if (snapshot._tag === "missing" || !snapshot.receipt.features.some((feature) => feature === voiceFeatureId)) {
       // Feature already deselected, but orphans (or a stale binary) may still exist after upgrades.
-      yield* purgeSpeakRuntimeDirectory(location.destination.root);
+      yield* wipeInstalledVoiceRuntime(location.destination.root);
       return { location, alreadyOff: true as const };
     }
 
@@ -282,7 +282,7 @@ export const disableVoiceWorker = (scope: CliScope) =>
     yield* stopInstalledVoiceWorker(location.destination.root);
     // Receipt-driven restore covers receipted paths; purge residual upgrade orphans
     // (e.g. dufflebag-voice when the receipt still listed voice.py).
-    yield* purgeSpeakRuntimeDirectory(location.destination.root);
+    yield* wipeInstalledVoiceRuntime(location.destination.root);
     return { location, alreadyOff: false as const };
   });
 
@@ -291,8 +291,9 @@ export const writeBagConfigPatch = (scope: CliScope, patch: Partial<BagConfig>) 
   Effect.gen(function* () {
     const { location, config } = yield* readScopedVoiceConfig(scope);
     const nextConfig = { ...config, ...patch };
-    // Structural compare avoids keyof casts on Partial patches.
-    if (JSON.stringify(config) === JSON.stringify(nextConfig)) {
+    const patchKeys = Object.keys(patch).filter((key): key is keyof BagConfig => key in defaultBagConfig);
+    const unchanged = patchKeys.every((key) => config[key] === nextConfig[key]);
+    if (unchanged) {
       return { location, config, changed: false as const };
     }
     const path = yield* Path.Path;
@@ -327,7 +328,7 @@ export const writeBagConfigPatch = (scope: CliScope, patch: Partial<BagConfig>) 
     return { location, config: nextConfig, changed: true as const };
   });
 
-export const writeNarrationMode = (scope: CliScope, mode: NarrationMode) =>
+export const writeSpeechNarrationPolicy = (scope: CliScope, mode: SpeechNarrationPolicy) =>
   writeBagConfigPatch(scope, { speechResponseMode: mode });
 
 const holdControlHint = "Hold Control to dictate; release to finish.";
@@ -486,11 +487,7 @@ const refineCommand = CliCommand.make(
         label: "Prompt refinement",
       });
     }),
-).pipe(
-  CliCommand.withDescription(
-    "Refine one prompt (route-aware; default backend codex / gpt-5.3-codex-spark from bag config)",
-  ),
-);
+).pipe(CliCommand.withDescription("Refine one prompt with Apple's local on-device model"));
 
 const devinCommand = CliCommand.make(
   "devin",
@@ -692,7 +689,7 @@ const ttsOnCommand = CliCommand.make(
       yield* TerminalUI.intro("tts on");
       // Narration needs the speak-response feature + worker inbox; STT rides along.
       const { location } = yield* enableVoiceWorker(args.scope);
-      const { config, changed } = yield* writeNarrationMode(args.scope, "auto");
+      const { config, changed } = yield* writeSpeechNarrationPolicy(args.scope, "auto");
       yield* TerminalUI.success(
         changed
           ? `TTS is on (${location.scope}) — speech-response-mode → auto.`
@@ -712,7 +709,7 @@ const ttsOffCommand = CliCommand.make(
   (args) =>
     Effect.gen(function* () {
       yield* TerminalUI.intro("tts off");
-      const { location, changed } = yield* writeNarrationMode(args.scope, "off");
+      const { location, changed } = yield* writeSpeechNarrationPolicy(args.scope, "off");
       yield* TerminalUI.success(
         changed
           ? `TTS is off (${location.scope}) — speech-response-mode → off.`
