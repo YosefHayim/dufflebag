@@ -113,9 +113,11 @@ _MODEL_UNAVAILABLE_MARKERS = (
     "model_not_found",
     "invalid_model",
     "no such model",
+    "the requested model is not supported",
+    "model_not_supported",
 )
 
-# Quota / rate-limit / billing → show model+effort picker instead of silent fail.
+# Quota / rate-limit / billing → rotate model (and eventually backend).
 _QUOTA_OR_LIMIT_MARKERS = (
     "quota",
     "rate limit",
@@ -126,6 +128,8 @@ _QUOTA_OR_LIMIT_MARKERS = (
     "status code 429",
     "http 429",
     " 429",
+    " 402",
+    'status":402',
     "usage limit",
     "usage_limit",
     "insufficient_quota",
@@ -137,9 +141,29 @@ _QUOTA_OR_LIMIT_MARKERS = (
     "tpm",
     "rpm",
     "out of credits",
+    "requires more credits",
+    "can only afford",
+    "openrouter.ai/settings/credits",
     "payment required",
     "spending limit",
     "budget",
+    "credit balance",
+    "insufficient credits",
+)
+
+# Unified STT refine: try several models/backends without hanging release.
+MAX_MODELS_PER_BACKEND = 6
+MAX_CROSS_BACKEND_ATTEMPTS = 4
+MAX_TOTAL_ATTEMPTS = 12
+# Preferred try order when rotating across providers after the requested one fails.
+_BACKEND_FALLBACK_ORDER = (
+    "codex",
+    "opencode",
+    "gemini",
+    "grok",
+    "pi",
+    "ollama",
+    "claude",
 )
 
 PROMPT_REFINEMENT_INSTRUCTIONS = """You refine messy freeform or spoken drafts into a single paste-ready prompt for a coding agent.
@@ -515,12 +539,13 @@ def _read_user_choice() -> dict[str, str]:
             value = json.load(handle)
         if isinstance(value, dict):
             return {
+                "backend": str(value.get("backend") or "").strip().lower(),
                 "model": str(value.get("model") or "").strip(),
                 "reasoningEffort": str(value.get("reasoningEffort") or "").strip().lower(),
             }
     except (OSError, json.JSONDecodeError, TypeError):
         pass
-    return {"model": "", "reasoningEffort": ""}
+    return {"backend": "", "model": "", "reasoningEffort": ""}
 
 
 def _write_user_choice(model: str, reasoning_effort: str) -> None:
@@ -931,7 +956,12 @@ def _list_kimi_models() -> list[str]:
 
 
 def _list_pi_models() -> list[str]:
-    """Models from `pi --list-models` (provider/id lines or free-form ids)."""
+    """Models from `pi --list-models` as provider/model ids.
+
+    Table format (v0.84+):
+      provider        model                    context  ...
+      openai-codex    gpt-5.4-mini             272K     ...
+    """
     lines = _run_lines(["pi", "--list-models"], timeout=_DISCOVERY_CMD_TIMEOUT)
     blob = "\n".join(lines).lower()
     if any(
@@ -950,26 +980,48 @@ def _list_pi_models() -> list[str]:
         if not text:
             continue
         lower = text.lower()
-        if lower.startswith(("usage", "options", "commands", "pi ", "use ", "see:", "error")):
+        if lower.startswith(("usage", "options", "commands", "pi ", "use ", "see:", "error", "provider")):
             continue
         if any(noise in lower for noise in ("login", "api key", "providers.md", "models.md")):
             continue
+        # Full provider/model already.
         slash = re.findall(r"\b[a-z][\w.-]*/[\w.:\-]+\b", text, flags=re.I)
         if slash:
             for token in slash:
                 if token not in found and "http" not in token.lower():
                     found.append(token)
             continue
-        token = text.split()[0].strip(",;")
-        if (
-            token
-            and token not in found
-            and not token.startswith("-")
-            and ("/" in token or "-" in token or token.count(".") >= 1)
-            and len(token) > 3
-        ):
-            found.append(token)
-    return found[:60] or ["default"]
+        # Two-column table: provider  model  context...
+        parts = text.split()
+        if len(parts) >= 2:
+            provider, model_id = parts[0].strip(), parts[1].strip()
+            if (
+                provider
+                and model_id
+                and not provider.startswith("-")
+                and model_id not in ("context", "max-out", "thinking", "images")
+                and "http" not in model_id.lower()
+            ):
+                token = f"{provider}/{model_id}"
+                if token not in found:
+                    found.append(token)
+                continue
+
+    # Prefer providers that usually work with OAuth (codex/copilot) before OpenRouter credits.
+    def _pi_rank(token: str) -> tuple[int, str]:
+        lower = token.lower()
+        if "openrouter" in lower:
+            return (9, token)
+        if lower.startswith("openai-codex/"):
+            return (0, token)
+        if lower.startswith("github-copilot/"):
+            return (1, token)
+        if lower.startswith("kimi"):
+            return (2, token)
+        return (5, token)
+
+    ordered = sorted(found, key=_pi_rank)
+    return ordered[:80] or ["default"]
 
 
 # Specs: id → binary candidates, effort support, model lister.
@@ -1012,6 +1064,260 @@ def _looks_like_cli_auth_or_config_failure(text: str) -> bool:
     if not blob:
         return False
     return any(marker in blob for marker in _CLI_AUTH_OR_CONFIG_FAIL_MARKERS)
+
+
+def _looks_like_failed_model_output(text: str) -> bool:
+    """True when CLI stdout is an error envelope, not a refined prompt.
+
+    Several agents (pi, openrouter wrappers) print 402/JSON errors with exit 0.
+    Those must never be typed into the caret as the "refined" draft.
+    """
+    blob = (text or "").strip()
+    if not blob:
+        return True
+    if _looks_like_cli_help(blob) or _looks_like_cli_auth_or_config_failure(blob):
+        return True
+    if _quota_or_limit_error(blob) or _model_unavailable_error(blob):
+        return True
+    lower = blob.lower()
+    if lower.startswith("402") or '"code":402' in lower or '"code": 402' in lower:
+        return True
+    if "invalid_request_error" in lower or "model_not_supported" in lower:
+        return True
+    # JSON error objects: {"message":"...","code":402} or {"error":{...}}
+    return blob.startswith("{") and (
+        '"error"' in lower or ('"code"' in lower and ("message" in lower or "credits" in lower))
+    )
+
+
+def _should_rotate_after_failure(detail: str) -> bool:
+    """Rotate on quota/unavailable/auth/credits; stop only on empty unknown soft noise."""
+    if not (detail or "").strip():
+        return True
+    if _looks_like_failed_model_output(detail):
+        return True
+    # Network / generic CLI failures: still try the next candidate.
+    lower = detail.lower()
+    return any(
+        marker in lower
+        for marker in (
+            "failed",
+            "error",
+            "timeout",
+            "timed out",
+            "connection",
+            "refused",
+            "not found",
+            "empty",
+        )
+    )
+
+
+def _normalize_backend(backend: str) -> str:
+    choice = (backend or DEFAULT_BACKEND).strip().lower() or DEFAULT_BACKEND
+    if choice == "pie":
+        return "pi"
+    if choice == "agy":
+        return "gemini"
+    if choice == "agent":
+        return "grok"
+    return choice
+
+
+def _backend_is_launchable(backend: str) -> bool:
+    be = _normalize_backend(backend)
+    if be == "local":
+        return sys.platform == "darwin"
+    if be == "codex":
+        return bool(_try_which("codex"))
+    if be == "claude":
+        return bool(_try_which("claude"))
+    if be == "gemini":
+        return bool(_try_which("gemini") or _try_which("agy"))
+    if be == "grok":
+        return bool(_try_which("grok") or _try_which("agent"))
+    if be == "ollama":
+        return bool(_try_which("ollama"))
+    if be == "opencode":
+        return bool(_try_which("opencode"))
+    if be == "pi":
+        return bool(_try_which("pi") or _try_which("pie"))
+    return False
+
+
+def _model_candidates_for_backend(backend: str, preferred: str = "") -> list[str]:
+    """Ordered model ids for one backend (preferred → sticky → discovery)."""
+    be = _normalize_backend(backend)
+    preferred_name = (preferred or "").strip()
+    models: list[str] = []
+
+    def push(name: str) -> None:
+        token = (name or "").strip()
+        if not token or token in models:
+            return
+        models.append(token)
+
+    if preferred_name and preferred_name not in ("default", "auto", "menu"):
+        push(preferred_name)
+
+    sticky = _read_user_choice()
+    if sticky.get("backend") == be and sticky.get("model"):
+        push(sticky["model"])
+
+    if be == "codex":
+        for name in _codex_model_candidates(preferred_name or DEFAULT_MODEL):
+            push(name)
+        return models[:MAX_MODELS_PER_BACKEND]
+
+    if be == "ollama":
+        for name in _list_ollama_models():
+            push(name)
+        if not models:
+            push("llama3.2")
+        return models[:MAX_MODELS_PER_BACKEND]
+
+    if be == "grok":
+        for name in _list_grok_models():
+            push(name)
+        return models[:MAX_MODELS_PER_BACKEND] or ["grok-4.5"]
+
+    if be == "claude":
+        for name in _list_claude_models():
+            push(name)
+        return models[:MAX_MODELS_PER_BACKEND] or ["sonnet"]
+
+    if be == "gemini":
+        for name in _list_gemini_models():
+            push(name)
+        return models[:MAX_MODELS_PER_BACKEND] or ["gemini-3.6-flash-low"]
+
+    if be == "opencode":
+        for name in _list_opencode_models():
+            push(name)
+        return models[:MAX_MODELS_PER_BACKEND] or ["opencode/big-pickle"]
+
+    if be == "pi":
+        for name in _list_pi_models():
+            push(name)
+        return models[:MAX_MODELS_PER_BACKEND] or ["default"]
+
+    push(preferred_name or "default")
+    return models[:MAX_MODELS_PER_BACKEND]
+
+
+def _build_attempt_queue(
+    backend: str,
+    model: str,
+    *,
+    cross_backend: bool = True,
+) -> list[tuple[str, str]]:
+    """Build (backend, model) attempts: preferred provider first, then others on PATH."""
+    preferred_backend = _normalize_backend(backend)
+    preferred_model = (model or "").strip()
+    attempts: list[tuple[str, str]] = []
+    seen: set[tuple[str, str]] = set()
+
+    def add(be: str, mo: str) -> None:
+        key = (_normalize_backend(be), (mo or "").strip())
+        if not key[1] or key in seen:
+            return
+        if not _backend_is_launchable(key[0]) and key[0] != "local":
+            return
+        seen.add(key)
+        attempts.append(key)
+
+    if preferred_backend == "auto":
+        sticky = _read_user_choice()
+        order = list(_BACKEND_FALLBACK_ORDER)
+        sticky_be = sticky.get("backend") or ""
+        if sticky_be in _BACKEND_FALLBACK_ORDER:
+            order = [sticky_be, *[b for b in order if b != sticky_be]]
+        # Apple local is free/fast when available — try early for auto.
+        if _backend_is_launchable("local"):
+            add("local", "apple-fm")
+        for be in order:
+            sticky_model = sticky.get("model") if sticky.get("backend") == be else ""
+            seed = preferred_model if be == sticky_be else sticky_model
+            for mo in _model_candidates_for_backend(be, seed):
+                add(be, mo)
+                if len(attempts) >= MAX_MODELS_PER_BACKEND + MAX_CROSS_BACKEND_ATTEMPTS:
+                    return attempts
+        return attempts
+
+    if preferred_backend == "local":
+        add("local", "apple-fm")
+        if not cross_backend:
+            return attempts
+        # After local fails, behave like auto without re-trying local.
+        for be, mo in _build_attempt_queue("auto", preferred_model, cross_backend=False):
+            if be != "local":
+                add(be, mo)
+        return attempts
+
+    for mo in _model_candidates_for_backend(preferred_backend, preferred_model):
+        add(preferred_backend, mo)
+
+    if not cross_backend:
+        return attempts
+
+    sticky = _read_user_choice()
+    cross = 0
+    for be in _BACKEND_FALLBACK_ORDER:
+        if be == preferred_backend:
+            continue
+        if not _backend_is_launchable(be):
+            continue
+        sticky_model = sticky.get("model") if sticky.get("backend") == be else ""
+        cands = _model_candidates_for_backend(be, sticky_model)
+        if not cands:
+            continue
+        add(be, cands[0])
+        cross += 1
+        if cross >= MAX_CROSS_BACKEND_ATTEMPTS:
+            break
+    return attempts[:MAX_TOTAL_ATTEMPTS]
+
+
+def _dispatch_single(
+    backend: str,
+    model: str,
+    reasoning_effort: str,
+    original: str,
+) -> str:
+    """One backend+model attempt (no rotation). Raises RuntimeError on failure."""
+    be = _normalize_backend(backend)
+    effort = (reasoning_effort or "").strip().lower()
+    if be == "local":
+        refined = refine_prompt_local(original)
+    elif be == "codex":
+        # Single codex model — no nested rotation/picker (outer loop owns that).
+        codex = _which("codex")
+        prompt = build_user_prompt(original)
+        refined_opt, detail = _run_codex_candidate(
+            codex, model or DEFAULT_MODEL, prompt, effort or DEFAULT_REASONING_EFFORT
+        )
+        if refined_opt is None:
+            raise RuntimeError(detail or "codex refine failed")
+        refined = refined_opt
+        if _looks_like_failed_model_output(refined):
+            raise RuntimeError((detail or refined)[:2000])
+    elif be == "grok":
+        refined = refine_prompt_grok(original, model=model, reasoning_effort=effort)
+    elif be == "ollama":
+        refined = refine_prompt_ollama(original, model=model or "llama3.2")
+    elif be == "opencode":
+        refined = refine_prompt_opencode(original, model=model, reasoning_effort=effort)
+    elif be == "claude":
+        refined = refine_prompt_claude(original, model=model)
+    elif be == "gemini":
+        refined = refine_prompt_gemini(original, model=model, reasoning_effort=effort)
+    elif be == "pi":
+        refined = refine_prompt_pi(original, model=model, reasoning_effort=effort)
+    else:
+        raise RuntimeError(f"Unknown prompt refinement backend: {backend!r}")
+    if _looks_like_failed_model_output(refined):
+        raise RuntimeError(refined[:2000])
+    return validate_refined_prompt(original, refined)
 
 
 def _discover_one(spec: dict[str, Any]) -> dict[str, Any] | None:
@@ -1572,6 +1878,8 @@ def refine_prompt_grok(original: str, model: str = "", reasoning_effort: str = "
     refined = _stdout_text(completed)
     if completed.returncode != 0 and not refined:
         raise RuntimeError(refined or "grok refine failed")
+    if _looks_like_failed_model_output(refined):
+        raise RuntimeError((refined or "grok refine failed")[:2000])
     # Plain mode is already the answer; strip chatter if any.
     return validate_refined_prompt(original, refined)
 
@@ -1653,8 +1961,8 @@ def refine_prompt_opencode(
     if completed.returncode != 0 and not refined:
         detail = (stderr or stdout or "opencode refine failed").strip()
         raise RuntimeError(detail[:2000])
-    if _looks_like_cli_help(refined):
-        raise RuntimeError("opencode refine returned CLI help text; check flags and model id")
+    if _looks_like_failed_model_output(refined):
+        raise RuntimeError((refined or "opencode refine failed")[:2000])
     try:
         return validate_refined_prompt(original, refined)
     except ValueError as error:
@@ -1672,6 +1980,8 @@ def refine_prompt_claude(original: str, model: str = "") -> str:
     refined = _extract_json_text(completed.stdout or "") or _stdout_text(completed)
     if completed.returncode != 0 and not refined:
         raise RuntimeError(refined or "claude refine failed")
+    if _looks_like_failed_model_output(refined):
+        raise RuntimeError((refined or "claude refine failed")[:2000])
     return validate_refined_prompt(original, refined)
 
 
@@ -1724,7 +2034,7 @@ def refine_prompt_gemini(
             refined = ""
     if not refined:
         refined = _stdout_text(completed)
-    if _looks_like_cli_help(refined) or _looks_like_cli_auth_or_config_failure(refined):
+    if _looks_like_failed_model_output(refined):
         raise RuntimeError((refined or "gemini/agy refine failed")[:2000])
     if completed.returncode != 0 and not refined:
         raise RuntimeError((stderr or refined or "gemini/agy refine failed")[:2000])
@@ -1762,8 +2072,9 @@ def refine_prompt_pi(
     command.extend(["-p", prompt])
     completed = _run(command, timeout=180)
     refined = _extract_json_text(completed.stdout or "") or _stdout_text(completed)
-    if _looks_like_cli_help(refined) or _looks_like_cli_auth_or_config_failure(refined):
-        raise RuntimeError((refined or "pi refine failed (not logged in / no API key)")[:2000])
+    # pi often prints OpenRouter 402 JSON with exit 0 — still a hard failure.
+    if _looks_like_failed_model_output(refined):
+        raise RuntimeError((refined or "pi refine failed")[:2000])
     if completed.returncode != 0 and not refined:
         err = refined or _stdout_text(completed) or "pi refine failed"
         raise RuntimeError(err[:2000])
@@ -1780,37 +2091,83 @@ def refine_prompt(
     *,
     allow_picker: bool = True,
 ) -> str:
-    """Refine a draft via a dynamic provider (ytcap-style backend + model + effort)."""
+    """Refine via preferred provider, rotating models then backends on failure.
+
+    Try order:
+      1. Requested backend x preferred model, then that backend's discovery list
+      2. Other launchable backends on PATH (last-good sticky model first)
+      3. Optional macOS picker (or skip) after exhaustion
+
+    Codex keeps its specialized last-good / failed-model bookkeeping when selected
+    as the preferred backend (via candidate list + single-model dispatch).
+    """
     draft = original.strip()
     if not draft:
         raise ValueError("Nothing to refine")
-    choice = (backend or DEFAULT_BACKEND).strip().lower() or DEFAULT_BACKEND
+    choice = _normalize_backend(backend)
     effort = (reasoning_effort or "").strip().lower()
-    if choice == "codex":
-        return refine_prompt_codex(draft, model=model, reasoning_effort=effort, allow_picker=allow_picker)
-    if choice == "local":
-        return refine_prompt_local(draft)
-    if choice in ("grok", "agent"):
-        return refine_prompt_grok(draft, model=model, reasoning_effort=effort)
-    if choice == "ollama":
-        return refine_prompt_ollama(draft, model=model or "llama3.2")
-    if choice == "opencode":
-        return refine_prompt_opencode(draft, model=model, reasoning_effort=effort)
-    if choice == "claude":
-        return refine_prompt_claude(draft, model=model)
-    if choice in ("gemini", "agy"):
-        return refine_prompt_gemini(draft, model=model, reasoning_effort=effort)
-    if choice in ("pi", "pie"):
-        return refine_prompt_pi(draft, model=model, reasoning_effort=effort)
-    if choice == "auto":
+    if choice not in KNOWN_BACKENDS and choice not in _REFINE_RUNNABLE_BACKENDS:
+        raise ValueError(f"Unknown prompt refinement backend: {backend!r}. Known: {', '.join(KNOWN_BACKENDS)}")
+
+    # Sticky effort when caller left it empty.
+    sticky = _read_user_choice()
+    if not effort:
+        effort = sticky.get("reasoningEffort") or DEFAULT_REASONING_EFFORT
+
+    attempts = _build_attempt_queue(choice, model or sticky.get("model") or DEFAULT_MODEL)
+    if not attempts:
+        raise RuntimeError(
+            "No refine providers available on PATH (install codex/opencode/pi/agy/… or enable Apple local)."
+        )
+
+    errors: list[str] = []
+    for be, mo in attempts:
         try:
-            return refine_prompt_local(draft)
-        except Exception as local_error:
-            try:
-                return refine_prompt_codex(draft, model=model, reasoning_effort=effort, allow_picker=allow_picker)
-            except Exception as codex_error:
-                raise RuntimeError(f"auto refine failed: local={local_error}; codex={codex_error}") from codex_error
-    raise ValueError(f"Unknown prompt refinement backend: {backend!r}. Known: {', '.join(KNOWN_BACKENDS)}")
+            print(f"refine try {be}/{mo}", file=sys.stderr)
+            refined = _dispatch_single(be, mo, effort, draft)
+            if be != choice or mo != (model or "").strip():
+                print(
+                    f"refine fell back to {be}/{mo} (preferred {choice}/{(model or '').strip() or 'default'})",
+                    file=sys.stderr,
+                )
+            _persist_refine_choice(mo, effort, backend=be)
+            if be == "codex":
+                _write_codex_model_cache(mo)
+                _clear_codex_model_failed(mo)
+            return refined
+        except Exception as error:
+            detail = str(error)
+            errors.append(f"{be}/{mo}: {detail[:400]}")
+            if be == "codex" and _model_unavailable_error(detail):
+                _mark_codex_model_failed(mo)
+            if not _should_rotate_after_failure(detail):
+                break
+            print(f"refine rotate after {be}/{mo}: {detail[:160]}", file=sys.stderr)
+            continue
+
+    joined = "; ".join(errors) if errors else "all refine attempts failed"
+    if allow_picker and _picker_enabled():
+        picked = pick_refine_target(
+            reason=f"Automatic refine fallbacks failed.\n{joined[:500]}",
+            preferred_backend=choice,
+            preferred_model=(model or "").strip(),
+            preferred_effort=effort,
+            include_skip=True,
+            use_gui=True,
+        )
+        if picked is None:
+            raise RuntimeError(f"refine cancelled at picker: {joined}"[:2000])
+        if picked["model"] == SKIP_REFINE_LABEL:
+            print("refine skipped via picker; returning raw draft", file=sys.stderr)
+            return draft
+        pick_backend = _normalize_backend(picked.get("backend") or choice)
+        pick_model = picked["model"]
+        pick_effort = picked.get("reasoningEffort") or effort or DEFAULT_REASONING_EFFORT
+        _persist_refine_choice(pick_model, pick_effort, backend=pick_backend)
+        # One more explicit attempt with the user's pick (no second picker).
+        return _dispatch_single(pick_backend, pick_model, pick_effort, draft)
+
+    raise RuntimeError(f"refine failed after fallbacks: {joined}"[:2000])
 
 
 def main(argv: list[str] | None = None) -> int:
