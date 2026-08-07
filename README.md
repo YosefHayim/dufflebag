@@ -26,7 +26,7 @@ npx ys-dufflebag install --scope project
 
 ## Usage
 
-Print command help, or open the explicit interactive menu:
+Print command help, or open the interactive TUI (same options as CLI args; shows an ordered plan and asks for approval before applying):
 
 ```bash
 npx ys-dufflebag

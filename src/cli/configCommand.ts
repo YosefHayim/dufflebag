@@ -15,7 +15,7 @@ import { type CliScope, CliUsageError, formatOption, scopeOption, yesOption } fr
 import { stagePackage } from "./stagePackage.js";
 import * as TerminalUI from "./TerminalUI.js";
 
-const configSettings = [
+export const configSettings = [
   "context-warn-fraction",
   "context-block-fraction",
   "autorun-default-cycle-count",
@@ -36,7 +36,7 @@ const configSettings = [
   "debug-enabled",
 ] as const;
 
-type ConfigSetting = (typeof configSettings)[number];
+export type ConfigSetting = (typeof configSettings)[number];
 type ConfigKey = keyof BagConfig;
 
 const configSettingChoices = configSettings.map((setting): [string, ConfigSetting] => [setting, setting]);
@@ -49,7 +49,7 @@ const optionalSettingArgument = settingArgument.pipe(Args.optional);
 
 const settingValueArgument = Args.text({ name: "value" }).pipe(Args.withDescription("New setting value"));
 
-const numericSettings = [
+export const numericSettings = [
   "context-warn-fraction",
   "context-block-fraction",
   "autorun-default-cycle-count",
@@ -60,9 +60,9 @@ const numericSettings = [
   "dictation-mic-off-delay-ms",
 ] as const;
 
-const booleanSettings = ["speech-read-along", "debug-enabled"] as const;
+export const booleanSettings = ["speech-read-along", "debug-enabled"] as const;
 
-const stringSettings = [
+export const stringSettings = [
   "idle-auto-compact",
   "speech-voice",
   "speech-response-mode",
@@ -73,13 +73,13 @@ const stringSettings = [
   "dedup-skip-directories",
 ] as const;
 
-const configSettingChangeSchema = Schema.Union(
+export const configSettingChangeSchema = Schema.Union(
   Schema.Struct({ setting: Schema.Literal(...numericSettings), value: Schema.NumberFromString }),
   Schema.Struct({ setting: Schema.Literal(...booleanSettings), value: Schema.BooleanFromString }),
   Schema.Struct({ setting: Schema.Literal(...stringSettings), value: Schema.String }),
 );
 
-const configSettingKeys: Record<ConfigSetting, ConfigKey> = {
+export const configSettingKeys: Record<ConfigSetting, ConfigKey> = {
   "context-warn-fraction": "contextWarnFraction",
   "context-block-fraction": "contextBlockFraction",
   "autorun-default-cycle-count": "autorunDefaultCycleCount",
@@ -100,7 +100,7 @@ const configSettingKeys: Record<ConfigSetting, ConfigKey> = {
   "debug-enabled": "debugEnabled",
 };
 
-const configLabels: Record<ConfigKey, string> = {
+export const configLabels: Record<ConfigKey, string> = {
   contextWarnFraction: "context warn fraction",
   contextBlockFraction: "context block fraction",
   autorunDefaultCycleCount: "autorun default cycles",
@@ -121,7 +121,7 @@ const configLabels: Record<ConfigKey, string> = {
   debugEnabled: "debug diagnostics",
 };
 
-const configKeys: ReadonlyArray<ConfigKey> = Object.values(configSettingKeys);
+export const configKeys: ReadonlyArray<ConfigKey> = Object.values(configSettingKeys);
 
 type ConfigDestination =
   | { readonly _tag: "global"; readonly root: string }
@@ -136,7 +136,7 @@ type ScopedConfig = {
   readonly current: BagConfig;
 };
 
-const readScopedConfig = (scope: CliScope) =>
+export const readScopedConfig = (scope: CliScope) =>
   Effect.gen(function* () {
     const host = yield* captureHostEvidence;
     const path = yield* Path.Path;
@@ -147,7 +147,7 @@ const readScopedConfig = (scope: CliScope) =>
     return { scope, host, destination, configPath, snapshot, current } satisfies ScopedConfig;
   });
 
-const writeScopedConfig = (request: { readonly scopedConfig: ScopedConfig; readonly nextConfig: BagConfig }) =>
+export const writeScopedConfig = (request: { readonly scopedConfig: ScopedConfig; readonly nextConfig: BagConfig }) =>
   Effect.gen(function* () {
     const path = yield* Path.Path;
     const fileSystem = yield* FileSystem.FileSystem;
