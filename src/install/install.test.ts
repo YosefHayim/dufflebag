@@ -679,7 +679,7 @@ layer(NodeContext.layer)("install", (it) => {
         const installedBytes = textEncoder.encode("installed\n");
         yield* fileSystem.writeFileString(path.join(root, relativePath), "user edited\n");
 
-        const result = yield* materializeArtifactRestorations({
+        const restorationPlan = yield* materializeArtifactRestorations({
           root,
           artifacts: [
             {
@@ -695,9 +695,9 @@ layer(NodeContext.layer)("install", (it) => {
           ],
         }).pipe(Effect.either);
 
-        expect(result._tag).toBe("Left");
-        if (result._tag === "Left") {
-          expect(result.left.message).toContain("changed after installation");
+        expect(restorationPlan._tag).toBe("Left");
+        if (restorationPlan._tag === "Left") {
+          expect(restorationPlan.left.message).toContain("changed after installation");
         }
       }),
     ),

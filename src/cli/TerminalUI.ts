@@ -136,3 +136,32 @@ export const optionalText = (input: { message: string; fallback: string }) =>
 
     return value.trim() === "" ? input.fallback : value.trim();
   });
+
+/** Numbered lines for a review-before-apply plan (pure; easy to unit-test). */
+export const formatOrderedFlow = (
+  steps: ReadonlyArray<{ readonly label: string; readonly detail: string }>,
+): ReadonlyArray<string> => steps.map((step, index) => `${String(index + 1)}. ${step.label}: ${step.detail}`);
+
+/** Print an ordered plan so the user can review intent before mutation. */
+export const presentOrderedFlow = (input: {
+  readonly title: string;
+  readonly steps: ReadonlyArray<{ readonly label: string; readonly detail: string }>;
+}) => note(formatOrderedFlow(input.steps).join("\n"), input.title);
+
+/**
+ * Show an ordered flow and require explicit confirmation before apply.
+ * Non-TTY uses `initialValue` without prompting (same fail-safe as confirm).
+ */
+export const approveOrderedFlow = (input: {
+  readonly title: string;
+  readonly steps: ReadonlyArray<{ readonly label: string; readonly detail: string }>;
+  readonly confirmMessage: string;
+  readonly initialValue?: boolean;
+}) =>
+  Effect.gen(function* () {
+    yield* presentOrderedFlow({ title: input.title, steps: input.steps });
+    return yield* confirm({
+      message: input.confirmMessage,
+      initialValue: input.initialValue === undefined ? false : input.initialValue,
+    });
+  });

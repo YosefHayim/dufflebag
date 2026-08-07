@@ -31,4 +31,28 @@ describe("TerminalUI", () => {
       expect(answer).toBe(true);
     }).pipe(Effect.provide(NodeContext.layer)),
   );
+
+  it("formats ordered flow steps as a numbered plan", () => {
+    expect(
+      TerminalUI.formatOrderedFlow([
+        { label: "Scope", detail: "global" },
+        { label: "Features", detail: "context-guard" },
+      ]),
+    ).toEqual(["1. Scope: global", "2. Features: context-guard"]);
+  });
+
+  it.effect("approveOrderedFlow returns the fallback on non-TTY without hanging", () =>
+    Effect.gen(function* () {
+      const approved = yield* TerminalUI.approveOrderedFlow({
+        title: "Plan",
+        steps: [
+          { label: "Action", detail: "install" },
+          { label: "Scope", detail: "project" },
+        ],
+        confirmMessage: "Apply?",
+        initialValue: false,
+      });
+      expect(approved).toBe(false);
+    }).pipe(Effect.provide(NodeContext.layer)),
+  );
 });
