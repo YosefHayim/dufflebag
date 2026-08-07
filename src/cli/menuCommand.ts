@@ -39,7 +39,7 @@ import {
   enableVoiceWorker,
   normalizeDictationLanguage,
   writeBagConfigPatch,
-  writeSpeechResponseMode,
+  writeSpeechNarrationPolicy,
 } from "./voiceCommand.js";
 
 type MenuAction =
@@ -800,14 +800,14 @@ const runTts = Effect.gen(function* () {
 
   if (action === "on") {
     const { location } = yield* enableVoiceWorker(scope);
-    const { config, changed } = yield* writeSpeechResponseMode(scope, "auto");
+    const { config, changed } = yield* writeSpeechNarrationPolicy(scope, "auto");
     yield* TerminalUI.success(
       changed
         ? `TTS is on (${location.scope}) — speech-response-mode → auto.`
         : `TTS is on (${location.scope}) — speech-response-mode already ${config.speechResponseMode}.`,
     );
   } else {
-    const { location, changed } = yield* writeSpeechResponseMode(scope, "off");
+    const { location, changed } = yield* writeSpeechNarrationPolicy(scope, "off");
     yield* TerminalUI.success(
       changed
         ? `TTS is off (${location.scope}) — speech-response-mode → off.`
