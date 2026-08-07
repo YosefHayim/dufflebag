@@ -242,7 +242,7 @@ describe("prompt refinement safeguards", () => {
     expect(parsed.known).toContain("pi");
   });
 
-  it("rejects credit/402 envelopes and builds a multi-backend attempt queue", () => {
+  it("rejects credit/402 envelopes and ranks cross-backend attempts", () => {
     const source = [
       "import importlib.util, pathlib, sys, json",
       "script_path = pathlib.Path(sys.argv[1])",
@@ -252,29 +252,38 @@ describe("prompt refinement safeguards", () => {
       'credit = module._looks_like_failed_model_output(\'402: {"message":"requires more credits","code":402}\')',
       "quota = module._quota_or_limit_error('can only afford 100 tokens')",
       "good = module._looks_like_failed_model_output('Fix the STT refine help paste bug.')",
+      // Stub host CLIs so CI (no pi/codex/opencode) still builds a deterministic queue.
+      "module._backend_is_launchable = lambda be: be in ('pi', 'codex', 'opencode')",
+      "module._model_candidates_for_backend = lambda be, preferred='': (",
+      "  ['openai-codex/gpt-5.4-mini', 'openrouter/slow'] if be == 'pi'",
+      "  else (['gpt-5.4-mini'] if be == 'codex' else ['opencode/big-pickle'])",
+      ")",
       "queue = module._build_attempt_queue('pi', 'default')",
-      "backends = sorted({be for be, _mo in queue})",
-      "print(json.dumps({'credit': credit, 'quota': quota, 'good': good, 'queue_len': len(queue), 'backends': backends, 'first': list(queue[0]) if queue else []}))",
+      "print(json.dumps({",
+      "  'credit': credit, 'quota': quota, 'good': good,",
+      "  'queue': [list(item) for item in queue],",
+      "  'first': list(queue[0]) if queue else [],",
+      "  'backends': [be for be, _mo in queue],",
+      "}))",
     ].join("\n");
     const output = execFileSync(pythonExecutable, ["-c", source, promptRefinementScript], {
       encoding: "utf8",
       env: { ...pythonEnvironment, DUFFLEBAG_REFINE_NO_PICKER: "1" },
-      timeout: 30_000,
+      timeout: 15_000,
     });
     const parsed = parseJsonObject(output);
     expect(parsed.credit).toBe(true);
     expect(parsed.quota).toBe(true);
     expect(parsed.good).toBe(false);
-    expect(typeof parsed.queue_len).toBe("number");
-    if (typeof parsed.queue_len !== "number") {
-      throw new Error("expected queue_len");
+    expect(Array.isArray(parsed.queue)).toBe(true);
+    if (!Array.isArray(parsed.queue) || !Array.isArray(parsed.first) || !Array.isArray(parsed.backends)) {
+      throw new Error("expected queue/first/backends arrays");
     }
-    expect(parsed.queue_len).toBeGreaterThan(1);
-    expect(Array.isArray(parsed.first)).toBe(true);
-    if (!Array.isArray(parsed.first)) {
-      throw new Error("expected first attempt");
-    }
+    expect(parsed.queue.length).toBeGreaterThan(1);
     expect(parsed.first[0]).toBe("pi");
+    expect(parsed.first[1]).toBe("openai-codex/gpt-5.4-mini");
+    expect(parsed.backends).toContain("codex");
+    expect(parsed.backends).toContain("opencode");
   });
 
   it("extracts OpenCode JSONL part.text and rejects yargs help dumps", () => {
