@@ -157,7 +157,7 @@ const readScopedVoiceConfig = (scope: CliScope) =>
   });
 
 /** Install speak-response if needed and start the local worker (STT + narrate daemon). */
-const enableVoiceWorker = (scope: CliScope) =>
+export const enableVoiceWorker = (scope: CliScope) =>
   Effect.gen(function* () {
     const location = yield* voiceLocation(scope);
     const path = yield* Path.Path;
@@ -255,7 +255,7 @@ const purgeSpeakResponseRuntime = (root: string) =>
   });
 
 /** Stop the worker and remove only the speak-response feature. */
-const disableVoiceWorker = (scope: CliScope) =>
+export const disableVoiceWorker = (scope: CliScope) =>
   Effect.gen(function* () {
     const location = yield* voiceLocation(scope);
     const path = yield* Path.Path;
@@ -287,7 +287,7 @@ const disableVoiceWorker = (scope: CliScope) =>
   });
 
 /** Persist selected bag-config fields without changing the feature selection. */
-const writeBagConfigPatch = (scope: CliScope, patch: Partial<BagConfig>) =>
+export const writeBagConfigPatch = (scope: CliScope, patch: Partial<BagConfig>) =>
   Effect.gen(function* () {
     const { location, config } = yield* readScopedVoiceConfig(scope);
     const nextConfig = { ...config, ...patch };
@@ -327,7 +327,7 @@ const writeBagConfigPatch = (scope: CliScope, patch: Partial<BagConfig>) =>
     return { location, config: nextConfig, changed: true as const };
   });
 
-const writeSpeechResponseMode = (scope: CliScope, mode: SpeechResponseMode) =>
+export const writeSpeechResponseMode = (scope: CliScope, mode: SpeechResponseMode) =>
   writeBagConfigPatch(scope, { speechResponseMode: mode });
 
 const holdControlHint = "Hold Control to dictate; release to finish.";
