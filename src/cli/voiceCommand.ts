@@ -157,7 +157,7 @@ const readScopedVoiceConfig = (scope: CliScope) =>
   });
 
 /** Install speak-response if needed and start the local worker (STT + narrate daemon). */
-const enableVoiceWorker = (scope: CliScope) =>
+export const enableVoiceWorker = (scope: CliScope) =>
   Effect.gen(function* () {
     const location = yield* voiceLocation(scope);
     const path = yield* Path.Path;
@@ -255,7 +255,7 @@ const purgeSpeakResponseRuntime = (root: string) =>
   });
 
 /** Stop the worker and remove only the speak-response feature. */
-const disableVoiceWorker = (scope: CliScope) =>
+export const disableVoiceWorker = (scope: CliScope) =>
   Effect.gen(function* () {
     const location = yield* voiceLocation(scope);
     const path = yield* Path.Path;
@@ -287,7 +287,7 @@ const disableVoiceWorker = (scope: CliScope) =>
   });
 
 /** Persist selected bag-config fields without changing the feature selection. */
-const writeBagConfigPatch = (scope: CliScope, patch: Partial<BagConfig>) =>
+export const writeBagConfigPatch = (scope: CliScope, patch: Partial<BagConfig>) =>
   Effect.gen(function* () {
     const { location, config } = yield* readScopedVoiceConfig(scope);
     const nextConfig = { ...config, ...patch };
@@ -327,7 +327,7 @@ const writeBagConfigPatch = (scope: CliScope, patch: Partial<BagConfig>) =>
     return { location, config: nextConfig, changed: true as const };
   });
 
-const writeSpeechResponseMode = (scope: CliScope, mode: SpeechResponseMode) =>
+export const writeSpeechResponseMode = (scope: CliScope, mode: SpeechResponseMode) =>
   writeBagConfigPatch(scope, { speechResponseMode: mode });
 
 const holdControlHint = "Hold Control to dictate; release to finish.";
@@ -351,8 +351,32 @@ const onCommand = CliCommand.make(
           ? `TTS narration: ${config.speechResponseMode} (toggle with \`dufflebag tts on|off\`).`
           : "TTS narration: off (enable with `dufflebag tts on`).",
       );
-      if (config.promptRefinementMode === "review") {
+      if (config.promptRefinementMode === "review" || config.promptRefinementMode === "both") {
         yield* TerminalUI.detail("Double-tap Control to refine the copied prompt, then press ⌘V to paste it.");
+      }
+      if (config.promptRefinementMode === "stt" || config.promptRefinementMode === "both") {
+        let delivery = "caret";
+        if (config.promptRefinementDelivery === "cmux-new") {
+          delivery = "new cmux workspace";
+        } else if (config.promptRefinementDelivery === "cmux-resume") {
+          delivery = "focused cmux session";
+        }
+        let effort = "";
+        if (config.promptRefinementReasoningEffort) {
+          effort = ` effort=${config.promptRefinementReasoningEffort}`;
+        }
+        const flagParts: string[] = [];
+        if (config.promptRefinementShowRawFirst) {
+          flagParts.push("raw-first");
+        }
+        if (config.promptRefinementAutoSubmit) {
+          flagParts.push("auto-Enter");
+        }
+        const flags = flagParts.join(", ");
+        const flagSuffix = flags.length > 0 ? ` (${flags})` : "";
+        yield* TerminalUI.detail(
+          `STT refine: ${config.promptRefinementBackend}/${config.promptRefinementModel}${effort} → ${delivery}${flagSuffix}.`,
+        );
       }
       yield* TerminalUI.outro("Ready.");
     }),
@@ -462,7 +486,11 @@ const refineCommand = CliCommand.make(
         label: "Prompt refinement",
       });
     }),
-).pipe(CliCommand.withDescription("Refine one prompt with Apple's local on-device model"));
+).pipe(
+  CliCommand.withDescription(
+    "Refine one prompt (route-aware; default backend codex / gpt-5.3-codex-spark from bag config)",
+  ),
+);
 
 const devinCommand = CliCommand.make(
   "devin",

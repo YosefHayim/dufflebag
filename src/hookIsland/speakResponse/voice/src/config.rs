@@ -6,7 +6,24 @@ use std::path::PathBuf;
 
 #[derive(Debug, Clone)]
 pub struct VoicePreferences {
+    /// off | review | stt | both
     pub prompt_refinement: String,
+    /// codex | local | auto
+    pub prompt_refinement_backend: String,
+    /// Provider model id (dynamic; e.g. gpt-5.3-codex-spark, grok-4.5, llama3.2)
+    pub prompt_refinement_model: String,
+    /// Optional reasoning effort (low|medium|high|…) for grok/codex when supported
+    pub prompt_refinement_reasoning_effort: String,
+    /// Paste raw STT first, then replace with refined text
+    pub prompt_refinement_show_raw_first: bool,
+    /// Send Enter after refined caret paste
+    pub prompt_refinement_auto_submit: bool,
+    /// caret | cmux-new | cmux-resume
+    pub prompt_refinement_delivery: String,
+    /// Optional cmux-new shell template ({{prompt_file}}, {{prompt}}, {{cwd}})
+    pub prompt_refinement_cmux_command: String,
+    /// Send Enter after inject for cmux-resume / paste-only cmux-new
+    pub prompt_refinement_cmux_auto_submit: bool,
     pub read_along: bool,
     pub narration_mode: String,
     pub speech_voice: String,
@@ -22,6 +39,16 @@ impl Default for VoicePreferences {
     fn default() -> Self {
         Self {
             prompt_refinement: "off".into(),
+            prompt_refinement_backend: "codex".into(),
+            prompt_refinement_model: "gpt-5.3-codex-spark".into(),
+            // low avoids Codex defaulting reasoning models to xhigh after Ctrl release
+            prompt_refinement_reasoning_effort: "low".into(),
+            // Prefer showing STT immediately; pipeline also force raw-first when refining.
+            prompt_refinement_show_raw_first: true,
+            prompt_refinement_auto_submit: false,
+            prompt_refinement_delivery: "caret".into(),
+            prompt_refinement_cmux_command: String::new(),
+            prompt_refinement_cmux_auto_submit: false,
             read_along: true,
             narration_mode: "auto".into(),
             speech_voice: "F4".into(),
@@ -30,6 +57,16 @@ impl Default for VoicePreferences {
             dictation_mic_off_delay_ms: 200,
             dictation_language: "en".into(),
         }
+    }
+}
+
+impl VoicePreferences {
+    pub fn stt_refine_enabled(&self) -> bool {
+        matches!(self.prompt_refinement.as_str(), "stt" | "both")
+    }
+
+    pub fn review_refine_enabled(&self) -> bool {
+        matches!(self.prompt_refinement.as_str(), "review" | "both")
     }
 }
 
@@ -85,10 +122,61 @@ pub fn voice_preferences() -> VoicePreferences {
         .and_then(|v| v.as_str())
         .unwrap_or("off");
     let refinement_mode = match refinement_mode {
-        "off" | "review" => refinement_mode,
+        "off" | "review" | "stt" | "both" => refinement_mode,
         _ => "off",
     }
     .to_string();
+    let refinement_backend = values
+        .get("promptRefinementBackend")
+        .and_then(|v| v.as_str())
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .unwrap_or("codex")
+        .to_ascii_lowercase();
+    let refinement_model = values
+        .get("promptRefinementModel")
+        .and_then(|v| v.as_str())
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .unwrap_or("gpt-5.3-codex-spark")
+        .to_string();
+    let refinement_reasoning_effort = values
+        .get("promptRefinementReasoningEffort")
+        .and_then(|v| v.as_str())
+        .map(str::trim)
+        .unwrap_or("low")
+        .to_ascii_lowercase();
+    let refinement_reasoning_effort = match refinement_reasoning_effort.as_str() {
+        "low" | "medium" | "high" | "xhigh" | "minimal" => refinement_reasoning_effort,
+        // Empty / unknown → low so STT refine stays snappy on reasoning models.
+        _ => "low".to_string(),
+    };
+    let refinement_show_raw_first = values
+        .get("promptRefinementShowRawFirst")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(true);
+    let refinement_auto_submit = values
+        .get("promptRefinementAutoSubmit")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
+    let refinement_delivery = values
+        .get("promptRefinementDelivery")
+        .and_then(|v| v.as_str())
+        .unwrap_or("caret");
+    let refinement_delivery = match refinement_delivery {
+        "caret" | "cmux-new" | "cmux-resume" => refinement_delivery,
+        _ => "caret",
+    }
+    .to_string();
+    let refinement_cmux_command = values
+        .get("promptRefinementCmuxCommand")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
+    let refinement_cmux_auto_submit = values
+        .get("promptRefinementCmuxAutoSubmit")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
     let voice = values
         .get("speechVoice")
         .and_then(|v| v.as_str())
@@ -130,6 +218,14 @@ pub fn voice_preferences() -> VoicePreferences {
     };
     VoicePreferences {
         prompt_refinement: refinement_mode,
+        prompt_refinement_backend: refinement_backend,
+        prompt_refinement_model: refinement_model,
+        prompt_refinement_reasoning_effort: refinement_reasoning_effort,
+        prompt_refinement_show_raw_first: refinement_show_raw_first,
+        prompt_refinement_auto_submit: refinement_auto_submit,
+        prompt_refinement_delivery: refinement_delivery,
+        prompt_refinement_cmux_command: refinement_cmux_command,
+        prompt_refinement_cmux_auto_submit: refinement_cmux_auto_submit,
         read_along,
         narration_mode,
         speech_voice,
@@ -177,5 +273,21 @@ mod tests {
         assert_eq!(map.get("Joseph").map(String::as_str), Some("Yosef"));
         assert_eq!(map.get("type script").map(String::as_str), Some("TypeScript"));
         assert_eq!(map.len(), 2);
+    }
+
+    #[test]
+    fn mode_helpers() {
+        let mut p = VoicePreferences::default();
+        assert!(!p.stt_refine_enabled());
+        assert!(!p.review_refine_enabled());
+        p.prompt_refinement = "stt".into();
+        assert!(p.stt_refine_enabled());
+        assert!(!p.review_refine_enabled());
+        p.prompt_refinement = "both".into();
+        assert!(p.stt_refine_enabled());
+        assert!(p.review_refine_enabled());
+        p.prompt_refinement = "review".into();
+        assert!(!p.stt_refine_enabled());
+        assert!(p.review_refine_enabled());
     }
 }

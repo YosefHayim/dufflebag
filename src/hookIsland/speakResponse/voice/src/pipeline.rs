@@ -118,27 +118,191 @@ impl DictationPipeline {
                                 None,
                             );
                         } else {
-                            let type_started = Instant::now();
-                            match type_final_transcript(&text, &job.replacements) {
-                                Ok(out) => {
-                                    let type_ms = type_started.elapsed().as_secs_f64() * 1000.0;
-                                    let total_ms = job_started.elapsed().as_secs_f64() * 1000.0;
-                                    log_line(&format!(
-                                        "typed gen={} decode_ms={decode_ms:.1} type_ms={type_ms:.1} total_ms={total_ms:.1} text={:?}",
-                                        job.generation, out
-                                    ));
+                            let prefs = crate::config::voice_preferences();
+                            let raw_text = text.clone();
+                            // Exact string that was pasted for raw-first (includes trailing space).
+                            // Used to backspace-replace without global ⌘A (which blues WebGL).
+                            let mut typed_raw: Option<String> = None;
+
+                            // Always paste raw STT first when refine is on so Ctrl release
+                            // writes immediately; refined text later replaces it. Previously
+                            // this waited on the model (often multi-second reasoning), so the
+                            // input looked stuck until refine finished.
+                            //
+                            // HUD rule: once raw is on screen, hide the pill. Keeping
+                            // "Refining (codex/…)…" up for the whole model wait made it look
+                            // stuck after paste (raw already looks final when refine is a
+                            // no-op). Only re-show a short "Updating…" if refined text differs.
+                            if prefs.stt_refine_enabled() {
+                                write_worker_status(
+                                    "typing",
+                                    "Pasting…",
+                                    Some(&model_name),
+                                    Some(&backend),
+                                    None,
+                                );
+                                match type_final_transcript(&raw_text, &job.replacements) {
+                                    Ok(typed) if !typed.is_empty() => {
+                                        typed_raw = Some(typed.clone());
+                                        log_line(&format!(
+                                            "stt raw-first gen={} text={:?}",
+                                            job.generation, typed
+                                        ));
+                                        // Text is already in the caret — hide the spinner
+                                        // while the model rewrites in the background.
+                                        write_worker_status(
+                                            "inactive",
+                                            "",
+                                            Some(&model_name),
+                                            Some(&backend),
+                                            None,
+                                        );
+                                    }
+                                    Ok(_) => {
+                                        log_line(&format!(
+                                            "stt raw-first empty gen={}",
+                                            job.generation
+                                        ));
+                                    }
+                                    Err(error) => {
+                                        log_line(&format!(
+                                            "raw-first type failed gen={}: {error}",
+                                            job.generation
+                                        ));
+                                    }
+                                }
+                            }
+
+                            if prefs.stt_refine_enabled() {
+                                // Only show a refining spinner when raw is NOT already on
+                                // screen (raw-first failed) so the user isn't left staring
+                                // at an empty input with no feedback.
+                                if typed_raw.is_none() {
+                                    let effort =
+                                        if prefs.prompt_refinement_reasoning_effort.is_empty() {
+                                            String::new()
+                                        } else {
+                                            format!("/{}", prefs.prompt_refinement_reasoning_effort)
+                                        };
                                     write_worker_status(
-                                        "inactive",
+                                        "refining",
                                         &format!(
-                                            "Typed in {total_ms:.0}ms (decode {decode_ms:.0}ms): {out}"
+                                            "Refining ({}/{}{})…",
+                                            prefs.prompt_refinement_backend,
+                                            prefs.prompt_refinement_model,
+                                            effort
                                         ),
                                         Some(&model_name),
                                         Some(&backend),
                                         None,
                                     );
                                 }
+                                let refine_started = Instant::now();
+                                match crate::refine::refine_with_prefs(&raw_text, &prefs) {
+                                    Ok(refined) if !refined.trim().is_empty() => {
+                                        let refine_ms =
+                                            refine_started.elapsed().as_secs_f64() * 1000.0;
+                                        log_line(&format!(
+                                            "stt refine gen={} backend={} model={} effort={} refine_ms={refine_ms:.1} raw={:?} refined={:?}",
+                                            job.generation,
+                                            prefs.prompt_refinement_backend,
+                                            prefs.prompt_refinement_model,
+                                            prefs.prompt_refinement_reasoning_effort,
+                                            raw_text,
+                                            refined
+                                        ));
+                                        text = refined;
+                                    }
+                                    Ok(_) => {
+                                        log_line(&format!(
+                                            "stt refine empty gen={}; keeping raw transcript",
+                                            job.generation
+                                        ));
+                                    }
+                                    Err(error) => {
+                                        log_line(&format!(
+                                            "stt refine failed gen={}: {error}; keeping raw transcript",
+                                            job.generation
+                                        ));
+                                    }
+                                }
+                            }
+
+                            // If refined equals what we already pasted, skip re-deliver so we
+                            // don't thrash the caret — and keep the HUD hidden.
+                            let refined_equals_raw = typed_raw
+                                .as_ref()
+                                .is_some_and(|prev| {
+                                    caret_projection_equals(prev, &text, &job.replacements)
+                                });
+
+                            let type_started = Instant::now();
+                            let deliver_result = if refined_equals_raw {
+                                log_line(&format!(
+                                    "stt refine no-op gen={} (same as raw-first)",
+                                    job.generation
+                                ));
+                                Ok(typed_raw.clone().unwrap_or_default())
+                            } else {
+                                // Only flash the pill when we're about to change the input.
+                                if typed_raw.is_some() && prefs.stt_refine_enabled() {
+                                    write_worker_status(
+                                        "typing",
+                                        "Updating…",
+                                        Some(&model_name),
+                                        Some(&backend),
+                                        None,
+                                    );
+                                }
+                                let delivery = prefs.prompt_refinement_delivery.clone();
+                                if crate::cmux_deliver::is_cmux_delivery(&delivery)
+                                    && prefs.stt_refine_enabled()
+                                {
+                                    match crate::cmux_deliver::deliver_text(&text, &prefs) {
+                                        Ok(result) => Ok(result.summary),
+                                        Err(error) => {
+                                            log_line(&format!(
+                                                "cmux deliver failed gen={}: {error}; falling back to caret",
+                                                job.generation
+                                            ));
+                                            deliver_to_caret(
+                                                &text,
+                                                &job.replacements,
+                                                typed_raw.as_deref(),
+                                                prefs.prompt_refinement_auto_submit,
+                                            )
+                                        }
+                                    }
+                                } else {
+                                    deliver_to_caret(
+                                        &text,
+                                        &job.replacements,
+                                        typed_raw.as_deref(),
+                                        prefs.prompt_refinement_auto_submit,
+                                    )
+                                }
+                            };
+
+                            match deliver_result {
+                                Ok(out) => {
+                                    let type_ms = type_started.elapsed().as_secs_f64() * 1000.0;
+                                    let total_ms = job_started.elapsed().as_secs_f64() * 1000.0;
+                                    log_line(&format!(
+                                        "delivered gen={} decode_ms={decode_ms:.1} type_ms={type_ms:.1} total_ms={total_ms:.1} text={:?}",
+                                        job.generation, out
+                                    ));
+                                    // Always clear the pill when work is done (including refine
+                                    // no-op). Never leave dictation=refining after paste.
+                                    write_worker_status(
+                                        "inactive",
+                                        "",
+                                        Some(&model_name),
+                                        Some(&backend),
+                                        None,
+                                    );
+                                }
                                 Err(error) => {
-                                    log_line(&format!("type error: {error}"));
+                                    log_line(&format!("deliver error: {error}"));
                                     write_worker_status(
                                         "unavailable",
                                         &error,
@@ -227,6 +391,70 @@ pub fn type_final_transcript(
         out.push(' ');
     }
     type_text(&out)?;
+    Ok(out)
+}
+
+/// True when projecting `transcript` with `replacements` yields the same caret string
+/// as `previous` (exact raw-first paste including trailing space).
+fn caret_projection_equals(
+    previous: &str,
+    transcript: &str,
+    replacements: &HashMap<String, String>,
+) -> bool {
+    let clean = transcript.trim();
+    if clean.is_empty() {
+        return previous.is_empty();
+    }
+    let words: Vec<String> = clean.split_whitespace().map(str::to_string).collect();
+    let projection =
+        dictation_projection(&words, Some(&FormatState::default()), replacements, false);
+    if projection.text.is_empty() {
+        return previous.is_empty();
+    }
+    let mut out = projection.text;
+    if projection.state.needs_space {
+        out.push(' ');
+    }
+    previous == out
+}
+
+/// Deliver final text to the caret.
+/// When `previous` is Some (raw-first path), backspace that exact string then paste
+/// refined — never global ⌘A (blues WebGL terminals).
+/// If `auto_submit`, press Enter after paste.
+fn deliver_to_caret(
+    transcript: &str,
+    replacements: &HashMap<String, String>,
+    previous: Option<&str>,
+    auto_submit: bool,
+) -> Result<String, String> {
+    let clean = transcript.trim();
+    if clean.is_empty() {
+        return Ok(String::new());
+    }
+    let words: Vec<String> = clean.split_whitespace().map(str::to_string).collect();
+    let projection =
+        dictation_projection(&words, Some(&FormatState::default()), replacements, false);
+    if projection.text.is_empty() {
+        return Ok(String::new());
+    }
+    let mut out = projection.text;
+    if projection.state.needs_space {
+        out.push(' ');
+    }
+    if let Some(prev) = previous {
+        if prev == out {
+            // Refined equals what we already typed — leave it.
+        } else {
+            crate::typing::replace_previous_with(prev, &out)?;
+        }
+    } else {
+        type_text(&out)?;
+    }
+    if auto_submit {
+        crate::typing::press_enter()?;
+        out.push_str(" [Enter]");
+    }
     Ok(out)
 }
 

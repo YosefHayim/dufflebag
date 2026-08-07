@@ -227,7 +227,8 @@ describe("planManagedConfig", () => {
     );
 
     expect(plan.config).toEqual(config);
-    expect(expectCleanup(plan).values).toHaveLength(18);
+    // Full defaultBagConfig encodes every schema-owned legacy env key (grows with new refine fields).
+    expect(expectCleanup(plan).values).toHaveLength(26);
   });
 
   it.each([

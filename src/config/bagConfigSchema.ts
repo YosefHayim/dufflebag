@@ -130,12 +130,89 @@ export const bagConfigSchema = Schema.Struct({
   promptRefinementMode: Schema.optionalWith(
     Schema.Trim.pipe(
       Schema.compose(
-        Schema.Literal("off", "review").annotations({
-          description: "Optional local prompt-refinement review triggered by a Control double-tap.",
+        Schema.Literal("off", "review", "stt", "both").annotations({
+          description:
+            "Prompt refine: off; review = Control double-tap clipboard; stt = refine final dictation before typing into the caret; both = review + stt.",
         }),
       ),
     ),
     { default: () => "off", exact: true },
+  ),
+  promptRefinementBackend: Schema.optionalWith(
+    Schema.Trim.pipe(
+      Schema.compose(
+        Schema.Trimmed.annotations({
+          description:
+            "Refine provider (dynamic, PATH-scanned): codex | local | auto | grok | ollama | opencode | claude | gemini | pi. Model via promptRefinementModel; effort via promptRefinementReasoningEffort. `dufflebag config pick-refine` only lists providers with a binary on PATH that refine can invoke.",
+        }),
+      ),
+    ),
+    { default: () => "codex", exact: true },
+  ),
+  promptRefinementModel: Schema.optionalWith(
+    Schema.Trim.pipe(
+      Schema.compose(
+        Schema.Trimmed.annotations({
+          description:
+            "Model id for the selected refine provider (e.g. gpt-5.3-codex-spark, grok-4.5, llama3.2). Empty uses provider default.",
+        }),
+      ),
+    ),
+    { default: () => "gpt-5.3-codex-spark", exact: true },
+  ),
+  promptRefinementReasoningEffort: Schema.optionalWith(
+    Schema.Trim.pipe(
+      Schema.compose(
+        Schema.Literal("", "low", "medium", "high", "xhigh", "minimal").annotations({
+          description:
+            "Optional reasoning effort for providers that support it (e.g. grok --reasoning-effort / codex model_reasoning_effort). Default low keeps STT refine snappy; empty still falls back to low in the voice worker.",
+        }),
+      ),
+    ),
+    { default: () => "low", exact: true },
+  ),
+  promptRefinementShowRawFirst: Schema.optionalWith(
+    Schema.Boolean.annotations({
+      description:
+        "After STT, paste the raw transcript first, then refine and replace it (so you see STT before the model rewrite). STT+refine always pastes raw first for latency regardless; this keeps the preference explicit.",
+    }),
+    { default: () => true, exact: true },
+  ),
+  promptRefinementAutoSubmit: Schema.optionalWith(
+    Schema.Boolean.annotations({
+      description:
+        "After the final refined text is typed into the caret, send Enter (submit). Independent of cmux auto-submit.",
+    }),
+    { default: () => false, exact: true },
+  ),
+  promptRefinementDelivery: Schema.optionalWith(
+    Schema.Trim.pipe(
+      Schema.compose(
+        Schema.Literal("caret", "cmux-new", "cmux-resume").annotations({
+          description:
+            "Where refined text goes: caret (focused input paste); cmux-new (new focused cmux workspace/terminal); cmux-resume (inject into focused cmux surface / session).",
+        }),
+      ),
+    ),
+    { default: () => "caret", exact: true },
+  ),
+  promptRefinementCmuxCommand: Schema.optionalWith(
+    Schema.Trim.pipe(
+      Schema.compose(
+        Schema.Trimmed.annotations({
+          description:
+            "Optional shell for cmux-new after spawn. Placeholders: {{prompt_file}} (safe path), {{prompt}} (shell-escaped), {{cwd}}. Empty = paste refined text into the new terminal only (you submit).",
+        }),
+      ),
+    ),
+    { default: () => "", exact: true },
+  ),
+  promptRefinementCmuxAutoSubmit: Schema.optionalWith(
+    Schema.Boolean.annotations({
+      description:
+        "When delivery is cmux-resume (or cmux-new without a command), send Enter after injecting the refined text.",
+    }),
+    { default: () => false, exact: true },
   ),
   dictationReplacements: Schema.optionalWith(
     Schema.Trim.pipe(
@@ -275,6 +352,50 @@ export const legacyBagConfigEnvironmentSchema = Schema.Struct({
     default: () => defaultBagConfig.promptRefinementMode,
     exact: true,
   }).pipe(Schema.fromKey("dufflebagPromptRefinementMode")),
+  promptRefinementBackend: Schema.optionalWith(bagConfigSchema.from.fields.promptRefinementBackend.from, {
+    default: () => defaultBagConfig.promptRefinementBackend,
+    exact: true,
+  }).pipe(Schema.fromKey("dufflebagPromptRefinementBackend")),
+  promptRefinementModel: Schema.optionalWith(bagConfigSchema.from.fields.promptRefinementModel.from, {
+    default: () => defaultBagConfig.promptRefinementModel,
+    exact: true,
+  }).pipe(Schema.fromKey("dufflebagPromptRefinementModel")),
+  promptRefinementReasoningEffort: Schema.optionalWith(
+    bagConfigSchema.from.fields.promptRefinementReasoningEffort.from,
+    {
+      default: () => defaultBagConfig.promptRefinementReasoningEffort,
+      exact: true,
+    },
+  ).pipe(Schema.fromKey("dufflebagPromptRefinementReasoningEffort")),
+  promptRefinementShowRawFirst: Schema.optionalWith(
+    legacyBooleanStringSchema.pipe(Schema.compose(bagConfigSchema.from.fields.promptRefinementShowRawFirst.from)),
+    {
+      default: () => defaultBagConfig.promptRefinementShowRawFirst,
+      exact: true,
+    },
+  ).pipe(Schema.fromKey("dufflebagPromptRefinementShowRawFirst")),
+  promptRefinementAutoSubmit: Schema.optionalWith(
+    legacyBooleanStringSchema.pipe(Schema.compose(bagConfigSchema.from.fields.promptRefinementAutoSubmit.from)),
+    {
+      default: () => defaultBagConfig.promptRefinementAutoSubmit,
+      exact: true,
+    },
+  ).pipe(Schema.fromKey("dufflebagPromptRefinementAutoSubmit")),
+  promptRefinementDelivery: Schema.optionalWith(bagConfigSchema.from.fields.promptRefinementDelivery.from, {
+    default: () => defaultBagConfig.promptRefinementDelivery,
+    exact: true,
+  }).pipe(Schema.fromKey("dufflebagPromptRefinementDelivery")),
+  promptRefinementCmuxCommand: Schema.optionalWith(bagConfigSchema.from.fields.promptRefinementCmuxCommand.from, {
+    default: () => defaultBagConfig.promptRefinementCmuxCommand,
+    exact: true,
+  }).pipe(Schema.fromKey("dufflebagPromptRefinementCmuxCommand")),
+  promptRefinementCmuxAutoSubmit: Schema.optionalWith(
+    legacyBooleanStringSchema.pipe(Schema.compose(bagConfigSchema.from.fields.promptRefinementCmuxAutoSubmit.from)),
+    {
+      default: () => defaultBagConfig.promptRefinementCmuxAutoSubmit,
+      exact: true,
+    },
+  ).pipe(Schema.fromKey("dufflebagPromptRefinementCmuxAutoSubmit")),
   dictationReplacements: Schema.optionalWith(bagConfigSchema.from.fields.dictationReplacements.from, {
     default: () => defaultBagConfig.dictationReplacements,
     exact: true,
