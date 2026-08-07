@@ -242,6 +242,41 @@ describe("prompt refinement safeguards", () => {
     expect(parsed.known).toContain("pi");
   });
 
+  it("rejects credit/402 envelopes and builds a multi-backend attempt queue", () => {
+    const source = [
+      "import importlib.util, pathlib, sys, json",
+      "script_path = pathlib.Path(sys.argv[1])",
+      "spec = importlib.util.spec_from_file_location('dufflebag_prompt_refinement', script_path)",
+      "module = importlib.util.module_from_spec(spec)",
+      "spec.loader.exec_module(module)",
+      'credit = module._looks_like_failed_model_output(\'402: {"message":"requires more credits","code":402}\')',
+      "quota = module._quota_or_limit_error('can only afford 100 tokens')",
+      "good = module._looks_like_failed_model_output('Fix the STT refine help paste bug.')",
+      "queue = module._build_attempt_queue('pi', 'default')",
+      "backends = sorted({be for be, _mo in queue})",
+      "print(json.dumps({'credit': credit, 'quota': quota, 'good': good, 'queue_len': len(queue), 'backends': backends, 'first': list(queue[0]) if queue else []}))",
+    ].join("\n");
+    const output = execFileSync(pythonExecutable, ["-c", source, promptRefinementScript], {
+      encoding: "utf8",
+      env: { ...pythonEnvironment, DUFFLEBAG_REFINE_NO_PICKER: "1" },
+      timeout: 30_000,
+    });
+    const parsed = parseJsonObject(output);
+    expect(parsed.credit).toBe(true);
+    expect(parsed.quota).toBe(true);
+    expect(parsed.good).toBe(false);
+    expect(typeof parsed.queue_len).toBe("number");
+    if (typeof parsed.queue_len !== "number") {
+      throw new Error("expected queue_len");
+    }
+    expect(parsed.queue_len).toBeGreaterThan(1);
+    expect(Array.isArray(parsed.first)).toBe(true);
+    if (!Array.isArray(parsed.first)) {
+      throw new Error("expected first attempt");
+    }
+    expect(parsed.first[0]).toBe("pi");
+  });
+
   it("extracts OpenCode JSONL part.text and rejects yargs help dumps", () => {
     const source = [
       "import importlib.util, pathlib, sys, json",
