@@ -1,6 +1,6 @@
 # Pipeline runbook
 
-Exact commands, schemas, and recipes for each step in `SKILL.md`. `BRIDGE=/Users/yosefhayimsabag/Desktop/Code/ai-browser-bridge/dist/bridge.js`. Always confirm the live CLI surface first — flags shift across bridge versions:
+Exact commands, schemas, and recipes for each step in `SKILL.md`. `BRIDGE="${BRIDGE:?set BRIDGE to your ai-browser-bridge/dist/bridge.js}"`. Always confirm the live CLI surface first — flags shift across bridge versions:
 
 ```bash
 node "$BRIDGE" --help && node "$BRIDGE" ask --help && node "$BRIDGE" download --help
