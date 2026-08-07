@@ -8,7 +8,7 @@ Native local voice worker for the speak-response feature.
 - **TTS:** separate `narrate-daemon` process + warm `tts_bridge.py serve` (Supertonic)
 - **UX:** hold Control to dictate; floating OSW-style pill with **live preview** caption
 - **Devin:** `watch-devin --path <atif.json>` debounces and enqueues agent turns
-- **Refine:** double-tap Control (when `promptRefinementMode=review`) or `refine --text …` via Apple Foundation Models
+- **Refine:** route-aware rewrite before paste/type — STT inject (`promptRefinementMode=stt|both`), Control double-tap clipboard (`review|both`), or `refine --text …`. Backend: `codex` (default `gpt-5.3-codex-spark`), `local` (Apple FM), or `auto`
 
 ## Architecture (OpenSuperWhisper-shaped)
 
@@ -91,7 +91,30 @@ Takeaway: default turbo is already **sub-second** on this machine. Faster Englis
 | --- | --- |
 | STT / hotkey / daemon / HUD / inbox / Devin | Rust binary |
 | Supertonic synthesize + play (warm serve, streamed chunks) | `tts_bridge.py serve` |
-| Apple prompt refinement | `prompt_refinement.py` |
+| Route-aware prompt refinement (codex / Apple FM) | `prompt_refinement.py` |
 | Cmux focus helper (optional) | `cmux_focus.py` |
 
-Python is off the dictation hot path. Narration still shells to Supertonic for quality parity.
+Python is off the dictation hot path except when STT refine is enabled (one shot after final transcript). Narration still shells to Supertonic for quality parity.
+
+## STT → refine → input (mode A)
+
+When `promptRefinementMode` is `stt` or `both`, after Whisper cleans the final transcript the worker:
+
+1. Calls `prompt_refinement.py` with bag `promptRefinementBackend` + `promptRefinementModel`
+2. Types the refined text into the focused caret (same as normal dictation)
+3. You review and press Enter in the **same** agent session
+
+Defaults when you enable refine:
+
+| Setting | Default | Purpose |
+| --- | --- | --- |
+| `promptRefinementBackend` | `codex` | Fast CLI refine |
+| `promptRefinementModel` | `gpt-5.3-codex-spark` | Cheap/fast Codex Spark |
+| `promptRefinementDelivery` | `caret` | `caret` \| `cmux-new` \| `cmux-resume` |
+| `promptRefinementCmuxCommand` | `""` | Optional shell for `cmux-new` (`{{prompt_file}}`, `{{prompt}}`, `{{cwd}}`) |
+| `promptRefinementCmuxAutoSubmit` | `false` | Send Enter after cmux inject |
+
+**cmux-new:** opens a new focused workspace and pastes the refined prompt (or runs `promptRefinementCmuxCommand`).  
+**cmux-resume:** injects into the focused surface / existing agent session.
+
+See [TESTING.md](./TESTING.md) for a step-by-step live check.

@@ -39,6 +39,14 @@ describe("bagConfigSchema", () => {
       speechResponseMode: "auto",
       speechReadAlong: true,
       promptRefinementMode: "off",
+      promptRefinementBackend: "codex",
+      promptRefinementModel: "gpt-5.3-codex-spark",
+      promptRefinementReasoningEffort: "low",
+      promptRefinementShowRawFirst: true,
+      promptRefinementAutoSubmit: false,
+      promptRefinementDelivery: "caret",
+      promptRefinementCmuxCommand: "",
+      promptRefinementCmuxAutoSubmit: false,
       dictationReplacements: "",
       dictationMicOffDelayMs: 200,
       dictationLanguage: "en",
@@ -62,6 +70,14 @@ describe("bagConfigSchema", () => {
     expectDescription(bagConfigSchema.from.fields.speechResponseMode);
     expectDescription(bagConfigSchema.from.fields.speechReadAlong);
     expectDescription(bagConfigSchema.from.fields.promptRefinementMode);
+    expectDescription(bagConfigSchema.from.fields.promptRefinementBackend);
+    expectDescription(bagConfigSchema.from.fields.promptRefinementModel);
+    expectDescription(bagConfigSchema.from.fields.promptRefinementReasoningEffort);
+    expectDescription(bagConfigSchema.from.fields.promptRefinementShowRawFirst);
+    expectDescription(bagConfigSchema.from.fields.promptRefinementAutoSubmit);
+    expectDescription(bagConfigSchema.from.fields.promptRefinementDelivery);
+    expectDescription(bagConfigSchema.from.fields.promptRefinementCmuxCommand);
+    expectDescription(bagConfigSchema.from.fields.promptRefinementCmuxAutoSubmit);
     expectDescription(bagConfigSchema.from.fields.dictationReplacements);
     expectDescription(bagConfigSchema.from.fields.dictationMicOffDelayMs);
     expectDescription(bagConfigSchema.from.fields.dictationLanguage);
@@ -91,6 +107,14 @@ describe("bagConfigSchema", () => {
     "speechResponseMode",
     "speechReadAlong",
     "promptRefinementMode",
+    "promptRefinementBackend",
+    "promptRefinementModel",
+    "promptRefinementReasoningEffort",
+    "promptRefinementShowRawFirst",
+    "promptRefinementAutoSubmit",
+    "promptRefinementDelivery",
+    "promptRefinementCmuxCommand",
+    "promptRefinementCmuxAutoSubmit",
     "dictationReplacements",
     "dictationMicOffDelayMs",
     "dictationLanguage",
@@ -188,6 +212,9 @@ describe("bagConfigSchema", () => {
         speechVoice: "  Ava  ",
         speechResponseMode: " focused ",
         promptRefinementMode: " review ",
+        promptRefinementBackend: " auto ",
+        promptRefinementModel: "  gpt-5.3-codex-spark  ",
+        promptRefinementReasoningEffort: " low ",
         dictationReplacements: "  Joseph=Yosef; type script=TypeScript  ",
         dedupEnforcement: " warn ",
         dedupSkipDirectories: "  templates, fixtures  ",
@@ -196,11 +223,41 @@ describe("bagConfigSchema", () => {
       speechVoice: "Ava",
       speechResponseMode: "focused",
       promptRefinementMode: "review",
+      promptRefinementBackend: "auto",
+      promptRefinementModel: "gpt-5.3-codex-spark",
+      promptRefinementReasoningEffort: "low",
       dictationReplacements: "Joseph=Yosef; type script=TypeScript",
       dedupEnforcement: "warn",
       dedupSkipDirectories: "templates, fixtures",
     });
     expect(decodeBagConfig({ speechVoice: "   " }).speechVoice).toBe("");
+  });
+
+  it("accepts stt/both modes, dynamic providers, and cmux delivery options", () => {
+    expect(decodeBagConfig({ promptRefinementMode: "stt" }).promptRefinementMode).toBe("stt");
+    expect(decodeBagConfig({ promptRefinementMode: "both" }).promptRefinementMode).toBe("both");
+    expect(decodeBagConfig({ promptRefinementBackend: "local" }).promptRefinementBackend).toBe("local");
+    expect(decodeBagConfig({ promptRefinementBackend: "grok" }).promptRefinementBackend).toBe("grok");
+    expect(decodeBagConfig({ promptRefinementBackend: "ollama" }).promptRefinementBackend).toBe("ollama");
+    expect(decodeBagConfig({ promptRefinementDelivery: "cmux-new" }).promptRefinementDelivery).toBe("cmux-new");
+    expect(decodeBagConfig({ promptRefinementDelivery: "cmux-resume" }).promptRefinementDelivery).toBe("cmux-resume");
+    expect(
+      decodeBagConfig({
+        promptRefinementModel: "grok-4.5",
+        promptRefinementReasoningEffort: "low",
+        promptRefinementShowRawFirst: true,
+        promptRefinementAutoSubmit: true,
+        promptRefinementCmuxCommand: 'codex --yolo -- "$(cat {{prompt_file}})"',
+        promptRefinementCmuxAutoSubmit: true,
+      }),
+    ).toMatchObject({
+      promptRefinementModel: "grok-4.5",
+      promptRefinementReasoningEffort: "low",
+      promptRefinementShowRawFirst: true,
+      promptRefinementAutoSubmit: true,
+      promptRefinementCmuxCommand: 'codex --yolo -- "$(cat {{prompt_file}})"',
+      promptRefinementCmuxAutoSubmit: true,
+    });
   });
 
   it("does not case-fold dedup enforcement", () => {
@@ -321,6 +378,6 @@ describe("bagConfigJsonSchema", () => {
     const json = Schema.encodeSync(bagConfigJsonSchema)(defaultBagConfig);
 
     expect(JSON.parse(json)).toEqual(defaultBagConfig);
-    expect(Object.keys(JSON.parse(json))).toHaveLength(18);
+    expect(Object.keys(JSON.parse(json))).toHaveLength(26);
   });
 });

@@ -3,6 +3,7 @@
 
 mod audio;
 mod bench;
+mod cmux_deliver;
 mod config;
 mod daemon;
 mod devin;
@@ -14,6 +15,7 @@ mod models;
 mod narrate;
 mod overlay;
 mod pipeline;
+mod refine;
 mod speech_render;
 mod state;
 mod stt;
@@ -68,12 +70,30 @@ enum Commands {
         #[arg(long)]
         path: PathBuf,
     },
-    /// Refine a prompt (Apple Foundation Models via prompt_refinement.py)
+    /// Refine a prompt (route-aware; multi-provider via prompt_refinement.py)
     Refine {
         #[arg(long)]
         text: String,
         #[arg(long, default_value_t = false)]
         speak: bool,
+        /// Provider: codex|local|auto|grok|ollama|opencode|claude|gemini
+        #[arg(long)]
+        backend: Option<String>,
+        /// Model id for the provider (e.g. gpt-5.3-codex-spark, grok-4.5, llama3.2)
+        #[arg(long)]
+        model: Option<String>,
+        /// Reasoning effort for providers that support it (low|medium|high|…)
+        #[arg(long)]
+        reasoning_effort: Option<String>,
+        /// caret | cmux-new | cmux-resume (default: bag config / caret)
+        #[arg(long)]
+        delivery: Option<String>,
+        /// cmux-new shell template; {{prompt_file}} {{prompt}} {{cwd}}
+        #[arg(long)]
+        cmux_command: Option<String>,
+        /// Send Enter after caret/cmux inject
+        #[arg(long, default_value_t = false)]
+        auto_submit: bool,
     },
     /// Debug: poll HID Control for N seconds (hold Control to verify detection)
     ControlCheck {
@@ -161,7 +181,25 @@ fn main() {
             0
         }
         Commands::WatchDevin { path } => devin::watch_devin(&path),
-        Commands::Refine { text, speak } => match refine_prompt(&text, speak) {
+        Commands::Refine {
+            text,
+            speak,
+            backend,
+            model,
+            reasoning_effort,
+            delivery,
+            cmux_command,
+            auto_submit,
+        } => match refine_prompt_cli(
+            &text,
+            speak,
+            backend.as_deref(),
+            model.as_deref(),
+            reasoning_effort.as_deref(),
+            delivery.as_deref(),
+            cmux_command.as_deref(),
+            auto_submit,
+        ) {
             Ok(refined) => {
                 println!("{refined}");
                 0
@@ -269,42 +307,40 @@ fn prepare() -> Result<serde_json::Value, String> {
     Ok(report)
 }
 
-fn refine_prompt(text: &str, speak: bool) -> Result<String, String> {
-    let candidates = [
-        std::env::current_exe()
-            .ok()
-            .and_then(|p| p.parent().map(|d| d.join("prompt_refinement.py"))),
-        Some(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../prompt_refinement.py")),
-    ];
-    let script = candidates
-        .into_iter()
-        .flatten()
-        .find(|p| p.is_file())
-        .ok_or_else(|| "prompt_refinement.py not found beside worker".to_string())?;
-    let parent = script
-        .parent()
-        .map(|p| p.to_path_buf())
-        .unwrap_or_else(|| PathBuf::from("."));
-    let code = "import sys; sys.path.insert(0, sys.argv[1]); from prompt_refinement import refine_prompt; print(refine_prompt(sys.argv[2]))";
-    let output = std::process::Command::new("uv")
-        .args([
-            "run",
-            "--with",
-            "apple-fm-sdk==0.2.1",
-            "python",
-            "-c",
-            code,
-            parent.to_str().unwrap_or("."),
-            text,
-        ])
-        .output()
-        .map_err(|e| format!("spawn refinement: {e}"))?;
-    if !output.status.success() {
-        return Err(String::from_utf8_lossy(&output.stderr).trim().to_string());
-    }
-    let refined = String::from_utf8_lossy(&output.stdout).trim().to_string();
+fn refine_prompt_cli(
+    text: &str,
+    speak: bool,
+    backend: Option<&str>,
+    model: Option<&str>,
+    reasoning_effort: Option<&str>,
+    delivery: Option<&str>,
+    cmux_command: Option<&str>,
+    auto_submit: bool,
+) -> Result<String, String> {
+    let mut prefs = config::voice_preferences();
+    let backend = backend.unwrap_or(prefs.prompt_refinement_backend.as_str());
+    let model = model.unwrap_or(prefs.prompt_refinement_model.as_str());
+    let effort =
+        reasoning_effort.unwrap_or(prefs.prompt_refinement_reasoning_effort.as_str());
+    let refined = refine::refine_prompt(text, backend, model, effort)?;
     if speak {
         let _ = tts::speak_markdown(&refined);
+    }
+    if let Some(delivery) = delivery {
+        prefs.prompt_refinement_delivery = delivery.to_string();
+    }
+    if let Some(cmd) = cmux_command {
+        prefs.prompt_refinement_cmux_command = cmd.to_string();
+    }
+    if auto_submit {
+        prefs.prompt_refinement_cmux_auto_submit = true;
+        prefs.prompt_refinement_auto_submit = true;
+    }
+    if cmux_deliver::is_cmux_delivery(&prefs.prompt_refinement_delivery) {
+        match cmux_deliver::deliver_text(&refined, &prefs) {
+            Ok(result) => eprintln!("delivery: {}", result.summary),
+            Err(error) => eprintln!("delivery failed: {error}"),
+        }
     }
     Ok(refined)
 }

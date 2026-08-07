@@ -32,6 +32,72 @@ pub fn type_text(text: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// Replace `previous` (just typed into the caret) with `next` without ⌘A.
+///
+/// Global ⌘A selects the whole cmux/Grok WebGL session (blue highlight) and
+/// often fails to replace only the input field — raw + refined double-paste.
+/// We backspace the exact previous string, then paste `next`.
+pub fn replace_previous_with(previous: &str, next: &str) -> Result<(), String> {
+    if previous == next {
+        return Ok(());
+    }
+    wait_control_up(400);
+    let _ = release_control_keys();
+    thread::sleep(Duration::from_millis(40));
+
+    if !previous.is_empty() {
+        backspace_chars(previous.chars().count())?;
+        thread::sleep(Duration::from_millis(20));
+    }
+    if !next.is_empty() {
+        type_text(next)?;
+    }
+    // Nudge caret so any residual selection (from host quirks) collapses.
+    let _ = collapse_selection();
+    Ok(())
+}
+
+/// Legacy name: replace without knowing previous text. Prefer
+/// [`replace_previous_with`]. Falls back to backspace-heavy path only when
+/// previous is empty (just type). Never sends global ⌘A.
+pub fn replace_text(text: &str) -> Result<(), String> {
+    replace_previous_with("", text)
+}
+
+/// Press Enter / Return in the focused field (submit).
+pub fn press_enter() -> Result<(), String> {
+    wait_control_up(200);
+    let _ = release_control_keys();
+    thread::sleep(Duration::from_millis(30));
+    let mut enigo = Enigo::new(&Settings::default()).map_err(|e| format!("enigo: {e}"))?;
+    enigo
+        .key(Key::Return, Direction::Click)
+        .map_err(|e| format!("return: {e}"))?;
+    Ok(())
+}
+
+fn backspace_chars(count: usize) -> Result<(), String> {
+    if count == 0 {
+        return Ok(());
+    }
+    let mut enigo = Enigo::new(&Settings::default()).map_err(|e| format!("enigo: {e}"))?;
+    for _ in 0..count {
+        enigo
+            .key(Key::Backspace, Direction::Click)
+            .map_err(|e| format!("backspace: {e}"))?;
+    }
+    Ok(())
+}
+
+fn collapse_selection() -> Result<(), String> {
+    let mut enigo = Enigo::new(&Settings::default()).map_err(|e| format!("enigo: {e}"))?;
+    // Right arrow collapses a range selection to the caret end in most inputs.
+    enigo
+        .key(Key::RightArrow, Direction::Click)
+        .map_err(|e| format!("right: {e}"))?;
+    Ok(())
+}
+
 fn wait_control_up(max_ms: u64) {
     let steps = max_ms / 10;
     for _ in 0..steps {
