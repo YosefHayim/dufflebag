@@ -214,15 +214,14 @@ const stageRuntimeFeature = (input: {
     // Stage every catalog-declared runtime asset authored beside the compiled island.
     for (const shippedPath of input.shippedPaths) {
       const source = path.join(authoredFeatureRoot, shippedPath);
+      const sourceExists = yield* fileSystem.exists(source);
+      if (!sourceExists && shippedPath === "dufflebag-voice") {
+        yield* ensureVoiceBinaryBuilt(input.packageRoot);
+      }
       if (!(yield* fileSystem.exists(source))) {
-        if (shippedPath === "dufflebag-voice") {
-          yield* ensureVoiceBinaryBuilt(input.packageRoot);
-        }
-        if (!(yield* fileSystem.exists(source))) {
-          return yield* new StagePackageError({
-            issue: `Catalog-shipped runtime path ${shippedPath} is missing under ${authoredFeatureRoot}.`,
-          });
-        }
+        return yield* new StagePackageError({
+          issue: `Catalog-shipped runtime path ${shippedPath} is missing under ${authoredFeatureRoot}.`,
+        });
       }
 
       yield* copyTree({
@@ -246,13 +245,17 @@ const ensureVoiceBinaryBuilt = (packageRoot: string) =>
     yield* Effect.tryPromise({
       try: async () => {
         const { spawnSync } = await import("node:child_process");
-        const result = spawnSync("bash", [script], {
+        const buildVoiceProcess = spawnSync("bash", [script], {
           cwd: packageRoot,
           encoding: "utf8",
           env: process.env,
         });
-        if (result.status !== 0) {
-          throw new Error(result.stderr || result.stdout || `buildVoice exited ${String(result.status)}`);
+        if (buildVoiceProcess.status !== 0) {
+          throw new Error(
+            buildVoiceProcess.stderr ||
+              buildVoiceProcess.stdout ||
+              `buildVoice exited ${String(buildVoiceProcess.status)}`,
+          );
         }
       },
       catch: (error) =>

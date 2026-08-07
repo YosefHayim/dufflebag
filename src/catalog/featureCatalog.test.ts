@@ -314,7 +314,13 @@ describe("featureCatalog", () => {
         id: "speak-response",
         platform: "any",
         sourceEntrypoint: "hooks/speakResponse.ts",
-        shippedPaths: ["cmux_focus.py", "prompt_refinement.py", "voice.py", "voice.py.lock"],
+        shippedPaths: [
+          "dufflebag-voice",
+          "cmux_focus.py",
+          "prompt_refinement.py",
+          "tts_bridge.py",
+          "tts_bridge.py.lock",
+        ],
         registrations: [
           {
             event: "Stop",

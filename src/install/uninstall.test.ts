@@ -137,7 +137,7 @@ layer(NodeContext.layer)("uninstall", (it) => {
     ),
   );
 
-  it.effect("fails before commit when a receipted artifact changed", () =>
+  it.effect("fails before commit when a replaced prior host file changed after install", () =>
     Effect.scoped(
       Effect.gen(function* () {
         const fileSystem = yield* FileSystem.FileSystem;
@@ -146,6 +146,11 @@ layer(NodeContext.layer)("uninstall", (it) => {
         const stagedRoot = yield* fileSystem.makeTempDirectoryScoped({ prefix: "dufflebag-uninstall-conflict-stage-" });
         const runtimePath = path.join(root, ".claude/dufflebag/runtime/contextGuard/hooks/ctxWatchSpawn.js");
         const receiptPath = path.join(root, ".claude/dufflebag/receipt.json");
+
+        // Seed a prior host file so ownership.previous is not "missing". Whole-file
+        // drift is only a hard conflict when uninstall would restore a prior file.
+        yield* fileSystem.makeDirectory(path.dirname(runtimePath), { recursive: true });
+        yield* fileSystem.writeFileString(runtimePath, "prior host content\n");
 
         yield* stagePackage(stagedRoot);
         yield* install(installRequest({ root, stagedRoot }));
