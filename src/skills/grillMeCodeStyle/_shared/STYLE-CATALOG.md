@@ -30,7 +30,7 @@ When a dimension is language-specific, a note like `[TS/JS only]` appears in the
 
 ### Both variants
 
-- **Every pick is recorded.** Chosen variant → the `✓` example on a `CODE-STYLE.md` rule card; rejected variant → the `✗` case. A rejected variant that's *actual slop* also becomes a concrete `## Never` entry (with a real `file:symbol` offender for existing repos). Give each rule a `verify:` command (the tool that catches it) or `judgment`.
+- **Every pick is recorded as a five-slot rule card** (see [CODE-STYLE-FORMAT.md](CODE-STYLE-FORMAT.md); living exemplar = this package’s root `CODE-STYLE.md`). Chosen variant → the `// ✓` case; rejected variant → the `// ✗` case. A rejected variant that's *actual slop* also becomes a concrete `## Never` entry citing `[rule:<id>]` (with a real `file:symbol` offender for existing repos). Metadata line is exactly `[rule:<id>] · verify: \`<command>\`` or `· verify: judgment`. **Never** put `[taste]` / `[lint: …]` / `[CI: …]` in the `###` heading.
 - **Compose at the end.** After the rounds, assemble every pick into one **canonical example** — a real feature slice (existing) or representative feature (greenfield) written in the agreed style — and land it as the `## Canonical example` block in `CODE-STYLE.md` (see [CODE-STYLE-FORMAT.md](CODE-STYLE-FORMAT.md)). It's the litmus you show in the plan before approval.
 
 ---
@@ -494,7 +494,7 @@ When a dimension is language-specific, a note like `[TS/JS only]` appears in the
   - Commit message format — conventional commits (`feat:` / `fix:` / `chore:`) vs free-form.
   - Branch naming — `feat|fix|refactor|chore/<issue?>-<kebab>` vs free-form; **default recommend: never product commits on main/default**.
   - Remote branch lifecycle — **default recommend: do not delete remote branches unless explicitly asked** (keep for handoff/CI).
-  - Parallel work — worktrees under `REPO/.worktrees/`, one task per lane; issue + PR linked (`Fixes #n`). Point agents at `coordinate-worktrees`.
+  - Parallel work — worktrees under `REPO/.worktrees/`, one task per lane; issue + PR linked (`Fixes #n`). Point agents at `sdlc-tasks-executions`.
   - PR size policy — small & focused vs batched.
   - Merge strategy — squash (default recommendation), merge, rebase.
   - When to open a PR vs commit directly to the working branch (default: PR to default branch; no merge unless asked).
@@ -524,15 +524,15 @@ Round 1's slop fingerprint catches *unreadable* code; this round catches *excess
 
 **The tool-first test — state it for ceremony families:** *if the framework/service CLI already does the job, call it; custom code only for product glue; generated orphans die with dead scripts.*
 
-For an existing repo, each family is a **keep/kill** against real offenders (cite `file:symbol` / path); greenfield, each is a **will-we-allow-this** with an illustrative snippet. Killed families become concrete `## Never` entries with an enforced-vs-taste tag. On existing repos, **surface the ceremony kill list from the scan even if the user wants a short grill** — do not skip C1–C8 when the scan found hits.
+For an existing repo, each family is a **keep/kill** against real offenders (cite `file:symbol` / path); greenfield, each is a **will-we-allow-this** with an illustrative snippet. Killed families become concrete `## Never` entries citing `[rule:<id>]`, with `verify:` set to a real command or `judgment` (never heading tags). On existing repos, **surface the ceremony kill list from the scan even if the user wants a short grill** — do not skip C1–C8 when the scan found hits.
 
 The five line-level families (each collapses to one TUI question):
 
-- **Needless indirection** — pass-through wrappers, one-line helpers around a single operator, identity functions (`(x) => x`), a `Manager`/`Service` class that is one static method, single-implementation interfaces. `[taste]` (some catchable via `no-restricted-syntax`)
-- **Fake robustness** — scattered `??` fallback chains, hand-rolled `isRecord`-style type guards where a schema belongs, deep optional chaining (`a?.b?.c?.d`), `catch { return null }` swallows, speculative unused config knobs (YAGNI). `[lint: no-restricted-syntax for banned guard shapes]` + `[taste]`
-- **Control-flow contortion** — nested ternaries, self-restating conditions (`=== true`, `? true : false`), boolean flag params, redundant `async`+`return await` / `new Promise(res => res(x))`. `[lint: no-nested-ternary, no-unnecessary-condition]`
-- **Shape noise** — pointless from→to remaps (same shape in and out), grab-bag object returns (caller uses 2 of 15 fields), `data`/`result`/`temp`/`final` variable soup. `[taste]`
-- **Dead space** — comments that restate code, function bodies with no breathing room, one function doing several jobs. `[taste]`
+- **Needless indirection** — pass-through wrappers, one-line helpers around a single operator, identity functions (`(x) => x`), a `Manager`/`Service` class that is one static method, single-implementation interfaces. Prefer `verify: judgment` (some catchable via restricted-syntax → real command).
+- **Fake robustness** — scattered `??` fallback chains, hand-rolled `isRecord`-style type guards where a schema belongs, deep optional chaining (`a?.b?.c?.d`), `catch { return null }` swallows, speculative unused config knobs (YAGNI). Prefer a real `verify` command for banned guard shapes when wired; else `judgment`.
+- **Control-flow contortion** — nested ternaries, self-restating conditions (`=== true`, `? true : false`), boolean flag params, redundant `async`+`return await` / `new Promise(res => res(x))`. Prefer `verify: biome ci .` (or project style gate) when nested-ternary / unnecessary-condition rules are on.
+- **Shape noise** — pointless from→to remaps (same shape in and out), grab-bag object returns (caller uses 2 of 15 fields), `data`/`result`/`temp`/`final` variable soup. Prefer `verify: judgment` (or a names AST checker).
+- **Dead space** — comments that restate code, function bodies with no breathing room, one function doing several jobs. Prefer `verify: judgment`.
 
 The structural families (grill these against the repo tree — `ls`/tree first):
 
@@ -542,12 +542,12 @@ The structural families (grill these against the repo tree — `ls`/tree first):
 
 The ceremony families (existing: grill the **scan kill list** as keep/kill batches; greenfield: will-we-allow — recommend kill/disallow as default):
 
-- **Tool-wrapper scripts** — files that only shell wrangler/biome/drizzle/tsc/…. → package.json / CI calls the tool. `[taste]`
-- **House typegen / drift theater** — reimplemented `wrangler types` / kit snapshot diffs + test suites. → official CLI only. `[taste]`
-- **Wrong tool for types** — wrangler for row shapes; hand vendor schemas when SDK/extension types exist. → bindings from wrangler, rows from schema infer, vendor from SDK. `[taste]`
-- **Scripts outside product lifecycle** — `src/scripts`, flat dumps, extra nests. → only `scripts/dev` + `scripts/production`, product glue only. `[taste]`
-- **Orphan generated artifacts** — `*.generated.*` for dead generators. → delete with the script. `[taste]`
-- **Parallel type/schema systems** — second interface layer for the same payload. → one SSOT. `[taste]`
-- **`console.*` scatter** — no single mute. → structured logger + one env (`LOG_LEVEL` or project pick). `[lint: no-console]` when the project agrees
+- **Tool-wrapper scripts** — files that only shell wrangler/biome/drizzle/tsc/…. → package.json / CI calls the tool. Prefer `verify: judgment` (or a scripts AST checker).
+- **House typegen / drift theater** — reimplemented `wrangler types` / kit snapshot diffs + test suites. → official CLI only. Prefer `verify: judgment`.
+- **Wrong tool for types** — wrangler for row shapes; hand vendor schemas when SDK/extension types exist. → bindings from wrangler, rows from schema infer, vendor from SDK. Prefer `verify: judgment`.
+- **Scripts outside product lifecycle** — `src/scripts`, flat dumps, extra nests. → only `scripts/dev` + `scripts/production`, product glue only. Prefer a real `verify` path checker when one exists.
+- **Orphan generated artifacts** — `*.generated.*` for dead generators. → delete with the script. Prefer `verify: judgment`.
+- **Parallel type/schema systems** — second interface layer for the same payload. → one SSOT. Prefer `verify: judgment`.
+- **`console.*` scatter** — no single mute. → structured logger + one env (`LOG_LEVEL` or project pick). Prefer `verify: biome ci .` (`noConsole`) when the project agrees.
 
 Fold the kills into the existing `## Never` list (Round 1's fingerprint) rather than a separate list, and wire the machine-catchable ones (`no-nested-ternary`, `no-console` when agreed, banned guard shapes, complexity/length caps) into the **Lint tells** in Round 6 so CI prevents them, not just documents them. Put the **ceremony kill list** (paths to delete/replace) in the Step 7 plan as an explicit cleanup section. Point ongoing enforcement at `deslop-v2` (per-diff + mass ceremony kill) alongside `deslop` (per-diff, readability).

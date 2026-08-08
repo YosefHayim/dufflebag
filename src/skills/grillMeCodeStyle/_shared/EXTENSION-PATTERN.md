@@ -54,11 +54,11 @@ End the path with a short **definition of done** checklist — the last gate bef
 
 The guard is what keeps the path paved as the project is maintained. Slop is defined as **"off the golden path"**. Build it in three layers, strongest first — this **complements** the `## Never` fingerprint the STYLE-CATALOG round already produced; it doesn't re-grill it.
 
-1. **Mechanical → lint config (CI blocks it).** Every `## Never` tell that a linter *can* catch (banned micro-helpers, redundant guards, nested ternaries, generic names via naming rules, one-use wrappers) gets a real rule in the committed `biome`/`eslint` config from [FORMATTERS.md](FORMATTERS.md). Its `CODE-STYLE.md` entry flips from `[taste]` to `[lint: <rule>]`. A tell that CI blocks can't regress silently — this is the primary guard.
-2. **Taste → `deslop` per-diff.** Tells a linter can't catch (locality, over-abstraction, drift from the canonical example) stay `[taste]` and are enforced by `deslop`, which reads `CODE-STYLE.md` (the `## Never` list + the `## Golden path`) on every diff. Confirm `deslop` is installed/available; if not, flag it — the taste layer has no teeth without it.
+1. **Mechanical → lint config (CI blocks it).** Every `## Never` tell that a linter *can* catch (banned micro-helpers, redundant guards, nested ternaries, generic names via naming rules, one-use wrappers) gets a real rule in the committed `biome`/`eslint` config from [FORMATTERS.md](FORMATTERS.md). Its rule card's `verify:` flips from `judgment` to the real command (e.g. `pnpm style`, `biome ci .`). **Never** encode this as a heading tag like `[lint: …]` or `[taste]` — those are forbidden; the metadata line owns enforcement. A tell that CI blocks can't regress silently — this is the primary guard.
+2. **Taste → `deslop` per-diff.** Tells a linter can't catch (locality, over-abstraction, drift from the canonical example) stay `verify: judgment` and are enforced by `deslop`, which reads `CODE-STYLE.md` (the `## Never` list + the `## Golden path`) on every diff. Confirm `deslop` is installed/available; if not, flag it — the taste layer has no teeth without it.
 3. **Human/agent → the done-checklist.** The definition of done from Step C is the last-mile gate the golden path itself carries.
 
-Record which tells landed in which layer — the plan's guard block shows the split (lint rules added vs taste/deslop), so I see exactly what CI will now catch.
+Record which tells landed in which layer — the plan's guard block shows the split (command-backed `verify` vs `judgment`/deslop), so I see exactly what CI will now catch.
 
 ---
 
