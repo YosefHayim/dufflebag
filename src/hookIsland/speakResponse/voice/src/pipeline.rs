@@ -106,13 +106,27 @@ impl DictationPipeline {
                             text = crate::stt::clean_transcript(&job.streamed_fallback);
                         }
                         log_line(&format!(
-                            "stt gen={} secs={secs:.2} decode_ms={decode_ms:.1} raw={:?} clean={:?}",
-                            job.generation, timed.text, text
+                            "stt gen={} secs={secs:.2} decode_ms={decode_ms:.1} rms={:.4} whisper={} raw={:?} clean={:?}",
+                            job.generation,
+                            timed.input_rms,
+                            if timed.ran_whisper { 1 } else { 0 },
+                            timed.text,
+                            text
                         ));
                         if text.is_empty() {
+                            let why = if !timed.ran_whisper {
+                                format!(
+                                    "No speech ({secs:.1}s, rms={:.4}, VAD skip)",
+                                    timed.input_rms
+                                )
+                            } else {
+                                format!(
+                                    "No speech ({secs:.1}s audio, {decode_ms:.0}ms decode)"
+                                )
+                            };
                             write_worker_status(
                                 "inactive",
-                                &format!("No speech ({secs:.1}s audio, {decode_ms:.0}ms decode)"),
+                                &why,
                                 Some(&model_name),
                                 Some(&backend),
                                 None,

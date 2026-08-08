@@ -1,6 +1,10 @@
 //! whisper.cpp STT (OpenSuperWhisper Whisper path) with energy VAD isolation.
 //! Tuned for short hold-to-talk: Metal + flash-attn + multi-thread + reused state.
 //! Supports initial_prompt dictionary boost and no-speech never-type cleanup.
+//!
+//! Production log finding (dictation.log): ~20% of jobs had decode_ms≈0 and empty
+//! text with multi-second sample buffers — silence/VAD rejected quiet mics before
+//! Whisper ran. Long holds also truncated mid-sentence under max_tokens=64.
 
 use parking_lot::Mutex;
 use std::path::Path;
@@ -15,20 +19,35 @@ pub struct TimedTranscript {
     pub text: String,
     /// Wall time for VAD isolation + whisper full + cleanup (ms).
     pub decode_ms: f64,
+    /// Peak RMS of the raw capture (pre-normalize), for dictation.log diagnostics.
+    pub input_rms: f32,
+    /// True when Whisper full() ran (false = silence/VAD early exit).
+    pub ran_whisper: bool,
 }
 
-/// Below this RMS, treat the whole buffer as silence.
-const SILENCE_RMS: f32 = 0.010;
+/// Below this RMS *after* peak-normalize, treat the whole buffer as silence.
+/// Quiet laptop mics often land at 0.003–0.009 raw; we normalize first so this
+/// only rejects true near-zero buffers.
+const SILENCE_RMS: f32 = 0.003;
 /// Frame size for energy VAD (~30 ms @ 16 kHz).
 const VAD_FRAME: usize = 480;
-/// Require at least this much voiced audio before trusting Whisper (~200 ms).
-const MIN_VOICED_SAMPLES: usize = 3_200;
+/// Require at least this much voiced audio before trusting Whisper (~120 ms).
+const MIN_VOICED_SAMPLES: usize = 1_920;
 /// Keep this much context around speech bursts (~150 ms).
 const SPEECH_PAD_FRAMES: usize = 5;
-/// Whisper often invents prose when fed near-silence; cap spoken rate hard.
-const MAX_WORDS_PER_SECOND: f32 = 3.5;
+/// Whisper often invents prose when fed near-silence; cap only short clips hard.
+/// Longer holds use a looser cap so real speech is not mid-sentence truncated.
+const MAX_WORDS_PER_SECOND_SHORT: f32 = 4.0;
+const MAX_WORDS_PER_SECOND_LONG: f32 = 6.0;
+/// Clips shorter than this (seconds) use the strict hallucination word cap.
+const SHORT_CLIP_SECONDS: f32 = 3.0;
 /// If less than this fraction of frames is voiced, treat as noise (bus / wind).
-const MIN_VOICED_FRAME_RATIO: f32 = 0.08;
+/// Only applied to longer buffers so short holds are not discarded.
+const MIN_VOICED_FRAME_RATIO: f32 = 0.04;
+/// Peak target after normalize (keeps quiet mics in Whisper's happy range).
+const NORMALIZE_PEAK: f32 = 0.45;
+/// Cap gain so pure digital silence cannot explode into noise.
+const MAX_NORMALIZE_GAIN: f32 = 50.0;
 
 pub struct SttEngine {
     /// Kept alive for the lifetime of `state` (whisper.cpp ownership).
@@ -115,16 +134,22 @@ impl SttEngine {
         initial_prompt: Option<&str>,
     ) -> Result<TimedTranscript, String> {
         let started = std::time::Instant::now();
-        let text = self.transcribe_inner(&self.state, samples, language, initial_prompt, false)?;
+        let input_rms = rms(samples);
+        let outcome =
+            self.transcribe_inner(&self.state, samples, language, initial_prompt, false)?;
         Ok(TimedTranscript {
-            text,
+            text: outcome.text,
             decode_ms: started.elapsed().as_secs_f64() * 1000.0,
+            input_rms,
+            ran_whisper: outcome.ran_whisper,
         })
     }
 
     /// Cheap sliding-window caption for the HUD only (OSW Parakeet-preview role).
     pub fn transcribe_preview(&self, samples: &[f32], language: &str) -> Result<String, String> {
-        self.transcribe_inner(&self.preview_state, samples, language, None, true)
+        Ok(self
+            .transcribe_inner(&self.preview_state, samples, language, None, true)?
+            .text)
     }
 
     fn transcribe_inner(
@@ -134,19 +159,23 @@ impl SttEngine {
         language: &str,
         initial_prompt: Option<&str>,
         preview: bool,
-    ) -> Result<String, String> {
+    ) -> Result<DecodeOutcome, String> {
         if samples.is_empty() {
-            return Ok(String::new());
-        }
-        if rms(samples) < SILENCE_RMS {
-            return Ok(String::new());
+            return Ok(DecodeOutcome::empty());
         }
 
-        let Some(isolated) = extract_speech_region(samples) else {
-            return Ok(String::new());
+        // Quiet mics: bring peak into range before silence/VAD so soft speech
+        // is not discarded with decode_ms≈0 (never reaches Whisper).
+        let normalized = peak_normalize(samples, NORMALIZE_PEAK);
+        if rms(&normalized) < SILENCE_RMS {
+            return Ok(DecodeOutcome::empty());
+        }
+
+        let Some(isolated) = extract_speech_region(&normalized) else {
+            return Ok(DecodeOutcome::empty());
         };
         if isolated.len() < MIN_VOICED_SAMPLES {
-            return Ok(String::new());
+            return Ok(DecodeOutcome::empty());
         }
 
         let mut state = state_slot.lock();
@@ -162,17 +191,22 @@ impl SttEngine {
         params.set_print_realtime(false);
         params.set_print_timestamps(false);
         params.set_suppress_blank(true);
-        params.set_no_speech_thold(0.9);
+        // Slightly less aggressive than 0.9 so quiet tails still decode.
+        params.set_no_speech_thold(if preview { 0.85 } else { 0.6 });
         params.set_temperature(0.0);
-        params.set_single_segment(true);
         params.set_no_context(true);
         params.set_suppress_nst(true);
         if preview {
-            params.set_max_tokens(32);
-            params.set_audio_ctx(512);
-        } else {
-            params.set_max_tokens(64);
+            // HUD only: cheap + single segment is fine (tail window is short).
+            params.set_single_segment(true);
+            params.set_max_tokens(48);
             params.set_audio_ctx(768);
+        } else {
+            // Final insert: multi-segment, full context, no token cap.
+            // max_tokens=64 was mid-sentence truncating ~20–25s holds in prod logs.
+            params.set_single_segment(false);
+            params.set_max_tokens(0);
+            params.set_audio_ctx(0);
         }
         // OSW custom-dictionary prompt boost.
         if let Some(prompt) = initial_prompt {
@@ -198,8 +232,41 @@ impl SttEngine {
         let joined = parts.join(" ").trim().to_string();
         let capped = cap_words_for_duration(&joined, isolated.len());
         let collapsed = collapse_repeated_runs(&capped);
-        Ok(reject_noise_hallucination(&collapsed, isolated.len()))
+        Ok(DecodeOutcome {
+            text: reject_noise_hallucination(&collapsed, isolated.len()),
+            ran_whisper: true,
+        })
     }
+}
+
+struct DecodeOutcome {
+    text: String,
+    ran_whisper: bool,
+}
+
+impl DecodeOutcome {
+    fn empty() -> Self {
+        Self {
+            text: String::new(),
+            ran_whisper: false,
+        }
+    }
+}
+
+/// Scale samples so peak abs amplitude ≈ `target_peak` (capped gain).
+fn peak_normalize(samples: &[f32], target_peak: f32) -> Vec<f32> {
+    let peak = samples
+        .iter()
+        .map(|s| s.abs())
+        .fold(0.0f32, f32::max);
+    if peak < 1e-6 {
+        return samples.to_vec();
+    }
+    let gain = (target_peak / peak).clamp(1.0, MAX_NORMALIZE_GAIN);
+    if (gain - 1.0).abs() < 0.05 {
+        return samples.to_vec();
+    }
+    samples.iter().map(|s| s * gain).collect()
 }
 
 /// Post-STT cleanup: strip tags, no-speech markers — empty means never type.
@@ -271,17 +338,28 @@ fn extract_speech_region(samples: &[f32]) -> Option<Vec<f32>> {
     sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
     let median = sorted[sorted.len() / 2];
     let p90 = sorted[(sorted.len() * 9) / 10];
-    let threshold = (median * 2.2)
-        .max(SILENCE_RMS * 1.4)
-        .min(p90.max(SILENCE_RMS) * 0.85);
+    // Softer than median*2.2 so continuous soft speech (median ≈ speech) still
+    // marks most frames voiced. Floor stays above pure silence.
+    let threshold = (median * 1.6)
+        .max(SILENCE_RMS * 1.2)
+        .min(p90.max(SILENCE_RMS) * 0.9);
 
     let voiced: Vec<bool> = energies.iter().map(|e| *e >= threshold).collect();
     let voiced_count = voiced.iter().filter(|v| **v).count();
     if voiced_count == 0 {
+        // Adaptive threshold can wipe soft continuous speech; fall back to full
+        // buffer when overall energy is clearly above silence.
+        if rms(samples) >= SILENCE_RMS * 1.5 {
+            return Some(samples.to_vec());
+        }
         return None;
     }
     let ratio = voiced_count as f32 / voiced.len() as f32;
-    if ratio < MIN_VOICED_FRAME_RATIO && samples.len() > SAMPLE_RATE as usize {
+    // Only discard long noise-heavy buffers; short holds keep any voiced span.
+    if ratio < MIN_VOICED_FRAME_RATIO && samples.len() > SAMPLE_RATE as usize * 2 {
+        if rms(samples) >= SILENCE_RMS * 2.0 {
+            return Some(samples.to_vec());
+        }
         return None;
     }
 
@@ -306,7 +384,12 @@ fn cap_words_for_duration(text: &str, sample_count: usize) -> String {
         return String::new();
     }
     let seconds = (sample_count as f32 / SAMPLE_RATE as f32).max(0.15);
-    let max_words = ((seconds * MAX_WORDS_PER_SECOND).ceil() as usize).max(1);
+    let rate = if seconds < SHORT_CLIP_SECONDS {
+        MAX_WORDS_PER_SECOND_SHORT
+    } else {
+        MAX_WORDS_PER_SECOND_LONG
+    };
+    let max_words = ((seconds * rate).ceil() as usize).max(1);
     let words: Vec<&str> = text.split_whitespace().collect();
     if words.len() <= max_words {
         return text.to_string();
@@ -390,13 +473,25 @@ mod tests {
     use super::*;
 
     #[test]
-    fn caps_hallucinated_length() {
+    fn caps_hallucinated_length_on_short_clip() {
         let long =
             "hello there thank you for watching please subscribe and like this video forever";
+        // 0.5s @ 16kHz → short-clip cap (~2 words at 4 wps)
         let samples = 8_000;
         let capped = cap_words_for_duration(long, samples);
         assert!(capped.split_whitespace().count() <= 3);
         assert!(capped.to_lowercase().starts_with("hello"));
+    }
+
+    #[test]
+    fn does_not_truncate_real_long_dictation() {
+        // 20s hold, real speech length that max_tokens=64 / 3.5 wps used to chop mid-sentence.
+        let text = "like sometimes when i'm holding the control it still doesn't properly stt everything i'm saying and sometimes it's just partial understand what i'm saying or not even getting it so i'm not sure if it's the mic so please check the logs and fix the silence gate and the token cap";
+        let samples = SAMPLE_RATE as usize * 20;
+        let wc = text.split_whitespace().count();
+        assert!(wc >= 45, "fixture word count {wc}");
+        let capped = cap_words_for_duration(text, samples);
+        assert_eq!(capped, text);
     }
 
     #[test]
@@ -405,6 +500,33 @@ mod tests {
         assert!(rms(&silence) < SILENCE_RMS);
         let loud = vec![0.2f32; 1600];
         assert!(rms(&loud) > SILENCE_RMS);
+    }
+
+    #[test]
+    fn peak_normalize_lifts_quiet_mic() {
+        // Quiet laptop mic levels that previously failed SILENCE_RMS=0.010.
+        let quiet: Vec<f32> = (0..8_000)
+            .map(|i| 0.004 * ((i as f32) * 0.1).sin())
+            .collect();
+        assert!(rms(&quiet) < 0.010);
+        let lifted = peak_normalize(&quiet, NORMALIZE_PEAK);
+        let peak = lifted.iter().map(|s| s.abs()).fold(0.0f32, f32::max);
+        // Gain is capped (MAX_NORMALIZE_GAIN) so peak may land below target.
+        assert!(peak > 0.15, "peak after normalize {peak}");
+        assert!(rms(&lifted) > SILENCE_RMS);
+    }
+
+    #[test]
+    fn extract_keeps_quiet_continuous_speech() {
+        // Soft continuous speech after normalize — must not return None.
+        let mut soft = vec![0.0f32; SAMPLE_RATE as usize * 3];
+        for (i, s) in soft.iter_mut().enumerate() {
+            *s = 0.006 * ((i as f32) * 0.08).sin();
+        }
+        let normalized = peak_normalize(&soft, NORMALIZE_PEAK);
+        let region = extract_speech_region(&normalized).expect("quiet speech region");
+        assert!(region.len() >= MIN_VOICED_SAMPLES);
+        assert!(rms(&region) >= SILENCE_RMS);
     }
 
     #[test]

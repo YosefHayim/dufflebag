@@ -17,11 +17,13 @@ use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 
-const PREVIEW_INTERVAL: Duration = Duration::from_millis(1400);
-/// Seconds of audio tail for the live caption (OSW uses ~1.5s chunks).
-const PREVIEW_TAIL_SECONDS: f32 = 3.0;
-/// Need at least this much audio before first preview (~0.6s).
-const MIN_PREVIEW_SAMPLES: usize = 9_600;
+/// Faster than 1.4s so the HUD shows text while still holding (user signal:
+/// "if the UI doesn't show the text then it's not writing").
+const PREVIEW_INTERVAL: Duration = Duration::from_millis(700);
+/// Wider tail so release fallback is not only the last few words of a long hold.
+const PREVIEW_TAIL_SECONDS: f32 = 8.0;
+/// Need at least this much audio before first preview (~0.4s).
+const MIN_PREVIEW_SAMPLES: usize = 6_400;
 
 pub fn live_preview_enabled() -> bool {
     match std::env::var("DUFFLEBAG_LIVE_PREVIEW") {
@@ -48,6 +50,15 @@ impl LiveCaption {
 
     pub fn set(&self, text: &str) {
         *self.text.lock() = text.to_string();
+    }
+
+    /// Prefer the longer stable caption so a later short tail does not wipe a
+    /// better mid-hold decode used as release fallback.
+    pub fn set_if_better(&self, text: &str) {
+        let mut slot = self.text.lock();
+        if text.len() >= slot.len() {
+            *slot = text.to_string();
+        }
     }
 
     pub fn take(&self) -> String {
@@ -92,7 +103,7 @@ pub fn spawn_preview_loop(
                 Ok(raw) => {
                     let text = crate::stt::clean_transcript(&raw);
                     if !text.is_empty() && recording.load(Ordering::SeqCst) {
-                        caption.set(&text);
+                        caption.set_if_better(&text);
                         write_worker_status(
                             "listening",
                             "",
