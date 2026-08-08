@@ -945,6 +945,22 @@ export const featureCatalog = Schema.decodeUnknownSync(featureCatalogSchema, {
     runtime: { _tag: "none" },
   },
   {
+    id: "route-request",
+    sourceDirectory: "routeRequest",
+    installedSkill: {
+      _tag: "skill",
+      id: "route-request",
+      shippedPaths: ["SKILL.md", "REFERENCE.md"],
+    },
+    title: "Route request (mid-orchestrator)",
+    summary:
+      "Refine messy freeform into a plan that picks and chains existing skills — a dispatcher, not a second copy of every workflow.",
+    selectedByDefault: false,
+    dependencies: [],
+    platform: "any",
+    runtime: { _tag: "none" },
+  },
+  {
     id: "agent-benchmark",
     sourceDirectory: "agentBenchmark",
     installedSkill: {
