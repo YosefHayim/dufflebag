@@ -1,15 +1,35 @@
 # PROJECT.md Format
 
-`PROJECT.md` holds the project's **purpose and direction** — the "why we're building this and where it's going" — for agents. `README.md` is the human-facing version; `PROJECT.md` is what an agent reads to understand *intent* before writing code.
+`PROJECT.md` holds the project's **purpose and direction** — the "why we're
+building this and where it's going" — for agents. `README.md` is the
+human-facing version; `PROJECT.md` is what an agent reads to understand *intent*
+before writing code.
 
-It is **not** a glossary (that's `CONTEXT.md`), **not** individual decisions (those are ADRs), and **not** current structure (that's `AGENTS.md`).
+| File | Role |
+| --- | --- |
+| `PROJECT.md` | Purpose & direction (this file) |
+| `CONTEXT.md` | Orientation — [CONTEXT-FORMAT.md](../../grillWithDocs/CONTEXT-FORMAT.md) |
+| `LANGUAGE.md` | Names-only glossary — [LANGUAGE-FORMAT.md](LANGUAGE-FORMAT.md) |
+| `docs/adr/` | Individual hard-to-reverse decisions |
+| `AGENTS.md` | Current structure / how to work in the repo |
 
-Create it lazily when purpose/direction is being pinned down — or by **extracting it from an overloaded `CONTEXT.md`**: problem statements, core insight, and roadmap belong here; the glossary stays in `CONTEXT.md`.
+**Canonical exemplars:** `planpage/PROJECT.md` and `dufflebag/PROJECT.md` (seven
+sections). `ai-browser-bridge/PROJECT.md` is a valid close variant (same intent,
+slightly different headings).
+
+Create it lazily when purpose/direction is being pinned down — or by **extracting
+it from an overloaded `CONTEXT.md`**: problem statements, core insight, and
+roadmap belong here; domain names stay in `LANGUAGE.md`; orientation stays in
+`CONTEXT.md`.
 
 ## Structure
 
 ```md
-# {Project} — Purpose & Direction
+# PROJECT.md — {Project}
+
+Purpose and direction. Read this to understand *why* the project exists and where
+it's going; read `CONTEXT.md` for how it's shaped, `LANGUAGE.md` for the words,
+and `CODE-STYLE.md` for how code is written.
 
 ## The problem
 {What problem this solves, and for whom. 2-4 sentences.}
@@ -35,9 +55,30 @@ Create it lazily when purpose/direction is being pinned down — or by **extract
 - {Non-negotiables that shape decisions — values, platform/budget limits. Deep rationale → an ADR.}
 ```
 
+### Accepted heading aliases (do not invent more)
+
+When validating an existing file, these count as the seven sections:
+
+| Canonical | Also OK |
+| --- | --- |
+| The problem | Problem, Purpose (when it states the pain), Why it exists |
+| Who it's for | Who it is for, Who it serves, Audience, Users, Target users |
+| The core insight | Core insight, The approach, The wedge, Product promise, Why this |
+| Goals | Success, Success criteria, What success looks like, Success metrics |
+| Non-goals | Non-goals (now), What it is not, Out of scope |
+| Direction | Status & direction, Current status, Roadmap (with Built/Next/Maybe) |
+| Guiding principles | Principles, Constraints, Operating principles, Design principles |
+
+Missing sections when **creating** a file: write the canonical seven. When
+**validating** an existing file: report drift; do not mass-rewrite content without
+approval.
+
 ## What to ask
 
-`grill-with-docs` owns PROJECT.md for every repo — new or existing. Walk these seven one at a time, each with a recommended default pulled from the repo, `README`, or the conversation (same as any grill). Skip a question only when the docs already answer it unambiguously.
+`grill-with-docs` owns PROJECT.md for every repo — new or existing. Walk these
+seven one at a time, each with a recommended default pulled from the repo,
+`README`, or the conversation (same as any grill). Skip a question only when the
+docs already answer it unambiguously.
 
 1. **Problem & status quo** — What problem does this solve, for whom, and what does someone do today without it? → *The problem.*
 2. **Who it's for / who it's not** — The primary user, and who is explicitly out of audience. Turn "everyone" into a real persona. → *Who it's for.*
@@ -50,7 +91,9 @@ Create it lazily when purpose/direction is being pinned down — or by **extract
 ## Rules
 
 - **Purpose and direction only.** Link to ADRs for the "why" of specific decisions; don't restate them.
-- **No glossary.** Domain terms belong in `CONTEXT.md`.
+- **No glossary.** Domain terms belong in `LANGUAGE.md` ([LANGUAGE-FORMAT.md](LANGUAGE-FORMAT.md)).
+- **No orientation dump.** Actors/shape belong in `CONTEXT.md`.
 - **No current structure.** Repo layout / module ownership belongs in `AGENTS.md`.
 - **Honest roadmap.** Mark Built / Next / Maybe. No aspirational fiction — if it doesn't exist and isn't decided, it's "Maybe" or it's absent.
-- **Keep it short.** A page, not an essay. It's an orientation, not a spec.
+- **Keep it short.** A page, not an essay.
+- **Title form:** `# PROJECT.md — {Project}` (same family as `LANGUAGE.md — {Project}`).

@@ -1,4 +1,4 @@
-# dufflebag — Purpose & Direction
+# PROJECT.md — dufflebag
 
 What an agent reads to understand product intent before changing behavior. The
 human-facing introduction lives in `README.md`; runtime boundaries live in

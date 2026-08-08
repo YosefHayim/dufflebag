@@ -32,9 +32,9 @@ These gate which [STYLE-CATALOG.md](../grill-me-code-style/_shared/STYLE-CATALOG
 
 Read whatever exists first so you grill about CODE, not product. Then **ensure the three structure docs** — gather the missing ones' content, validate the present ones against their role, and **never restructure a doc that already exists** (report drift, don't rewrite it). Defer file writes to Step 7 so the plan can show them.
 
-- **PROJECT.md** — purpose & direction. Missing/thin → gather via `grill-with-docs`' PROJECT.md flow (its seven-part checklist in [PROJECT-FORMAT.md](../grill-me-code-style/_shared/PROJECT-FORMAT.md)). `grill-with-docs` owns PROJECT.md.
-- **CONTEXT.md** — orientation (what it is, actors, shape — NOT a glossary). Model on the Oly-App `CONTEXT.md` convention.
-- **LANGUAGE.md** — glossary / human↔agent bridge: **names only** (term → definition + aliases to avoid). Validate an existing one against the code's real vocabulary; model on the Oly-App `LANGUAGE.md` convention.
+- **PROJECT.md** — purpose & direction. Missing/thin → gather via `grill-with-docs`' PROJECT.md flow ([PROJECT-FORMAT.md](../grill-me-code-style/_shared/PROJECT-FORMAT.md)). Title: `# PROJECT.md — {Project}`. `grill-with-docs` owns PROJECT.md.
+- **CONTEXT.md** — orientation only. Validate against [CONTEXT-FORMAT.md](../grillWithDocs/CONTEXT-FORMAT.md) (exemplar: `ai-browser-bridge/CONTEXT.md`). Title: `# CONTEXT.md — {Project}`. Flag `## Language` / glossary `_Avoid_:` blocks as **drift** → migrate to `LANGUAGE.md`.
+- **LANGUAGE.md** — glossary / human↔agent bridge: **names only**. Validate against [LANGUAGE-FORMAT.md](../grill-me-code-style/_shared/LANGUAGE-FORMAT.md) and the code's real vocabulary (exemplar: `ai-browser-bridge/LANGUAGE.md`). Flag tables / bullet glossaries / colon-on-bold as **drift**.
 
 Record each doc's state — `create` · `validate ✓` · `drift` — for the Step 6 plan.
 
