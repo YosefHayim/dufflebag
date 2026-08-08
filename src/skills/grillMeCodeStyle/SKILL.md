@@ -56,9 +56,9 @@ The answer gates:
 
 A project can't have a code style before it has a spine. Before grilling code, **ensure the three structure docs** — gather the missing ones' content now, validate the present ones, and **never restructure a doc that already exists** (report drift, don't rewrite it). Defer the actual file writes to Step 7 so the plan can show them.
 
-- **PROJECT.md** — purpose & direction. Missing/thin → gather it via `grill-with-docs`' PROJECT.md flow (its seven-part checklist in [PROJECT-FORMAT.md](_shared/PROJECT-FORMAT.md)). Don't write your own purpose questions — `grill-with-docs` owns PROJECT.md.
-- **CONTEXT.md** — orientation: what the project is, its actors, and how it's shaped (NOT a glossary). Model it on the Oly-App `CONTEXT.md` convention.
-- **LANGUAGE.md** — the glossary / human↔agent bridge: **names only** (term → one-line definition + aliases to avoid), grouped by area. This is the shared vocabulary so I and the agent decode the same jargon. Model it on the Oly-App `LANGUAGE.md` convention (`CONTEXT.md` = orientation, `LANGUAGE.md` = glossary).
+- **PROJECT.md** — purpose & direction. Missing/thin → gather via `grill-with-docs`' PROJECT.md flow (seven-part checklist in [PROJECT-FORMAT.md](_shared/PROJECT-FORMAT.md)). Title: `# PROJECT.md — {Project}`. Don't write your own purpose questions — `grill-with-docs` owns PROJECT.md.
+- **CONTEXT.md** — orientation only (what it is, actors, shape — NOT a glossary). Create/validate against [CONTEXT-FORMAT.md](../grillWithDocs/CONTEXT-FORMAT.md) (exemplar: `ai-browser-bridge/CONTEXT.md`). Title: `# CONTEXT.md — {Project}`. No `## Language` / `_Avoid_:` blocks.
+- **LANGUAGE.md** — glossary / human↔agent bridge: **names only**. Create/validate against [LANGUAGE-FORMAT.md](_shared/LANGUAGE-FORMAT.md) (exemplar: `ai-browser-bridge/LANGUAGE.md` — bold term on its own line, definition, `_Avoid_:`). Never tables, bullet glossaries, or colon-on-bold.
 
 Record each doc's state — `create` · `validate ✓` · `drift` (with the gap) — for the Step 6 plan.
 

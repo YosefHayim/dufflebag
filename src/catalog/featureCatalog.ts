@@ -599,11 +599,11 @@ export const featureCatalog = Schema.decodeUnknownSync(featureCatalogSchema, {
     installedSkill: {
       _tag: "skill",
       id: "grill-with-docs",
-      shippedPaths: ["SKILL.md", "CONTEXT-FORMAT.md", "ADR-FORMAT.md"],
+      shippedPaths: ["SKILL.md", "CONTEXT-FORMAT.md", "ADR-FORMAT.md", "LANGUAGE-FORMAT.md"],
     },
     title: "Grill with docs",
     summary:
-      "A grilling session that challenges a plan against the existing domain model, sharpens terminology, and updates CONTEXT.md, PROJECT.md, and ADRs inline as decisions crystallise.",
+      "A grilling session that challenges a plan against the existing domain model, sharpens terminology, and updates LANGUAGE.md, CONTEXT.md, PROJECT.md, and ADRs inline as decisions crystallise.",
     selectedByDefault: false,
     dependencies: ["grill-me-code-style"],
     platform: "any",
