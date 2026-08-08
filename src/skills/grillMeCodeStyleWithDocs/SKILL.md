@@ -1,9 +1,29 @@
 ---
 name: grill-me-code-style-with-docs
-description: Grill the user on how an EXISTING codebase is built — code style, structure docs, and CLI — using real code as evidence, then render an HTML plan and, on approval, write/update CODE-STYLE.md + formatter config and refresh the AGENTS.md digest. Use when the user says grill-me-code-style-with-docs, $grill, gridme (typo), rebuild CODE-STYLE.md / structure docs, proper cleanup with conventions/filenames, full-repo deslop that starts by deciding style (generic-name bans, deps, CLI), or "from the beginning" style grill on a repo with meaningful code. Fans out sub-agents for repeated patterns including ceremony/tool-slop. For brand-new/empty projects use grill-me-code-style; after the guide exists, mass kill of wrappers/ceremony → deslop-v2.
+description: >
+  Grill an EXISTING codebase for code style, structure docs, and CLI — using real
+  code as evidence — then render an HTML plan and, on approval, write/update
+  CODE-STYLE.md + formatter config and refresh the AGENTS.md digest. Also runs
+  read-only compliance audit when the user already has docs and wants to check
+  slices/files against CODE-STYLE / PROJECT / AGENTS without rewriting them.
+  Use when: grill-me-code-style-with-docs, $grill, gridme, rebuild CODE-STYLE,
+  audit CODE-STYLE compliance, docs vs code, ban generic names (result/payload),
+  full-repo deslop that starts by deciding style, or "from the beginning" style
+  grill on a repo with meaningful code. Fans out sub-agents for repeated patterns
+  including ceremony/tool-slop; ships deterministic inventory + naming scanners.
+  Greenfield → grill-me-code-style; mass kill after guide exists → deslop-v2.
 ---
 
 <what-to-do>
+
+Pick a mode from the user request, then execute only that mode:
+
+| Mode | When | Writes files? |
+| --- | --- | --- |
+| **Grill** (default) | Decide / rebuild style with me using real code as evidence | Only after planpage approval |
+| **Audit** | Docs already exist; check whether code + slices follow them | **Never** — report only; hand cleanup to `deslop-v2` |
+
+### Mode: Grill
 
 Interview me relentlessly about **how this codebase is built** — its code style, its structure docs, and its CLI — until we reach a shared understanding. Walk down each branch of the decision tree, resolving dependencies one-by-one. For each question, provide your recommended answer.
 
@@ -13,9 +33,35 @@ My **taste is the source of truth**; the existing code is **evidence, not gospel
 
 **Nothing is written to disk until I approve.** You scan and grill (Steps 1–4) — the code-style grill is a **pick-the-code gallery**: you show me real code variants and I pick what I like, dimension by dimension (Step 3) — then compose the **golden path for adding a unit + its slop guard** from those picks and the evidence (Step 6). You render an **interactive HTML plan** as the review gate (Step 7, built with the **planpage** kit — I approve, adjust, or flip any decision right in the browser and it posts back), write the files on approval (Step 8), then run one **structure-review capstone** (Step 9) that can reorganize the tree and open a PR.
 
+### Mode: Audit (read-only compliance)
+
+When I already have `CODE-STYLE.md` / structure docs and want confirmation that the tree follows them (including mechanical bans like `result` / `payload` / vague `to*`·`build*`·`resolve*` mappers):
+
+1. Resolve the package/repo root.
+2. Run mechanical inventory + scan from this skill directory (paths relative to the installed skill root):
+
+   ```bash
+   node scripts/inventory-repository.mjs --root <repo> --out /tmp/style-inventory.json
+   node scripts/scan-style-compliance.mjs --root <repo> --out /tmp/style-findings.json
+   ```
+
+3. Map apps, packages, feature slices, and cross-slice imports from the inventory.
+4. Compare docs (AGENTS, CODE-STYLE, PROJECT, CONTEXT, LANGUAGE, README, ADRs) for missing files, nested contradictions, and path drift.
+5. Publish evidence-first findings (`ruleId`, path, symbol, line, evidence, severity, confidence, remediation). Taxonomy: [references/finding-taxonomy.md](references/finding-taxonomy.md). Defaults informed by [references/research-principles.md](references/research-principles.md); **project CODE-STYLE wins**.
+6. If findings are **persisted** (not chat-only): write **`docs/agent/style-audit/FINDINGS.md`** only — `mkdir -p docs/agent/style-audit` first. Never write `*AUDIT*.md` / compliance reports at the repository root. Migrate any legacy root audit files into that dir.
+7. Do **not** rewrite CODE-STYLE or rename symbols in audit mode. Approved cleanup → `deslop-v2`; structural prove-outs → `lean-prove`.
+
+Honest limit: mechanical scanners prove banned names, missing docs, and path patterns — not whether a name truly captures a business concept (`confidence: judgment` for those).
+
 </what-to-do>
 
 <supporting-info>
+
+## Mechanical pre-scan (both modes)
+
+Before sub-agent fan-out (grill Step 2) or as the core of audit mode, run the zero-dep scripts shipped with this skill. They give prevalence counts and concrete `file:symbol` offenders for generic locals and vague mappers without inventing taste.
+
+Research defaults (Uncle Bob + Matt Pocock caption corpus): [references/research-principles.md](references/research-principles.md).
 
 ## Step 1 — Detect language and runtime, then ensure the structure docs
 
@@ -55,7 +101,7 @@ Run the full catalog: **[STYLE-CATALOG.md](../grill-me-code-style/_shared/STYLE-
 Key behaviors:
 - **Each pick → a rule card.** Chosen variant = the `✓` example; rejected variant = the `✗` case. Every card follows the fixed five-slot anatomy in [CODE-STYLE-FORMAT.md](../grill-me-code-style/_shared/CODE-STYLE-FORMAT.md): heading, `[rule:<id>] · verify: <command>` metadata line, **one-sentence** assertion, ✓/✗ block, `Why:` line. `verify:` names a real command, or `judgment`.
 - **Formatting** — quotes/semis/width/trailing-commas/import-order: grill my preference but land it as a **formatter config** (per [FORMATTERS.md](../grill-me-code-style/_shared/FORMATTERS.md)), recorded as an ADR — not prose. Reconcile with any config already in the repo. The **machine-catchable slop tells** land here too as **linter rules** — prevented, not just documented.
-- **AI-slop fingerprint (the tells)** — the scan's fingerprint angle brings back the recognizable AI tells **with counts**; grill each **keep or kill**. A high count is *not* a free pass — repeated slop is still slop. Killed tells become the concrete `## Never` list, each with its real `file:symbol` offender and an enforced-vs-taste tag.
+- **AI-slop fingerprint (the tells)** — the scan's fingerprint angle brings back the recognizable AI tells **with counts**; grill each **keep or kill**. A high count is *not* a free pass — repeated slop is still slop. Killed tells become the concrete `## Never` list, each with its real `file:symbol` offender and a cross-reference to the owning `[rule:<id>]` (whose `verify:` is a real command or `judgment` — never a heading tag like `[taste]` / `[lint: …]`).
 - **Over-engineering (the "too much" fingerprint)** — run [STYLE-CATALOG.md](../grill-me-code-style/_shared/STYLE-CATALOG.md) **Round 7**: grill each over-engineering family (needless indirection, fake robustness, control-flow contortion, shape noise, dead space, structural too-much/too-little — `ls`/tree the repo first — **and ceremony C1–C8** from the mandatory SCAN angle) as **keep/kill against real `file:symbol` / path offenders**. Tests: *abstraction earns its place only with a second real caller or a genuine domain concept*; *tool-first — if the CLI already does it, no house wrapper; generated orphans die with dead scripts*. Before/after: `deslop-v2` references (`line-smells`, `structure-smells`, **`ceremony-smells`**). Killed families fold into `## Never`; ceremony hits become a **kill list** in the plan (path → replace with tool / delete). Wire machine-catchable ones into lint; point mass cleanup at `deslop-v2` (“kill ceremony”).
 - **Golden exemplars** — grill me to name **1–3 real files** that best embody the agreed style ("write new code exactly like these"). They anchor `CODE-STYLE.md`'s Exemplars and give `deslop` a concrete target. If nothing qualifies yet, flag it — that's a finding.
 - **Compose the canonical example.** After the rounds, assemble every pick into one **canonical example** — a real feature slice from this repo rewritten in the agreed style — so I see the whole pattern working together, not just atomized picks. It becomes the Step 6 litmus and the `## Canonical example` block of `CODE-STYLE.md`.

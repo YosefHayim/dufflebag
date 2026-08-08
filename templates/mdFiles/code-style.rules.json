@@ -1,66 +1,21 @@
 {
-  "$schema-note": "Machine mirror of templates/mdFiles/CODE-STYLE.md (Uncle Bob workspace philosophy). Judgment-enforced unless a project adds Biome/AST channels. Keep in step with the prose guide.",
-  "version": 2,
-  "repo": "scaffolded",
-  "generatedFrom": "templates/mdFiles/CODE-STYLE.md",
-  "gate": "project-defined (prefer: biome ci && tsc --noEmit && tests && build)",
-  "channels": {
-    "judgment": "Review / deslop / coach skills and human review. No deterministic detector by default."
-  },
+  "version": 3,
+  "guide": "CODE-STYLE.md",
   "rules": [
     {
-      "id": "workspace.reuse-before-invent",
-      "statement": "Reuse and extend before creating; promote to shared only on a real second consumer.",
-      "channel": "judgment",
-      "source": "§0 Workspace stance"
+      "id": "names.domain-specific",
+      "statement": "Project-owned bindings and filenames use the narrowest product or technical name and never use banned generic names.",
+      "verify": "judgment"
     },
     {
-      "id": "workspace.ssot-kiss-yagni-dry",
-      "statement": "SSOT / KISS / YAGNI / DRY: one source of truth; simplest thing that works; no premature features; no copy-paste logic.",
-      "channel": "judgment",
-      "source": "§0 Workspace stance"
+      "id": "functions.arrow-constants",
+      "statement": "Named non-framework functions are arrow constants declared before first use.",
+      "verify": "judgment"
     },
     {
-      "id": "function.small-one-thing",
-      "statement": "Functions are small, do one thing, stay at one abstraction level; few args; no flag/output args.",
-      "channel": "judgment",
-      "source": "§3 Functions"
-    },
-    {
-      "id": "function.cqs",
-      "statement": "Command–Query Separation: commands change state and return void; queries return values without mutating.",
-      "channel": "judgment",
-      "source": "§4 Side effects and CQS"
-    },
-    {
-      "id": "comment.last-resort",
-      "statement": "Comments are last resort; delete noise/journals/commented-out code; keep consequence warnings and clarifying intent when the language truly can’t.",
-      "channel": "judgment",
-      "source": "§6 Comments"
-    },
-    {
-      "id": "name.reveal-intent",
-      "statement": "Names reveal intent; no noise words (data/info/manager); distinguish meaningfully.",
-      "channel": "judgment",
-      "source": "§7 Names"
-    },
-    {
-      "id": "test.tdd-courage",
-      "statement": "Prefer red→green→refactor; tests are living documentation; do not ship untested behavior.",
-      "channel": "judgment",
-      "source": "§9 TDD"
-    },
-    {
-      "id": "architecture.dependency-rule",
-      "statement": "Dependencies point inward; frameworks/DB/web are details/plugins; protect structure over urgent hacks.",
-      "channel": "judgment",
-      "source": "§10 Architecture"
-    },
-    {
-      "id": "ocp.prefer-types",
-      "statement": "Prefer adding a type/class over hunting every switch/if for a new case.",
-      "channel": "judgment",
-      "source": "§12 Open/Closed"
+      "id": "functions.single-job",
+      "statement": "Each function performs one cohesive job and leaves unrelated effects to its caller.",
+      "verify": "judgment"
     }
   ]
 }

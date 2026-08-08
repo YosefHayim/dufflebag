@@ -2,6 +2,17 @@
 
 Goal: surface the **most-repeated** patterns in an existing codebase as evidence for the style grill. You want dominant reality, not a file dump — so use read-only explore agents that report conclusions, not contents.
 
+## Mechanical pre-scan (run first)
+
+From this skill directory:
+
+```bash
+node scripts/inventory-repository.mjs --root <repo> --out /tmp/style-inventory.json
+node scripts/scan-style-compliance.mjs --root <repo> --out /tmp/style-findings.json
+```
+
+Feed counts and top offenders into the AI-slop and ceremony angles below so sub-agents start with measured prevalence, not a cold tree walk. Finding IDs: [references/finding-taxonomy.md](references/finding-taxonomy.md).
+
 ## Fan-out
 
 Spawn a small set of read-only sub-agents in parallel (prefer the `Explore` agent type), each on a different angle. Scale to repo size — 2-3 for a small repo, 5-6 for a large one:

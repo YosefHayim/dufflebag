@@ -1,6 +1,6 @@
 # Dufflebag code style
 
-This file is the **project dialect** (prescriptive SSOT) for maintained code in this repository. Workspace philosophy is the Uncle Bob distillation shipped as `templates/mdFiles/CODE-STYLE.md`. When mechanism conflicts with philosophy (e.g. Schema vs interfaces), **this file wins**; philosophy still binds on intent (small functions, honest names, dependency direction, tests as courage).
+This file is the **project dialect** (prescriptive SSOT) for maintained code in this repository. The rule-card format is owned by this package: `src/skills/grillMeCodeStyle/_shared/CODE-STYLE-FORMAT.md`, with this file as the living exemplar and `templates/mdFiles/CODE-STYLE.md` as the greenfield scaffold. When another guide elsewhere conflicts with this one, **this file wins for dufflebag**.
 
 The maintained tree conforms to this contract. A new rule is not complete until its verifier gates the same change when the rule is mechanically decidable.
 
@@ -960,7 +960,7 @@ A **feature** is dufflebag's unit of extension: a catalog entry plus the artifac
 
 ### Branching & PR
 
-See rule `git.feature-branch` under **Rules**. Skills: `finish-and-ship`, `organized-commits`, `coordinate-worktrees`. Remote branches stay unless the user explicitly asks to delete them.
+See rule `git.feature-branch` under **Rules**. Skills: `finish-and-ship`, `organized-commits`, `sdlc-tasks-executions`. Remote branches stay unless the user explicitly asks to delete them.
 
 ### Adding a CLI command
 

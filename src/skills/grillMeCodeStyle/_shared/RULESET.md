@@ -6,8 +6,9 @@ makes review deterministic across hundreds of changed files — the reviewer wal
 by its command, not just the `## Never` list. Emit it in Step 8, right after the formatter/
 linter config, and generate the artifacts each rule points to.
 
-Schema and slot rules: [CODE-STYLE-FORMAT.md](CODE-STYLE-FORMAT.md). Exemplar to copy:
-`code-style.rules.json` in dufflebag.
+Schema and slot rules: [CODE-STYLE-FORMAT.md](CODE-STYLE-FORMAT.md). Exemplar to
+copy: this package’s root `code-style.rules.json` (scaffold:
+`templates/mdFiles/code-style.rules.json`).
 
 ```json
 { "id": "function.arrow-only", "statement": "…one sentence…", "verify": "pnpm style" }
