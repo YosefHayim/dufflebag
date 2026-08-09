@@ -54,8 +54,8 @@ Keep user wording. Note workspace if known. Strip secrets from logs, not from th
 |-------|------------------|---------------|
 | Ship / branch / PR / report when done | new branch, open PR, commit push | `finish-and-ship` |
 | Whole messy repo / every feature / backup main | multi-feature cleanup | `messy-repo-orchestrator` |
-| Parallel agents / worktrees | many lanes, fan-out | `coordinate-worktrees` setup-lanes |
-| Land concurrent lanes | salvage, integrate worktrees | `coordinate-worktrees` land-lanes |
+| Parallel agents / worktrees | many lanes, fan-out | `sdlc-tasks-executions` setup-lanes |
+| Land concurrent lanes | salvage, integrate worktrees | `sdlc-tasks-executions` land-lanes |
 | Local UI prove | launch local, playwright, don’t deploy | `preview-and-prove` |
 | Prod live prove | redeploy, is live, curl | `deploy-and-prove` |
 | Lean / ceremony | deslop, AI slop, ban payload | `deslop-v2` |

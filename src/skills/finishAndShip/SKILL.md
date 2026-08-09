@@ -1,6 +1,6 @@
 ---
 name: finish-and-ship
-description: Use when the user wants completed work closed out end-to-end — including freeform "git commit push", "git commit push to main", "ok nice git commit push", "fix then commit push", wrap up after fixes, finish what was asked, prepare a branch for handoff, or ship the local change set with verify + handoff. Always land product work on a feature-related branch (feat/fix/refactor/chore)—never ship from main/default by default. Never delete remote branches unless the user explicitly asks. Prefer this over bare commit-only when they imply gates, leftovers, or done after finishing all work. Hand pure commit-splitting to organized-commits; multi-lane worktrees to coordinate-worktrees; redeploy/live prove to deploy-and-prove; local browser proof to preview-and-prove. Anti-triggers: "no commit", "do not commit", "NO git commit/add/push".
+description: Use when the user wants completed work closed out end-to-end — including freeform "git commit push", "git commit push to main", "ok nice git commit push", "fix then commit push", wrap up after fixes, finish what was asked, prepare a branch for handoff, or ship the local change set with verify + handoff. Always land product work on a feature-related branch (feat/fix/refactor/chore)—never ship from main/default by default. Never delete remote branches unless the user explicitly asks. Prefer this over bare commit-only when they imply gates, leftovers, or done after finishing all work. Hand pure commit-splitting to organized-commits; multi-lane worktrees to sdlc-tasks-executions; redeploy/live prove to deploy-and-prove; local browser proof to preview-and-prove. Anti-triggers: "no commit", "do not commit", "NO git commit/add/push".
 type: flow
 ---
 
@@ -20,7 +20,7 @@ Close the whole delivery loop from the repository's real state. “Done” means
 ## Workflow
 
 1. Inspect repository instructions, branch/upstream, worktrees, status, recent commits, and the complete diff. Build an explicit ledger of requested work, user-owned changes, generated changes, and unresolved items.
-2. If on the default branch with product changes (or about to make them), cut a topic branch from an up-to-date default tip before committing. Name it for the job (feature, fix, refactor, chore). Multi-lane parallel work → `coordinate-worktrees` **setup-lanes**.
+2. If on the default branch with product changes (or about to make them), cut a topic branch from an up-to-date default tip before committing. Name it for the job (feature, fix, refactor, chore). Multi-lane parallel work → `sdlc-tasks-executions` **setup-lanes**.
 3. Trace the changed behavior through its real entrypoints and tests. Search for placeholders, disabled checks, temporary debug code, stale docs, and unhandled call sites.
 4. Run the narrowest relevant checks first. Fix failures within scope, then run the repository's full documented gate from a fresh command.
 5. Exercise the real behavior when the task has a user-visible or integration surface. Use `preview-and-prove` for browser flows and `deploy-and-prove` only when deployment is authorized.

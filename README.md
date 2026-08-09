@@ -218,11 +218,17 @@ Override one launched agent without changing persistent config, for example
 | **mcp-oauth-onboarding** | Install an MCP at the intended scope, complete OAuth, reload the agent, and prove it with a harmless tool call. | 🟢 any OS |
 | **rtl-ui-audit** | Audit and verify real right-to-left layout, bidi content, directional assets, interaction, and accessibility. | 🟢 any OS |
 | **deploy-and-prove** | Deploy or publish an immutable source identity and prove the provider, live runtime, and changed behavior serve it. | 🟢 any OS |
-| **coordinate-worktrees** | Setup parallel feature lanes under .worktrees/ (issue + branch + PR) or land overlapping worktrees with backups, intent-aware integration, and reachability proof — never delete remotes unless asked. | 🟢 any OS |
+| **fix-bug** | Reproduce one or many reported bugs (env, logs, edge cases), root-cause, fix, and verify — never patch from the report alone. | 🟢 any OS |
+| **sdlc-tasks-executions** | Numbered task list → one agent per task → full SDLC (issue, implement, unit+e2e, UI QA, PR, optional merge). Also setup-lanes / land-lanes for multi-agent worktrees (replaces coordinate-worktrees). Campaign boards use run-scoped docs/agent/sdlc-tasks/<run-id>/. | 🟢 any OS |
+| **ship-feature-e2e** | One feature from ask/issue through worktree, unit+e2e happy paths, PR with confidence score, local act CI, merge to main, and global reinstall proof. | 🟢 any OS |
+| **test-gap-tdd** | Sub-agent scan of unit, mocks/MSW, integration, and e2e layers per feature; report missing cases; TDD-fill; run e2e headless by default. Reports under docs/agent/test-gap/<run-id>/. | 🟢 any OS |
+| **test-gap-ship** | One init: scan or resume test gaps, backup main, parallel worktree+issue lanes per feature, TDD-fill, headless e2e, PR, merge after gates. Composes test-gap-tdd + messy-repo + sdlc-tasks-executions + finish-and-ship. | 🟢 any OS |
+| **lean-prove** | Sub-agent scan for over-engineering (files, folders, line/ceremony smells, test-slop) with proofs and before/after; TDD parity first; apply lean via deslop-v2 rules; prove with unit + headless e2e. | 🟢 any OS |
+| **ux-journey-improve** | Expert UX/UI journey improvement: audit flows, high-fi taste mocks on planpage, implement after direction pick via issues/worktrees/PRs. Campaign artifacts under docs/agent/ux-journey/<run-id>/. | 🟢 any OS |
 | **kill-ports-local-dev** | List and free local TCP listeners (default keep Metro 8081) so the next dev launch is not blocked by stale processes. | 🟢 any OS |
 | **workspace-bootstrap** | Clone or sync GitHub user/org repos into a Code folder, optional bulk package installs, and pull-all delta reports. | 🟢 any OS |
 | **cloudflare-ops** | Wrangler/D1/KV/R2 operational wiring and safe migrations — distinct from deploy-and-prove live production proof. | 🟢 any OS |
-| **messy-repo-orchestrator** | Backup main, then fan out one sub-agent per feature for safe refactors/deslop/fixes with issue + PR to main for human review. Ask host mode: background subagents, cmux terminal per lane (watch/join/continue), or briefs only. | 🟢 any OS |
+| **messy-repo-orchestrator** | Backup main, then fan out one sub-agent per feature for safe refactors/deslop/fixes with issue + PR to main for human review. Ask host mode: background subagents, cmux terminal per lane (watch/join/continue), or briefs only. Campaign files under docs/agent/messy-repo/<run-id>/. | 🟢 any OS |
 | **skill-from-feedback** | Patch an existing skill from concrete user or session feedback: triggers, routing, safety, verification — then validate and re-sync. | 🟢 any OS |
 | **route-request** | Refine messy freeform into a plan that picks and chains existing skills — a dispatcher, not a second copy of every workflow. | 🟢 any OS |
 | **agent-benchmark** | Design and run dynamic same-task agent/skill/tool benchmarks with tokens, turns, latency, cost, and success — evidence over stars. | 🟢 any OS |

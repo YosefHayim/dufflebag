@@ -98,6 +98,35 @@ describe("shipped skills", () => {
   });
 });
 
+describe("agent artifact run isolation", () => {
+  const sharedArtifacts = path.join(skillRoot, "_shared", "agent-artifacts.md");
+
+  it("requires time-stamped run dirs under docs/agent (not fixed flat BOARD/REPORT paths)", () => {
+    const text = readFileSync(sharedArtifacts, "utf8");
+    expect(text).toMatch(/date -u \+%Y-%m-%dT%H%M%SZ/);
+    expect(text).toMatch(/CURRENT/);
+    expect(text).toMatch(/run-id/);
+    expect(text).toMatch(/docs\/agent\/<campaign>\/<run-id>\//);
+    // Product SSOT (plural) must stay distinct from campaign noise (singular)
+    expect(text).toMatch(/docs\/agents\//);
+  });
+
+  it.each([
+    ["sdlcTasksExecutions", "sdlc-tasks"],
+    ["testGapTdd", "test-gap"],
+    ["testGapShip", "test-gap"],
+    ["leanProve", "lean-prove"],
+    ["messyRepoOrchestrator", "messy-repo"],
+    ["uxJourneyImprove", "ux-journey"],
+  ] as const)("%s mints or resumes run-scoped docs/agent/%s paths", (sourceDirectory, campaign) => {
+    const skillMd = path.join(skillRoot, sourceDirectory, "SKILL.md");
+    const text = readFileSync(skillMd, "utf8");
+    expect(text).toMatch(new RegExp(`docs/agent/${campaign}/`));
+    expect(text).toMatch(/run-id|RUN_ID|AGENT_DOCS/);
+    expect(text).toMatch(/CURRENT|date -u \+%Y-%m-%dT%H%M%SZ/);
+  });
+});
+
 describe("local skill sources", () => {
   it.each(sourceSkillDirectories)("%s is camelCase and has valid skill frontmatter", (sourceDirectory) => {
     // e.g. "pngToCode" — not "png-to-code"
