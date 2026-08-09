@@ -14,12 +14,12 @@ Reuse existing skills rather than inventing a second ship path:
 
 | Concern | Skill |
 |---------|--------|
-| Worktree layout, lane isolation, land later | `coordinate-worktrees` (**setup-lanes** / **land-lanes**) |
+| Worktree layout, lane isolation, land later | `sdlc-tasks-executions` (**setup-lanes** / **land-lanes**) |
 | Commit / push on a feature branch | `organized-commits` + `finish-and-ship` |
 | Lean structure / ceremony kill | `deslop-v2` (then `deslop` for readability if needed) |
 | Missing style SSOT | `grill-me-code-style-with-docs` (once, before mass fan-out when absent) |
 | UI / local proof | `preview-and-prove` |
-| After lanes merge messily | `coordinate-worktrees` **land-lanes** only |
+| After lanes merge messily | `sdlc-tasks-executions` **land-lanes** only |
 
 ## Safety
 
@@ -41,6 +41,21 @@ Reuse existing skills rather than inventing a second ship path:
 - Do not deploy, publish, or delete production resources as part of cleanup.
 - Respect `AGENTS.md` / `CODE-STYLE.md` / ADRs; if they are missing or useless, run a **single** style grill first rather than N conflicting styles.
 - **Never close cmux workspaces/panes** created for lanes unless the user explicitly asks. They are human entry points, not throwaway spawn shells.
+
+
+
+## Artifact paths (run isolation)
+
+Campaign boards and reports go under **`docs/agent/messy-repo/<run-id>/`**, never the repo root and never a fixed flat path that parallel runs overwrite.
+
+```bash
+RUN_ID=$(date -u +%Y-%m-%dT%H%M%SZ)
+AGENT_DOCS="docs/agent/messy-repo/$RUN_ID"
+mkdir -p "$AGENT_DOCS"
+printf '%s\n' "$RUN_ID" > docs/agent/messy-repo/CURRENT
+```
+
+Write MATRIX/STATE/AUDIT under `$AGENT_DOCS`. Resume → use `CURRENT` or an explicit run-id (do not mint a new one). Put `AGENT_DOCS` in every `LANE-BRIEF.md`. Product SSOT stays under `docs/agents/` (plural).
 
 ## Workflow
 
@@ -76,9 +91,9 @@ If they already said e.g. “cmux terminal for each sub agent”, skip re-asking
 2. Ensure working policy: product commits only on topic branches; PRs target default branch.
 3. If CODE-STYLE is missing and the user wants consistency across lanes, run `grill-me-code-style-with-docs` **once** on the main checkout (or a single docs-only branch) before fan-out so agents share one `## Never` list.
 
-### 3. Fan out lanes (delegate to coordinate-worktrees setup-lanes)
+### 3. Fan out lanes (delegate to sdlc-tasks-executions setup-lanes)
 
-For each approved feature, follow `coordinate-worktrees` **setup-lanes** with these defaults:
+For each approved feature, follow `sdlc-tasks-executions` **setup-lanes** with these defaults:
 
 | Item | Default |
 |------|---------|
@@ -204,7 +219,7 @@ Plus:
 - which PRs block others (shared contracts, migrations);
 - for mode **B**: how to re-enter a lane (workspace name/ref) and reminder that terminals were left open for watch / follow-up tasks.
 
-If two PRs conflict, do **not** force-resolve on main. Prefer rebasing the later PR onto updated default after earlier merges, or run `coordinate-worktrees` **land-lanes** with backups when the user wants a single integration branch—still no silent main rewrite.
+If two PRs conflict, do **not** force-resolve on main. Prefer rebasing the later PR onto updated default after earlier merges, or run `sdlc-tasks-executions` **land-lanes** with backups when the user wants a single integration branch—still no silent main rewrite.
 
 ### 6. After human review
 

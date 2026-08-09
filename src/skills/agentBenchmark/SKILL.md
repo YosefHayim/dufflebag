@@ -58,7 +58,16 @@ Prefer repo-owned scripts under `scripts/dev/` or `scripts/bench/` (gitignored p
 2. For each trial: prepare isolation → run agent/tool under condition → collect metrics → evaluate success predicate.
 3. Append one JSONL row per trial: `suite, task, condition, trial, metrics, error, artifact_path`.
 4. Aggregate: mean/median, success rate, p50/p95 latency, total cost; optional bootstrap CI if n allows.
-5. Emit `REPORT.md` + `results.json` with methodology, versions, and raw data paths.
+5. Mint a run dir, then emit `$AGENT_DOCS/REPORT.md` + `$AGENT_DOCS/results.json`:
+
+   ```bash
+   RUN_ID=$(date -u +%Y-%m-%dT%H%M%SZ)
+   AGENT_DOCS="docs/agent/benchmark/$RUN_ID"
+   mkdir -p "$AGENT_DOCS"
+   printf '%s\n' "$RUN_ID" > docs/agent/benchmark/CURRENT
+   ```
+
+   Include methodology, versions, and raw data paths. Never write these at the repository root or a fixed flat path that a second bench overwrites.
 
 Dynamic = the plan file is the product: user adds tasks/conditions without rewriting the runner.
 

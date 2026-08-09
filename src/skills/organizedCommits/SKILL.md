@@ -39,7 +39,7 @@ Make Git history a debug timeline: one intent per commit, useful messages, and n
 8. Run the repository's fresh verification gate before shipping non-trivial work.
 9. Immediately before push, fetch or inspect the remote relationship, confirm no secret entered the outgoing range, and push without force. Do not delete the remote branch afterward.
 
-For classification, split, push, and consolidation examples, read [REFERENCE.md](REFERENCE.md). Multi-worktree fan-out or land → `coordinate-worktrees`. Full verify/handoff loop → `finish-and-ship`.
+For classification, split, push, and consolidation examples, read [REFERENCE.md](REFERENCE.md). Multi-worktree fan-out or land → `sdlc-tasks-executions`. Full verify/handoff loop → `finish-and-ship`.
 
 ## Verification
 

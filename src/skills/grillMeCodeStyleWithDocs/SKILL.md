@@ -48,7 +48,16 @@ When I already have `CODE-STYLE.md` / structure docs and want confirmation that 
 3. Map apps, packages, feature slices, and cross-slice imports from the inventory.
 4. Compare docs (AGENTS, CODE-STYLE, PROJECT, CONTEXT, LANGUAGE, README, ADRs) for missing files, nested contradictions, and path drift.
 5. Publish evidence-first findings (`ruleId`, path, symbol, line, evidence, severity, confidence, remediation). Taxonomy: [references/finding-taxonomy.md](references/finding-taxonomy.md). Defaults informed by [references/research-principles.md](references/research-principles.md); **project CODE-STYLE wins**.
-6. If findings are **persisted** (not chat-only): write **`docs/agent/style-audit/FINDINGS.md`** only — `mkdir -p docs/agent/style-audit` first. Never write `*AUDIT*.md` / compliance reports at the repository root. Migrate any legacy root audit files into that dir.
+6. If findings are **persisted** (not chat-only): mint a run dir and write **`$AGENT_DOCS/FINDINGS.md`** only:
+
+   ```bash
+   RUN_ID=$(date -u +%Y-%m-%dT%H%M%SZ)
+   AGENT_DOCS="docs/agent/style-audit/$RUN_ID"
+   mkdir -p "$AGENT_DOCS"
+   printf '%s\n' "$RUN_ID" > docs/agent/style-audit/CURRENT
+   ```
+
+   Resume → use `CURRENT` / explicit run-id. Never write `*AUDIT*.md` / compliance reports at the repository root or a fixed flat path. Migrate any legacy root/flat audit files into a run dir.
 7. Do **not** rewrite CODE-STYLE or rename symbols in audit mode. Approved cleanup → `deslop-v2`; structural prove-outs → `lean-prove`.
 
 Honest limit: mechanical scanners prove banned names, missing docs, and path patterns — not whether a name truly captures a business concept (`confidence: judgment` for those).

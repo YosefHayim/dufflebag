@@ -30,7 +30,7 @@ Improve an **existing** skill using concrete feedback. The skill file is the pro
    - **Packaging** — missing shipped paths, scripts, catalog deps, sync
 4. **Diff plan** (show before edit): exact sections to change, sample new description bullets, any new anti-triggers, what stays untouched.
 5. **Patch minimally**: prefer description + one workflow bullet + verification line over a rewrite. For freeform-trigger gaps, add the user’s real phrases. For failure modes, add an explicit anti-path or stop condition.
-6. **Cross-links**: if the skill should hand off (e.g. to `finish-and-ship`, `coordinate-worktrees`), name the sibling skill; if feedback was “I had to paste the whole SKILL.md”, add short aliases / `$name` variants.
+6. **Cross-links**: if the skill should hand off (e.g. to `finish-and-ship`, `sdlc-tasks-executions`), name the sibling skill; if feedback was “I had to paste the whole SKILL.md”, add short aliases / `$name` variants.
 7. **Validate**: frontmatter/tests/catalog; optionally dry-run the new description against 3–5 real user phrases (“would this load?”).
 8. **Ship path**: if dufflebag, ensure `featureCatalog` / `shippedPaths` still correct; remind `sync-agent-skills` or install so hosts pick up the change. Prefer a feature branch + PR when the repo uses that policy.
 
