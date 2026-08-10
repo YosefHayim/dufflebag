@@ -4,10 +4,12 @@ import { beforeEach, describe } from "vitest";
 
 import {
   acknowledgementVersion,
+  activeFreeProviderCount,
   documentedFreePoolCount,
   documentedRecurringTokenEstimate,
   freePoolSnapshot,
   freeProviderCatalog,
+  unavailableFreeProviderCount,
 } from "./freeProviderCatalog.js";
 import { connectOpenRouter } from "./openRouterOAuth.js";
 import {
@@ -68,13 +70,56 @@ describe("provider routing", () => {
     expect(new Set(freePoolSnapshot.map((freePool) => `${freePool.providerId}/${freePool.modelId}`)).size).toBe(43);
   });
 
-  it("exposes only officially active free providers and models", () => {
-    expect(listFreeProviders()).toHaveLength(5);
-    expect(listFreeModels()).toHaveLength(5);
-  });
+  it.effect("exposes only officially active free providers and models", () =>
+    Effect.gen(function* () {
+      const providerManifests = yield* listFreeProviders();
+      const freeModels = yield* listFreeModels();
+      expect(activeFreeProviderCount).toBe(30);
+      expect(unavailableFreeProviderCount).toBe(13);
+      expect(freeProviderCatalog).toHaveLength(43);
+      expect(providerManifests).toHaveLength(30);
+      expect(freeModels).toHaveLength(30);
+      expect(new Set(freeProviderCatalog.map((providerManifest) => providerManifest.providerId)).size).toBe(43);
+      expect(new Set(freeProviderCatalog.map((providerManifest) => providerManifest.freeTierWindow.poolId)).size).toBe(
+        43,
+      );
+      expect(new Set(freeProviderCatalog.map((providerManifest) => providerManifest.providerId))).toEqual(
+        new Set(freePoolSnapshot.map((freePool) => freePool.providerId)),
+      );
+      expect(
+        freeProviderCatalog
+          .filter((providerManifest) => providerManifest.activation === "unavailable")
+          .every((providerManifest) => providerManifest.unavailableReason !== undefined),
+      ).toBe(true);
+    }),
+  );
 
   it("rejects malformed manifests and routing declarations at the boundary", () => {
     expect(() => Schema.decodeUnknownSync(providerManifestSchema)({ providerId: "", models: [] })).toThrow();
+    const manifestFields = {
+      providerId: "boundary-provider",
+      displayName: "Boundary provider",
+      protocolFamily: "openai-chat",
+      endpoint: "https://boundary.example/chat/completions",
+      termsStatus: "ok",
+      freeTierWindow: { poolId: "boundary-pool", reset: "unquantified", estimatedTokens: 0 },
+      models: [{ modelId: "boundary-model", capabilities: ["text"] }],
+      source: "https://boundary.example/docs",
+    };
+    expect(() =>
+      Schema.decodeUnknownSync(providerManifestSchema)({
+        ...manifestFields,
+        authentication: "api-key",
+        activation: "active",
+      }),
+    ).toThrow();
+    expect(() =>
+      Schema.decodeUnknownSync(providerManifestSchema)({
+        ...manifestFields,
+        authentication: "keyless",
+        activation: "unavailable",
+      }),
+    ).toThrow();
     expect(() =>
       Schema.decodeUnknownSync(documentedFreePoolSchema)({
         poolId: "pool",
@@ -150,25 +195,113 @@ describe("provider routing", () => {
   );
 
   it.effect("falls back only before the first streamed output", () => {
-    const providerManifests = freeProviderCatalog.filter(
-      (providerManifest) => providerManifest.providerId === "groq" || providerManifest.providerId === "cerebras",
-    );
+    const groqManifest = freeProviderCatalog.find((providerManifest) => providerManifest.providerId === "groq");
+    const cerebrasManifest = freeProviderCatalog.find((providerManifest) => providerManifest.providerId === "cerebras");
+    if (groqManifest === undefined || cerebrasManifest === undefined) {
+      return Effect.die("The fallback test requires the Groq and Cerebras manifests.");
+    }
+    const invokedProviders: Array<string> = [];
     return completeFreeChat({
       routingRequest,
       dependencies: {
-        providerManifests,
+        providerManifests: [groqManifest, cerebrasManifest],
         credentialLookup: () => Effect.succeed(Option.some("test-key")),
         routingState,
-        providerExchange: ({ providerManifest, modelId }) =>
-          providerManifest.providerId === "groq"
+        providerExchange: ({ providerManifest, modelId }) => {
+          invokedProviders.push(providerManifest.providerId);
+          return providerManifest.providerId === "groq"
             ? Stream.fail(
                 new ProviderFailure({ providerId: providerManifest.providerId, modelId, failureClass: "upstream" }),
               )
-            : Stream.fromIterable([{ _tag: "text" as const, text: "hello" }, { _tag: "completed" as const }]),
+            : Stream.fromIterable([{ _tag: "text" as const, text: "hello" }, { _tag: "completed" as const }]);
+        },
       },
     }).pipe(
       Effect.tap((streamEvents) =>
-        Effect.sync(() => expect([...streamEvents]).toEqual([{ _tag: "text", text: "hello" }, { _tag: "completed" }])),
+        Effect.sync(() => {
+          expect([...streamEvents]).toEqual([{ _tag: "text", text: "hello" }, { _tag: "completed" }]);
+          expect(invokedProviders).toEqual(["groq", "cerebras"]);
+        }),
+      ),
+    );
+  });
+
+  it.effect("does not cross providers after a usage event is streamed", () => {
+    const groqManifest = freeProviderCatalog.find((providerManifest) => providerManifest.providerId === "groq");
+    const cerebrasManifest = freeProviderCatalog.find((providerManifest) => providerManifest.providerId === "cerebras");
+    if (groqManifest === undefined || cerebrasManifest === undefined) {
+      return Effect.die("The streamed-output test requires the Groq and Cerebras manifests.");
+    }
+    const invokedProviders: Array<string> = [];
+    return completeFreeChat({
+      routingRequest,
+      dependencies: {
+        providerManifests: [groqManifest, cerebrasManifest],
+        credentialLookup: () => Effect.succeed(Option.some("test-key")),
+        routingState,
+        providerExchange: ({ providerManifest, modelId }) => {
+          invokedProviders.push(providerManifest.providerId);
+          return Stream.fromIterable([{ _tag: "usage" as const, inputTokens: 1, outputTokens: 0 }]).pipe(
+            Stream.concat(
+              Stream.fail(
+                new ProviderFailure({ providerId: providerManifest.providerId, modelId, failureClass: "upstream" }),
+              ),
+            ),
+          );
+        },
+      },
+    }).pipe(
+      Effect.either,
+      Effect.tap((attempt) =>
+        Effect.sync(() => {
+          expect(Either.isLeft(attempt)).toBe(true);
+          expect(invokedProviders).toEqual(["groq"]);
+        }),
+      ),
+    );
+  });
+
+  it.effect("keeps explicit provider selection deterministic and surfaces its original failure", () => {
+    const providerManifest = freeProviderCatalog.find((candidateManifest) => candidateManifest.providerId === "groq");
+    if (providerManifest === undefined) return Effect.die("The Groq manifest is required for deterministic routing.");
+    const modelCapability = providerManifest.models.at(0);
+    if (modelCapability === undefined) return Effect.die("The Groq model is required for deterministic routing.");
+    const explicitRequest = decodeRoutingRequest({
+      target: { providerId: providerManifest.providerId, modelId: modelCapability.modelId },
+      chatRequest: { turns: [{ role: "user", text: "Say hi" }], requiredCapabilities: ["text"] },
+      acknowledgementVersion,
+      observedAt: "2026-08-10T00:00:00.000Z",
+    });
+    return completeFreeChat({
+      routingRequest: explicitRequest,
+      dependencies: {
+        providerManifests: [providerManifest],
+        credentialLookup: () => Effect.succeed(Option.some("test-key")),
+        routingState,
+        providerExchange: ({ providerManifest: selectedManifest, modelId }) =>
+          Stream.fail(
+            new ProviderFailure({
+              providerId: selectedManifest.providerId,
+              modelId,
+              failureClass: "upstream",
+              statusCode: 503,
+            }),
+          ),
+      },
+    }).pipe(
+      Effect.either,
+      Effect.tap((attempt) =>
+        Effect.sync(() => {
+          expect(Either.isLeft(attempt)).toBe(true);
+          if (Either.isLeft(attempt)) {
+            expect(attempt.left).toMatchObject({
+              _tag: "ProviderFailure",
+              providerId: "groq",
+              failureClass: "upstream",
+              statusCode: 503,
+            });
+          }
+        }),
       ),
     );
   });
@@ -194,6 +327,52 @@ describe("provider routing", () => {
         Effect.sync(() =>
           expect([...streamEvents]).toEqual([{ _tag: "text", text: "unified" }, { _tag: "completed" }]),
         ),
+      ),
+      Effect.ensuring(
+        Effect.sync(() => {
+          globalThis.fetch = originalFetch;
+        }),
+      ),
+    );
+  });
+
+  it.effect("uses the official AI Horde anonymous credential and GitHub API headers", () => {
+    const originalFetch = globalThis.fetch;
+    const observedHeaders: Array<Headers> = [];
+    globalThis.fetch = async (_endpoint, requestInit) => {
+      observedHeaders.push(new Headers(requestInit?.headers));
+      return new Response("data: [DONE]\n\n", { headers: { "content-type": "text/event-stream" } });
+    };
+    const providerManifests = freeProviderCatalog.filter(
+      (providerManifest) =>
+        providerManifest.providerId === "aihorde" || providerManifest.providerId === "github-models",
+    );
+    return Effect.forEach(providerManifests, (providerManifest) => {
+      const modelCapability = providerManifest.models.at(0);
+      if (modelCapability === undefined) return Effect.die("Focused provider manifest has no model.");
+      const credential =
+        providerManifest.providerId === "github-models" ? Option.some("github-model-key") : Option.none<string>();
+      return Stream.runCollect(
+        exchangeProviderChat({
+          providerManifest,
+          modelId: modelCapability.modelId,
+          credential,
+          chatRequest: routingRequest.chatRequest,
+        }),
+      );
+    }).pipe(
+      Effect.tap(() =>
+        Effect.sync(() => {
+          const hordeHeaders = observedHeaders.find(
+            (providerHeaders) => providerHeaders.get("authorization") === "Bearer 0000000000",
+          );
+          const githubHeaders = observedHeaders.find(
+            (providerHeaders) => providerHeaders.get("authorization") === "Bearer github-model-key",
+          );
+          expect(hordeHeaders).toBeDefined();
+          expect(githubHeaders?.get("accept")).toBe("application/vnd.github+json");
+          expect(githubHeaders?.get("x-github-api-version")).toBe("2026-03-10");
+        }),
       ),
       Effect.ensuring(
         Effect.sync(() => {

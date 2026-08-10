@@ -1,6 +1,5 @@
-import { spawn, spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, rmSync } from "node:fs";
-import { createServer } from "node:http";
+import { spawnSync } from "node:child_process";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -36,26 +35,6 @@ const runCli = (args: ReadonlyArray<string>, env: NodeJS.ProcessEnv = {}): CliEx
     exitCode: invocation.status === null ? 1 : invocation.status,
   };
 };
-
-const runCliAsync = (args: ReadonlyArray<string>, env: NodeJS.ProcessEnv = {}): Promise<CliExecution> =>
-  new Promise((resolveExecution, rejectExecution) => {
-    const invocation = spawn(process.execPath, ["--import", "tsx", CLI_ENTRY, ...args], {
-      cwd: REPO_ROOT,
-      env: { ...process.env, FORCE_COLOR: "0", ...env },
-    });
-    let stdout = "";
-    let stderr = "";
-    invocation.stdout.on("data", (outputChunk: Buffer) => {
-      stdout += outputChunk.toString();
-    });
-    invocation.stderr.on("data", (errorChunk: Buffer) => {
-      stderr += errorChunk.toString();
-    });
-    invocation.once("error", rejectExecution);
-    invocation.once("close", (exitCode) => {
-      resolveExecution({ stdout, stderr, exitCode: exitCode === null ? 1 : exitCode });
-    });
-  });
 
 describe("isBareArgv", () => {
   it("detects bare invocations that should route to the menu or help", () => {
@@ -136,72 +115,61 @@ describe("CLI help", () => {
   );
 
   it(
-    "documents OmniRoute model selection through the local unified gateway",
+    "documents standalone direct free-provider routing without an external gateway",
     async () => {
-      const execution = await runCli(["omniroute", "chat", "--help"]);
+      const execution = await runCli(["free", "--help"]);
 
       expect(execution.exitCode).toBe(0);
-      expect(execution.stdout).toContain("--model");
-      expect(execution.stdout).toContain("--base-url");
-      expect(execution.stdout).toContain("explicit configured model");
+      expect(execution.stdout).toContain("models");
+      expect(execution.stdout).toContain("credentials");
+      expect(execution.stdout).toContain("acknowledge");
+      expect(execution.stdout).toContain("chat");
+      expect(execution.stdout).not.toContain("base-url");
+      expect(execution.stdout).not.toContain("OmniRoute");
     },
     CLI_TEST_TIMEOUT,
   );
 
   it(
-    "streams an explicit OmniRoute model through a keyless local gateway",
+    "lists direct model identities, keyless readiness, credential variables, and unavailable pools",
     async () => {
-      let authorizationHeader: string | undefined;
-      let requestText = "";
-      const gateway = createServer((gatewayRequest, gatewayReply) => {
-        authorizationHeader = gatewayRequest.headers.authorization;
-        const requestChunks: Array<Buffer> = [];
-        gatewayRequest.on("data", (requestChunk: Buffer) => {
-          requestChunks.push(requestChunk);
-        });
-        gatewayRequest.on("end", () => {
-          requestText = Buffer.concat(requestChunks).toString();
-          gatewayReply.writeHead(200, { "content-type": "text/event-stream" });
-          gatewayReply.end('data: {"choices":[{"delta":{"content":"explicit-model-ok"}}]}\n\ndata: [DONE]\n\n');
-        });
-      });
-      await new Promise<void>((resolveListening) => gateway.listen(0, "127.0.0.1", resolveListening));
-      const gatewayAddress = gateway.address();
-      if (gatewayAddress === null || typeof gatewayAddress === "string") {
-        gateway.close();
-        throw new Error("The OmniRoute test gateway did not bind a TCP port.");
-      }
+      const execution = await runCli(["free", "models"], { GROQ_API_KEY: "" });
+
+      expect(execution.exitCode).toBe(0);
+      expect(execution.stdout).toContain("groq/meta-llama/llama-4-scout-17b-16e-instruct");
+      expect(execution.stdout).toContain("needs: export GROQ_API_KEY");
+      expect(execution.stdout).toContain("needs: export CLOUDFLARE_ACCOUNT_ID");
+      expect(execution.stdout).toContain("pollinations/openai");
+      expect(execution.stdout).toContain("needs: export POLLINATIONS_API_KEY");
+      expect(execution.stdout).toContain("ovhcloud/gpt-oss-120b");
+      expect(execution.stdout).toContain("ready: keyless");
+      expect(execution.stdout).toContain("huggingchat/baidu/ERNIE-4.5-VL-424B-A47B-Base-PT");
+      expect(execution.stdout).toContain("unavailable: browser-cookie");
+    },
+    CLI_TEST_TIMEOUT,
+  );
+
+  it(
+    "persists only the current terms acknowledgement and rejects malformed explicit model identities",
+    async () => {
+      const stateDirectory = mkdtempSync(path.join(tmpdir(), "dufflebag-provider-state-"));
+      const statePath = path.join(stateDirectory, "provider-routing.json");
       try {
-        const execution = await runCliAsync(
-          [
-            "omniroute",
-            "chat",
-            "say hi",
-            "--model",
-            "provider/model",
-            "--base-url",
-            `http://127.0.0.1:${String(gatewayAddress.port)}/v1`,
-          ],
-          { OMNIROUTE_API_KEY: "" },
-        );
-        expect(execution.exitCode, `${execution.stdout}\n${execution.stderr}`).toBe(0);
-        expect(execution.stdout).toContain("explicit-model-ok");
-        expect(requestText).toContain('"model":"provider/model"');
-        expect(authorizationHeader).toBeUndefined();
+        const acknowledgement = await runCli(["free", "acknowledge"], {
+          DUFFLEBAG_PROVIDER_STATE_PATH: statePath,
+        });
+        const malformedModel = await runCli(["free", "chat", "say hi", "--model", "missing-separator"], {
+          DUFFLEBAG_PROVIDER_STATE_PATH: statePath,
+        });
+
+        expect(acknowledgement.exitCode).toBe(0);
+        expect(readFileSync(statePath, "utf8")).toContain("omniroute-3.8.50-2026-06-17");
+        expect(readFileSync(statePath, "utf8")).not.toContain("say hi");
+        expect(malformedModel.exitCode).toBe(2);
+        expect(malformedModel.stdout).toContain("--model must be auto-free or provider/model");
       } finally {
-        await new Promise<void>((resolveClosed) => gateway.close(() => resolveClosed()));
+        rmSync(stateDirectory, { recursive: true, force: true });
       }
-    },
-    CLI_TEST_TIMEOUT,
-  );
-
-  it(
-    "rejects non-HTTP OmniRoute base URLs at the CLI boundary",
-    async () => {
-      const execution = await runCli(["omniroute", "chat", "say hi", "--base-url", "ftp://localhost/v1"]);
-
-      expect(execution.exitCode).toBe(2);
-      expect(execution.stdout).toContain("--base-url must be an absolute HTTP or HTTPS URL");
     },
     CLI_TEST_TIMEOUT,
   );

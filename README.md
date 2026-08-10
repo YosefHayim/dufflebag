@@ -83,32 +83,35 @@ Responses, Anthropic Messages, and Google Generative AI from
 `ys-dufflebag/provider-routing`. Compatible providers use declarations instead
 of provider-specific code.
 
-To use every provider already configured in a local
-[OmniRoute](https://github.com/diegosouzapw/OmniRoute) installation, start
-OmniRoute, create a local endpoint key in its dashboard, and pass either its
-automatic route or an explicit model:
+The CLI calls providers directly; it does not install, start, or proxy through
+OmniRoute. Inspect the 43-pool snapshot, credential readiness, and policy-held
+web/synthetic adapters before routing:
 
 ```bash
-npm install -g omniroute
-omniroute
-export OMNIROUTE_API_KEY="<local OmniRoute endpoint key>"
-dufflebag omniroute chat "Explain this repository" --model auto
-dufflebag omniroute chat "Explain this repository" --model provider/model
+dufflebag free models
+dufflebag free credentials
+dufflebag free acknowledge
+dufflebag free chat "Explain this repository" --model auto-free
+dufflebag free chat "Explain this repository" --model groq/meta-llama/llama-4-scout-17b-16e-instruct
 ```
 
-The local gateway defaults to `http://localhost:20128/v1`; override it with
-`--base-url`. Dufflebag never stores the gateway key or upstream credentials.
-OmniRoute owns upstream provider consent and configuration. The attributed
-v3.8.50 snapshot documents 43 recurring/keyless pools and about 1.526B
-pool-deduplicated recurring tokens, but actual access depends on the providers
-connected to the local gateway and their current terms and quotas.
-
-OpenRouter can also be used directly through browser consent:
+`free credentials` prints the exact environment variable accepted for each
+API-key provider. Dufflebag reads those values for the process and never writes
+them to disk. Cloudflare additionally needs `CLOUDFLARE_ACCOUNT_ID` so its
+account-scoped endpoint can be formed. The existing OpenRouter browser-consent
+command remains the keyless setup path for OpenRouter:
 
 ```bash
 dufflebag openrouter connect
-dufflebag openrouter chat "Explain this repository"
+dufflebag free chat "Explain this repository" --model openrouter/openrouter/free
 ```
+
+The independently attributed OmniRoute v3.8.50 snapshot documents 43
+pool-deduplicated recurring/keyless pools and about 1.526B estimated recurring
+tokens. Dufflebag activates only official API or officially keyless contracts;
+browser-cookie replay and synthetic CLI identities are listed as unavailable.
+The estimate is not a grant or guarantee: actual access depends on credentials,
+current provider terms, model availability, and live quotas.
 
 ### Migrating to 0.14
 

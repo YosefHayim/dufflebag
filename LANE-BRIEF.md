@@ -2,7 +2,7 @@
 
 ## Scope
 
-Ship provider-neutral streaming exchanges for the four declared wire families, refresh the attributed OmniRoute 43-pool snapshot, and add an OmniRoute local-gateway CLI that accepts an explicit model.
+Ship provider-neutral streaming exchanges for the four declared wire families, refresh the attributed OmniRoute 43-pool snapshot, and expose direct standalone free-provider CLI routing with explicit model selection.
 
 ## Safety boundary
 
@@ -15,7 +15,7 @@ Ship provider-neutral streaming exchanges for the four declared wire families, r
 
 - Colocated public-behavior tests for every wire family and failure class.
 - Catalog identity and pinned-total tests.
-- Credential-gated live checks where credentials or a local OmniRoute service exist.
+- Credential-gated live checks where direct provider credentials exist.
 - `pnpm test`
 - `pnpm typecheck`
 - `pnpm verify`

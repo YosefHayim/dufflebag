@@ -1,4 +1,4 @@
-import { DateTime, Effect, Option, Stream } from "effect";
+import { Context, DateTime, Effect, Option, Stream } from "effect";
 
 import { freeProviderCatalog } from "./freeProviderCatalog.js";
 import {
@@ -10,6 +10,7 @@ import {
   type ProviderId,
   type ProviderManifest,
   type RoutingRequest,
+  type RoutingStateFailure,
   type StreamEvent,
 } from "./providerContract.js";
 import {
@@ -23,11 +24,13 @@ import { exchangeProviderChat } from "./providerHttp.js";
 
 export {
   acknowledgementVersion,
+  activeFreeProviderCount,
   documentedFreePoolCount,
   documentedRecurringTokenEstimate,
   freePoolSnapshot,
   freePoolSnapshotSource,
   freeProviderCatalog,
+  unavailableFreeProviderCount,
 } from "./freeProviderCatalog.js";
 export { connectOpenRouter } from "./openRouterOAuth.js";
 export {
@@ -54,8 +57,11 @@ export {
   type ProviderManifest,
   providerIdSchema,
   providerManifestSchema,
+  providerUnavailabilitySchema,
   type RoutingRequest,
+  RoutingStateFailure,
   routingRequestSchema,
+  routingTargetSchema,
   type StreamEvent,
   streamEventSchema,
   termsStatusSchema,
@@ -80,10 +86,15 @@ export {
  * @returns An Effect containing an optional secret supplied by the caller.
  */
 export type CredentialLookup = (credentialId: string) => Effect.Effect<Option.Option<string>>;
-type RoutingState = {
-  readHealth: (identity: { providerId: ProviderId; modelId: ModelId }) => Effect.Effect<Option.Option<HealthRecord>>;
-  writeHealth: (healthRecord: HealthRecord) => Effect.Effect<void>;
-};
+export const RoutingState = Context.GenericTag<{
+  readHealth: (identity: {
+    providerId: ProviderId;
+    modelId: ModelId;
+  }) => Effect.Effect<Option.Option<HealthRecord>, RoutingStateFailure>;
+  writeHealth: (healthRecord: HealthRecord) => Effect.Effect<void, RoutingStateFailure>;
+}>("ys-dufflebag/provider-routing/RoutingState");
+
+type RoutingStateService = Context.Tag.Service<typeof RoutingState>;
 /**
  * Executes one selected provider/model invocation as a lazy Effect Stream.
  * @param invocation - Selected manifest, model, credential option, and chat request.
@@ -103,7 +114,7 @@ export type ProviderExchange = (invocation: {
 type ProviderRoutingDependencies = {
   providerManifests?: ReadonlyArray<ProviderManifest>;
   credentialLookup: CredentialLookup;
-  routingState: RoutingState;
+  routingState: RoutingStateService;
   providerExchange?: ProviderExchange;
 };
 
@@ -207,7 +218,7 @@ const recordFailure = (request: {
   eligibleProvider: EligibleProvider;
   routingRequest: RoutingRequest;
   failure: ProviderFailure;
-  routingState: RoutingState;
+  routingState: RoutingStateService;
 }) => {
   const prior = request.eligibleProvider.healthRecord;
   const priorFailedCalls = prior === undefined ? 0 : prior.failedCalls;
@@ -239,7 +250,7 @@ const recordSuccess = (request: {
   routingRequest: RoutingRequest;
   usageTokens: number;
   latencyMilliseconds: number;
-  routingState: RoutingState;
+  routingState: RoutingStateService;
 }) => {
   const prior = request.eligibleProvider.healthRecord;
   const quotaExpired =
@@ -269,8 +280,10 @@ const streamFromEligibleProviders = (request: {
   eligibleProviders: ReadonlyArray<EligibleProvider>;
   routingRequest: RoutingRequest;
   dependencies: ProviderRoutingDependencies;
-}): Stream.Stream<StreamEvent, ProviderFailure | NoEligibleProvider> => {
-  const tryProvider = (providerIndex: number): Stream.Stream<StreamEvent, ProviderFailure | NoEligibleProvider> => {
+}): Stream.Stream<StreamEvent, ProviderFailure | NoEligibleProvider | RoutingStateFailure> => {
+  const tryProvider = (
+    providerIndex: number,
+  ): Stream.Stream<StreamEvent, ProviderFailure | NoEligibleProvider | RoutingStateFailure> => {
     const eligibleProvider = request.eligibleProviders[providerIndex];
     if (eligibleProvider === undefined) {
       return Stream.fail(
@@ -289,9 +302,7 @@ const streamFromEligibleProviders = (request: {
       chatRequest: request.routingRequest.chatRequest,
     }).pipe(
       Stream.map((streamEvent) => {
-        if (streamEvent._tag === "text" || streamEvent._tag === "reasoning" || streamEvent._tag === "tool") {
-          emittedOutput = true;
-        }
+        emittedOutput = true;
         if (streamEvent._tag === "usage") {
           inputTokens = Math.max(inputTokens, streamEvent.inputTokens);
           outputTokens = Math.max(outputTokens, streamEvent.outputTokens);
@@ -310,21 +321,23 @@ const streamFromEligibleProviders = (request: {
               failure,
               routingState: request.dependencies.routingState,
             });
-            return emittedOutput ? Stream.fail(failure) : tryProvider(providerIndex + 1);
+            if (emittedOutput || request.routingRequest.target !== "auto-free") return Stream.fail(failure);
+            return tryProvider(providerIndex + 1);
           }),
         ),
       ),
-      Stream.ensuring(
-        Effect.suspend(() =>
-          completed
-            ? recordSuccess({
-                eligibleProvider,
-                routingRequest: request.routingRequest,
-                usageTokens: inputTokens + outputTokens,
-                latencyMilliseconds: Date.now() - startedAt,
-                routingState: request.dependencies.routingState,
-              })
-            : Effect.void,
+      Stream.concat(
+        Stream.unwrap(
+          Effect.suspend(() => {
+            if (!completed) return Effect.succeed(Stream.empty);
+            return recordSuccess({
+              eligibleProvider,
+              routingRequest: request.routingRequest,
+              usageTokens: inputTokens + outputTokens,
+              latencyMilliseconds: Date.now() - startedAt,
+              routingState: request.dependencies.routingState,
+            }).pipe(Effect.as(Stream.empty));
+          }),
         ),
       ),
     );
@@ -339,9 +352,11 @@ const streamFromEligibleProviders = (request: {
  */
 export const listFreeProviders = (
   request: { providerManifests?: ReadonlyArray<ProviderManifest> } = {},
-): ReadonlyArray<ProviderManifest> =>
-  (request.providerManifests === undefined ? freeProviderCatalog : request.providerManifests).filter(
-    (providerManifest) => providerManifest.activation === "active",
+): Effect.Effect<ReadonlyArray<ProviderManifest>> =>
+  Effect.succeed(
+    (request.providerManifests === undefined ? freeProviderCatalog : request.providerManifests).filter(
+      (providerManifest) => providerManifest.activation === "active",
+    ),
   );
 
 /**
@@ -350,8 +365,15 @@ export const listFreeProviders = (
  * @returns Flattened active provider/model capabilities.
  */
 export const listFreeModels = (request: { providerManifests?: ReadonlyArray<ProviderManifest> } = {}) =>
-  listFreeProviders(request).flatMap((providerManifest) =>
-    providerManifest.models.map((modelCapability) => ({ providerId: providerManifest.providerId, ...modelCapability })),
+  listFreeProviders(request).pipe(
+    Effect.map((providerManifests) =>
+      providerManifests.flatMap((providerManifest) =>
+        providerManifest.models.map((modelCapability) => ({
+          providerId: providerManifest.providerId,
+          ...modelCapability,
+        })),
+      ),
+    ),
   );
 
 /**
@@ -362,7 +384,7 @@ export const listFreeModels = (request: { providerManifests?: ReadonlyArray<Prov
 export const inspectProviderHealth = (request: {
   providerId: ProviderId;
   modelId: ModelId;
-  routingState: RoutingState;
+  routingState: RoutingStateService;
 }) => request.routingState.readHealth({ providerId: request.providerId, modelId: request.modelId });
 
 /**
@@ -373,7 +395,7 @@ export const inspectProviderHealth = (request: {
 export const routeFreeChat = (request: {
   routingRequest: RoutingRequest;
   dependencies: ProviderRoutingDependencies;
-}): Stream.Stream<StreamEvent, ProviderFailure | NoEligibleProvider> =>
+}): Stream.Stream<StreamEvent, ProviderFailure | NoEligibleProvider | RoutingStateFailure> =>
   Stream.unwrap(
     selectEligibleProviders(request.routingRequest, request.dependencies).pipe(
       Effect.map((eligibleProviders) =>
