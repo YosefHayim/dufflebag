@@ -3,6 +3,9 @@
   "version": "0.14.0",
   "description": "TypeScript CLI that installs and surgically updates coding-agent skills, native hooks, managed configuration, and copyable workflows for Claude Code, Codex, Grok, Kimi, Kiro, and more.",
   "type": "module",
+  "exports": {
+    "./provider-routing": "./dist/src/providerRouting/providerRouting.js"
+  },
   "bin": {
     "dufflebag": "dist/src/cli/main.js"
   },
