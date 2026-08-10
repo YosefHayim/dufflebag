@@ -68,7 +68,10 @@ const waitForAuthorizationCode = (request: { callbackUrl: URL; state: string }) 
       if (loopbackHost === undefined) {
         return;
       }
-      callbackServer.once("error", () => resume(Effect.fail(new OpenRouterOAuthFailure({ failureClass: "callback" }))));
+      callbackServer.once("error", () => {
+        closeCallbackServers();
+        resume(Effect.fail(new OpenRouterOAuthFailure({ failureClass: "callback" })));
+      });
       callbackServer.listen(Number(request.callbackUrl.port), loopbackHost);
     });
     return Effect.sync(closeCallbackServers);

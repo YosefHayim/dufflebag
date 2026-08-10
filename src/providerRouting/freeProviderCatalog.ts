@@ -79,7 +79,7 @@ const activeProviders: ReadonlyArray<ProviderManifest> = [
     authentication: "api-key",
     credentialId: "openrouter-oauth",
     termsStatus: "caution",
-    acknowledgementVersion: "openrouter-2026-08-10",
+    acknowledgementVersion: "omniroute-2026-06-17",
     activation: "active",
     freeTierWindow: { poolId: "openrouter-free", reset: "unquantified", estimatedTokens: 100000 },
     models: [{ modelId: "openrouter/free", capabilities: ["text", "reasoning", "tools"] }],

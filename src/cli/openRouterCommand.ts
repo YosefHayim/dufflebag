@@ -1,4 +1,4 @@
-import { execFile } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
 
 import { Command as CliCommand, Options } from "@effect/cli";
 import { Effect, Schema } from "effect";
@@ -14,6 +14,11 @@ const callbackPortOption = Options.integer("port").pipe(
 );
 
 const decodeOpenRouterOAuthRequest = Schema.decodeUnknownSync(openRouterOAuthRequestSchema);
+
+const requireMacOs = () =>
+  process.platform === "darwin"
+    ? Effect.void
+    : Effect.fail(new Error("OpenRouter Keychain consent is currently available on macOS only."));
 
 const executeMacOsCommand = (request: {
   executable: string;
@@ -34,10 +39,29 @@ const openConsentScreen = (authorizationUrl: URL) =>
   });
 
 const persistOpenRouterCredential = (credential: string) =>
-  executeMacOsCommand({
-    executable: "security",
-    arguments_: ["add-generic-password", "-a", "dufflebag", "-s", keychainService, "-w", credential, "-U"],
-    failureMessage: "macOS Keychain could not save the OpenRouter credential.",
+  Effect.async<void, Error>((resume) => {
+    const keychainPrompt = [
+      `spawn security add-generic-password -a dufflebag -s ${keychainService} -U -w`,
+      'expect "password data for new item:"',
+      "gets stdin credential",
+      'send -- "$credential\\r"',
+      'expect "retype password for new item:"',
+      'send -- "$credential\\r"',
+      "expect eof",
+    ].join("\n");
+    const keychainWriter = spawn("expect", ["-c", keychainPrompt], { stdio: ["pipe", "ignore", "ignore"] });
+    keychainWriter.once("error", () =>
+      resume(Effect.fail(new Error("macOS Keychain could not save the OpenRouter credential."))),
+    );
+    keychainWriter.once("close", (exitCode) =>
+      resume(
+        exitCode === 0
+          ? Effect.void
+          : Effect.fail(new Error("macOS Keychain could not save the OpenRouter credential.")),
+      ),
+    );
+    keychainWriter.stdin.write(`${credential}\n`);
+    keychainWriter.stdin.end();
   });
 
 const readOpenRouterCredential = () =>
@@ -81,6 +105,7 @@ const verifyOpenRouterFreeChat = (credential: string) =>
 
 const connectCommand = CliCommand.make("connect", { port: callbackPortOption }, (arguments_) =>
   Effect.gen(function* () {
+    yield* requireMacOs();
     yield* TerminalUI.intro("OpenRouter consent");
     yield* TerminalUI.step("Opening OpenRouter in your browser");
     const openRouterCredential = yield* connectOpenRouter({
@@ -94,6 +119,7 @@ const connectCommand = CliCommand.make("connect", { port: callbackPortOption }, 
 
 const smokeCommand = CliCommand.make("smoke", {}, () =>
   Effect.gen(function* () {
+    yield* requireMacOs();
     yield* TerminalUI.intro("OpenRouter free-model smoke check");
     const credential = yield* readOpenRouterCredential();
     yield* verifyOpenRouterFreeChat(credential);
