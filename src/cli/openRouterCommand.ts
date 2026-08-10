@@ -152,7 +152,7 @@ const chatCommand = CliCommand.make("chat", { prompt: chatPromptArgument }, (arg
       routingRequest: decodeRoutingRequest({
         target: "auto-free",
         chatRequest: { turns: [{ role: "user", text: arguments_.prompt }], requiredCapabilities: ["text"] },
-        acknowledgementVersion: "omniroute-2026-06-17",
+        acknowledgementVersion: "omniroute-3.8.50-2026-06-17",
         observedAt: new Date().toISOString(),
       }),
       dependencies: {

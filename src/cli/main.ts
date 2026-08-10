@@ -19,6 +19,7 @@ import { dedupCommand } from "./dedupCheckCommand.js";
 import { doctorCommand } from "./doctorCommand.js";
 import { installCommand } from "./installCommand.js";
 import { menuCommand } from "./menuCommand.js";
+import { omniRouteCommand } from "./omniRouteCommand.js";
 import { openRouterCommand } from "./openRouterCommand.js";
 import { workflowCommand } from "./scaffoldWorkflowsCommand.js";
 import { CliUsageError } from "./scopeOptions.js";
@@ -79,6 +80,7 @@ const dufflebag = Command.make("dufflebag").pipe(
     ttsCommand,
     voiceCommand,
     openRouterCommand,
+    omniRouteCommand,
   ]),
 );
 

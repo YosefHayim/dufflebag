@@ -76,6 +76,40 @@ dufflebag workflow scaffold .
 dufflebag dedup . --staged
 ```
 
+### Free provider routing
+
+Dufflebag exposes provider-neutral streaming adapters for OpenAI Chat, OpenAI
+Responses, Anthropic Messages, and Google Generative AI from
+`ys-dufflebag/provider-routing`. Compatible providers use declarations instead
+of provider-specific code.
+
+To use every provider already configured in a local
+[OmniRoute](https://github.com/diegosouzapw/OmniRoute) installation, start
+OmniRoute, create a local endpoint key in its dashboard, and pass either its
+automatic route or an explicit model:
+
+```bash
+npm install -g omniroute
+omniroute
+export OMNIROUTE_API_KEY="<local OmniRoute endpoint key>"
+dufflebag omniroute chat "Explain this repository" --model auto
+dufflebag omniroute chat "Explain this repository" --model provider/model
+```
+
+The local gateway defaults to `http://localhost:20128/v1`; override it with
+`--base-url`. Dufflebag never stores the gateway key or upstream credentials.
+OmniRoute owns upstream provider consent and configuration. The attributed
+v3.8.50 snapshot documents 43 recurring/keyless pools and about 1.526B
+pool-deduplicated recurring tokens, but actual access depends on the providers
+connected to the local gateway and their current terms and quotas.
+
+OpenRouter can also be used directly through browser consent:
+
+```bash
+dufflebag openrouter connect
+dufflebag openrouter chat "Explain this repository"
+```
+
 ### Migrating to 0.14
 
 Version 0.14 intentionally removes the old pre-1.0 grammar instead of carrying hidden aliases.

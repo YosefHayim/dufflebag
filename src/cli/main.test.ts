@@ -115,6 +115,19 @@ describe("CLI help", () => {
   );
 
   it(
+    "documents OmniRoute model selection through the local unified gateway",
+    async () => {
+      const execution = await runCli(["omniroute", "chat", "--help"]);
+
+      expect(execution.exitCode).toBe(0);
+      expect(execution.stdout).toContain("--model");
+      expect(execution.stdout).toContain("--base-url");
+      expect(execution.stdout).toContain("explicit configured model");
+    },
+    CLI_TEST_TIMEOUT,
+  );
+
+  it(
     "prints version",
     async () => {
       const execution = await runCli(["-V"]);
