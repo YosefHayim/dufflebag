@@ -8,6 +8,7 @@ import {
   OpenRouterOAuthFailure,
   type OpenRouterOAuthRequest,
   openRouterCredentialSchema,
+  openRouterKeyExchangeSchema,
 } from "./providerContract.js";
 
 const openRouterAuthorizationEndpoint = "https://openrouter.ai/auth";
@@ -92,7 +93,8 @@ const exchangeAuthorizationCode = (request: { code: string; codeVerifier: string
       if (!upstreamReply.ok) {
         throw new Error("OpenRouter declined the authorization code.");
       }
-      return Schema.decodeUnknownSync(openRouterCredentialSchema)(await upstreamReply.json());
+      const openRouterKeyExchange = Schema.decodeUnknownSync(openRouterKeyExchangeSchema)(await upstreamReply.json());
+      return Schema.decodeUnknownSync(openRouterCredentialSchema)({ credential: openRouterKeyExchange.key });
     },
     catch: () => new OpenRouterOAuthFailure({ failureClass: "exchange" }),
   });

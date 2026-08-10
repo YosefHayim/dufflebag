@@ -74,6 +74,10 @@ export const openRouterCredentialSchema = Schema.Struct({
   credential: Schema.NonEmptyTrimmedString,
 });
 
+export const openRouterKeyExchangeSchema = Schema.Struct({
+  key: Schema.NonEmptyTrimmedString,
+});
+
 export const streamEventSchema = Schema.Union(
   Schema.TaggedStruct("text", { text: Schema.String }),
   Schema.TaggedStruct("reasoning", { text: Schema.String }),
