@@ -161,56 +161,56 @@ const selectEligibleProviders = (routingRequest: RoutingRequest, dependencies: P
       );
   });
 
-const recordFailure = (
-  eligibleProvider: EligibleProvider,
-  routingRequest: RoutingRequest,
-  failure: ProviderFailure,
-  routingState: RoutingState,
-) => {
-  const prior = eligibleProvider.healthRecord;
+const recordFailure = (request: {
+  eligibleProvider: EligibleProvider;
+  routingRequest: RoutingRequest;
+  failure: ProviderFailure;
+  routingState: RoutingState;
+}) => {
+  const prior = request.eligibleProvider.healthRecord;
   const priorFailedCalls = prior === undefined ? 0 : prior.failedCalls;
   const cooldownUntil =
-    failure.failureClass === "quota"
-      ? DateTime.unsafeMake(DateTime.toEpochMillis(routingRequest.observedAt) + 60_000)
+    request.failure.failureClass === "quota"
+      ? DateTime.unsafeMake(DateTime.toEpochMillis(request.routingRequest.observedAt) + 60_000)
       : undefined;
   const circuitUntil =
-    failure.failureClass === "upstream" && priorFailedCalls >= 2
-      ? DateTime.unsafeMake(DateTime.toEpochMillis(routingRequest.observedAt) + 300_000)
+    request.failure.failureClass === "upstream" && priorFailedCalls >= 2
+      ? DateTime.unsafeMake(DateTime.toEpochMillis(request.routingRequest.observedAt) + 300_000)
       : undefined;
-  return routingState.writeHealth({
-    providerId: eligibleProvider.providerManifest.providerId,
-    modelId: eligibleProvider.modelId,
-    observedAt: routingRequest.observedAt,
+  return request.routingState.writeHealth({
+    providerId: request.eligibleProvider.providerManifest.providerId,
+    modelId: request.eligibleProvider.modelId,
+    observedAt: request.routingRequest.observedAt,
     cooldownUntil,
     circuitUntil,
     quotaUsedTokens: prior === undefined ? 0 : prior.quotaUsedTokens,
-    quotaWindowStartedAt: prior === undefined ? routingRequest.observedAt : prior.quotaWindowStartedAt,
+    quotaWindowStartedAt: prior === undefined ? request.routingRequest.observedAt : prior.quotaWindowStartedAt,
     successfulCalls: prior === undefined ? 0 : prior.successfulCalls,
     failedCalls: priorFailedCalls + 1,
     latencyMilliseconds: prior === undefined ? 0 : prior.latencyMilliseconds,
-    failureClass: failure.failureClass === "configuration" ? "upstream" : failure.failureClass,
+    failureClass: request.failure.failureClass === "configuration" ? "upstream" : request.failure.failureClass,
   });
 };
 
-const streamFromEligibleProviders = (
-  eligibleProviders: ReadonlyArray<EligibleProvider>,
-  routingRequest: RoutingRequest,
-  dependencies: ProviderRoutingDependencies,
-): Stream.Stream<StreamEvent, ProviderFailure | NoEligibleProvider> => {
+const streamFromEligibleProviders = (request: {
+  eligibleProviders: ReadonlyArray<EligibleProvider>;
+  routingRequest: RoutingRequest;
+  dependencies: ProviderRoutingDependencies;
+}): Stream.Stream<StreamEvent, ProviderFailure | NoEligibleProvider> => {
   const tryProvider = (providerIndex: number): Stream.Stream<StreamEvent, ProviderFailure | NoEligibleProvider> => {
-    const eligibleProvider = eligibleProviders[providerIndex];
+    const eligibleProvider = request.eligibleProviders[providerIndex];
     if (eligibleProvider === undefined) {
       return Stream.fail(
-        new NoEligibleProvider({ requiredCapabilities: routingRequest.chatRequest.requiredCapabilities }),
+        new NoEligibleProvider({ requiredCapabilities: request.routingRequest.chatRequest.requiredCapabilities }),
       );
     }
     let emittedOutput = false;
-    return dependencies
+    return request.dependencies
       .providerExchange({
         providerManifest: eligibleProvider.providerManifest,
         modelId: eligibleProvider.modelId,
         credential: eligibleProvider.credential,
-        chatRequest: routingRequest.chatRequest,
+        chatRequest: request.routingRequest.chatRequest,
       })
       .pipe(
         Stream.map((streamEvent) => {
@@ -222,7 +222,12 @@ const streamFromEligibleProviders = (
         Stream.catchAll((failure) =>
           Stream.unwrap(
             Effect.gen(function* () {
-              yield* recordFailure(eligibleProvider, routingRequest, failure, dependencies.routingState);
+              yield* recordFailure({
+                eligibleProvider,
+                routingRequest: request.routingRequest,
+                failure,
+                routingState: request.dependencies.routingState,
+              });
               return emittedOutput ? Stream.fail(failure) : tryProvider(providerIndex + 1);
             }),
           ),
@@ -257,7 +262,11 @@ export const routeFreeChat = (request: {
   Stream.unwrap(
     selectEligibleProviders(request.routingRequest, request.dependencies).pipe(
       Effect.map((eligibleProviders) =>
-        streamFromEligibleProviders(eligibleProviders, request.routingRequest, request.dependencies),
+        streamFromEligibleProviders({
+          eligibleProviders,
+          routingRequest: request.routingRequest,
+          dependencies: request.dependencies,
+        }),
       ),
     ),
   );
