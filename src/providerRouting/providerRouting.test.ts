@@ -5,6 +5,7 @@ import { describe } from "vitest";
 import { documentedFreePoolCount, freeProviderCatalog } from "./freeProviderCatalog.js";
 import { connectOpenRouter } from "./openRouterOAuth.js";
 import {
+  openRouterKeyExchangeSchema,
   openRouterOAuthRequestSchema,
   ProviderFailure,
   providerManifestSchema,
@@ -62,6 +63,9 @@ describe("provider routing", () => {
     expect(() => Schema.decodeUnknownSync(providerManifestSchema)({ providerId: "", models: [] })).toThrow();
     expect(() => Schema.decodeUnknownSync(routingRequestSchema)({ target: "auto-free" })).toThrow();
     expect(() => Schema.decodeUnknownSync(openRouterOAuthRequestSchema)({ callbackPort: 80 })).toThrow();
+    expect(() =>
+      Schema.decodeUnknownSync(openRouterKeyExchangeSchema)({ credential: "not-an-openrouter-key" }),
+    ).toThrow();
   });
 
   it.effect(
