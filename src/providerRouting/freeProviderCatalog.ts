@@ -7,9 +7,9 @@ import {
   providerManifestSchema,
 } from "./providerContract.js";
 
-const omniRouteSnapshotSource =
+export const freePoolSnapshotSource =
   "https://github.com/diegosouzapw/OmniRoute/blob/release/v3.8.50/docs/reference/FREE_TIERS.md";
-const acknowledgementVersion = "omniroute-3.8.50-2026-06-17";
+export const acknowledgementVersion = "omniroute-3.8.50-2026-06-17";
 const decodeDocumentedFreePool = Schema.decodeUnknownSync(documentedFreePoolSchema);
 const decodeProviderManifest = Schema.decodeUnknownSync(providerManifestSchema);
 
@@ -79,7 +79,7 @@ export const freeProviderCatalog: ReadonlyArray<ProviderManifest> = [
     termsStatus: "caution",
     acknowledgementVersion,
     activation: "active",
-    freeTierWindow: { poolId: "openrouter-free", reset: "daily", estimatedTokens: 1_200_000 },
+    freeTierWindow: { poolId: "openrouter-free", reset: "daily", estimatedTokens: 40_000 },
     models: [{ modelId: "openrouter/free", capabilities: ["text", "reasoning", "tools"] }],
     source: "https://openrouter.ai/docs/guides/overview/auth/oauth",
   }),
@@ -93,7 +93,7 @@ export const freeProviderCatalog: ReadonlyArray<ProviderManifest> = [
     termsStatus: "caution",
     acknowledgementVersion,
     activation: "active",
-    freeTierWindow: { poolId: "gemini-free", reset: "daily", estimatedTokens: 60_000_000 },
+    freeTierWindow: { poolId: "gemini-free", reset: "daily", estimatedTokens: 2_000_000 },
     models: [{ modelId: "gemini-2.5-flash", capabilities: ["text", "reasoning", "tools"] }],
     source: "https://ai.google.dev/gemini-api/docs/rate-limits",
   }),
@@ -107,7 +107,7 @@ export const freeProviderCatalog: ReadonlyArray<ProviderManifest> = [
     termsStatus: "caution",
     acknowledgementVersion,
     activation: "active",
-    freeTierWindow: { poolId: "groq", reset: "daily", estimatedTokens: 15_000_000 },
+    freeTierWindow: { poolId: "groq", reset: "daily", estimatedTokens: 500_000 },
     models: [{ modelId: "meta-llama/llama-4-scout-17b-16e-instruct", capabilities: ["text", "tools"] }],
     source: "https://console.groq.com/docs/rate-limits",
   }),
@@ -135,10 +135,8 @@ export const freeProviderCatalog: ReadonlyArray<ProviderManifest> = [
     termsStatus: "caution",
     acknowledgementVersion,
     activation: "active",
-    freeTierWindow: { poolId: "cerebras", reset: "daily", estimatedTokens: 30_000_000 },
+    freeTierWindow: { poolId: "cerebras", reset: "daily", estimatedTokens: 1_000_000 },
     models: [{ modelId: "zai-glm-4.7", capabilities: ["text", "tools"] }],
     source: "https://inference-docs.cerebras.ai/support/rate-limits",
   }),
 ];
-
-export const freePoolSnapshotSource = omniRouteSnapshotSource;

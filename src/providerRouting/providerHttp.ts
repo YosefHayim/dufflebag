@@ -19,22 +19,25 @@ const openAiStreamChunkSchema = Schema.Struct({
   choices: Schema.optional(
     Schema.Array(
       Schema.Struct({
-        delta: Schema.Struct({
-          content: Schema.optional(Schema.String),
-          reasoning_content: Schema.optional(Schema.String),
-          tool_calls: Schema.optional(
-            Schema.Array(
-              Schema.Struct({
-                function: Schema.optional(
-                  Schema.Struct({
-                    name: Schema.optional(Schema.String),
-                    arguments: Schema.optional(Schema.String),
-                  }),
-                ),
-              }),
+        delta: Schema.optional(
+          Schema.Struct({
+            content: Schema.optional(Schema.String),
+            reasoning_content: Schema.optional(Schema.String),
+            tool_calls: Schema.optional(
+              Schema.Array(
+                Schema.Struct({
+                  index: Schema.NonNegativeInt,
+                  function: Schema.optional(
+                    Schema.Struct({
+                      name: Schema.optional(Schema.String),
+                      arguments: Schema.optional(Schema.String),
+                    }),
+                  ),
+                }),
+              ),
             ),
-          ),
-        }),
+          }),
+        ),
         finish_reason: Schema.optional(Schema.NullOr(Schema.String)),
       }),
     ),
@@ -52,6 +55,7 @@ const openAiResponsesStreamChunkSchema = Schema.Struct({
 
 const anthropicStreamChunkSchema = Schema.Struct({
   type: Schema.String,
+  index: Schema.optional(Schema.NonNegativeInt),
   content_block: Schema.optional(
     Schema.Struct({
       type: Schema.String,
@@ -109,7 +113,7 @@ const encodeAnthropicTurns = (chatRequest: ChatRequest) =>
       content: chatTurn.text,
     }));
 
-const encodeAnthropicSystem = (chatRequest: ChatRequest): string | undefined => {
+const joinSystemText = (chatRequest: ChatRequest): string | undefined => {
   const systemText = chatRequest.turns
     .filter((chatTurn) => chatTurn.role === "system")
     .map((chatTurn) => chatTurn.text)
@@ -157,7 +161,7 @@ export const encodeAnthropicRequest = (chatRequest: ChatRequest, modelId: string
   model: modelId,
   stream: true,
   max_tokens: chatRequest.maximumOutputTokens === undefined ? 1024 : chatRequest.maximumOutputTokens,
-  system: encodeAnthropicSystem(chatRequest),
+  system: joinSystemText(chatRequest),
   messages: encodeAnthropicTurns(chatRequest),
 });
 
@@ -167,7 +171,7 @@ export const encodeAnthropicRequest = (chatRequest: ChatRequest, modelId: string
  * @returns The Google GenerateContent request object.
  */
 export const encodeGoogleGenerativeRequest = (chatRequest: ChatRequest) => {
-  const systemText = encodeAnthropicSystem(chatRequest);
+  const systemText = joinSystemText(chatRequest);
   return {
     systemInstruction: systemText === undefined ? undefined : { parts: [{ text: systemText }] },
     generationConfig: {
@@ -198,9 +202,9 @@ const usageEvent = (request: { inputTokens: number | undefined; outputTokens: nu
   outputTokens: request.outputTokens === undefined ? 0 : request.outputTokens,
 });
 
-const firstStreamEvent = (streamEvents: ReadonlyArray<StreamEvent>): StreamEvent => {
-  const streamEvent = streamEvents.find(() => true);
-  return streamEvent === undefined ? { _tag: "completed" } : streamEvent;
+const stringifyToolArguments = (toolArguments: unknown): string => {
+  const encodedArguments = JSON.stringify(toolArguments);
+  return encodedArguments === undefined ? "" : encodedArguments;
 };
 
 const decodeOpenAiStreamEvents = (
@@ -211,25 +215,13 @@ const decodeOpenAiStreamEvents = (
     (openAiChunk): ReadonlyArray<StreamEvent> => {
       const choiceEvents = (openAiChunk.choices === undefined ? [] : openAiChunk.choices).flatMap(
         (choice): ReadonlyArray<StreamEvent> => {
-          if (choice.delta.content !== undefined) {
+          if (choice.delta?.content !== undefined) {
             return [{ _tag: "text" as const, text: choice.delta.content }];
           }
-          if (choice.delta.reasoning_content !== undefined) {
+          if (choice.delta?.reasoning_content !== undefined) {
             return [{ _tag: "reasoning" as const, text: choice.delta.reasoning_content }];
           }
-          const firstToolCall = choice.delta.tool_calls?.find(() => true)?.function;
-          if (firstToolCall?.name !== undefined) {
-            return [
-              {
-                _tag: "tool" as const,
-                name: firstToolCall.name,
-                argumentsText: firstToolCall.arguments === undefined ? "" : firstToolCall.arguments,
-              },
-            ];
-          }
-          return choice.finish_reason === undefined || choice.finish_reason === null
-            ? []
-            : [{ _tag: "completed" as const }];
+          return [];
         },
       );
       const usageEvents =
@@ -292,15 +284,6 @@ const decodeAnthropicStreamEvents = (
       if (anthropicChunk.delta?.thinking !== undefined) {
         return [{ _tag: "reasoning" as const, text: anthropicChunk.delta.thinking }];
       }
-      if (anthropicChunk.content_block?.type === "tool_use" && anthropicChunk.content_block.name !== undefined) {
-        return [
-          {
-            _tag: "tool" as const,
-            name: anthropicChunk.content_block.name,
-            argumentsText: JSON.stringify(anthropicChunk.content_block.input),
-          },
-        ];
-      }
       const messageUsage = anthropicChunk.message?.usage;
       if (messageUsage !== undefined) {
         return [usageEvent({ inputTokens: messageUsage.input_tokens, outputTokens: messageUsage.output_tokens })];
@@ -331,7 +314,7 @@ const decodeGoogleStreamEvents = (
               {
                 _tag: "tool" as const,
                 name: part.functionCall.name,
-                argumentsText: JSON.stringify(part.functionCall.args),
+                argumentsText: stringifyToolArguments(part.functionCall.args),
               },
             ];
           }
@@ -357,41 +340,158 @@ const decodeGoogleStreamEvents = (
     },
   );
 
+type ToolCallBuffer = {
+  index: number;
+  name: string | undefined;
+  argumentsText: string;
+};
+
+type ProviderStreamState = {
+  openAiToolCalls: ReadonlyArray<ToolCallBuffer>;
+  anthropicToolCalls: ReadonlyArray<ToolCallBuffer>;
+};
+
+const emptyProviderStreamState: ProviderStreamState = {
+  openAiToolCalls: [],
+  anthropicToolCalls: [],
+};
+
+const mergeToolCallBuffer = (
+  toolCalls: ReadonlyArray<ToolCallBuffer>,
+  fragment: ToolCallBuffer,
+): ReadonlyArray<ToolCallBuffer> => {
+  const priorToolCall = toolCalls.find((toolCall) => toolCall.index === fragment.index);
+  const name = fragment.name === undefined ? priorToolCall?.name : fragment.name;
+  const argumentsText = `${priorToolCall === undefined ? "" : priorToolCall.argumentsText}${fragment.argumentsText}`;
+  return [...toolCalls.filter((toolCall) => toolCall.index !== fragment.index), { ...fragment, name, argumentsText }];
+};
+
+const toolEvents = (toolCalls: ReadonlyArray<ToolCallBuffer>): ReadonlyArray<StreamEvent> =>
+  toolCalls.flatMap((toolCall): ReadonlyArray<StreamEvent> => {
+    if (toolCall.name === undefined) return [];
+    return [{ _tag: "tool", name: toolCall.name, argumentsText: toolCall.argumentsText }];
+  });
+
+const withoutCompleted = (streamEvents: ReadonlyArray<StreamEvent>): ReadonlyArray<StreamEvent> =>
+  streamEvents.filter((streamEvent) => streamEvent._tag !== "completed");
+
+const decodeOpenAiStatefulEvents = (
+  state: ProviderStreamState,
+  wireChunk: unknown,
+): Either.Either<readonly [ProviderStreamState, ReadonlyArray<StreamEvent>], SchemaParseIssue.ParseError> =>
+  Either.flatMap(Schema.decodeUnknownEither(openAiStreamChunkSchema)(wireChunk), (openAiChunk) =>
+    Either.map(decodeOpenAiStreamEvents(wireChunk), (streamEvents) => {
+      const bufferedToolCalls = (openAiChunk.choices === undefined ? [] : openAiChunk.choices).reduce(
+        (knownToolCalls, choice) =>
+          (choice.delta?.tool_calls === undefined ? [] : choice.delta.tool_calls).reduce(
+            (updatedToolCalls, toolCall) => {
+              return mergeToolCallBuffer(updatedToolCalls, {
+                index: toolCall.index,
+                name: toolCall.function?.name,
+                argumentsText: toolCall.function?.arguments === undefined ? "" : toolCall.function.arguments,
+              });
+            },
+            knownToolCalls,
+          ),
+        state.openAiToolCalls,
+      );
+      const toolCallsFinished = (openAiChunk.choices === undefined ? [] : openAiChunk.choices).some(
+        (choice) => choice.finish_reason !== undefined && choice.finish_reason !== null,
+      );
+      if (!toolCallsFinished) {
+        return [{ ...state, openAiToolCalls: bufferedToolCalls }, streamEvents];
+      }
+      return [{ ...state, openAiToolCalls: [] }, [...streamEvents, ...toolEvents(bufferedToolCalls)]];
+    }),
+  );
+
+const initialAnthropicArguments = (toolInput: unknown): string => {
+  const encodedArguments = stringifyToolArguments(toolInput);
+  return encodedArguments === "{}" ? "" : encodedArguments;
+};
+
+const decodeAnthropicStatefulEvents = (
+  state: ProviderStreamState,
+  wireChunk: unknown,
+): Either.Either<readonly [ProviderStreamState, ReadonlyArray<StreamEvent>], SchemaParseIssue.ParseError> =>
+  Either.flatMap(Schema.decodeUnknownEither(anthropicStreamChunkSchema)(wireChunk), (anthropicChunk) =>
+    Either.map(decodeAnthropicStreamEvents(wireChunk), (streamEvents) => {
+      const index = anthropicChunk.index === undefined ? 0 : anthropicChunk.index;
+      const contentBlock = anthropicChunk.content_block;
+      if (contentBlock?.type === "tool_use" && contentBlock.name !== undefined) {
+        const anthropicToolCalls = mergeToolCallBuffer(state.anthropicToolCalls, {
+          index,
+          name: contentBlock.name,
+          argumentsText: initialAnthropicArguments(contentBlock.input),
+        });
+        return [{ ...state, anthropicToolCalls }, streamEvents];
+      }
+      if (anthropicChunk.delta?.partial_json !== undefined) {
+        const anthropicToolCalls = mergeToolCallBuffer(state.anthropicToolCalls, {
+          index,
+          name: undefined,
+          argumentsText: anthropicChunk.delta.partial_json,
+        });
+        return [{ ...state, anthropicToolCalls }, streamEvents];
+      }
+      const stoppedToolCall = state.anthropicToolCalls.filter((toolCall) => toolCall.index === index);
+      if (anthropicChunk.type === "content_block_stop" && stoppedToolCall.length > 0) {
+        return [
+          {
+            ...state,
+            anthropicToolCalls: state.anthropicToolCalls.filter((toolCall) => toolCall.index !== index),
+          },
+          [...streamEvents, ...toolEvents(stoppedToolCall)],
+        ];
+      }
+      if (anthropicChunk.type !== "message_stop") return [state, streamEvents];
+      return [
+        { ...state, anthropicToolCalls: [] },
+        [...withoutCompleted(streamEvents), ...toolEvents(state.anthropicToolCalls), { _tag: "completed" }],
+      ];
+    }),
+  );
+
+const decodeStatelessProviderEvents = (
+  state: ProviderStreamState,
+  decodedEvents: Either.Either<ReadonlyArray<StreamEvent>, SchemaParseIssue.ParseError>,
+): Either.Either<readonly [ProviderStreamState, ReadonlyArray<StreamEvent>], SchemaParseIssue.ParseError> =>
+  Either.map(decodedEvents, (streamEvents) => [state, streamEvents]);
+
 /**
  * Decodes one OpenAI Chat SSE chunk into provider-neutral vocabulary.
  * @param wireChunk - Untrusted JSON parsed from an SSE line.
- * @returns Either a stream event or a Schema parse failure.
+ * @returns Either zero or more stream events, or a Schema parse failure.
  */
-export const decodeOpenAiStreamChunk = (wireChunk: unknown): Either.Either<StreamEvent, SchemaParseIssue.ParseError> =>
-  Either.map(decodeOpenAiStreamEvents(wireChunk), firstStreamEvent);
+export const decodeOpenAiStreamChunk = decodeOpenAiStreamEvents;
 
 /**
  * Decodes one OpenAI Responses SSE chunk into provider-neutral vocabulary.
  * @param wireChunk - Untrusted JSON parsed from an SSE line.
- * @returns Either a stream event or a Schema parse failure.
+ * @returns Either zero or more stream events, or a Schema parse failure.
  */
 export const decodeOpenAiResponsesStreamChunk = (
   wireChunk: unknown,
-): Either.Either<StreamEvent, SchemaParseIssue.ParseError> =>
-  Either.map(decodeOpenAiResponsesStreamEvents(wireChunk), firstStreamEvent);
+): Either.Either<ReadonlyArray<StreamEvent>, SchemaParseIssue.ParseError> =>
+  decodeOpenAiResponsesStreamEvents(wireChunk);
 
 /**
  * Decodes one Anthropic Messages SSE chunk into provider-neutral vocabulary.
  * @param wireChunk - Untrusted JSON parsed from an SSE line.
- * @returns Either a stream event or a Schema parse failure.
+ * @returns Either zero or more stream events, or a Schema parse failure.
  */
 export const decodeAnthropicStreamChunk = (
   wireChunk: unknown,
-): Either.Either<StreamEvent, SchemaParseIssue.ParseError> =>
-  Either.map(decodeAnthropicStreamEvents(wireChunk), firstStreamEvent);
+): Either.Either<ReadonlyArray<StreamEvent>, SchemaParseIssue.ParseError> => decodeAnthropicStreamEvents(wireChunk);
 
 /**
  * Decodes one Google Generative AI SSE chunk into provider-neutral vocabulary.
  * @param wireChunk - Untrusted JSON parsed from an SSE line.
- * @returns Either a stream event or a Schema parse failure.
+ * @returns Either zero or more stream events, or a Schema parse failure.
  */
-export const decodeGoogleStreamChunk = (wireChunk: unknown): Either.Either<StreamEvent, SchemaParseIssue.ParseError> =>
-  Either.map(decodeGoogleStreamEvents(wireChunk), firstStreamEvent);
+export const decodeGoogleStreamChunk = (
+  wireChunk: unknown,
+): Either.Either<ReadonlyArray<StreamEvent>, SchemaParseIssue.ParseError> => decodeGoogleStreamEvents(wireChunk);
 
 /**
  * Classifies an upstream HTTP status without reading provider-specific prose.
@@ -409,9 +509,17 @@ const decodeProviderStreamChunk = (request: {
   providerManifest: ProviderManifest;
   modelId: ModelId;
   streamLine: string;
-}): Effect.Effect<ReadonlyArray<StreamEvent>, ProviderFailure> => {
+  streamState: ProviderStreamState;
+}): Effect.Effect<readonly [ProviderStreamState, ReadonlyArray<StreamEvent>], ProviderFailure> => {
   if (request.streamLine === "[DONE]") {
-    return Effect.succeed([{ _tag: "completed" }]);
+    return Effect.succeed([
+      emptyProviderStreamState,
+      [
+        ...toolEvents(request.streamState.openAiToolCalls),
+        ...toolEvents(request.streamState.anthropicToolCalls),
+        { _tag: "completed" },
+      ],
+    ]);
   }
   return Effect.try({
     try: () => {
@@ -426,55 +534,39 @@ const decodeProviderStreamChunk = (request: {
       }),
   }).pipe(
     Effect.flatMap((upstreamChunk) => {
+      const parseFailure = () =>
+        providerFailure({
+          providerManifest: request.providerManifest,
+          modelId: request.modelId,
+          failureClass: "upstream",
+        });
       switch (request.providerManifest.protocolFamily) {
         case "openai-chat":
-          return Either.match(decodeOpenAiStreamEvents(upstreamChunk), {
-            onLeft: () =>
-              Effect.fail(
-                providerFailure({
-                  providerManifest: request.providerManifest,
-                  modelId: request.modelId,
-                  failureClass: "upstream",
-                }),
-              ),
+          return Either.match(decodeOpenAiStatefulEvents(request.streamState, upstreamChunk), {
+            onLeft: () => Effect.fail(parseFailure()),
             onRight: Effect.succeed,
           });
         case "openai-responses":
-          return Either.match(decodeOpenAiResponsesStreamEvents(upstreamChunk), {
-            onLeft: () =>
-              Effect.fail(
-                providerFailure({
-                  providerManifest: request.providerManifest,
-                  modelId: request.modelId,
-                  failureClass: "upstream",
-                }),
-              ),
-            onRight: Effect.succeed,
-          });
+          return Either.match(
+            decodeStatelessProviderEvents(request.streamState, decodeOpenAiResponsesStreamEvents(upstreamChunk)),
+            {
+              onLeft: () => Effect.fail(parseFailure()),
+              onRight: Effect.succeed,
+            },
+          );
         case "anthropic-messages":
-          return Either.match(decodeAnthropicStreamEvents(upstreamChunk), {
-            onLeft: () =>
-              Effect.fail(
-                providerFailure({
-                  providerManifest: request.providerManifest,
-                  modelId: request.modelId,
-                  failureClass: "upstream",
-                }),
-              ),
+          return Either.match(decodeAnthropicStatefulEvents(request.streamState, upstreamChunk), {
+            onLeft: () => Effect.fail(parseFailure()),
             onRight: Effect.succeed,
           });
         case "google-generative":
-          return Either.match(decodeGoogleStreamEvents(upstreamChunk), {
-            onLeft: () =>
-              Effect.fail(
-                providerFailure({
-                  providerManifest: request.providerManifest,
-                  modelId: request.modelId,
-                  failureClass: "upstream",
-                }),
-              ),
-            onRight: Effect.succeed,
-          });
+          return Either.match(
+            decodeStatelessProviderEvents(request.streamState, decodeGoogleStreamEvents(upstreamChunk)),
+            {
+              onLeft: () => Effect.fail(parseFailure()),
+              onRight: Effect.succeed,
+            },
+          );
       }
       return Effect.fail(
         providerFailure({
@@ -506,11 +598,12 @@ const streamProviderReply = (request: {
     Stream.filter((streamLine) => streamLine.startsWith("data:")),
     Stream.map((streamLine) => streamLine.slice("data:".length).trim()),
     Stream.filter((streamLine) => streamLine !== ""),
-    Stream.mapEffect((streamLine) =>
+    Stream.mapAccumEffect(emptyProviderStreamState, (streamState, streamLine) =>
       decodeProviderStreamChunk({
         providerManifest: request.providerManifest,
         modelId: request.modelId,
         streamLine,
+        streamState,
       }),
     ),
     Stream.mapConcat((streamEvents) => streamEvents),
@@ -599,13 +692,23 @@ export const exchangeProviderChat = (invocation: {
           body: JSON.stringify(encodeProviderRequest(invocation)),
           signal: abortSignal,
         }),
-      catch: () =>
+      catch: (fetchFailure) =>
         providerFailure({
           providerManifest: invocation.providerManifest,
           modelId: invocation.modelId,
-          failureClass: "upstream",
+          failureClass:
+            fetchFailure instanceof DOMException && fetchFailure.name === "AbortError" ? "cancelled" : "upstream",
         }),
     }).pipe(
+      Effect.timeoutFail({
+        duration: "60 seconds",
+        onTimeout: () =>
+          providerFailure({
+            providerManifest: invocation.providerManifest,
+            modelId: invocation.modelId,
+            failureClass: "cancelled",
+          }),
+      }),
       Effect.flatMap((upstreamReply) => {
         if (!upstreamReply.ok) {
           return Effect.fail(
@@ -632,7 +735,17 @@ export const exchangeProviderChat = (invocation: {
             providerManifest: invocation.providerManifest,
             modelId: invocation.modelId,
             upstreamStream: upstreamReply.body,
-          }),
+          }).pipe(
+            Stream.timeoutFail(
+              () =>
+                providerFailure({
+                  providerManifest: invocation.providerManifest,
+                  modelId: invocation.modelId,
+                  failureClass: "cancelled",
+                }),
+              "60 seconds",
+            ),
+          ),
         );
       }),
     ),

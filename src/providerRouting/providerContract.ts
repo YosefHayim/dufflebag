@@ -25,7 +25,7 @@ export const modelCapabilitySchema = Schema.Struct({
 export const freeTierWindowSchema = Schema.Struct({
   poolId: poolIdSchema,
   reset: Schema.Literal("daily", "monthly", "never", "unquantified"),
-  estimatedTokens: Schema.NonNegative,
+  estimatedTokens: Schema.Number.pipe(Schema.int(), Schema.nonNegative()),
 });
 
 export const documentedFreePoolSchema = Schema.Struct({
@@ -33,7 +33,7 @@ export const documentedFreePoolSchema = Schema.Struct({
   providerId: providerIdSchema,
   modelId: modelIdSchema,
   freeType: Schema.Literal("recurring-daily", "recurring-monthly", "keyless"),
-  estimatedMonthlyTokens: Schema.NonNegative,
+  estimatedMonthlyTokens: Schema.Number.pipe(Schema.int(), Schema.nonNegative()),
   termsStatus: termsStatusSchema,
 });
 

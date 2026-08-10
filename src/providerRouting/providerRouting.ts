@@ -22,6 +22,7 @@ import {
 import { exchangeProviderChat } from "./providerHttp.js";
 
 export {
+  acknowledgementVersion,
   documentedFreePoolCount,
   documentedRecurringTokenEstimate,
   freePoolSnapshot,
@@ -190,19 +191,16 @@ const selectEligibleProviders = (routingRequest: RoutingRequest, dependencies: P
     return eligibleProviders
       .filter(Option.isSome)
       .map((eligibleProvider) => eligibleProvider.value)
-      .sort(
-        (left, right) =>
-          providerRank({
-            providerManifest: right.providerManifest,
-            healthRecord: right.healthRecord,
-            observedAt: routingRequest.observedAt,
-          }) -
-          providerRank({
-            providerManifest: left.providerManifest,
-            healthRecord: left.healthRecord,
-            observedAt: routingRequest.observedAt,
-          }),
-      );
+      .map((eligibleProvider) => ({
+        eligibleProvider,
+        providerRank: providerRank({
+          providerManifest: eligibleProvider.providerManifest,
+          healthRecord: eligibleProvider.healthRecord,
+          observedAt: routingRequest.observedAt,
+        }),
+      }))
+      .sort((left, right) => right.providerRank - left.providerRank)
+      .map((rankedProvider) => rankedProvider.eligibleProvider);
   });
 
 const recordFailure = (request: {
@@ -281,7 +279,8 @@ const streamFromEligibleProviders = (request: {
     }
     let emittedOutput = false;
     let completed = false;
-    let usageTokens = 0;
+    let inputTokens = 0;
+    let outputTokens = 0;
     const startedAt = Date.now();
     return providerExchangeFor(request.dependencies)({
       providerManifest: eligibleProvider.providerManifest,
@@ -294,7 +293,8 @@ const streamFromEligibleProviders = (request: {
           emittedOutput = true;
         }
         if (streamEvent._tag === "usage") {
-          usageTokens = streamEvent.inputTokens + streamEvent.outputTokens;
+          inputTokens = Math.max(inputTokens, streamEvent.inputTokens);
+          outputTokens = Math.max(outputTokens, streamEvent.outputTokens);
         }
         if (streamEvent._tag === "completed") {
           completed = true;
@@ -320,7 +320,7 @@ const streamFromEligibleProviders = (request: {
             ? recordSuccess({
                 eligibleProvider,
                 routingRequest: request.routingRequest,
-                usageTokens,
+                usageTokens: inputTokens + outputTokens,
                 latencyMilliseconds: Date.now() - startedAt,
                 routingState: request.dependencies.routingState,
               })

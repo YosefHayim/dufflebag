@@ -3,6 +3,7 @@ import { Effect, Either, Option, Schema, Stream } from "effect";
 import { beforeEach, describe } from "vitest";
 
 import {
+  acknowledgementVersion,
   documentedFreePoolCount,
   documentedRecurringTokenEstimate,
   freePoolSnapshot,
@@ -39,7 +40,7 @@ const decodeRoutingRequest = Schema.decodeUnknownSync(routingRequestSchema);
 const routingRequest = decodeRoutingRequest({
   target: "auto-free",
   chatRequest: { turns: [{ role: "user", text: "Say hi" }], requiredCapabilities: ["text"] },
-  acknowledgementVersion: "omniroute-3.8.50-2026-06-17",
+  acknowledgementVersion,
   observedAt: "2026-08-10T00:00:00.000Z",
 });
 
@@ -81,6 +82,16 @@ describe("provider routing", () => {
         modelId: "model",
         freeType: "recurring-daily",
         estimatedMonthlyTokens: -1,
+        termsStatus: "ok",
+      }),
+    ).toThrow();
+    expect(() =>
+      Schema.decodeUnknownSync(documentedFreePoolSchema)({
+        poolId: "pool",
+        providerId: "provider",
+        modelId: "model",
+        freeType: "recurring-daily",
+        estimatedMonthlyTokens: 1.5,
         termsStatus: "ok",
       }),
     ).toThrow();
@@ -195,22 +206,19 @@ describe("provider routing", () => {
   it("classifies status failures and decodes every supported chunk family", () => {
     expect(classifyUpstreamFailure(401)).toBe("authentication");
     expect(classifyUpstreamFailure(429)).toBe("quota");
-    expect(decodeOpenAiStreamChunk({ choices: [{ delta: { content: "hi" } }] }).right).toEqual({
-      _tag: "text",
-      text: "hi",
-    });
-    expect(decodeAnthropicStreamChunk({ type: "content_block_delta", delta: { text: "hi" } }).right).toEqual({
-      _tag: "text",
-      text: "hi",
-    });
-    expect(decodeGoogleStreamChunk({ candidates: [{ content: { parts: [{ text: "hi" }] } }] }).right).toEqual({
-      _tag: "text",
-      text: "hi",
-    });
-    expect(decodeOpenAiResponsesStreamChunk({ type: "response.output_text.delta", delta: "hi" }).right).toEqual({
-      _tag: "text",
-      text: "hi",
-    });
+    expect(decodeOpenAiStreamChunk({ choices: [{ delta: { content: "hi" } }] }).right).toEqual([
+      { _tag: "text", text: "hi" },
+    ]);
+    expect(decodeAnthropicStreamChunk({ type: "content_block_delta", delta: { text: "hi" } }).right).toEqual([
+      { _tag: "text", text: "hi" },
+    ]);
+    expect(decodeGoogleStreamChunk({ candidates: [{ content: { parts: [{ text: "hi" }] } }] }).right).toEqual([
+      { _tag: "text", text: "hi" },
+    ]);
+    expect(decodeOpenAiResponsesStreamChunk({ type: "response.output_text.delta", delta: "hi" }).right).toEqual([
+      { _tag: "text", text: "hi" },
+    ]);
+    expect(decodeOpenAiResponsesStreamChunk({ type: "response.created" }).right).toEqual([]);
     expect(Either.isLeft(decodeOpenAiStreamChunk({ choices: "malformed" }))).toBe(true);
     expect(Either.isLeft(decodeAnthropicStreamChunk({ type: 42 }))).toBe(true);
     expect(Either.isLeft(decodeGoogleStreamChunk({ candidates: [{ content: {} }] }))).toBe(true);
@@ -230,7 +238,9 @@ describe("provider routing", () => {
         [
           'data: {"choices":[{"delta":{"content":"chat"}}]}',
           'data: {"choices":[{"delta":{"reasoning_content":"think"}}]}',
-          'data: {"choices":[{"delta":{"tool_calls":[{"function":{"name":"lookup","arguments":"{}"}}]}}]}',
+          'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"name":"lookup","arguments":"{\\"city\\":"}}]}}]}',
+          'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\\"Haifa\\"}"}}]}}]}',
+          'data: {"choices":[{"delta":{},"finish_reason":"tool_calls"}]}',
           'data: {"usage":{"prompt_tokens":3,"completion_tokens":4}}',
           "data: [DONE]",
         ].join("\n\n"),
@@ -249,7 +259,10 @@ describe("provider routing", () => {
         [
           'data: {"type":"content_block_delta","delta":{"type":"text_delta","text":"anthropic"}}',
           'data: {"type":"content_block_delta","delta":{"type":"thinking_delta","thinking":"reason"}}',
-          'data: {"type":"content_block_start","content_block":{"type":"tool_use","name":"weather","input":{"city":"Haifa"}}}',
+          'data: {"type":"message_start","message":{"usage":{"input_tokens":5}}}',
+          'data: {"type":"content_block_start","index":1,"content_block":{"type":"tool_use","name":"weather","input":{}}}',
+          'data: {"type":"content_block_delta","index":1,"delta":{"type":"input_json_delta","partial_json":"{\\"city\\":\\"Haifa\\"}"}}',
+          'data: {"type":"content_block_stop","index":1}',
           'data: {"type":"message_delta","usage":{"output_tokens":7}}',
           'data: {"type":"message_stop"}',
         ].join("\n\n"),
@@ -340,9 +353,13 @@ describe("provider routing", () => {
           expect(wireFamilyEvents.map((streamEvents) => Array.from(streamEvents).map((event) => event._tag))).toEqual([
             ["text", "reasoning", "tool", "usage", "completed"],
             ["text", "reasoning", "tool", "usage", "completed"],
-            ["text", "reasoning", "tool", "usage", "completed"],
+            ["text", "reasoning", "usage", "tool", "usage", "completed"],
             ["text", "reasoning", "tool", "usage", "completed"],
           ]);
+          const openAiTool = Array.from(wireFamilyEvents[0]).find((streamEvent) => streamEvent._tag === "tool");
+          const anthropicTool = Array.from(wireFamilyEvents[2]).find((streamEvent) => streamEvent._tag === "tool");
+          expect(openAiTool).toEqual({ _tag: "tool", name: "lookup", argumentsText: '{"city":"Haifa"}' });
+          expect(anthropicTool).toEqual({ _tag: "tool", name: "weather", argumentsText: '{"city":"Haifa"}' });
           expect(invocations[0]?.headers.get("authorization")).toBe("Bearer wire-family-key");
           expect(invocations[2]?.headers.get("x-api-key")).toBe("wire-family-key");
           expect(invocations[2]?.headers.get("anthropic-version")).toBe("2023-06-01");
@@ -382,15 +399,21 @@ describe("provider routing", () => {
       return Effect.die("Decoded failure manifest had no model capability.");
     }
     return Effect.forEach(statusCodes, (statusCode) => {
-      globalThis.fetch = async () => new Response(null, { status: statusCode });
-      return Stream.runCollect(
-        exchangeProviderChat({
-          providerManifest,
-          modelId: failureModel.modelId,
-          credential: Option.some("failure-key"),
-          chatRequest: routingRequest.chatRequest,
-        }),
-      ).pipe(Effect.either);
+      return Effect.sync(() => {
+        globalThis.fetch = async () => new Response(null, { status: statusCode });
+      }).pipe(
+        Effect.flatMap(() =>
+          Stream.runCollect(
+            exchangeProviderChat({
+              providerManifest,
+              modelId: failureModel.modelId,
+              credential: Option.some("failure-key"),
+              chatRequest: routingRequest.chatRequest,
+            }),
+          ),
+        ),
+        Effect.either,
+      );
     }).pipe(
       Effect.tap((failures) =>
         Effect.sync(() => {
@@ -399,6 +422,44 @@ describe("provider routing", () => {
             "quota",
             "upstream",
           ]);
+        }),
+      ),
+      Effect.ensuring(
+        Effect.sync(() => {
+          globalThis.fetch = originalFetch;
+        }),
+      ),
+    );
+  });
+
+  it.effect("classifies an aborted provider request as cancelled", () => {
+    const originalFetch = globalThis.fetch;
+    const providerManifest = freeProviderCatalog.find(
+      (candidateManifest) => candidateManifest.providerId === "openrouter",
+    );
+    if (providerManifest === undefined) return Effect.die("The OpenRouter manifest is required for cancellation.");
+    const modelCapability = providerManifest.models.find(() => true);
+    if (modelCapability === undefined) return Effect.die("The OpenRouter model is required for cancellation.");
+    return Effect.sync(() => {
+      globalThis.fetch = async () => {
+        throw new DOMException("The request was aborted.", "AbortError");
+      };
+    }).pipe(
+      Effect.flatMap(() =>
+        Stream.runCollect(
+          exchangeProviderChat({
+            providerManifest,
+            modelId: modelCapability.modelId,
+            credential: Option.some("failure-key"),
+            chatRequest: routingRequest.chatRequest,
+          }),
+        ),
+      ),
+      Effect.either,
+      Effect.tap((cancelledAttempt) =>
+        Effect.sync(() => {
+          expect(Either.isLeft(cancelledAttempt)).toBe(true);
+          if (Either.isLeft(cancelledAttempt)) expect(cancelledAttempt.left.failureClass).toBe("cancelled");
         }),
       ),
       Effect.ensuring(
@@ -431,9 +492,24 @@ describe("provider routing", () => {
     const observedAt = Schema.decodeUnknownSync(Schema.DateTimeUtc)("2026-08-10T00:05:01.000Z");
 
     expect(quotaWindowIsExpired({ providerManifest, healthRecord: exhaustedHealth, observedAt })).toBe(true);
-    expect(estimatedRemainingQuota({ providerManifest, healthRecord: exhaustedHealth, observedAt })).toBe(30_000_000);
+    expect(estimatedRemainingQuota({ providerManifest, healthRecord: exhaustedHealth, observedAt })).toBe(1_000_000);
     expect(providerIsCoolingDown(exhaustedHealth, observedAt)).toBe(false);
     expect(providerCircuitIsOpen(exhaustedHealth, observedAt)).toBe(false);
+
+    const monthlyManifest = freeProviderCatalog.find((candidateManifest) => candidateManifest.providerId === "mistral");
+    if (monthlyManifest === undefined) throw new Error("The active Mistral declaration is required for quota tests.");
+    const monthlyModel = monthlyManifest.models.find(() => true);
+    if (monthlyModel === undefined) throw new Error("The active Mistral model is required for quota tests.");
+    const januaryHealth = {
+      ...exhaustedHealth,
+      providerId: monthlyManifest.providerId,
+      modelId: monthlyModel.modelId,
+      quotaWindowStartedAt: Schema.decodeUnknownSync(Schema.DateTimeUtc)("2026-01-31T23:59:00.000Z"),
+    };
+    const february = Schema.decodeUnknownSync(Schema.DateTimeUtc)("2026-02-01T00:00:00.000Z");
+    expect(
+      quotaWindowIsExpired({ providerManifest: monthlyManifest, healthRecord: januaryHealth, observedAt: february }),
+    ).toBe(true);
   });
 
   it.effect("persists only restart-safe health counters after a completed stream", () => {
@@ -443,7 +519,7 @@ describe("provider routing", () => {
     const privateRoutingRequest = decodeRoutingRequest({
       target: "auto-free",
       chatRequest: { turns: [{ role: "user", text: privatePrompt }], requiredCapabilities: ["text"] },
-      acknowledgementVersion: "omniroute-3.8.50-2026-06-17",
+      acknowledgementVersion,
       observedAt: "2026-08-10T00:00:00.000Z",
     });
     return completeFreeChat({
@@ -455,7 +531,8 @@ describe("provider routing", () => {
         providerExchange: () =>
           Stream.fromIterable([
             { _tag: "text" as const, text: "reply-must-not-persist" },
-            { _tag: "usage" as const, inputTokens: 11, outputTokens: 7 },
+            { _tag: "usage" as const, inputTokens: 11, outputTokens: 0 },
+            { _tag: "usage" as const, inputTokens: 0, outputTokens: 7 },
             { _tag: "completed" as const },
           ]),
       },

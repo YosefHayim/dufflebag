@@ -2,6 +2,7 @@ import { execFile, spawn } from "node:child_process";
 
 import { Args, Command as CliCommand, Options } from "@effect/cli";
 import { Effect, Option, Schema } from "effect";
+import { acknowledgementVersion } from "../providerRouting/freeProviderCatalog.js";
 import { openRouterOAuthRequestSchema, routingRequestSchema } from "../providerRouting/providerContract.js";
 import { completeFreeChat, connectOpenRouter } from "../providerRouting/providerRouting.js";
 import * as TerminalUI from "./TerminalUI.js";
@@ -152,7 +153,7 @@ const chatCommand = CliCommand.make("chat", { prompt: chatPromptArgument }, (arg
       routingRequest: decodeRoutingRequest({
         target: "auto-free",
         chatRequest: { turns: [{ role: "user", text: arguments_.prompt }], requiredCapabilities: ["text"] },
-        acknowledgementVersion: "omniroute-3.8.50-2026-06-17",
+        acknowledgementVersion,
         observedAt: new Date().toISOString(),
       }),
       dependencies: {

@@ -16,5 +16,7 @@ Ship provider-neutral streaming exchanges for the four declared wire families, r
 - Colocated public-behavior tests for every wire family and failure class.
 - Catalog identity and pinned-total tests.
 - Credential-gated live checks where credentials or a local OmniRoute service exist.
+- `pnpm test`
+- `pnpm typecheck`
 - `pnpm verify`
 - `npm pack --dry-run`
