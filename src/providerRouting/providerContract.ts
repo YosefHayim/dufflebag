@@ -25,7 +25,16 @@ export const modelCapabilitySchema = Schema.Struct({
 export const freeTierWindowSchema = Schema.Struct({
   poolId: poolIdSchema,
   reset: Schema.Literal("daily", "monthly", "never", "unquantified"),
-  estimatedTokens: Schema.NonNegative,
+  estimatedTokens: Schema.Number.pipe(Schema.int(), Schema.nonNegative()),
+});
+
+export const documentedFreePoolSchema = Schema.Struct({
+  poolId: poolIdSchema,
+  providerId: providerIdSchema,
+  modelId: modelIdSchema,
+  freeType: Schema.Literal("recurring-daily", "recurring-monthly", "keyless"),
+  estimatedMonthlyTokens: Schema.Number.pipe(Schema.int(), Schema.nonNegative()),
+  termsStatus: termsStatusSchema,
 });
 
 export const providerManifestSchema = Schema.Struct({
@@ -100,6 +109,7 @@ export const healthRecordSchema = Schema.Struct({
   failureClass: Schema.optional(Schema.Literal("authentication", "quota", "upstream", "cancelled")),
 });
 
+/** Describes one classified failure from an attempted provider/model route. */
 export class ProviderFailure extends Schema.TaggedError<ProviderFailure>()("ProviderFailure", {
   providerId: providerIdSchema,
   modelId: modelIdSchema,
@@ -107,20 +117,33 @@ export class ProviderFailure extends Schema.TaggedError<ProviderFailure>()("Prov
   statusCode: Schema.optional(Schema.Int),
 }) {}
 
+/** Reports that no declared provider satisfies a routing request. */
 export class NoEligibleProvider extends Schema.TaggedError<NoEligibleProvider>()("NoEligibleProvider", {
   requiredCapabilities: Schema.Array(capabilitySchema),
 }) {}
 
+/** Describes a failed OpenRouter browser-consent operation. */
 export class OpenRouterOAuthFailure extends Schema.TaggedError<OpenRouterOAuthFailure>()("OpenRouterOAuthFailure", {
   failureClass: Schema.Literal("callback", "exchange", "state"),
 }) {}
 
+/** A validated provider declaration used by routing and HTTP boundaries. */
 export type ProviderManifest = Schema.Schema.Type<typeof providerManifestSchema>;
+/** One pool-deduplicated entry from the attributed free-tier snapshot. */
+export type DocumentedFreePool = Schema.Schema.Type<typeof documentedFreePoolSchema>;
+/** Provider-neutral chat turns and required model capabilities. */
 export type ChatRequest = Schema.Schema.Type<typeof chatRequestSchema>;
+/** A validated target, chat request, acknowledgement, and observation time. */
 export type RoutingRequest = Schema.Schema.Type<typeof routingRequestSchema>;
+/** A provider-neutral streamed text, reasoning, tool, usage, or completion event. */
 export type StreamEvent = Schema.Schema.Type<typeof streamEventSchema>;
+/** Persistable provider health and quota counters without conversation content. */
 export type HealthRecord = Schema.Schema.Type<typeof healthRecordSchema>;
+/** A branded provider identity. */
 export type ProviderId = Schema.Schema.Type<typeof providerIdSchema>;
+/** A branded model identity. */
 export type ModelId = Schema.Schema.Type<typeof modelIdSchema>;
+/** Local callback settings for OpenRouter browser consent. */
 export type OpenRouterOAuthRequest = Schema.Schema.Type<typeof openRouterOAuthRequestSchema>;
+/** The credential returned by a successful OpenRouter key exchange. */
 export type OpenRouterCredential = Schema.Schema.Type<typeof openRouterCredentialSchema>;

@@ -99,6 +99,11 @@ const exchangeAuthorizationCode = (request: { code: string; codeVerifier: string
     catch: () => new OpenRouterOAuthFailure({ failureClass: "exchange" }),
   });
 
+/**
+ * Runs OpenRouter PKCE browser consent and returns the exchanged credential to the caller.
+ * @param request - Validated callback settings and optional browser/exchange mechanisms.
+ * @returns An Effect containing the OpenRouter credential without persisting it.
+ */
 export const connectOpenRouter = (request: {
   openRouterOAuthRequest: OpenRouterOAuthRequest;
   dependencies: OpenRouterOAuthDependencies;

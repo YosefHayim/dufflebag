@@ -14,6 +14,12 @@ const writeLine = (message: string) =>
     yield* terminal.display(`${message}\n`);
   });
 
+export const appendChatText = (message: string) =>
+  Effect.gen(function* () {
+    const terminal = yield* Terminal.Terminal;
+    yield* terminal.display(message);
+  });
+
 export const intro = (title: string) => writeLine(`\n  dufflebag · ${title}\n`);
 
 export const outro = (message: string) => writeLine(`\n  ${message}\n`);

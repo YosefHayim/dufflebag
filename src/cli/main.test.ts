@@ -1,5 +1,6 @@
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -35,6 +36,26 @@ const runCli = (args: ReadonlyArray<string>, env: NodeJS.ProcessEnv = {}): CliEx
     exitCode: invocation.status === null ? 1 : invocation.status,
   };
 };
+
+const runCliAsync = (args: ReadonlyArray<string>, env: NodeJS.ProcessEnv = {}): Promise<CliExecution> =>
+  new Promise((resolveExecution, rejectExecution) => {
+    const invocation = spawn(process.execPath, ["--import", "tsx", CLI_ENTRY, ...args], {
+      cwd: REPO_ROOT,
+      env: { ...process.env, FORCE_COLOR: "0", ...env },
+    });
+    let stdout = "";
+    let stderr = "";
+    invocation.stdout.on("data", (outputChunk: Buffer) => {
+      stdout += outputChunk.toString();
+    });
+    invocation.stderr.on("data", (errorChunk: Buffer) => {
+      stderr += errorChunk.toString();
+    });
+    invocation.once("error", rejectExecution);
+    invocation.once("close", (exitCode) => {
+      resolveExecution({ stdout, stderr, exitCode: exitCode === null ? 1 : exitCode });
+    });
+  });
 
 describe("isBareArgv", () => {
   it("detects bare invocations that should route to the menu or help", () => {
@@ -110,6 +131,77 @@ describe("CLI help", () => {
       expect(execution.stdout).toContain("smoke");
       expect(execution.stdout).toContain("chat");
       expect(execution.stdout.toLowerCase()).toContain("oauth");
+    },
+    CLI_TEST_TIMEOUT,
+  );
+
+  it(
+    "documents OmniRoute model selection through the local unified gateway",
+    async () => {
+      const execution = await runCli(["omniroute", "chat", "--help"]);
+
+      expect(execution.exitCode).toBe(0);
+      expect(execution.stdout).toContain("--model");
+      expect(execution.stdout).toContain("--base-url");
+      expect(execution.stdout).toContain("explicit configured model");
+    },
+    CLI_TEST_TIMEOUT,
+  );
+
+  it(
+    "streams an explicit OmniRoute model through a keyless local gateway",
+    async () => {
+      let authorizationHeader: string | undefined;
+      let requestText = "";
+      const gateway = createServer((gatewayRequest, gatewayReply) => {
+        authorizationHeader = gatewayRequest.headers.authorization;
+        const requestChunks: Array<Buffer> = [];
+        gatewayRequest.on("data", (requestChunk: Buffer) => {
+          requestChunks.push(requestChunk);
+        });
+        gatewayRequest.on("end", () => {
+          requestText = Buffer.concat(requestChunks).toString();
+          gatewayReply.writeHead(200, { "content-type": "text/event-stream" });
+          gatewayReply.end('data: {"choices":[{"delta":{"content":"explicit-model-ok"}}]}\n\ndata: [DONE]\n\n');
+        });
+      });
+      await new Promise<void>((resolveListening) => gateway.listen(0, "127.0.0.1", resolveListening));
+      const gatewayAddress = gateway.address();
+      if (gatewayAddress === null || typeof gatewayAddress === "string") {
+        gateway.close();
+        throw new Error("The OmniRoute test gateway did not bind a TCP port.");
+      }
+      try {
+        const execution = await runCliAsync(
+          [
+            "omniroute",
+            "chat",
+            "say hi",
+            "--model",
+            "provider/model",
+            "--base-url",
+            `http://127.0.0.1:${String(gatewayAddress.port)}/v1`,
+          ],
+          { OMNIROUTE_API_KEY: "" },
+        );
+        expect(execution.exitCode, `${execution.stdout}\n${execution.stderr}`).toBe(0);
+        expect(execution.stdout).toContain("explicit-model-ok");
+        expect(requestText).toContain('"model":"provider/model"');
+        expect(authorizationHeader).toBeUndefined();
+      } finally {
+        await new Promise<void>((resolveClosed) => gateway.close(() => resolveClosed()));
+      }
+    },
+    CLI_TEST_TIMEOUT,
+  );
+
+  it(
+    "rejects non-HTTP OmniRoute base URLs at the CLI boundary",
+    async () => {
+      const execution = await runCli(["omniroute", "chat", "say hi", "--base-url", "ftp://localhost/v1"]);
+
+      expect(execution.exitCode).toBe(2);
+      expect(execution.stdout).toContain("--base-url must be an absolute HTTP or HTTPS URL");
     },
     CLI_TEST_TIMEOUT,
   );
