@@ -3,7 +3,13 @@ import { Effect, Option, Schema, Stream } from "effect";
 import { describe } from "vitest";
 
 import { documentedFreePoolCount, freeProviderCatalog } from "./freeProviderCatalog.js";
-import { ProviderFailure, providerManifestSchema, routingRequestSchema } from "./providerContract.js";
+import { connectOpenRouter } from "./openRouterOAuth.js";
+import {
+  openRouterOAuthRequestSchema,
+  ProviderFailure,
+  providerManifestSchema,
+  routingRequestSchema,
+} from "./providerContract.js";
 import {
   classifyUpstreamFailure,
   decodeAnthropicStreamChunk,
@@ -48,14 +54,62 @@ describe("provider routing", () => {
   });
 
   it("exposes only officially active free providers and models", () => {
-    expect(listFreeProviders()).toHaveLength(4);
-    expect(listFreeModels()).toHaveLength(4);
+    expect(listFreeProviders()).toHaveLength(5);
+    expect(listFreeModels()).toHaveLength(5);
   });
 
   it("rejects malformed manifests and routing declarations at the boundary", () => {
     expect(() => Schema.decodeUnknownSync(providerManifestSchema)({ providerId: "", models: [] })).toThrow();
     expect(() => Schema.decodeUnknownSync(routingRequestSchema)({ target: "auto-free" })).toThrow();
+    expect(() => Schema.decodeUnknownSync(openRouterOAuthRequestSchema)({ callbackPort: 80 })).toThrow();
   });
+
+  it.effect(
+    "completes a state-validated local OpenRouter callback without persisting transient authorization material",
+    () => {
+      let authorizationUrl: URL | undefined;
+      let exchangedCode: string | undefined;
+      let exchangedVerifier: string | undefined;
+      const callbackPort = 49153;
+      return connectOpenRouter({
+        openRouterOAuthRequest: Schema.decodeUnknownSync(openRouterOAuthRequestSchema)({ callbackPort }),
+        dependencies: {
+          openBrowser: (openedAuthorizationUrl) =>
+            Effect.tryPromise({
+              try: async () => {
+                authorizationUrl = openedAuthorizationUrl;
+                const callbackText = openedAuthorizationUrl.searchParams.get("callback_url");
+                if (callbackText === null) {
+                  throw new Error("OpenRouter authorization URL did not include a callback URL.");
+                }
+                const callbackUrl = new URL(callbackText);
+                if (!callbackUrl.pathname.startsWith("/openrouter/callback/")) {
+                  throw new Error("OpenRouter callback URL did not include state.");
+                }
+                callbackUrl.searchParams.set("code", "authorization-code");
+                await fetch(callbackUrl);
+              },
+              catch: (failure) => (failure instanceof Error ? failure : new Error("Could not complete test callback.")),
+            }),
+          exchangeAuthorizationCode: ({ code, codeVerifier }) =>
+            Effect.sync(() => {
+              exchangedCode = code;
+              exchangedVerifier = codeVerifier;
+              return { credential: "test-openrouter-key" };
+            }),
+        },
+      }).pipe(
+        Effect.tap((openRouterCredential) =>
+          Effect.sync(() => {
+            expect(openRouterCredential.credential).toBe("test-openrouter-key");
+            expect(authorizationUrl?.hostname).toBe("openrouter.ai");
+            expect(exchangedCode).toBe("authorization-code");
+            expect(exchangedVerifier).toBeDefined();
+          }),
+        ),
+      );
+    },
+  );
 
   it.effect("falls back only before the first streamed output", () => {
     const providerManifests = freeProviderCatalog.filter(

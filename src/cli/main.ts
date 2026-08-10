@@ -19,6 +19,7 @@ import { dedupCommand } from "./dedupCheckCommand.js";
 import { doctorCommand } from "./doctorCommand.js";
 import { installCommand } from "./installCommand.js";
 import { menuCommand } from "./menuCommand.js";
+import { openRouterCommand } from "./openRouterCommand.js";
 import { workflowCommand } from "./scaffoldWorkflowsCommand.js";
 import { CliUsageError } from "./scopeOptions.js";
 import * as TerminalUI from "./TerminalUI.js";
@@ -77,6 +78,7 @@ const dufflebag = Command.make("dufflebag").pipe(
     sttCommand,
     ttsCommand,
     voiceCommand,
+    openRouterCommand,
   ]),
 );
 

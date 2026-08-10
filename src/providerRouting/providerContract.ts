@@ -4,6 +4,8 @@ export const providerIdSchema = Schema.NonEmptyTrimmedString.pipe(Schema.brand("
 export const modelIdSchema = Schema.NonEmptyTrimmedString.pipe(Schema.brand("ModelId"));
 export const poolIdSchema = Schema.NonEmptyTrimmedString.pipe(Schema.brand("PoolId"));
 export const credentialIdSchema = Schema.NonEmptyTrimmedString.pipe(Schema.brand("CredentialId"));
+export const oauthStateSchema = Schema.NonEmptyTrimmedString.pipe(Schema.brand("OAuthState"));
+export const oauthCodeVerifierSchema = Schema.NonEmptyTrimmedString.pipe(Schema.brand("OAuthCodeVerifier"));
 export const protocolFamilySchema = Schema.Literal(
   "openai-chat",
   "openai-responses",
@@ -64,6 +66,14 @@ export const routingRequestSchema = Schema.Struct({
   observedAt: Schema.DateTimeUtc,
 });
 
+export const openRouterOAuthRequestSchema = Schema.Struct({
+  callbackPort: Schema.Int.pipe(Schema.between(1024, 65535)),
+});
+
+export const openRouterCredentialSchema = Schema.Struct({
+  credential: Schema.NonEmptyTrimmedString,
+});
+
 export const streamEventSchema = Schema.Union(
   Schema.TaggedStruct("text", { text: Schema.String }),
   Schema.TaggedStruct("reasoning", { text: Schema.String }),
@@ -97,6 +107,10 @@ export class NoEligibleProvider extends Schema.TaggedError<NoEligibleProvider>()
   requiredCapabilities: Schema.Array(capabilitySchema),
 }) {}
 
+export class OpenRouterOAuthFailure extends Schema.TaggedError<OpenRouterOAuthFailure>()("OpenRouterOAuthFailure", {
+  failureClass: Schema.Literal("callback", "exchange", "state"),
+}) {}
+
 export type ProviderManifest = Schema.Schema.Type<typeof providerManifestSchema>;
 export type ChatRequest = Schema.Schema.Type<typeof chatRequestSchema>;
 export type RoutingRequest = Schema.Schema.Type<typeof routingRequestSchema>;
@@ -104,3 +118,5 @@ export type StreamEvent = Schema.Schema.Type<typeof streamEventSchema>;
 export type HealthRecord = Schema.Schema.Type<typeof healthRecordSchema>;
 export type ProviderId = Schema.Schema.Type<typeof providerIdSchema>;
 export type ModelId = Schema.Schema.Type<typeof modelIdSchema>;
+export type OpenRouterOAuthRequest = Schema.Schema.Type<typeof openRouterOAuthRequestSchema>;
+export type OpenRouterCredential = Schema.Schema.Type<typeof openRouterCredentialSchema>;

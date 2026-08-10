@@ -101,6 +101,19 @@ describe("CLI help", () => {
   );
 
   it(
+    "documents OpenRouter browser consent and the credential-gated free-model smoke check",
+    async () => {
+      const execution = await runCli(["openrouter", "--help"]);
+
+      expect(execution.exitCode).toBe(0);
+      expect(execution.stdout).toContain("connect");
+      expect(execution.stdout).toContain("smoke");
+      expect(execution.stdout.toLowerCase()).toContain("oauth");
+    },
+    CLI_TEST_TIMEOUT,
+  );
+
+  it(
     "prints version",
     async () => {
       const execution = await runCli(["-V"]);
