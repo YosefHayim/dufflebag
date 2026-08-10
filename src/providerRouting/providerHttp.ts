@@ -627,21 +627,37 @@ const providerHeaders = (invocation: {
   providerManifest: ProviderManifest;
   credential: string | undefined;
 }): HeadersInit => {
-  if (invocation.credential === undefined) {
-    return { "content-type": "application/json" };
-  }
+  const commonHeaders = { "content-type": "application/json", "user-agent": "ys-dufflebag/0.14" };
   switch (invocation.providerManifest.protocolFamily) {
     case "anthropic-messages":
+      if (invocation.credential === undefined) return commonHeaders;
       return {
+        ...commonHeaders,
         "anthropic-version": "2023-06-01",
-        "content-type": "application/json",
         "x-api-key": invocation.credential,
       };
     case "google-generative":
-      return { "content-type": "application/json", "x-goog-api-key": invocation.credential };
+      return invocation.credential === undefined
+        ? commonHeaders
+        : { ...commonHeaders, "x-goog-api-key": invocation.credential };
     case "openai-chat":
-    case "openai-responses":
-      return { authorization: `Bearer ${invocation.credential}`, "content-type": "application/json" };
+    case "openai-responses": {
+      const credential =
+        invocation.credential === undefined && invocation.providerManifest.providerId === "aihorde"
+          ? "0000000000"
+          : invocation.credential;
+      const authorizationHeaders: Record<string, string> =
+        credential === undefined ? {} : { authorization: `Bearer ${credential}` };
+      const githubHeaders: Record<string, string> =
+        invocation.providerManifest.providerId === "github-models"
+          ? { accept: "application/vnd.github+json", "x-github-api-version": "2026-03-10" }
+          : {};
+      const airforceHeaders: Record<string, string> =
+        invocation.providerManifest.providerId === "api-airforce"
+          ? { "http-referer": "https://github.com/YosefHayim/dufflebag", "x-title": "Dufflebag" }
+          : {};
+      return { ...commonHeaders, ...authorizationHeaders, ...githubHeaders, ...airforceHeaders };
+    }
   }
 };
 
@@ -674,6 +690,7 @@ export const exchangeProviderChat = (invocation: {
   chatRequest: ChatRequest;
 }): Stream.Stream<StreamEvent, ProviderFailure> => {
   const credential = Option.getOrUndefined(invocation.credential);
+  const requestTimeout = invocation.providerManifest.providerId === "aihorde" ? "120 seconds" : "60 seconds";
   if (invocation.providerManifest.authentication === "api-key" && credential === undefined) {
     return Stream.fail(
       providerFailure({
@@ -701,7 +718,7 @@ export const exchangeProviderChat = (invocation: {
         }),
     }).pipe(
       Effect.timeoutFail({
-        duration: "60 seconds",
+        duration: requestTimeout,
         onTimeout: () =>
           providerFailure({
             providerManifest: invocation.providerManifest,
@@ -743,7 +760,7 @@ export const exchangeProviderChat = (invocation: {
                   modelId: invocation.modelId,
                   failureClass: "cancelled",
                 }),
-              "60 seconds",
+              requestTimeout,
             ),
           ),
         );

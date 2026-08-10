@@ -15,6 +15,13 @@ export const protocolFamilySchema = Schema.Literal(
 export const termsStatusSchema = Schema.Literal("ok", "caution", "ambiguous", "unknown", "avoid");
 export const authenticationRequirementSchema = Schema.Literal("api-key", "keyless");
 export const providerActivationSchema = Schema.Literal("active", "unavailable");
+export const providerUnavailabilitySchema = Schema.Literal(
+  "browser-cookie",
+  "retired-contract",
+  "synthetic-identity",
+  "unsupported-protocol",
+  "unverified-contract",
+);
 export const capabilitySchema = Schema.Literal("text", "reasoning", "tools");
 
 export const modelCapabilitySchema = Schema.Struct({
@@ -37,7 +44,7 @@ export const documentedFreePoolSchema = Schema.Struct({
   termsStatus: termsStatusSchema,
 });
 
-export const providerManifestSchema = Schema.Struct({
+const providerManifestFieldsSchema = Schema.Struct({
   providerId: providerIdSchema,
   displayName: Schema.NonEmptyTrimmedString,
   protocolFamily: protocolFamilySchema,
@@ -47,10 +54,26 @@ export const providerManifestSchema = Schema.Struct({
   termsStatus: termsStatusSchema,
   acknowledgementVersion: Schema.optional(Schema.NonEmptyTrimmedString),
   activation: providerActivationSchema,
+  unavailableReason: Schema.optional(providerUnavailabilitySchema),
   freeTierWindow: freeTierWindowSchema,
   models: Schema.NonEmptyArray(modelCapabilitySchema),
   source: Schema.URL,
 });
+
+export const providerManifestSchema = providerManifestFieldsSchema.pipe(
+  Schema.filter(
+    (providerManifest) =>
+      (providerManifest.authentication === "api-key" && providerManifest.credentialId !== undefined) ||
+      (providerManifest.authentication === "keyless" && providerManifest.credentialId === undefined),
+    { message: () => "API-key providers require a credential identity and keyless providers must omit one." },
+  ),
+  Schema.filter(
+    (providerManifest) =>
+      (providerManifest.activation === "unavailable" && providerManifest.unavailableReason !== undefined) ||
+      (providerManifest.activation === "active" && providerManifest.unavailableReason === undefined),
+    { message: () => "Unavailable providers require one policy reason and active providers must omit it." },
+  ),
+);
 
 export const chatTurnSchema = Schema.Struct({
   role: Schema.Literal("system", "user", "assistant", "tool"),
@@ -120,6 +143,11 @@ export class ProviderFailure extends Schema.TaggedError<ProviderFailure>()("Prov
 /** Reports that no declared provider satisfies a routing request. */
 export class NoEligibleProvider extends Schema.TaggedError<NoEligibleProvider>()("NoEligibleProvider", {
   requiredCapabilities: Schema.Array(capabilitySchema),
+}) {}
+
+/** Describes a failure reading or writing caller-owned provider routing state. */
+export class RoutingStateFailure extends Schema.TaggedError<RoutingStateFailure>()("RoutingStateFailure", {
+  issue: Schema.NonEmptyTrimmedString,
 }) {}
 
 /** Describes a failed OpenRouter browser-consent operation. */
