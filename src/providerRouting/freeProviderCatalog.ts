@@ -72,6 +72,20 @@ const documentedUnavailableProviders = documentedPoolIds.map((providerId) =>
 
 const activeProviders: ReadonlyArray<ProviderManifest> = [
   decodeProviderManifest({
+    providerId: "openrouter",
+    displayName: "OpenRouter free models",
+    protocolFamily: "openai-chat",
+    endpoint: "https://openrouter.ai/api/v1/chat/completions",
+    authentication: "api-key",
+    credentialId: "openrouter-oauth",
+    termsStatus: "caution",
+    acknowledgementVersion: "omniroute-2026-06-17",
+    activation: "active",
+    freeTierWindow: { poolId: "openrouter-free", reset: "unquantified", estimatedTokens: 100000 },
+    models: [{ modelId: "openrouter/free", capabilities: ["text", "reasoning", "tools"] }],
+    source: "https://openrouter.ai/docs/guides/overview/auth/oauth",
+  }),
+  decodeProviderManifest({
     providerId: "gemini",
     displayName: "Google Gemini",
     protocolFamily: "google-generative",

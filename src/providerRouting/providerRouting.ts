@@ -20,6 +20,7 @@ import {
 } from "./providerHealth.js";
 
 export { documentedFreePoolCount, freeProviderCatalog } from "./freeProviderCatalog.js";
+export { connectOpenRouter } from "./openRouterOAuth.js";
 export {
   type ChatRequest,
   capabilitySchema,
@@ -32,6 +33,11 @@ export {
   modelCapabilitySchema,
   modelIdSchema,
   NoEligibleProvider,
+  type OpenRouterCredential,
+  OpenRouterOAuthFailure,
+  type OpenRouterOAuthRequest,
+  openRouterCredentialSchema,
+  openRouterOAuthRequestSchema,
   ProviderFailure,
   type ProviderId,
   type ProviderManifest,
