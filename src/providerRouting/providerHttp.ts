@@ -8,59 +8,178 @@ import {
   type StreamEvent,
 } from "./providerContract.js";
 
+const usageSchema = Schema.Struct({
+  prompt_tokens: Schema.optional(Schema.NonNegative),
+  completion_tokens: Schema.optional(Schema.NonNegative),
+  input_tokens: Schema.optional(Schema.NonNegative),
+  output_tokens: Schema.optional(Schema.NonNegative),
+});
+
 const openAiStreamChunkSchema = Schema.Struct({
-  choices: Schema.Array(
-    Schema.Struct({
-      delta: Schema.Struct({
-        content: Schema.optional(Schema.String),
-        reasoning_content: Schema.optional(Schema.String),
+  choices: Schema.optional(
+    Schema.Array(
+      Schema.Struct({
+        delta: Schema.Struct({
+          content: Schema.optional(Schema.String),
+          reasoning_content: Schema.optional(Schema.String),
+          tool_calls: Schema.optional(
+            Schema.Array(
+              Schema.Struct({
+                function: Schema.optional(
+                  Schema.Struct({
+                    name: Schema.optional(Schema.String),
+                    arguments: Schema.optional(Schema.String),
+                  }),
+                ),
+              }),
+            ),
+          ),
+        }),
+        finish_reason: Schema.optional(Schema.NullOr(Schema.String)),
       }),
-    }),
+    ),
   ),
+  usage: Schema.optional(usageSchema),
+});
+
+const openAiResponsesStreamChunkSchema = Schema.Struct({
+  type: Schema.String,
+  delta: Schema.optional(Schema.String),
+  name: Schema.optional(Schema.String),
+  arguments: Schema.optional(Schema.String),
+  response: Schema.optional(Schema.Struct({ usage: Schema.optional(usageSchema) })),
 });
 
 const anthropicStreamChunkSchema = Schema.Struct({
   type: Schema.String,
-  delta: Schema.optional(
-    Schema.Struct({ text: Schema.optional(Schema.String), thinking: Schema.optional(Schema.String) }),
+  content_block: Schema.optional(
+    Schema.Struct({
+      type: Schema.String,
+      name: Schema.optional(Schema.String),
+      input: Schema.optional(Schema.Unknown),
+    }),
   ),
+  delta: Schema.optional(
+    Schema.Struct({
+      type: Schema.optional(Schema.String),
+      text: Schema.optional(Schema.String),
+      thinking: Schema.optional(Schema.String),
+      partial_json: Schema.optional(Schema.String),
+    }),
+  ),
+  message: Schema.optional(Schema.Struct({ usage: Schema.optional(usageSchema) })),
+  usage: Schema.optional(usageSchema),
 });
 
 const googleStreamChunkSchema = Schema.Struct({
-  candidates: Schema.Array(
+  candidates: Schema.optional(
+    Schema.Array(
+      Schema.Struct({
+        content: Schema.Struct({
+          parts: Schema.Array(
+            Schema.Struct({
+              text: Schema.optional(Schema.String),
+              thought: Schema.optional(Schema.Boolean),
+              functionCall: Schema.optional(
+                Schema.Struct({ name: Schema.NonEmptyTrimmedString, args: Schema.optional(Schema.Unknown) }),
+              ),
+            }),
+          ),
+        }),
+        finishReason: Schema.optional(Schema.String),
+      }),
+    ),
+  ),
+  usageMetadata: Schema.optional(
     Schema.Struct({
-      content: Schema.Struct({ parts: Schema.Array(Schema.Struct({ text: Schema.optional(Schema.String) })) }),
+      promptTokenCount: Schema.optional(Schema.NonNegative),
+      candidatesTokenCount: Schema.optional(Schema.NonNegative),
     }),
   ),
 });
 
-const encodeTurns = (chatRequest: ChatRequest) =>
+const encodeOpenAiTurns = (chatRequest: ChatRequest) =>
   chatRequest.turns.map((chatTurn) => ({ role: chatTurn.role, content: chatTurn.text }));
 
+const encodeAnthropicTurns = (chatRequest: ChatRequest) =>
+  chatRequest.turns
+    .filter((chatTurn) => chatTurn.role !== "system")
+    .map((chatTurn) => ({
+      role: chatTurn.role === "assistant" ? "assistant" : "user",
+      content: chatTurn.text,
+    }));
+
+const encodeAnthropicSystem = (chatRequest: ChatRequest): string | undefined => {
+  const systemText = chatRequest.turns
+    .filter((chatTurn) => chatTurn.role === "system")
+    .map((chatTurn) => chatTurn.text)
+    .join("\n\n");
+  return systemText === "" ? undefined : systemText;
+};
+
+const encodeGoogleRole = (role: ChatRequest["turns"][number]["role"]): "user" | "model" =>
+  role === "assistant" ? "model" : "user";
+
+/**
+ * Encodes a provider-neutral chat request for the OpenAI Chat wire family.
+ * @param chatRequest - Validated conversation turns and output constraints.
+ * @param modelId - Upstream model identity.
+ * @returns The OpenAI Chat request object.
+ */
 export const encodeOpenAiChatRequest = (chatRequest: ChatRequest, modelId: string) => ({
   model: modelId,
   stream: true,
-  messages: encodeTurns(chatRequest),
+  stream_options: { include_usage: true },
+  max_tokens: chatRequest.maximumOutputTokens,
+  messages: encodeOpenAiTurns(chatRequest),
 });
 
+/**
+ * Encodes a provider-neutral chat request for the OpenAI Responses wire family.
+ * @param chatRequest - Validated conversation turns and output constraints.
+ * @param modelId - Upstream model identity.
+ * @returns The OpenAI Responses request object.
+ */
 export const encodeOpenAiResponsesRequest = (chatRequest: ChatRequest, modelId: string) => ({
   model: modelId,
   stream: true,
-  input: encodeTurns(chatRequest),
+  max_output_tokens: chatRequest.maximumOutputTokens,
+  input: encodeOpenAiTurns(chatRequest),
 });
 
+/**
+ * Encodes a provider-neutral chat request for Anthropic Messages.
+ * @param chatRequest - Validated conversation turns and output constraints.
+ * @param modelId - Upstream model identity.
+ * @returns The Anthropic Messages request object.
+ */
 export const encodeAnthropicRequest = (chatRequest: ChatRequest, modelId: string) => ({
   model: modelId,
   stream: true,
-  max_tokens: chatRequest.maximumOutputTokens,
-  messages: encodeTurns(chatRequest),
+  max_tokens: chatRequest.maximumOutputTokens === undefined ? 1024 : chatRequest.maximumOutputTokens,
+  system: encodeAnthropicSystem(chatRequest),
+  messages: encodeAnthropicTurns(chatRequest),
 });
 
-export const encodeGoogleGenerativeRequest = (chatRequest: ChatRequest) => ({
-  contents: chatRequest.turns.map((chatTurn) => ({ role: chatTurn.role, parts: [{ text: chatTurn.text }] })),
-});
+/**
+ * Encodes a provider-neutral chat request for Google Generative AI.
+ * @param chatRequest - Validated conversation turns and output constraints.
+ * @returns The Google GenerateContent request object.
+ */
+export const encodeGoogleGenerativeRequest = (chatRequest: ChatRequest) => {
+  const systemText = encodeAnthropicSystem(chatRequest);
+  return {
+    systemInstruction: systemText === undefined ? undefined : { parts: [{ text: systemText }] },
+    generationConfig: {
+      maxOutputTokens: chatRequest.maximumOutputTokens,
+    },
+    contents: chatRequest.turns
+      .filter((chatTurn) => chatTurn.role !== "system")
+      .map((chatTurn) => ({ role: encodeGoogleRole(chatTurn.role), parts: [{ text: chatTurn.text }] })),
+  };
+};
 
-const openRouterFailure = (request: {
+const providerFailure = (request: {
   providerManifest: ProviderManifest;
   modelId: ModelId;
   failureClass: ProviderFailure["failureClass"];
@@ -73,38 +192,212 @@ const openRouterFailure = (request: {
     statusCode: request.statusCode,
   });
 
-export const decodeOpenAiStreamChunk = (wireChunk: unknown): Either.Either<StreamEvent, SchemaParseIssue.ParseError> =>
-  Either.map(Schema.decodeUnknownEither(openAiStreamChunkSchema)(wireChunk), (openAiChunk) => {
-    const firstChoice = openAiChunk.choices[0];
-    if (firstChoice === undefined || firstChoice.delta.content === undefined) {
-      return firstChoice?.delta.reasoning_content === undefined
-        ? { _tag: "completed" as const }
-        : { _tag: "reasoning" as const, text: firstChoice.delta.reasoning_content };
-    }
-    return { _tag: "text" as const, text: firstChoice.delta.content };
-  });
+const usageEvent = (request: { inputTokens: number | undefined; outputTokens: number | undefined }): StreamEvent => ({
+  _tag: "usage",
+  inputTokens: request.inputTokens === undefined ? 0 : request.inputTokens,
+  outputTokens: request.outputTokens === undefined ? 0 : request.outputTokens,
+});
 
+const firstStreamEvent = (streamEvents: ReadonlyArray<StreamEvent>): StreamEvent => {
+  const streamEvent = streamEvents.find(() => true);
+  return streamEvent === undefined ? { _tag: "completed" } : streamEvent;
+};
+
+const decodeOpenAiStreamEvents = (
+  wireChunk: unknown,
+): Either.Either<ReadonlyArray<StreamEvent>, SchemaParseIssue.ParseError> =>
+  Either.map(
+    Schema.decodeUnknownEither(openAiStreamChunkSchema)(wireChunk),
+    (openAiChunk): ReadonlyArray<StreamEvent> => {
+      const choiceEvents = (openAiChunk.choices === undefined ? [] : openAiChunk.choices).flatMap(
+        (choice): ReadonlyArray<StreamEvent> => {
+          if (choice.delta.content !== undefined) {
+            return [{ _tag: "text" as const, text: choice.delta.content }];
+          }
+          if (choice.delta.reasoning_content !== undefined) {
+            return [{ _tag: "reasoning" as const, text: choice.delta.reasoning_content }];
+          }
+          const firstToolCall = choice.delta.tool_calls?.find(() => true)?.function;
+          if (firstToolCall?.name !== undefined) {
+            return [
+              {
+                _tag: "tool" as const,
+                name: firstToolCall.name,
+                argumentsText: firstToolCall.arguments === undefined ? "" : firstToolCall.arguments,
+              },
+            ];
+          }
+          return choice.finish_reason === undefined || choice.finish_reason === null
+            ? []
+            : [{ _tag: "completed" as const }];
+        },
+      );
+      const usageEvents =
+        openAiChunk.usage === undefined
+          ? []
+          : [
+              usageEvent({
+                inputTokens: openAiChunk.usage.prompt_tokens,
+                outputTokens: openAiChunk.usage.completion_tokens,
+              }),
+            ];
+      return [...choiceEvents, ...usageEvents];
+    },
+  );
+
+const decodeOpenAiResponsesStreamEvents = (
+  wireChunk: unknown,
+): Either.Either<ReadonlyArray<StreamEvent>, SchemaParseIssue.ParseError> =>
+  Either.map(
+    Schema.decodeUnknownEither(openAiResponsesStreamChunkSchema)(wireChunk),
+    (openAiChunk): ReadonlyArray<StreamEvent> => {
+      if (openAiChunk.type === "response.output_text.delta" && openAiChunk.delta !== undefined) {
+        return [{ _tag: "text" as const, text: openAiChunk.delta }];
+      }
+      if (openAiChunk.type === "response.reasoning_summary_text.delta" && openAiChunk.delta !== undefined) {
+        return [{ _tag: "reasoning" as const, text: openAiChunk.delta }];
+      }
+      if (openAiChunk.type === "response.function_call_arguments.done" && openAiChunk.name !== undefined) {
+        return [
+          {
+            _tag: "tool" as const,
+            name: openAiChunk.name,
+            argumentsText: openAiChunk.arguments === undefined ? "" : openAiChunk.arguments,
+          },
+        ];
+      }
+      if (openAiChunk.type !== "response.completed") {
+        return [];
+      }
+      const completedUsage = openAiChunk.response?.usage;
+      if (completedUsage === undefined) {
+        return [{ _tag: "completed" as const }];
+      }
+      return [
+        usageEvent({ inputTokens: completedUsage.input_tokens, outputTokens: completedUsage.output_tokens }),
+        { _tag: "completed" as const },
+      ];
+    },
+  );
+
+const decodeAnthropicStreamEvents = (
+  wireChunk: unknown,
+): Either.Either<ReadonlyArray<StreamEvent>, SchemaParseIssue.ParseError> =>
+  Either.map(
+    Schema.decodeUnknownEither(anthropicStreamChunkSchema)(wireChunk),
+    (anthropicChunk): ReadonlyArray<StreamEvent> => {
+      if (anthropicChunk.delta?.text !== undefined) {
+        return [{ _tag: "text" as const, text: anthropicChunk.delta.text }];
+      }
+      if (anthropicChunk.delta?.thinking !== undefined) {
+        return [{ _tag: "reasoning" as const, text: anthropicChunk.delta.thinking }];
+      }
+      if (anthropicChunk.content_block?.type === "tool_use" && anthropicChunk.content_block.name !== undefined) {
+        return [
+          {
+            _tag: "tool" as const,
+            name: anthropicChunk.content_block.name,
+            argumentsText: JSON.stringify(anthropicChunk.content_block.input),
+          },
+        ];
+      }
+      const messageUsage = anthropicChunk.message?.usage;
+      if (messageUsage !== undefined) {
+        return [usageEvent({ inputTokens: messageUsage.input_tokens, outputTokens: messageUsage.output_tokens })];
+      }
+      if (anthropicChunk.usage !== undefined) {
+        return [
+          usageEvent({
+            inputTokens: anthropicChunk.usage.input_tokens,
+            outputTokens: anthropicChunk.usage.output_tokens,
+          }),
+        ];
+      }
+      return anthropicChunk.type === "message_stop" ? [{ _tag: "completed" as const }] : [];
+    },
+  );
+
+const decodeGoogleStreamEvents = (
+  wireChunk: unknown,
+): Either.Either<ReadonlyArray<StreamEvent>, SchemaParseIssue.ParseError> =>
+  Either.map(
+    Schema.decodeUnknownEither(googleStreamChunkSchema)(wireChunk),
+    (googleChunk): ReadonlyArray<StreamEvent> => {
+      const candidates = googleChunk.candidates === undefined ? [] : googleChunk.candidates;
+      const contentEvents = candidates.flatMap((candidate) =>
+        candidate.content.parts.flatMap((part): ReadonlyArray<StreamEvent> => {
+          if (part.functionCall !== undefined) {
+            return [
+              {
+                _tag: "tool" as const,
+                name: part.functionCall.name,
+                argumentsText: JSON.stringify(part.functionCall.args),
+              },
+            ];
+          }
+          if (part.text !== undefined && part.thought === true) {
+            return [{ _tag: "reasoning" as const, text: part.text }];
+          }
+          return part.text === undefined ? [] : [{ _tag: "text" as const, text: part.text }];
+        }),
+      );
+      const usageEvents =
+        googleChunk.usageMetadata === undefined
+          ? []
+          : [
+              usageEvent({
+                inputTokens: googleChunk.usageMetadata.promptTokenCount,
+                outputTokens: googleChunk.usageMetadata.candidatesTokenCount,
+              }),
+            ];
+      const completionEvents = candidates.some((candidate) => candidate.finishReason !== undefined)
+        ? [{ _tag: "completed" as const }]
+        : [];
+      return [...contentEvents, ...usageEvents, ...completionEvents];
+    },
+  );
+
+/**
+ * Decodes one OpenAI Chat SSE chunk into provider-neutral vocabulary.
+ * @param wireChunk - Untrusted JSON parsed from an SSE line.
+ * @returns Either a stream event or a Schema parse failure.
+ */
+export const decodeOpenAiStreamChunk = (wireChunk: unknown): Either.Either<StreamEvent, SchemaParseIssue.ParseError> =>
+  Either.map(decodeOpenAiStreamEvents(wireChunk), firstStreamEvent);
+
+/**
+ * Decodes one OpenAI Responses SSE chunk into provider-neutral vocabulary.
+ * @param wireChunk - Untrusted JSON parsed from an SSE line.
+ * @returns Either a stream event or a Schema parse failure.
+ */
+export const decodeOpenAiResponsesStreamChunk = (
+  wireChunk: unknown,
+): Either.Either<StreamEvent, SchemaParseIssue.ParseError> =>
+  Either.map(decodeOpenAiResponsesStreamEvents(wireChunk), firstStreamEvent);
+
+/**
+ * Decodes one Anthropic Messages SSE chunk into provider-neutral vocabulary.
+ * @param wireChunk - Untrusted JSON parsed from an SSE line.
+ * @returns Either a stream event or a Schema parse failure.
+ */
 export const decodeAnthropicStreamChunk = (
   wireChunk: unknown,
 ): Either.Either<StreamEvent, SchemaParseIssue.ParseError> =>
-  Either.map(Schema.decodeUnknownEither(anthropicStreamChunkSchema)(wireChunk), (anthropicChunk) => {
-    if (anthropicChunk.delta?.text !== undefined) {
-      return { _tag: "text" as const, text: anthropicChunk.delta.text };
-    }
-    return anthropicChunk.delta?.thinking === undefined
-      ? { _tag: "completed" as const }
-      : { _tag: "reasoning" as const, text: anthropicChunk.delta.thinking };
-  });
+  Either.map(decodeAnthropicStreamEvents(wireChunk), firstStreamEvent);
 
+/**
+ * Decodes one Google Generative AI SSE chunk into provider-neutral vocabulary.
+ * @param wireChunk - Untrusted JSON parsed from an SSE line.
+ * @returns Either a stream event or a Schema parse failure.
+ */
 export const decodeGoogleStreamChunk = (wireChunk: unknown): Either.Either<StreamEvent, SchemaParseIssue.ParseError> =>
-  Either.map(Schema.decodeUnknownEither(googleStreamChunkSchema)(wireChunk), (googleChunk) => {
-    const firstCandidate = googleChunk.candidates[0];
-    const firstPart = firstCandidate?.content.parts[0];
-    return firstPart?.text === undefined
-      ? { _tag: "completed" as const }
-      : { _tag: "text" as const, text: firstPart.text };
-  });
+  Either.map(decodeGoogleStreamEvents(wireChunk), firstStreamEvent);
 
+/**
+ * Classifies an upstream HTTP status without reading provider-specific prose.
+ * @param statusCode - Upstream HTTP status.
+ * @returns The provider-neutral failure class.
+ */
 export const classifyUpstreamFailure = (statusCode: number): "authentication" | "quota" | "upstream" => {
   if (statusCode === 401 || statusCode === 403) {
     return "authentication";
@@ -112,13 +405,13 @@ export const classifyUpstreamFailure = (statusCode: number): "authentication" | 
   return statusCode === 429 ? "quota" : "upstream";
 };
 
-const decodeOpenRouterStreamLine = (request: {
+const decodeProviderStreamChunk = (request: {
   providerManifest: ProviderManifest;
   modelId: ModelId;
   streamLine: string;
-}): Effect.Effect<StreamEvent, ProviderFailure> => {
+}): Effect.Effect<ReadonlyArray<StreamEvent>, ProviderFailure> => {
   if (request.streamLine === "[DONE]") {
-    return Effect.succeed({ _tag: "completed" });
+    return Effect.succeed([{ _tag: "completed" }]);
   }
   return Effect.try({
     try: () => {
@@ -126,64 +419,171 @@ const decodeOpenRouterStreamLine = (request: {
       return upstreamChunk;
     },
     catch: () =>
-      openRouterFailure({
+      providerFailure({
         providerManifest: request.providerManifest,
         modelId: request.modelId,
         failureClass: "upstream",
       }),
   }).pipe(
-    Effect.flatMap((upstreamChunk) =>
-      Either.match(decodeOpenAiStreamChunk(upstreamChunk), {
-        onLeft: () =>
-          Effect.fail(
-            openRouterFailure({
-              providerManifest: request.providerManifest,
-              modelId: request.modelId,
-              failureClass: "upstream",
-            }),
-          ),
-        onRight: Effect.succeed,
-      }),
-    ),
+    Effect.flatMap((upstreamChunk) => {
+      switch (request.providerManifest.protocolFamily) {
+        case "openai-chat":
+          return Either.match(decodeOpenAiStreamEvents(upstreamChunk), {
+            onLeft: () =>
+              Effect.fail(
+                providerFailure({
+                  providerManifest: request.providerManifest,
+                  modelId: request.modelId,
+                  failureClass: "upstream",
+                }),
+              ),
+            onRight: Effect.succeed,
+          });
+        case "openai-responses":
+          return Either.match(decodeOpenAiResponsesStreamEvents(upstreamChunk), {
+            onLeft: () =>
+              Effect.fail(
+                providerFailure({
+                  providerManifest: request.providerManifest,
+                  modelId: request.modelId,
+                  failureClass: "upstream",
+                }),
+              ),
+            onRight: Effect.succeed,
+          });
+        case "anthropic-messages":
+          return Either.match(decodeAnthropicStreamEvents(upstreamChunk), {
+            onLeft: () =>
+              Effect.fail(
+                providerFailure({
+                  providerManifest: request.providerManifest,
+                  modelId: request.modelId,
+                  failureClass: "upstream",
+                }),
+              ),
+            onRight: Effect.succeed,
+          });
+        case "google-generative":
+          return Either.match(decodeGoogleStreamEvents(upstreamChunk), {
+            onLeft: () =>
+              Effect.fail(
+                providerFailure({
+                  providerManifest: request.providerManifest,
+                  modelId: request.modelId,
+                  failureClass: "upstream",
+                }),
+              ),
+            onRight: Effect.succeed,
+          });
+      }
+      return Effect.fail(
+        providerFailure({
+          providerManifest: request.providerManifest,
+          modelId: request.modelId,
+          failureClass: "configuration",
+        }),
+      );
+    }),
   );
 };
 
-const streamOpenRouterReply = (request: {
+const streamProviderReply = (request: {
   providerManifest: ProviderManifest;
   modelId: ModelId;
   upstreamStream: ReadableStream<Uint8Array>;
 }): Stream.Stream<StreamEvent, ProviderFailure> =>
-  Stream.fromAsyncIterable(request.upstreamStream, () =>
-    openRouterFailure({
-      providerManifest: request.providerManifest,
-      modelId: request.modelId,
-      failureClass: "upstream",
-    }),
+  Stream.fromReadableStream(
+    () => request.upstreamStream,
+    () =>
+      providerFailure({
+        providerManifest: request.providerManifest,
+        modelId: request.modelId,
+        failureClass: "upstream",
+      }),
   ).pipe(
     Stream.decodeText(),
     Stream.splitLines,
-    Stream.filter((streamLine) => streamLine.startsWith("data: ")),
-    Stream.map((streamLine) => streamLine.slice("data: ".length).trim()),
+    Stream.filter((streamLine) => streamLine.startsWith("data:")),
+    Stream.map((streamLine) => streamLine.slice("data:".length).trim()),
     Stream.filter((streamLine) => streamLine !== ""),
     Stream.mapEffect((streamLine) =>
-      decodeOpenRouterStreamLine({
+      decodeProviderStreamChunk({
         providerManifest: request.providerManifest,
         modelId: request.modelId,
         streamLine,
       }),
     ),
+    Stream.mapConcat((streamEvents) => streamEvents),
   );
 
-export const exchangeOpenRouterChat = (invocation: {
+const providerEndpoint = (invocation: {
+  providerManifest: ProviderManifest;
+  modelId: ModelId;
+  credential: string | undefined;
+}): URL => {
+  const endpoint = new URL(invocation.providerManifest.endpoint);
+  if (invocation.providerManifest.protocolFamily !== "google-generative") {
+    return endpoint;
+  }
+  endpoint.pathname = `${endpoint.pathname.replace(/\/$/, "")}/models/${encodeURIComponent(invocation.modelId)}:streamGenerateContent`;
+  endpoint.searchParams.set("alt", "sse");
+  return endpoint;
+};
+
+const providerHeaders = (invocation: {
+  providerManifest: ProviderManifest;
+  credential: string | undefined;
+}): HeadersInit => {
+  if (invocation.credential === undefined) {
+    return { "content-type": "application/json" };
+  }
+  switch (invocation.providerManifest.protocolFamily) {
+    case "anthropic-messages":
+      return {
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
+        "x-api-key": invocation.credential,
+      };
+    case "google-generative":
+      return { "content-type": "application/json", "x-goog-api-key": invocation.credential };
+    case "openai-chat":
+    case "openai-responses":
+      return { authorization: `Bearer ${invocation.credential}`, "content-type": "application/json" };
+  }
+};
+
+const encodeProviderRequest = (invocation: {
+  providerManifest: ProviderManifest;
+  modelId: ModelId;
+  chatRequest: ChatRequest;
+}) => {
+  switch (invocation.providerManifest.protocolFamily) {
+    case "openai-chat":
+      return encodeOpenAiChatRequest(invocation.chatRequest, invocation.modelId);
+    case "openai-responses":
+      return encodeOpenAiResponsesRequest(invocation.chatRequest, invocation.modelId);
+    case "anthropic-messages":
+      return encodeAnthropicRequest(invocation.chatRequest, invocation.modelId);
+    case "google-generative":
+      return encodeGoogleGenerativeRequest(invocation.chatRequest);
+  }
+};
+
+/**
+ * Executes one provider declaration through its official streaming wire family.
+ * @param invocation - Manifest, model, credential option, and chat request.
+ * @returns A lazy Effect Stream of provider-neutral events.
+ */
+export const exchangeProviderChat = (invocation: {
   providerManifest: ProviderManifest;
   modelId: ModelId;
   credential: Option.Option<string>;
   chatRequest: ChatRequest;
 }): Stream.Stream<StreamEvent, ProviderFailure> => {
   const credential = Option.getOrUndefined(invocation.credential);
-  if (invocation.providerManifest.providerId !== "openrouter" || credential === undefined) {
+  if (invocation.providerManifest.authentication === "api-key" && credential === undefined) {
     return Stream.fail(
-      openRouterFailure({
+      providerFailure({
         providerManifest: invocation.providerManifest,
         modelId: invocation.modelId,
         failureClass: "configuration",
@@ -192,17 +592,15 @@ export const exchangeOpenRouterChat = (invocation: {
   }
   return Stream.unwrap(
     Effect.tryPromise({
-      try: () =>
-        fetch(invocation.providerManifest.endpoint, {
+      try: (abortSignal) =>
+        fetch(providerEndpoint({ ...invocation, credential }), {
           method: "POST",
-          headers: {
-            authorization: `Bearer ${credential}`,
-            "content-type": "application/json",
-          },
-          body: JSON.stringify(encodeOpenAiChatRequest(invocation.chatRequest, invocation.modelId)),
+          headers: providerHeaders({ providerManifest: invocation.providerManifest, credential }),
+          body: JSON.stringify(encodeProviderRequest(invocation)),
+          signal: abortSignal,
         }),
       catch: () =>
-        openRouterFailure({
+        providerFailure({
           providerManifest: invocation.providerManifest,
           modelId: invocation.modelId,
           failureClass: "upstream",
@@ -211,7 +609,7 @@ export const exchangeOpenRouterChat = (invocation: {
       Effect.flatMap((upstreamReply) => {
         if (!upstreamReply.ok) {
           return Effect.fail(
-            openRouterFailure({
+            providerFailure({
               providerManifest: invocation.providerManifest,
               modelId: invocation.modelId,
               failureClass: classifyUpstreamFailure(upstreamReply.status),
@@ -221,7 +619,7 @@ export const exchangeOpenRouterChat = (invocation: {
         }
         if (upstreamReply.body === null) {
           return Effect.fail(
-            openRouterFailure({
+            providerFailure({
               providerManifest: invocation.providerManifest,
               modelId: invocation.modelId,
               failureClass: "upstream",
@@ -230,7 +628,7 @@ export const exchangeOpenRouterChat = (invocation: {
           );
         }
         return Effect.succeed(
-          streamOpenRouterReply({
+          streamProviderReply({
             providerManifest: invocation.providerManifest,
             modelId: invocation.modelId,
             upstreamStream: upstreamReply.body,
@@ -240,3 +638,10 @@ export const exchangeOpenRouterChat = (invocation: {
     ),
   );
 };
+
+/**
+ * Preserves the original OpenRouter exchange name for library callers.
+ * @param invocation - Manifest, model, credential option, and chat request.
+ * @returns A lazy Effect Stream of provider-neutral events.
+ */
+export const exchangeOpenRouterChat = exchangeProviderChat;

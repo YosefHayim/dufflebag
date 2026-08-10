@@ -2,6 +2,14 @@ import { DateTime } from "effect";
 
 import type { HealthRecord, ProviderManifest } from "./providerContract.js";
 
+const unquantifiedQuotaRank = 1_000_000_000_000;
+
+/**
+ * Checks whether a provider cooldown extends beyond the observation time.
+ * @param healthRecord - Previously persisted health, when present.
+ * @param observedAt - Current routing observation time.
+ * @returns Whether the provider remains in cooldown.
+ */
 export const providerIsCoolingDown = (
   healthRecord: HealthRecord | undefined,
   observedAt: HealthRecord["observedAt"],
@@ -15,6 +23,12 @@ export const providerIsCoolingDown = (
   );
 };
 
+/**
+ * Checks whether a provider circuit extends beyond the observation time.
+ * @param healthRecord - Previously persisted health, when present.
+ * @param observedAt - Current routing observation time.
+ * @returns Whether the provider circuit remains open.
+ */
 export const providerCircuitIsOpen = (
   healthRecord: HealthRecord | undefined,
   observedAt: HealthRecord["observedAt"],
@@ -28,16 +42,63 @@ export const providerCircuitIsOpen = (
   );
 };
 
-export const estimatedRemainingQuota = (
-  providerManifest: ProviderManifest,
-  healthRecord: HealthRecord | undefined,
-): number => {
-  if (healthRecord === undefined) {
-    return providerManifest.freeTierWindow.estimatedTokens;
+/**
+ * Checks whether a daily or estimated monthly quota window has rolled over.
+ * @param request - Manifest, persisted health, and optional observation time.
+ * @returns Whether a fresh quota window applies.
+ */
+export const quotaWindowIsExpired = (request: {
+  providerManifest: ProviderManifest;
+  healthRecord: HealthRecord;
+  observedAt: HealthRecord["observedAt"] | undefined;
+}): boolean => {
+  if (request.observedAt === undefined) {
+    return false;
   }
-  return Math.max(0, providerManifest.freeTierWindow.estimatedTokens - healthRecord.quotaUsedTokens);
+  const elapsedMilliseconds =
+    DateTime.toEpochMillis(request.observedAt) - DateTime.toEpochMillis(request.healthRecord.quotaWindowStartedAt);
+  if (request.providerManifest.freeTierWindow.reset === "daily") {
+    return elapsedMilliseconds >= 86_400_000;
+  }
+  if (request.providerManifest.freeTierWindow.reset === "monthly") {
+    return elapsedMilliseconds >= 2_592_000_000;
+  }
+  return false;
 };
 
+/**
+ * Estimates remaining tokens while keeping unquantified pools rankable.
+ * @param request - Manifest, persisted health, and optional observation time.
+ * @returns The routing quota score available to the model.
+ */
+export const estimatedRemainingQuota = (request: {
+  providerManifest: ProviderManifest;
+  healthRecord: HealthRecord | undefined;
+  observedAt?: HealthRecord["observedAt"];
+}): number => {
+  if (request.providerManifest.freeTierWindow.reset === "unquantified") {
+    return unquantifiedQuotaRank;
+  }
+  if (request.healthRecord === undefined) {
+    return request.providerManifest.freeTierWindow.estimatedTokens;
+  }
+  if (
+    quotaWindowIsExpired({
+      providerManifest: request.providerManifest,
+      healthRecord: request.healthRecord,
+      observedAt: request.observedAt,
+    })
+  ) {
+    return request.providerManifest.freeTierWindow.estimatedTokens;
+  }
+  return Math.max(0, request.providerManifest.freeTierWindow.estimatedTokens - request.healthRecord.quotaUsedTokens);
+};
+
+/**
+ * Calculates observed provider reliability from persisted call counters.
+ * @param healthRecord - Previously persisted health, when present.
+ * @returns A score from zero to one.
+ */
 export const providerReliabilityScore = (healthRecord: HealthRecord | undefined): number => {
   if (healthRecord === undefined) {
     return 1;
@@ -46,11 +107,16 @@ export const providerReliabilityScore = (healthRecord: HealthRecord | undefined)
   return attempts === 0 ? 1 : healthRecord.successfulCalls / attempts;
 };
 
-export const providerRank = (providerManifest: ProviderManifest, healthRecord: HealthRecord | undefined): number => {
-  const latencyPenalty = healthRecord === undefined ? 0 : healthRecord.latencyMilliseconds / 1000;
-  return (
-    providerReliabilityScore(healthRecord) * 1000000 +
-    estimatedRemainingQuota(providerManifest, healthRecord) -
-    latencyPenalty
-  );
+/**
+ * Ranks a provider by reliability, quota availability, and latency.
+ * @param request - Manifest, persisted health, and optional observation time.
+ * @returns A descending routing score.
+ */
+export const providerRank = (request: {
+  providerManifest: ProviderManifest;
+  healthRecord: HealthRecord | undefined;
+  observedAt?: HealthRecord["observedAt"];
+}): number => {
+  const latencyPenalty = request.healthRecord === undefined ? 0 : request.healthRecord.latencyMilliseconds / 1000;
+  return providerReliabilityScore(request.healthRecord) * 1000000 + estimatedRemainingQuota(request) - latencyPenalty;
 };
