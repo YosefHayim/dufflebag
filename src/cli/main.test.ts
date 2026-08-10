@@ -108,6 +108,7 @@ describe("CLI help", () => {
       expect(execution.exitCode).toBe(0);
       expect(execution.stdout).toContain("connect");
       expect(execution.stdout).toContain("smoke");
+      expect(execution.stdout).toContain("chat");
       expect(execution.stdout.toLowerCase()).toContain("oauth");
     },
     CLI_TEST_TIMEOUT,

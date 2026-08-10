@@ -1,9 +1,9 @@
 import { execFile, spawn } from "node:child_process";
 
-import { Command as CliCommand, Options } from "@effect/cli";
-import { Effect, Schema } from "effect";
-import { openRouterOAuthRequestSchema } from "../providerRouting/providerContract.js";
-import { connectOpenRouter } from "../providerRouting/providerRouting.js";
+import { Args, Command as CliCommand, Options } from "@effect/cli";
+import { Effect, Option, Schema } from "effect";
+import { openRouterOAuthRequestSchema, routingRequestSchema } from "../providerRouting/providerContract.js";
+import { completeFreeChat, connectOpenRouter } from "../providerRouting/providerRouting.js";
 import * as TerminalUI from "./TerminalUI.js";
 
 const keychainService = "ys-dufflebag.openrouter";
@@ -14,6 +14,11 @@ const callbackPortOption = Options.integer("port").pipe(
 );
 
 const decodeOpenRouterOAuthRequest = Schema.decodeUnknownSync(openRouterOAuthRequestSchema);
+const decodeRoutingRequest = Schema.decodeUnknownSync(routingRequestSchema);
+
+const chatPromptArgument = Args.text({ name: "prompt" }).pipe(
+  Args.withDescription("Text to send through the unified free route"),
+);
 
 const requireMacOs = () =>
   process.platform === "darwin"
@@ -103,6 +108,18 @@ const verifyOpenRouterFreeChat = (credential: string) =>
     catch: () => new Error("OpenRouter free-model smoke check was declined."),
   });
 
+const openRouterRoutingState = {
+  readHealth: () => Effect.succeed(Option.none()),
+  writeHealth: () => Effect.void,
+};
+
+const textFromStreamEvents = (streamEvents: ReadonlyArray<{ _tag: string; text?: string }>) =>
+  streamEvents
+    .filter((streamEvent) => streamEvent._tag === "text" || streamEvent._tag === "reasoning")
+    .map((streamEvent) => streamEvent.text)
+    .filter((streamText): streamText is string => streamText !== undefined)
+    .join("");
+
 const connectCommand = CliCommand.make("connect", { port: callbackPortOption }, (arguments_) =>
   Effect.gen(function* () {
     yield* requireMacOs();
@@ -127,7 +144,28 @@ const smokeCommand = CliCommand.make("smoke", {}, () =>
   }),
 ).pipe(CliCommand.withDescription("Run one credential-gated chat check against OpenRouter's free-model route"));
 
+const chatCommand = CliCommand.make("chat", { prompt: chatPromptArgument }, (arguments_) =>
+  Effect.gen(function* () {
+    yield* requireMacOs();
+    const credential = yield* readOpenRouterCredential();
+    const streamEvents = yield* completeFreeChat({
+      routingRequest: decodeRoutingRequest({
+        target: "auto-free",
+        chatRequest: { turns: [{ role: "user", text: arguments_.prompt }], requiredCapabilities: ["text"] },
+        acknowledgementVersion: "omniroute-2026-06-17",
+        observedAt: new Date().toISOString(),
+      }),
+      dependencies: {
+        credentialLookup: (credentialId) =>
+          credentialId === "openrouter-oauth" ? Effect.succeed(Option.some(credential)) : Effect.succeed(Option.none()),
+        routingState: openRouterRoutingState,
+      },
+    });
+    yield* TerminalUI.note(textFromStreamEvents(Array.from(streamEvents)));
+  }),
+).pipe(CliCommand.withDescription("Send text through Dufflebag's unified OpenRouter free route"));
+
 export const openRouterCommand = CliCommand.make("openrouter").pipe(
   CliCommand.withDescription("Use OpenRouter's unified OAuth credential"),
-  CliCommand.withSubcommands([connectCommand, smokeCommand]),
+  CliCommand.withSubcommands([connectCommand, smokeCommand, chatCommand]),
 );

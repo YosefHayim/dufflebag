@@ -18,6 +18,7 @@ import {
   providerIsCoolingDown,
   providerRank,
 } from "./providerHealth.js";
+import { exchangeOpenRouterChat } from "./providerHttp.js";
 
 export { documentedFreePoolCount, freeProviderCatalog } from "./freeProviderCatalog.js";
 export { connectOpenRouter } from "./openRouterOAuth.js";
@@ -58,6 +59,7 @@ export {
   encodeGoogleGenerativeRequest,
   encodeOpenAiChatRequest,
   encodeOpenAiResponsesRequest,
+  exchangeOpenRouterChat,
 } from "./providerHttp.js";
 
 export type CredentialLookup = (credentialId: string) => Effect.Effect<Option.Option<string>>;
@@ -76,7 +78,7 @@ type ProviderRoutingDependencies = {
   providerManifests?: ReadonlyArray<ProviderManifest>;
   credentialLookup: CredentialLookup;
   routingState: RoutingState;
-  providerExchange: ProviderExchange;
+  providerExchange?: ProviderExchange;
 };
 
 type EligibleProvider = {
@@ -88,6 +90,9 @@ type EligibleProvider = {
 
 const manifestsFor = (dependencies: ProviderRoutingDependencies): ReadonlyArray<ProviderManifest> =>
   dependencies.providerManifests === undefined ? freeProviderCatalog : dependencies.providerManifests;
+
+const providerExchangeFor = (dependencies: ProviderRoutingDependencies): ProviderExchange =>
+  dependencies.providerExchange === undefined ? exchangeOpenRouterChat : dependencies.providerExchange;
 
 const requiresAcknowledgement = (providerManifest: ProviderManifest): boolean => providerManifest.termsStatus !== "ok";
 
@@ -211,34 +216,32 @@ const streamFromEligibleProviders = (request: {
       );
     }
     let emittedOutput = false;
-    return request.dependencies
-      .providerExchange({
-        providerManifest: eligibleProvider.providerManifest,
-        modelId: eligibleProvider.modelId,
-        credential: eligibleProvider.credential,
-        chatRequest: request.routingRequest.chatRequest,
-      })
-      .pipe(
-        Stream.map((streamEvent) => {
-          if (streamEvent._tag === "text" || streamEvent._tag === "reasoning" || streamEvent._tag === "tool") {
-            emittedOutput = true;
-          }
-          return streamEvent;
-        }),
-        Stream.catchAll((failure) =>
-          Stream.unwrap(
-            Effect.gen(function* () {
-              yield* recordFailure({
-                eligibleProvider,
-                routingRequest: request.routingRequest,
-                failure,
-                routingState: request.dependencies.routingState,
-              });
-              return emittedOutput ? Stream.fail(failure) : tryProvider(providerIndex + 1);
-            }),
-          ),
+    return providerExchangeFor(request.dependencies)({
+      providerManifest: eligibleProvider.providerManifest,
+      modelId: eligibleProvider.modelId,
+      credential: eligibleProvider.credential,
+      chatRequest: request.routingRequest.chatRequest,
+    }).pipe(
+      Stream.map((streamEvent) => {
+        if (streamEvent._tag === "text" || streamEvent._tag === "reasoning" || streamEvent._tag === "tool") {
+          emittedOutput = true;
+        }
+        return streamEvent;
+      }),
+      Stream.catchAll((failure) =>
+        Stream.unwrap(
+          Effect.gen(function* () {
+            yield* recordFailure({
+              eligibleProvider,
+              routingRequest: request.routingRequest,
+              failure,
+              routingState: request.dependencies.routingState,
+            });
+            return emittedOutput ? Stream.fail(failure) : tryProvider(providerIndex + 1);
+          }),
         ),
-      );
+      ),
+    );
   };
   return tryProvider(0);
 };

@@ -139,6 +139,36 @@ describe("provider routing", () => {
     );
   });
 
+  it.effect("uses the built-in OpenRouter exchange when auto-free has its saved credential", () => {
+    const openRouterManifest = freeProviderCatalog.filter(
+      (providerManifest) => providerManifest.providerId === "openrouter",
+    );
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async () =>
+      new Response('data: {"choices":[{"delta":{"content":"unified"}}]}\n\ndata: [DONE]\n\n', {
+        headers: { "content-type": "text/event-stream" },
+      });
+    return completeFreeChat({
+      routingRequest,
+      dependencies: {
+        providerManifests: openRouterManifest,
+        credentialLookup: () => Effect.succeed(Option.some("saved-openrouter-key")),
+        routingState,
+      },
+    }).pipe(
+      Effect.tap((streamEvents) =>
+        Effect.sync(() =>
+          expect([...streamEvents]).toEqual([{ _tag: "text", text: "unified" }, { _tag: "completed" }]),
+        ),
+      ),
+      Effect.ensuring(
+        Effect.sync(() => {
+          globalThis.fetch = originalFetch;
+        }),
+      ),
+    );
+  });
+
   it("classifies status failures and decodes every supported chunk family", () => {
     expect(classifyUpstreamFailure(401)).toBe("authentication");
     expect(classifyUpstreamFailure(429)).toBe("quota");
