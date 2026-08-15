@@ -20,6 +20,9 @@ src/skills/pngToCode/scripts/.playwright/
 # Local agent install mirrors (not product source)
 .agents/
 .devin/
+.claude/
+.grok/
+__pycache__/
 
 # Kiro CLI agent config (local)
 .kiro
