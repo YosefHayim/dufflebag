@@ -120,12 +120,44 @@ pub fn process_running(pid: Option<u32>) -> bool {
     #[cfg(unix)]
     {
         // Signal 0 probes existence without delivering a signal.
-        unsafe { libc_kill(pid as i32, 0) == 0 }
+        // Zombies still answer signal 0 until reaped — treat them as not running so
+        // overlay.pid / worker.pid never block respawn after SIGKILL of a child.
+        if unsafe { libc_kill(pid as i32, 0) } != 0 {
+            return false;
+        }
+        !process_is_zombie(pid)
     }
     #[cfg(not(unix))]
     {
         let _ = pid;
         false
+    }
+}
+
+#[cfg(unix)]
+fn process_is_zombie(pid: u32) -> bool {
+    let output = std::process::Command::new("ps")
+        .args(["-o", "state=", "-p", &pid.to_string()])
+        .output();
+    let Ok(output) = output else {
+        return false;
+    };
+    String::from_utf8_lossy(&output.stdout)
+        .trim()
+        .starts_with('Z')
+}
+
+/// Reap exited children (overlay / narrate fire-and-forget spawns) so they do not
+/// linger as zombies that still pass `kill(pid, 0)`.
+pub fn reap_child_processes() {
+    #[cfg(unix)]
+    unsafe {
+        extern "C" {
+            fn waitpid(pid: i32, status: *mut i32, options: i32) -> i32;
+        }
+        const WNOHANG: i32 = 1;
+        let mut status = 0;
+        while waitpid(-1, &mut status, WNOHANG) > 0 {}
     }
 }
 
@@ -214,7 +246,8 @@ pub fn clear_overlay_pid() {
 }
 
 fn force_kill_pid(pid: u32) {
-    if pid == 0 || pid == std::process::id() {
+    // Never signal pid 0/1 — kill(-1) would broadcast to every process we own.
+    if pid <= 1 || pid == std::process::id() {
         return;
     }
     #[cfg(unix)]
@@ -227,18 +260,29 @@ fn force_kill_pid(pid: u32) {
 }
 
 fn force_kill_process_group(pid: u32) {
-    if pid == 0 || pid == std::process::id() {
+    // pid 1 → kill(-1) = signal every process the caller can reach. Hard-forbid.
+    if pid <= 1 || pid == std::process::id() {
         return;
     }
     #[cfg(unix)]
-    unsafe {
-        // Negative pid = process group (warm uv + python TTS).
-        let _ = libc_kill(-(pid as i32), 15);
-        std::thread::sleep(std::time::Duration::from_millis(30));
-        let _ = libc_kill(-(pid as i32), 9);
-        let _ = libc_kill(pid as i32, 9);
+    {
+        // Never kill(-our_pgid) — that terminates the CLI and its parent shell.
+        if process_group_id(std::process::id()) == Some(pid as i32) {
+            force_kill_pid(pid);
+            return;
+        }
+        unsafe {
+            // Negative pid = process group (warm uv + python TTS / overlay + HUD).
+            let _ = libc_kill(-(pid as i32), 15);
+            std::thread::sleep(std::time::Duration::from_millis(30));
+            let _ = libc_kill(-(pid as i32), 9);
+            let _ = libc_kill(pid as i32, 9);
+        }
     }
-    let _ = pid;
+    #[cfg(not(unix))]
+    {
+        let _ = pid;
+    }
 }
 
 /// True only for argv shaped like `…/dufflebag-voice daemon|narrate-daemon|overlay …`.
@@ -257,12 +301,48 @@ fn is_voice_worker_line(args: &str) -> bool {
     )
 }
 
+/// True for the Swift HUD interpreter whose argv includes this voice state home.
+/// These are the visible pills; killing only `dufflebag-voice overlay` orphans them (ppid=1).
+///
+/// Requires a real interpreter invocation (`swift - <pid> …` or `swift-frontend … -- <pid> …`)
+/// so shell scripts / awk one-liners that merely *mention* these strings are not matched.
+/// State home often contains spaces (`Application Support`), so path equality is substring-based.
+pub fn is_overlay_hud_line(args: &str, state_home: &str) -> bool {
+    if state_home.is_empty() || !args.contains(state_home) {
+        return false;
+    }
+    let tokens: Vec<&str> = args.split_whitespace().collect();
+    let Some(idx) = tokens.iter().position(|t| {
+        let base = t.rsplit('/').next().unwrap_or(t);
+        base == "swift" || base == "swift-frontend"
+    }) else {
+        return false;
+    };
+    let rest = &tokens[idx + 1..];
+    let has_stdin_or_separator = rest.iter().any(|t| *t == "-" || *t == "--");
+    let has_worker_pid = rest.iter().any(|t| !t.is_empty() && t.chars().all(|c| c.is_ascii_digit()));
+    has_stdin_or_separator && has_worker_pid
+}
+
+#[cfg(unix)]
+fn process_group_id(pid: u32) -> Option<i32> {
+    unsafe {
+        extern "C" {
+            fn getpgid(pid: i32) -> i32;
+        }
+        let pgid = getpgid(pid as i32);
+        (pgid > 1).then_some(pgid)
+    }
+}
+
 /// Kill every `dufflebag-voice` process that looks like a daemon/overlay, except `keep`.
 /// Safe to call from the short-lived `stop`/`start`/`reset` CLI.
+/// Never signals the caller's own process group (protects the CLI + parent shell).
 pub fn kill_stray_voice_processes(keep: Option<u32>) {
     #[cfg(unix)]
     {
         let self_pid = std::process::id();
+        let self_pgid = process_group_id(self_pid);
         let scan_and_kill = |signal: i32| {
             let output = std::process::Command::new("ps")
                 .args(["-ax", "-o", "pid=,args="])
@@ -283,7 +363,11 @@ pub fn kill_stray_voice_processes(keep: Option<u32>) {
                 let Ok(pid) = pid_str.parse::<u32>() else {
                     continue;
                 };
-                if pid == self_pid || keep == Some(pid) {
+                if pid <= 1 || pid == self_pid || keep == Some(pid) {
+                    continue;
+                }
+                // Do not shoot the CLI invocation or its parent shell.
+                if self_pgid.is_some() && process_group_id(pid) == self_pgid {
                     continue;
                 }
                 let args = line[pid_str.len()..].trim();
@@ -297,6 +381,120 @@ pub fn kill_stray_voice_processes(keep: Option<u32>) {
         scan_and_kill(15);
         std::thread::sleep(std::time::Duration::from_millis(150));
         scan_and_kill(9);
+    }
+}
+
+/// Kill orphan Swift HUD interpreters for this voice state home (ppid == 1).
+/// Required because SIGKILL on the overlay wrapper leaves `swift-frontend` pills alive.
+/// Live HUDs still parented by `dufflebag-voice overlay` are left alone.
+pub fn kill_stray_overlay_huds() {
+    kill_overlay_huds(true);
+}
+
+/// Kill every Swift HUD for this state home, including ones still parented by an overlay wrapper.
+pub fn kill_all_overlay_huds() {
+    kill_overlay_huds(false);
+}
+
+fn kill_overlay_huds(orphans_only: bool) {
+    #[cfg(unix)]
+    {
+        let self_pid = std::process::id();
+        let self_pgid = process_group_id(self_pid);
+        let state_home = voice_state_home().to_string_lossy().to_string();
+        let scan_and_kill = |signal: i32| {
+            let output = std::process::Command::new("ps")
+                .args(["-ax", "-o", "pid=,ppid=,args="])
+                .output();
+            let Ok(output) = output else {
+                return;
+            };
+            let text = String::from_utf8_lossy(&output.stdout);
+            for line in text.lines() {
+                let line = line.trim();
+                if line.is_empty() {
+                    continue;
+                }
+                let mut parts = line.split_whitespace();
+                let Some(pid_str) = parts.next() else {
+                    continue;
+                };
+                let Some(ppid_str) = parts.next() else {
+                    continue;
+                };
+                let Ok(pid) = pid_str.parse::<u32>() else {
+                    continue;
+                };
+                let Ok(ppid) = ppid_str.parse::<u32>() else {
+                    continue;
+                };
+                if pid <= 1 || pid == self_pid {
+                    continue;
+                }
+                if self_pgid.is_some() && process_group_id(pid) == self_pgid {
+                    continue;
+                }
+                if orphans_only && ppid != 1 {
+                    continue;
+                }
+                // Drop pid + ppid columns; remainder is argv.
+                let args = {
+                    let mut tokens = line.split_whitespace();
+                    let _ = tokens.next();
+                    let _ = tokens.next();
+                    tokens.collect::<Vec<_>>().join(" ")
+                };
+                if is_overlay_hud_line(&args, &state_home) {
+                    unsafe {
+                        let _ = libc_kill(pid as i32, signal);
+                    }
+                }
+            }
+        };
+        scan_and_kill(15);
+        std::thread::sleep(std::time::Duration::from_millis(80));
+        scan_and_kill(9);
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = orphans_only;
+    }
+}
+
+#[cfg(test)]
+mod overlay_hud_match_tests {
+    use super::is_overlay_hud_line;
+
+    #[test]
+    fn matches_swift_dash_hud() {
+        let home = "/Users/me/Library/Application Support/dufflebag/voice";
+        let line = format!("swift - 3452 {home}");
+        assert!(is_overlay_hud_line(&line, home));
+    }
+
+    #[test]
+    fn matches_swift_frontend_interpret_hud() {
+        let home = "/Users/me/Library/Application Support/dufflebag/voice";
+        let line = format!(
+            "/Applications/Xcode.app/.../swift-frontend -frontend -interpret - -- 3452 {home}"
+        );
+        assert!(is_overlay_hud_line(&line, home));
+    }
+
+    #[test]
+    fn ignores_unrelated_swift() {
+        let home = "/Users/me/Library/Application Support/dufflebag/voice";
+        assert!(!is_overlay_hud_line("swift build", home));
+        assert!(!is_overlay_hud_line("swift - 1 /tmp/other", home));
+    }
+
+    #[test]
+    fn ignores_shell_scripts_that_mention_swift() {
+        let home = "/Users/me/Library/Application Support/dufflebag/voice";
+        let line = format!(
+            "/bin/zsh -c awk index($0,\"swift-frontend\") && index($0,\"dufflebag/voice\") STATE={home}"
+        );
+        assert!(!is_overlay_hud_line(&line, home));
     }
 }
 
@@ -338,8 +536,9 @@ pub fn reset_voice_runtime() {
     if let Some(pid) = read_pid() {
         force_kill_pid(pid);
     }
+    // Overlay wrapper + its process group (Swift HUD child).
     if let Some(pid) = read_overlay_pid() {
-        force_kill_pid(pid);
+        force_kill_process_group(pid);
     }
     if let Ok(text) = fs::read_to_string(voice_state_home().join("narrate.pid")) {
         if let Ok(pid) = text.trim().parse::<u32>() {
@@ -352,6 +551,8 @@ pub fn reset_voice_runtime() {
         }
     }
     kill_stray_voice_processes(None);
+    kill_all_overlay_huds();
+    kill_stray_overlay_huds();
     kill_stray_tts_bridges();
     let home = voice_state_home();
     for name in [
@@ -360,6 +561,7 @@ pub fn reset_voice_runtime() {
         "narrate.pid",
         "narrate.lock",
         "overlay.pid",
+        "overlay.lock",
         "tts.pid",
         "tts-stop",
         "speaking.lock",

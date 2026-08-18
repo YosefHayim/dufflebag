@@ -22,4 +22,8 @@ cd "$VOICE_CRATE"
 cargo build --release
 cp -f "$VOICE_CRATE/target/release/dufflebag-voice" "$OUT"
 chmod +x "$OUT"
+# cp breaks the linker-signed adhoc signature; without re-sign macOS SIGKILLs the binary (exit 137).
+if command -v codesign >/dev/null 2>&1; then
+  codesign --force -s - "$OUT" >/dev/null 2>&1 || true
+fi
 echo "Built $OUT"

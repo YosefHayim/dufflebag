@@ -13,8 +13,8 @@ use crate::narrate;
 use crate::overlay;
 use crate::pipeline::{self, DictationJob, DictationPipeline};
 use crate::state::{
-    acquire_worker_pid, clear_stop_flag, ensure_state_home, release_worker_pid, reset_voice_runtime,
-    stop_requested, worker_already_running, write_worker_status, WorkerStatus,
+    acquire_worker_pid, clear_stop_flag, ensure_state_home, reap_child_processes, release_worker_pid,
+    reset_voice_runtime, stop_requested, worker_already_running, write_worker_status, WorkerStatus,
 };
 use crate::stt::SttEngine;
 use crate::tts;
@@ -431,6 +431,9 @@ pub fn run_daemon() -> i32 {
 
     // Block until stop requested (daemon used to block on listen runloop).
     while running.load(Ordering::SeqCst) && !stop_requested() {
+        // Reap overlay/narrate children so SIGKILL'd wrappers do not linger as
+        // zombies that still pass kill(pid, 0) and block HUD respawn.
+        reap_child_processes();
         thread::sleep(Duration::from_millis(100));
     }
     running.store(false, Ordering::SeqCst);
@@ -652,21 +655,35 @@ fn write_macos_clipboard(text: &str) -> Result<(), String> {
 
 fn spawn_overlay(worker_pid: u32) {
     if let Ok(exe) = std::env::current_exe() {
-        let _ = Command::new(&exe)
+        let mut command = Command::new(&exe);
+        command
             .args(["overlay", "--worker-pid", &worker_pid.to_string()])
             .stdin(Stdio::null())
             .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .spawn();
+            .stderr(Stdio::null());
+        // Own process group so kill(-overlay.pid) reaps the Swift HUD child.
+        #[cfg(unix)]
+        {
+            use std::os::unix::process::CommandExt;
+            command.process_group(0);
+        }
+        let _ = command.spawn();
     }
 }
 
 pub fn start_worker_detached() -> Result<serde_json::Value, String> {
     ensure_state_home().map_err(|e| e.to_string())?;
     if worker_already_running() {
-        overlay::kill_existing_overlay();
-        if let Some(pid) = crate::state::read_pid() {
-            spawn_overlay(pid);
+        // Keep a healthy overlay. Only rebuild when the wrapper is gone; always
+        // reap orphaned swift-frontend pills left by older kills.
+        crate::state::kill_stray_overlay_huds();
+        let overlay_alive = crate::state::read_overlay_pid()
+            .is_some_and(|pid| crate::state::process_running(Some(pid)));
+        if !overlay_alive {
+            overlay::kill_existing_overlay();
+            if let Some(pid) = crate::state::read_pid() {
+                spawn_overlay(pid);
+            }
         }
         // Ensure narrate is up even if only dictate was left.
         let _ = narrate::start_narrate_detached();
