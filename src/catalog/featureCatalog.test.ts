@@ -217,7 +217,7 @@ describe("featureCatalog", () => {
       ["grill-me-code-style", ["SKILL.md", "_shared"]],
       ["grill-me-code-style-coach", ["SKILL.md"]],
       ["grill-me-code-style-review", ["SKILL.md"]],
-      ["grill-me-code-style-with-docs", ["SKILL.md", "SCAN.md"]],
+      ["grill-me-code-style-with-docs", ["SKILL.md", "SCAN.md", "references", "scripts"]],
       ["grill-me-stack", ["SKILL.md", "TEACH-FORMAT.md"]],
       ["grill-with-docs", ["SKILL.md", "CONTEXT-FORMAT.md", "ADR-FORMAT.md", "LANGUAGE-FORMAT.md"]],
       ["planpage", ["SKILL.md", "COMPONENTS.md"]],

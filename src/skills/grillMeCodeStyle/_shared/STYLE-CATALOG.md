@@ -1,6 +1,6 @@
 # Style Catalog — the pick-the-code gallery
 
-The comprehensive checklist of code-style dimensions the grill covers, grouped into rounds. Run it as a **pick-the-code** gallery: for each dimension, show code variants in the TUI (`AskUserQuestion`, one option per variant, code in the `preview`) and let me **pick**. This is the surface where "what the agent writes" surprises you — cover it, so we don't discover the surprise at PR review.
+The comprehensive checklist of code-style dimensions the grill covers, grouped into rounds. Run it as a **pick-the-code** gallery: put every applicable dimension in **one** TUI card (`AskUserQuestion` — one question per dimension, one option per variant, code in the `preview`) and let me **pick** them all in that card. This is the surface where "what the agent writes" surprises you — cover it, so we don't discover the surprise at PR review.
 
 The list below is a **floor, not a ceiling** — for the average codebase it's roughly complete; add any dimension a specific project needs that isn't here.
 
@@ -18,13 +18,13 @@ When a dimension is language-specific, a note like `[TS/JS only]` appears in the
 
 ### Existing codebase (grill-me-code-style-with-docs)
 
-- **Grouped rounds, checkpoints between.** Walk the areas in order. Within a round, ask each dimension as its own TUI question. After each round, checkpoint: **keep going · go deeper here · skip the rest**. Scale to the stack — skip a whole round when it doesn't apply (no UI → skip Frontend; no HTTP surface → trim API/IO).
+- **One card, skip what doesn't apply.** Fire every applicable dimension in **one** `AskUserQuestion`. Skip a whole round when it doesn't apply (no UI → skip Frontend; no HTTP surface → trim API/IO). Do not serialize dimensions or rounds. If the host rejects the card for size, split into the fewest cards that fit — still never one question per turn.
 - **Variants are the repo's REAL code.** Variant **A** is the actual incumbent, pulled **verbatim** from the scan with a `file:symbol` cite — warts and all, so you're reacting to *your* code, not a textbook. Variant **B** is the de-slopped rewrite. Two variants by default; add a third only when there's a genuine spectrum (e.g. throw / Result / neverthrow).
 - **Uncontested → keep/kill, not a fake choice.** If the repo already settles a dimension one way and it isn't slop, show the single incumbent and ask **keep or kill** — never fabricate an alternative just to fill the slot. (An uncontested dimension is still shown — that's how you stay un-surprised.)
 
 ### Greenfield (grill-me-code-style)
 
-- **Grouped rounds, checkpoints between.** Same structure as above.
+- **One card, skip what doesn't apply.** Same structure as above. Language/runtime unknown → one 2-question gate card (Q0+Q1), then the catalog card.
 - **Variants are illustrative, grounded in purpose.** With no code to cite, variant **A** is the common/default idiom for this language + framework (the one the agent would reach for), variant **B** is the alternative worth considering. Two variants by default; add a third only when there's a genuine spectrum. Make the snippets concrete to THIS project's domain — not `foo`/`bar`.
 - **Recommend, then let me pick.** Derive a recommended variant from the purpose + framework and mark it, but the pick is mine.
 

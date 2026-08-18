@@ -38,7 +38,7 @@ Each draft step is **concrete and project-specific**: real file paths, real regi
 
 ## Step C — Grill the path step-by-step
 
-Present the numbered draft and grill it as **keep / adjust / reorder / cut**, one step at a time — the same react-to-a-concrete-artifact discipline as the pick-the-code gallery, not a blank prompt. Fold each reaction back into the ordered list. When a step encodes a real trade-off with genuine alternatives (e.g. "register in a central manifest" vs "convention-based auto-discovery"), that's ADR-worthy — offer one.
+Present the numbered draft and grill it as **keep / adjust / reorder / cut** in **one** `AskUserQuestion` (one question per step) — the same react-to-a-concrete-artifact discipline as the pick-the-code gallery, not a blank prompt. Fold the answers back into the ordered list. When a step encodes a real trade-off with genuine alternatives (e.g. "register in a central manifest" vs "convention-based auto-discovery"), that's ADR-worthy — offer one.
 
 End the path with a short **definition of done** checklist — the last gate before a unit is "in". Derive it from the picks; keep it to what's actually load-bearing for THIS repo. Typical entries (grill each in/out, don't paste them all):
 

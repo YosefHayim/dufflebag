@@ -12,7 +12,7 @@ Read the package manifest. Flag unmaintained / unstable / duplicative deps and s
 
 ### Greenfield
 
-Grill a dependency policy (2–3 quick picks):
+Grill a dependency policy (2–3 quick picks) in the **same** `AskUserQuestion` as the style catalog when those picks are already askable:
 
 - Pin exact versions or allow ranges? (Recommend: pin exact)
 - Prefer zero-dep / minimal-dep where feasible? (Recommend: yes)
@@ -33,7 +33,7 @@ The capstone of the grill, run **after dependencies are settled and before the p
 See **[EXTENSION-PATTERN.md](EXTENSION-PATTERN.md)** for the full procedure. In brief:
 
 - **Name the unit of extension** (feature / endpoint / screen / component / Actor / module) — parameterize everything to the project's real word; don't hardcode "feature".
-- **Derive a draft golden path** from the picks (existing repos also mine how the last 1–3 units were really added — see [SCAN.md](../../grill-me-code-style-with-docs/SCAN.md)), then grill it **step-by-step** (keep / adjust / reorder / cut) — react to a concrete draft, never a blank prompt.
+- **Derive a draft golden path** from the picks (existing repos also mine how the last 1–3 units were really added — see [SCAN.md](../../grill-me-code-style-with-docs/SCAN.md)), then grill it in **one** `AskUserQuestion` (keep / adjust / reorder / cut per step) — react to a concrete draft, never a blank prompt.
 - End it with a short **definition of done** checklist.
 - **Wire the slop guard** in three layers: machine-catchable `## Never` tells → **lint config** (CI blocks, flips a rule's `verify` from `judgment` to a real command); taste tells → **`deslop` per-diff**; the done-checklist → the human/agent gate. Slop is "off the golden path".
 
