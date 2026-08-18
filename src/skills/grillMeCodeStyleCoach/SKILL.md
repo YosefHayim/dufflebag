@@ -31,7 +31,7 @@ this go" comes from *my* docs, not generic advice). No ruleset in the repo? Say 
 - `judgment` (taste / architecture / placement) → **this is where you stop and coach.** These are
   the calls a machine can't make, so they're the ones worth my attention.
 
-Ask **one question at a time** and wait. Never batch.
+When several judgment decisions are live, fire them in **one** `AskUserQuestion` (the host TUI question card). Recommended option first, marked `(Recommended)`; code variants go in each option's `preview`. Do not drip live questions one-by-one. Do not invent future decisions just to fill a card. A second card is only for questions that could not exist until these answers landed.
 
 </what-to-do>
 
@@ -46,10 +46,11 @@ Ask **one question at a time** and wait. Never batch.
    idea to one I've already used in this repo ("this is like the `settings` pure/IO split you saw").
 3. **Show two concrete variants** via `AskUserQuestion` — put the real code in each option's
    `preview`. Variant A vs B on the actual decision (e.g. "pure `check*` + thin fetch" vs "one fused
-   function"; "extend `features.ts`" vs "new module"). Cite `file:symbol` from this repo.
-4. **Make me pick — and WAIT.** High friction: do not write the code until I answer. If I pick, that
-   direction is locked; if I'm unsure, teach a bit more and re-offer. This is active recall — the
-   point is that I *decide*, so I learn.
+   function"; "extend `features.ts`" vs "new module"). Cite `file:symbol` from this repo. If more
+   than one judgment call is live, they share this card.
+4. **Make me pick — and WAIT on the card.** High friction: do not write the code until I answer the
+   card. If I pick, that direction is locked; if I'm unsure, teach a bit more and re-offer. This is
+   active recall — the point is that I *decide*, so I learn.
 5. **Write it my way**, following the ruleset. Colocate the `*.test.ts`. Then in one or two lines,
    **teach the mechanism**: how this actually works here (the data flow / lifecycle / who calls it),
    and **link the exemplar** from the ruleset ("mirrors `src/…`— open it to see the whole shape").

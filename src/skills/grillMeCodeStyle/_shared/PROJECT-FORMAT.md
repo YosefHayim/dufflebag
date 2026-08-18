@@ -75,10 +75,10 @@ approval.
 
 ## What to ask
 
-`grill-with-docs` owns PROJECT.md for every repo — new or existing. Walk these
-seven one at a time, each with a recommended default pulled from the repo,
-`README`, or the conversation (same as any grill). Skip a question only when the
-docs already answer it unambiguously.
+`grill-with-docs` owns PROJECT.md for every repo — new or existing. Fire every
+unanswered item in **one** `AskUserQuestion`, each with a recommended default
+pulled from the repo, `README`, or the conversation (same as any grill). Skip a
+question only when the docs already answer it unambiguously.
 
 1. **Problem & status quo** — What problem does this solve, for whom, and what does someone do today without it? → *The problem.*
 2. **Who it's for / who it's not** — The primary user, and who is explicitly out of audience. Turn "everyone" into a real persona. → *Who it's for.*

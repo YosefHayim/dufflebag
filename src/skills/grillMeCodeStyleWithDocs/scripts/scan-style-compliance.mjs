@@ -256,7 +256,7 @@ if (args.out) {
 }
 
 function flagParams(paramList, relPath, lineNo, line, findingsList, banned) {
-  if (!paramList || !paramList.trim()) return;
+  if (!paramList?.trim()) return;
   const parts = paramList
     .split(",")
     .map((p) => p.trim())

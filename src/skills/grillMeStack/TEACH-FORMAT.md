@@ -1,7 +1,7 @@
 # TEACH-FORMAT.md — how to write `TEACH.md`
 
 `TEACH.md` is **the user's personal learning record** for a project: *why this stack, and how it
-works*, in plain language they can re-read and re-explain. It grows one decision at a time and is
+works*, in plain language they can re-read and re-explain. It grows as decisions are recorded and is
 **deduped** — never re-write a decision or term already present.
 
 It is **not** `LANGUAGE.md` (that's the shared human↔agent glossary for *domain* terms) and **not** an

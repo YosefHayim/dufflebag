@@ -42,7 +42,14 @@ def declaration_names(node: ast.AST) -> list[str]:
 
 def python_sources(repository_root: Path) -> list[Path]:
     authored_roots = [repository_root / "src", repository_root / "scripts"]
-    return sorted(source_path for root in authored_roots for source_path in root.rglob("*.py"))
+    # Skip build trees (e.g. whisper.cpp under voice/target) even when present on disk.
+    skip_parts = {"target", "node_modules", ".venv", "__pycache__"}
+    return sorted(
+        source_path
+        for root in authored_roots
+        for source_path in root.rglob("*.py")
+        if not any(part in skip_parts for part in source_path.parts)
+    )
 
 
 def forbidden_declarations(repository_root: Path) -> list[str]:

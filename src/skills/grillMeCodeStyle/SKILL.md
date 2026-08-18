@@ -7,11 +7,11 @@ description: Grill the user on how a NEW/greenfield project is built — code st
 
 Interview me relentlessly about **how this project is built** — its code style, its structure docs, and its CLI — until we reach a shared understanding. Walk down each branch of the decision tree, resolving dependencies one-by-one. For each question, provide your recommended answer.
 
-Ask the questions one at a time, waiting for feedback on each before continuing.
+Fire every ready question in **one** `AskUserQuestion` (the host TUI question card). Recommended option first, marked `(Recommended)`; code variants go in each option's `preview`. Do not drip questions one-by-one. A second card is only for questions that could not exist until these answers landed (language/runtime when unknown is the only allowed gate card — Q0+Q1 together). If the host rejects the card for size, split into the fewest cards that fit — still never one question per turn.
 
 This is the **greenfield** variant: there is little or no code to read. Your source of truth is my **taste** (grill me) plus the project's **purpose** and its **language/framework** conventions. Never write generic advice ("use clear names", "keep functions small") — every rule must be a real, load-bearing decision for THIS project. If the project already has meaningful code, stop and use `grill-me-code-style-with-docs` instead.
 
-**Nothing is written to disk until I approve.** You grill (Steps 0–5) — the code-style grill is a **pick-the-code gallery**: I pick from illustrative code variants shown in the TUI, dimension by dimension (Step 2); then you compose the **golden path for adding a unit + its slop guard** (Step 5). You render an **interactive HTML plan** as the review gate (Step 6, built with the **planpage** kit — I approve, adjust, or flip any decision in the browser), and only then write the files (Step 7).
+**Nothing is written to disk until I approve.** You grill (Steps 0–5) — the code-style grill is a **pick-the-code gallery**: I pick from illustrative code variants shown in **one** TUI question card (Step 2); then you compose the **golden path for adding a unit + its slop guard** (Step 5). You render an **interactive HTML plan** as the review gate (Step 6, built with the **planpage** kit — I approve, adjust, or flip any decision in the browser), and only then write the files (Step 7).
 
 </what-to-do>
 
@@ -19,7 +19,7 @@ This is the **greenfield** variant: there is little or no code to read. Your sou
 
 ## Step 0 — Detect language and runtime
 
-Before anything else, establish the two most load-bearing facts about this project:
+Before anything else, establish the two most load-bearing facts about this project. If either is unknown, they are the **only** allowed gate card — ask **Q0 and Q1 together** in one `AskUserQuestion`, then fire the catalog card. If both are already known, skip to Step 2.
 
 ### Q0 — Primary language
 
@@ -66,7 +66,7 @@ Record each doc's state — `create` · `validate ✓` · `drift` (with the gap)
 
 ## Step 2 — Grill the code style as a pick-the-code gallery
 
-The code-style grill runs as **pick-the-code**, not prose. For each dimension I show you code **variants in the TUI** (`AskUserQuestion` — the code goes in each option's `preview`) and you **pick**. With no repo to read, variants are **illustrative**: variant **A** is the default idiom for this language + framework (what the agent would reach for), variant **B** the alternative — both concrete to THIS project's domain, never `foo`/`bar`. Recommend one from the purpose + framework, but the pick is mine.
+The code-style grill runs as **pick-the-code**, not prose. Put every applicable dimension in **one** TUI card (`AskUserQuestion` — one question per dimension, code in each option's `preview`) and I **pick** them all in that card. With no repo to read, variants are **illustrative**: variant **A** is the default idiom for this language + framework (what the agent would reach for), variant **B** the alternative — both concrete to THIS project's domain, never `foo`/`bar`. Recommend one from the purpose + framework, but the pick is mine.
 
 Run the full catalog: **[STYLE-CATALOG.md](_shared/STYLE-CATALOG.md)** — all language-conditional sections filtered by the Q0 answer, all new dimensions included.
 
@@ -81,7 +81,7 @@ Key behaviors:
 
 ## Step 3 — Grill the CLI
 
-In the agent era every project earns a **CLI that both humans and agents drive**. Grill it:
+In the agent era every project earns a **CLI that both humans and agents drive**. Put these picks on the **same** `AskUserQuestion` as the style catalog when they are already askable:
 
 - **Have/need one?** Default to yes — a dev+ops CLI (scaffold, run, check, deploy). A pure library or Worker may lean on its framework CLI instead — if so, say why and skip.
 - **Command surface** — the verbs/nouns and their shape.
@@ -104,7 +104,7 @@ When a library choice comes up, research + recommend a stable option (WebSearch 
 With the picks, CLI, structure, and dependency policy settled, compose the one artifact a future contributor reaches for: **"if tomorrow we add a thing, how do we add it, and how do we not slop it up?"** See **[EXTENSION-PATTERN.md](_shared/EXTENSION-PATTERN.md)** for the full procedure. Greenfield-specific: with no code yet, the path is **derived from the picks** (illustrative, not mined from history) — but still concrete to THIS project, never abstract "add tests" prose.
 
 - **Name the unit** of extension (feature / endpoint / screen / component / Actor / module) — parameterize the section to the project's real word.
-- **Derive a draft numbered path** from the picks + canonical example, then grill it **step-by-step** (keep / adjust / reorder / cut); end with a **definition-of-done** checklist.
+- **Derive a draft numbered path** from the picks + canonical example, then grill it in **one** `AskUserQuestion` (keep / adjust / reorder / cut per step); end with a **definition-of-done** checklist.
 - **Wire the guard** in layers: machine-catchable `## Never` tells → the **lint config** (CI blocks; flips a rule's `verify` from `judgment` to a real command); taste tells → **`deslop` per-diff**; the checklist → the human/agent gate. Slop is "off the golden path".
 
 Lands a first-class `## Golden path — adding a {unit}` in `CODE-STYLE.md` + a tight mirror in the `AGENTS.md` digest.

@@ -510,7 +510,7 @@ export const featureCatalog = Schema.decodeUnknownSync(featureCatalogSchema, {
     },
     title: "Grill me",
     summary:
-      "A skill that interviews the user relentlessly about a plan or design until reaching shared understanding, resolving each branch of the decision tree one question at a time.",
+      "A skill that interviews the user relentlessly about a plan or design until reaching shared understanding, firing every ready question in one TUI question card.",
     selectedByDefault: false,
     dependencies: [],
     platform: "any",
@@ -568,7 +568,7 @@ export const featureCatalog = Schema.decodeUnknownSync(featureCatalogSchema, {
     installedSkill: {
       _tag: "skill",
       id: "grill-me-code-style-with-docs",
-      shippedPaths: ["SKILL.md", "SCAN.md"],
+      shippedPaths: ["SKILL.md", "SCAN.md", "references", "scripts"],
     },
     title: "Grill me — code style (existing codebase)",
     summary:

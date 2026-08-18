@@ -5,11 +5,9 @@ description: Grilling session that challenges your plan against the existing dom
 
 <what-to-do>
 
-Interview me relentlessly about every aspect of this plan until we reach a shared understanding. Walk down each branch of the design tree, resolving dependencies between decisions one-by-one. For each question, provide your recommended answer.
+Interview me relentlessly about every aspect of this plan until we reach a shared understanding. If a question can be answered by exploring the codebase, explore the codebase instead.
 
-Ask the questions one at a time, waiting for feedback on each question before continuing.
-
-If a question can be answered by exploring the codebase, explore the codebase instead.
+Fire every remaining question in **one** `AskUserQuestion` (the host TUI question card). Recommended option first, marked `(Recommended)`. Do not drip questions one-by-one. A second card is only for questions that could not exist until these answers landed. If the host rejects the card for size, split into the fewest cards that fit — still never one question per turn. If the host has no question tool, dump the same form as one numbered list in a single message.
 
 </what-to-do>
 
@@ -97,7 +95,7 @@ Matt Pocock's upstream domain-modeling skill keeps this anatomy inside `CONTEXT.
 
 Purpose, goals, and product direction do NOT belong in `LANGUAGE.md` (glossary), `CONTEXT.md` (orientation), or ADRs (individual decisions) — they live in `PROJECT.md`. When the project's "why" or "where it's going" comes up — or when you notice a `CONTEXT.md` that has bloated into problem statements and roadmaps — capture/extract it into `PROJECT.md` using the format in [PROJECT-FORMAT.md](../grill-me-code-style/_shared/PROJECT-FORMAT.md).
 
-This skill is the **single owner of PROJECT.md** — for any repo, new or existing. When purpose is thin or absent, walk the seven-part **"What to ask"** checklist in [PROJECT-FORMAT.md](../grill-me-code-style/_shared/PROJECT-FORMAT.md), one question at a time with a recommended default, to produce a professional PROJECT.md. Other skills (the `grill-me-code-style` pair) don't write their own purpose questions — they offer to run this flow and hand off here.
+This skill is the **single owner of PROJECT.md** — for any repo, new or existing. When purpose is thin or absent, fire the seven-part **"What to ask"** checklist in [PROJECT-FORMAT.md](../grill-me-code-style/_shared/PROJECT-FORMAT.md) as **one** `AskUserQuestion`, each with a recommended default, to produce a professional PROJECT.md. Other skills (the `grill-me-code-style` pair) don't write their own purpose questions — they offer to run this flow and hand off here.
 
 ### Offer ADRs sparingly
 

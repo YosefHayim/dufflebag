@@ -2,7 +2,7 @@
 name: grill-me-stack
 description: >
   Grill the user on the TECHNOLOGY choices of a project — language, runtime, framework/meta-framework
-  (e.g. React vs Next), and the key services/vendors — one decision at a time, so they can EXPLAIN
+  (e.g. React vs Next), and the key services/vendors — in one TUI question card, so they can EXPLAIN
   why, not just accept it. For each: teach the tradeoff space in plain terms (honest cost vs gain,
   alternatives conceded), make them pick, then explain how that piece's architecture actually works.
   Writes each outcome to TEACH.md as a lean decision-record + a self-closing, officially-cited
@@ -16,7 +16,7 @@ description: >
 <what-to-do>
 
 Interview me about **why this project is built on the technologies it is** — language, runtime,
-framework, meta-framework, and the load-bearing services/vendors — one decision at a time, until I
+framework, meta-framework, and the load-bearing services/vendors — in one TUI question card, until I
 could **explain each choice to someone else**. This is a different axis from `grill-me-code-style`
 (which is *how we write code here*); this is ***why this stack, and how it works***.
 
@@ -28,13 +28,16 @@ For each decision, the point is **active recall + honest tradeoffs**, never a sa
 - **Teach the tradeoff space in plain terms** — what each option costs, and what you'd *gain* for
   paying that cost. Concede the real strengths of the option we *don't* pick (Go really is great for
   CLIs — just not here). A choice I can't argue against the alternative to, I don't understand.
-- **Make me pick, and WAIT.** Recommend one with your reasoning, but the call is mine. High friction.
+- **Make me pick, and WAIT on the card.** Recommend one with your reasoning, but the call is mine. High friction.
 - **Then explain how it works** — the mechanism of the thing we chose (what runs it, in what order),
   concretely enough that I picture it.
 
-Ask **one question at a time** and wait. Never batch.
+Fire every unsettled stack decision in **one** `AskUserQuestion` (the host TUI question card).
+Teach the tradeoff space in each option's detail. Recommended option first, marked `(Recommended)`.
+Do not drip questions one-by-one. A second card is only for questions that could not exist until
+these answers landed.
 
-**Write only after I've decided.** On each resolved decision, append to `TEACH.md` per
+**Write only after I've decided.** After the card returns, append each resolved decision to `TEACH.md` per
 **[TEACH-FORMAT.md](TEACH-FORMAT.md)**: a **lean decision-record** on top + a **self-closing,
 cited glossary** below (every term explained, every term *used inside* a term also explained, one
 short code snippet each). Skip anything already in `TEACH.md`.
@@ -45,7 +48,7 @@ short code snippet each). Skip anything already in `TEACH.md`.
 
 ## What counts as a "stack decision" worth grilling
 
-Walk these in dependency order (each gates the next); skip any already settled in `TEACH.md`:
+Walk these in dependency order inside **one** card (language first, then runtime, then framework, then vendors); skip any already settled in `TEACH.md`:
 
 1. **Language** — why this one, vs the obvious alternatives for this domain (TS vs Python vs Go vs
    bash…). The deciding lens is usually **substrate fit**: what ground does the code already run on?
@@ -69,9 +72,9 @@ concern, not a stack decision.
 2. **Teach the tradeoff space (KISS).** 2–4 candidates, one honest line each: its strength, its cost
    *here*, and what you'd gain for that cost. Never trust memory for a factual claim (a version, a
    limit, "X doesn't support Y") — **verify with WebSearch and cite the official doc.**
-3. **Recommend + show alternatives via `AskUserQuestion`.** Put the real tradeoff in each option's
-   detail. Concede the rejected option's genuine strengths.
-4. **Make me pick — and WAIT.** Don't write until I answer. If I'm unsure, teach a bit more, re-offer.
+3. **Recommend + show alternatives via one `AskUserQuestion`.** Put the real tradeoff in each option's
+   detail. Concede the rejected option's genuine strengths. Unsettled decisions share this card.
+4. **Make me pick — and WAIT on the card.** Don't write until I answer. If I'm unsure, teach a bit more, re-offer.
 5. **Explain how the chosen thing works** — the mechanism (what executes it, the order it runs in),
    concrete enough to picture. Offer to hand a real deep-dive to the **`teach`** skill (which builds
    cited, multi-session lessons) — this skill teaches the *decision*, `teach` teaches the *concept*.

@@ -27,11 +27,11 @@ Pick a mode from the user request, then execute only that mode:
 
 Interview me relentlessly about **how this codebase is built** — its code style, its structure docs, and its CLI — until we reach a shared understanding. Walk down each branch of the decision tree, resolving dependencies one-by-one. For each question, provide your recommended answer.
 
-Ask the questions one at a time, waiting for feedback on each before continuing.
+Fire every ready question in **one** `AskUserQuestion` (the host TUI question card). Recommended option first, marked `(Recommended)`; code variants go in each option's `preview`. Do not drip questions one-by-one. A second card is only for questions that could not exist until these answers landed. If the host rejects the card for size, split into the fewest cards that fit — still never one question per turn.
 
 My **taste is the source of truth**; the existing code is **evidence, not gospel** — much of it may be the slop I want gone. When code and my stated taste conflict, my taste wins and `CODE-STYLE.md` records the DESIRED end-state, not the current one.
 
-**Nothing is written to disk until I approve.** You scan and grill (Steps 1–4) — the code-style grill is a **pick-the-code gallery**: you show me real code variants and I pick what I like, dimension by dimension (Step 3) — then compose the **golden path for adding a unit + its slop guard** from those picks and the evidence (Step 6). You render an **interactive HTML plan** as the review gate (Step 7, built with the **planpage** kit — I approve, adjust, or flip any decision right in the browser and it posts back), write the files on approval (Step 8), then run one **structure-review capstone** (Step 9) that can reorganize the tree and open a PR.
+**Nothing is written to disk until I approve.** You scan and grill (Steps 1–4) — the code-style grill is a **pick-the-code gallery**: you show me real code variants and I pick what I like in **one** TUI question card (Step 3) — then compose the **golden path for adding a unit + its slop guard** from those picks and the evidence (Step 6). You render an **interactive HTML plan** as the review gate (Step 7, built with the **planpage** kit — I approve, adjust, or flip any decision right in the browser and it posts back), write the files on approval (Step 8), then run one **structure-review capstone** (Step 9) that can reorganize the tree and open a PR.
 
 ### Mode: Audit (read-only compliance)
 
@@ -103,7 +103,7 @@ Fan out read-only sub-agents to survey the codebase and report the **most-repeat
 
 ## Step 3 — Grill the code as a pick-the-code gallery
 
-The code-style grill runs as **pick-the-code**, not prose. For each dimension I show you real code **variants in the TUI** (`AskUserQuestion` — the code goes in each option's `preview`) and you **pick**; your pick is recorded verbatim. Variant **A** is the repo's actual incumbent (pulled verbatim by the scan, `file:symbol`-cited — you react to *your* code, warts and all); variant **B** is the de-slopped rewrite; an **uncontested** dimension collapses to a single **keep/kill** rather than a fabricated choice.
+The code-style grill runs as **pick-the-code**, not prose. Put every applicable dimension in **one** TUI card (`AskUserQuestion` — one question per dimension, code in each option's `preview`) and I **pick**; each pick is recorded verbatim. Variant **A** is the repo's actual incumbent (pulled verbatim by the scan, `file:symbol`-cited — you react to *your* code, warts and all); variant **B** is the de-slopped rewrite; an **uncontested** dimension collapses to a single **keep/kill** rather than a fabricated choice.
 
 Run the full catalog: **[STYLE-CATALOG.md](../grill-me-code-style/_shared/STYLE-CATALOG.md)** — all language-conditional sections filtered by the auto-detected language, all new dimensions included.
 
@@ -119,7 +119,7 @@ Key behaviors:
 
 ## Step 4 — Grill the CLI
 
-Every project earns a **CLI both humans and agents drive**. If the repo already has one, hand the deep audit to the `interactive-cli-reviewer` skill and fold its findings back here; otherwise grill it fresh:
+Every project earns a **CLI both humans and agents drive**. If the repo already has one, hand the deep audit to the `interactive-cli-reviewer` skill and fold its findings back here; otherwise put these picks on the **same** `AskUserQuestion` as the style catalog:
 
 - **Have/need one?** Default yes — a dev+ops surface.
 - **Command surface** — verbs/nouns.
@@ -134,7 +134,7 @@ Record the command surface as an **ADR**; the conventions become `CODE-STYLE.md`
 See **[STEPS.md](../grill-me-code-style/_shared/STEPS.md)** for the shared procedures:
 
 - **Step 5** → Audit dependencies (flag unmaintained/unstable/duplicative, record ADRs).
-- **Step 6** → Compose the **golden path + slop guard** (see [EXTENSION-PATTERN.md](../grill-me-code-style/_shared/EXTENSION-PATTERN.md)) — name the unit of extension, **mine how the last 1–3 units were really added** (the `SCAN.md` "how a {unit} gets added" angle) and grill the derived numbered path step-by-step, end with a definition-of-done checklist, and wire the guard (machine-catchable `## Never` tells → the lint config that CI blocks; taste → `deslop` per-diff; ceremony → `deslop-v2` kill list).
+- **Step 6** → Compose the **golden path + slop guard** (see [EXTENSION-PATTERN.md](../grill-me-code-style/_shared/EXTENSION-PATTERN.md)) — name the unit of extension, **mine how the last 1–3 units were really added** (the `SCAN.md` "how a {unit} gets added" angle) and grill the derived numbered path in one `AskUserQuestion`, end with a definition-of-done checklist, and wire the guard (machine-catchable `## Never` tells → the lint config that CI blocks; taste → `deslop` per-diff; ceremony → `deslop-v2` kill list).
 - **Step 7** → Reference framework practices, then render the interactive planpage plan (the review gate) — including the **golden-path + guard block** and the **ceremony kill list** (paths to delete/replace with official tools) when the scan found hits.
 - **Step 8** → On approval, write the files (CODE-STYLE.md incl. `## Golden path`, formatter + lint config, structure docs, ADRs, AGENTS.md digest incl. the tight golden-path mirror).
 - **Step 9** → Structure review & reorg capstone (judge organization, propose moves, open PR on approval).
