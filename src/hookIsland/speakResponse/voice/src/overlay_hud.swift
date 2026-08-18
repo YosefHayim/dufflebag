@@ -1,4 +1,5 @@
 import AppKit
+import Darwin
 import Foundation
 import QuartzCore
 
@@ -12,6 +13,18 @@ guard args.count >= 3, let workerPid = Int32(args[1]) else {
 }
 let stateHome = args[2]
 let statusPath = (stateHome as NSString).appendingPathComponent("status.json")
+let lockPath = (stateHome as NSString).appendingPathComponent("overlay.lock")
+
+// Exclusive lock so stacked / orphaned HUDs never paint a second pill.
+let lockFd = open(lockPath, O_CREAT | O_RDWR, 0o600)
+if lockFd < 0 {
+    fputs("overlay_hud: cannot open overlay.lock\n", stderr)
+    exit(1)
+}
+if flock(lockFd, LOCK_EX | LOCK_NB) != 0 {
+    // Another live HUD already owns the display.
+    exit(0)
+}
 
 class Panel: NSPanel {
     override var canBecomeKey: Bool { false }
