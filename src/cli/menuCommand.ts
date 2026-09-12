@@ -665,7 +665,7 @@ const runStt = Effect.gen(function* () {
       steps: [
         {
           label: "Action",
-          detail: action === "on" ? "enable hold-Control dictation" : "disable dictation worker",
+          detail: action === "on" ? "enable hold-§ dictation" : "disable dictation worker",
         },
         { label: "Scope", detail: scope },
         { label: "Equivalent CLI", detail: `dufflebag stt ${action} --scope ${scope}` },
@@ -680,7 +680,7 @@ const runStt = Effect.gen(function* () {
     if (action === "on") {
       const { location } = yield* enableVoiceWorker(scope);
       yield* TerminalUI.success(`STT is on (${location.scope}).`);
-      yield* TerminalUI.detail("Hold Control to dictate; release to finish.");
+      yield* TerminalUI.detail("Hold § to dictate; release to finish.");
     } else {
       const { location, alreadyOff } = yield* disableVoiceWorker(scope);
       yield* TerminalUI.success(

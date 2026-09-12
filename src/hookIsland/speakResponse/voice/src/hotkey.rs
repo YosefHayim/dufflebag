@@ -1,6 +1,6 @@
-//! Control-hold finite state machine (tap / hold-to-dictate / release).
+//! Section-key hold finite state machine (tap / hold-to-dictate / release).
 //!
-//! Control is detected by polling HID key state + modifier flags so we do not
+//! The §/± key is detected by polling HID key state so we do not
 //! depend on CGEventTap / Input Monitoring (often missing for a rebuilt binary).
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -50,12 +50,14 @@ pub fn control_hold_transition(
 
 /// Hold threshold before listening (short, but long enough to beat key bounce).
 pub const CONTROL_HOLD_SECONDS: f64 = 0.12;
-/// Max gap between taps for double-tap Control (cancel TTS / mute / refine).
+/// Max gap between taps for double-tap § (cancel TTS / mute / refine).
 pub const CONTROL_DOUBLE_TAP_SECONDS: f64 = 0.4;
-/// Default release tail (ms) when config is missing — keep the mic open after Control-up.
+/// Default release tail (ms) when config is missing — keep the mic open after § up.
 pub const DICTATION_RELEASE_GRACE_MS: u64 = 200;
-/// How often to sample HID Control state (edge-detect hold).
+/// How often to sample HID § state (edge-detect hold).
 pub const CONTROL_POLL_MS: u64 = 8;
+/// kVK_ISO_Section: the physical §/± key under Esc on ISO MacBook keyboards.
+pub const SECTION_KEY_CODE: u16 = 0x0A;
 
 #[cfg(target_os = "macos")]
 #[link(name = "CoreGraphics", kind = "framework")]
@@ -64,28 +66,13 @@ extern "C" {
     fn CGEventSourceKeyState(state_id: u32, key: u16) -> bool;
 }
 
-/// True while either Control key is held.
-/// Uses both the Control modifier flag and raw keycodes (59 left / 62 right).
+/// True while the MacBook §/± key is held.
 #[cfg(target_os = "macos")]
 pub fn control_modifier_down() -> bool {
     const HID_SYSTEM_STATE: u32 = 1;
-    // kCGEventFlagMaskControl
-    const CONTROL_MASK: u64 = 0x0004_0000;
-    // Hardware keycodes (Carbon / HID)
-    const CONTROL_LEFT: u16 = 59;
-    const CONTROL_RIGHT: u16 = 62;
     unsafe {
-        let flags = CGEventSourceFlagsState(HID_SYSTEM_STATE);
-        if flags & CONTROL_MASK != 0 {
-            return true;
-        }
-        if CGEventSourceKeyState(HID_SYSTEM_STATE, CONTROL_LEFT) {
-            return true;
-        }
-        if CGEventSourceKeyState(HID_SYSTEM_STATE, CONTROL_RIGHT) {
-            return true;
-        }
-        false
+        let _ = CGEventSourceFlagsState(HID_SYSTEM_STATE);
+        CGEventSourceKeyState(HID_SYSTEM_STATE, SECTION_KEY_CODE)
     }
 }
 

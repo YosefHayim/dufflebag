@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 use uuid::Uuid;
 
-pub const HOTKEY_LABEL: &str = "hold-control";
+pub const HOTKEY_LABEL: &str = "hold-section";
 pub const SAMPLE_RATE: u32 = 16_000;
 
 /// Session mute: inbox stays, nothing is spoken until unmuted.

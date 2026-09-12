@@ -164,7 +164,7 @@ route-request: here is my raw ask — <paste> — primary skill + paste-ready re
 ## Seamless UX (how to do this right)
 
 ```text
-[STT hold-Control release] or [typed draft]
+[STT hold-§ release] or [typed draft]
         │
         ▼
   route-aware refine  (route-request rules + preserve literals)

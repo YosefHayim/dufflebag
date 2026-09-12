@@ -50,7 +50,7 @@ dufflebag
     └── devin [-- <devin-arguments...>]
 ```
 
-`stt on|off` starts or stops hold-Control dictation (the local voice worker).
+`stt on|off` starts or stops hold-§ dictation (the local voice worker).
 `tts on|off` sets `speech-response-mode` to `auto` or `off` (and ensures the worker is up for `tts on`).
 `voice` remains the full surface for status, one-shot speak, refine, and Devin.
 

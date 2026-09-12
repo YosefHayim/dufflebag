@@ -11,7 +11,7 @@ clap = { version = "4.5.41", features = ["derive"] }
 cpal = "0.15.3"
 enigo = "0.2.1"
 parking_lot = "0.12.4"
-rdev = "0.5.3"
+rdev = { version = "0.5.3", features = ["unstable_grab"] }
 regex = "1.11.1"
 reqwest = { version = "0.12.22", default-features = false, features = ["blocking", "rustls-tls"] }
 serde = { version = "1.0.219", features = ["derive"] }

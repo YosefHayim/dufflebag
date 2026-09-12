@@ -1,11 +1,11 @@
-//! Dictate worker: primed mic + hold Control + serial STT queue.
+//! Dictate worker: primed mic + hold § + serial STT queue.
 //! Narration runs in a separate process (`narrate-daemon`).
 
 use crate::audio::PrimedMic;
 use crate::config::voice_preferences;
 use crate::hotkey::{
     control_hold_transition, control_modifier_down, HoldAction, HoldEvent, HoldState,
-    CONTROL_DOUBLE_TAP_SECONDS, CONTROL_HOLD_SECONDS, CONTROL_POLL_MS,
+    CONTROL_DOUBLE_TAP_SECONDS, CONTROL_HOLD_SECONDS, CONTROL_POLL_MS, SECTION_KEY_CODE,
 };
 use crate::live_preview::{self, LiveCaption};
 use crate::models::{self, selected_model_key};
@@ -13,14 +13,15 @@ use crate::narrate;
 use crate::overlay;
 use crate::pipeline::{self, DictationJob, DictationPipeline};
 use crate::state::{
-    acquire_worker_pid, clear_stop_flag, ensure_state_home, reap_child_processes, release_worker_pid,
-    reset_voice_runtime, stop_requested, worker_already_running, write_worker_status, WorkerStatus,
+    acquire_worker_pid, clear_stop_flag, ensure_state_home, reap_child_processes,
+    release_worker_pid, reset_voice_runtime, stop_requested, worker_already_running,
+    write_worker_status, WorkerStatus,
 };
 use crate::stt::SttEngine;
 use crate::tts;
 // release_control_keys is only used when inserting text (typing.rs), never while holding.
 use parking_lot::Mutex;
-use rdev::{listen, EventType, Key};
+use rdev::{grab, EventType, Key};
 use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -131,7 +132,7 @@ pub fn run_daemon() -> i32 {
     let cancel_prepare = Arc::new(AtomicBool::new(false));
     let running = Arc::new(AtomicBool::new(true));
 
-    // Capture control loop: prime mic here (Stream !Send), flip buffer + enqueue only.
+    // Capture hotkey loop: prime mic here (Stream !Send), flip buffer + enqueue only.
     {
         let control = control.clone();
         let start_flag = start_flag.clone();
@@ -145,7 +146,7 @@ pub fn run_daemon() -> i32 {
         let model_name_c = model_name.clone();
         let backend_c = backend.clone();
         thread::spawn(move || {
-            // Prime mic once on this thread — Control never pays device-open latency.
+            // Prime mic once on this thread — the hotkey never pays device-open latency.
             let mic = match PrimedMic::prime() {
                 Ok(m) => m,
                 Err(error) => {
@@ -181,11 +182,8 @@ pub fn run_daemon() -> i32 {
                     let mut state = control.lock();
                     if let Some(deadline) = state.hold_deadline {
                         if Instant::now() >= deadline && state.hold == HoldState::Waiting {
-                            let (next, action) = control_hold_transition(
-                                state.hold,
-                                HoldEvent::HoldElapsed,
-                                false,
-                            );
+                            let (next, action) =
+                                control_hold_transition(state.hold, HoldEvent::HoldElapsed, false);
                             state.hold = next;
                             state.hold_deadline = None;
                             if action == HoldAction::Start {
@@ -195,8 +193,8 @@ pub fn run_daemon() -> i32 {
                     }
                 }
 
-                // Control-down: soft-stop TTS if any, begin buffer.
-                // NEVER inject Control key-up here — that made the poller see a
+                // Hotkey-down: soft-stop TTS if any, begin buffer.
+                // NEVER inject key-up here — that made the poller see a
                 // fake release → Tap → HUD "Connecting…" then vanish, and enigo
                 // key events can glitch system audio under other music apps.
                 if prepare_flag.swap(false, Ordering::SeqCst) {
@@ -279,13 +277,13 @@ pub fn run_daemon() -> i32 {
                         if mic.is_recording() || cancel_prepare.load(Ordering::SeqCst) {
                             break;
                         }
-                        // Kick prepare if Control-down hasn't been processed yet.
+                        // Kick prepare if hotkey-down hasn't been processed yet.
                         if !prepare_flag.load(Ordering::SeqCst) && !mic.is_recording() {
                             // Capture may still be priming from Schedule — wait.
                         }
                         thread::sleep(Duration::from_millis(5));
                     }
-                    // Release tail: keep capturing after Control-up so the last word is not clipped.
+                    // Release tail: keep capturing after hotkey-up so the last word is not clipped.
                     let grace_ms = voice_preferences().dictation_mic_off_delay_ms;
                     if grace_ms > 0 {
                         thread::sleep(Duration::from_millis(grace_ms));
@@ -346,8 +344,8 @@ pub fn run_daemon() -> i32 {
         });
     }
 
-    // Primary Control path: poll HID modifier flags (works without Input Monitoring).
-    // rdev CGEventTap often never delivers pure Control on macOS when TCC isn't granted
+    // Primary § path: poll HID key state (works without Input Monitoring).
+    // rdev CGEventTap often never delivers some keys on macOS when TCC isn't granted
     // to this exact binary path — that left status stuck on "inactive" and no HUD.
     {
         let control = control.clone();
@@ -398,34 +396,61 @@ pub fn run_daemon() -> i32 {
         });
     }
 
-    // Optional: rdev for "other key while waiting" cancel (⌘C etc.). Best-effort;
-    // if the tap has no permission, Control still works via the poller above.
+    // Optional: rdev grab for "other key while waiting" cancel and § suppression.
+    // If the tap has no permission, § still works via the poller above, but macOS
+    // will type the literal key because only an event tap can swallow it.
     let control_keys = control.clone();
     let start_flag_keys = start_flag.clone();
     let prepare_flag_keys = prepare_flag.clone();
     let cancel_prepare_keys = cancel_prepare.clone();
     let running_keys = running.clone();
     thread::spawn(move || {
-        let callback = move |event: rdev::Event| {
+        let callback = move |event: rdev::Event| -> Option<rdev::Event> {
             if !running_keys.load(Ordering::SeqCst) {
-                return;
+                return Some(event);
             }
-            if let EventType::KeyPress(key) = event.event_type {
-                // Ignore Control — poller owns those edges (avoids double-fire).
-                if matches!(key, Key::ControlLeft | Key::ControlRight) {
-                    return;
+            match event.event_type {
+                EventType::KeyPress(key) if is_section_key(key) => {
+                    apply_hold(
+                        &control_keys,
+                        &start_flag_keys,
+                        &prepare_flag_keys,
+                        &cancel_prepare_keys,
+                        HoldEvent::ControlDown,
+                    );
+                    // Swallow the physical key event so holding the hotkey does
+                    // not type § into the focused app.
+                    return None;
                 }
-                apply_hold(
-                    &control_keys,
-                    &start_flag_keys,
-                    &prepare_flag_keys,
-                    &cancel_prepare_keys,
-                    HoldEvent::OtherDown,
-                );
+                EventType::KeyRelease(key) if is_section_key(key) => {
+                    apply_hold(
+                        &control_keys,
+                        &start_flag_keys,
+                        &prepare_flag_keys,
+                        &cancel_prepare_keys,
+                        HoldEvent::ControlUp,
+                    );
+                    return None;
+                }
+                EventType::KeyPress(_) => {
+                    // Ignore key-repeat from the hotkey while held; § edges are handled above.
+                    if control_modifier_down() {
+                        return Some(event);
+                    }
+                    apply_hold(
+                        &control_keys,
+                        &start_flag_keys,
+                        &prepare_flag_keys,
+                        &cancel_prepare_keys,
+                        HoldEvent::OtherDown,
+                    );
+                }
+                _ => {}
             }
+            Some(event)
         };
-        if let Err(error) = listen(callback) {
-            eprintln!("rdev listen (optional): {error:?}");
+        if let Err(error) = grab(callback) {
+            eprintln!("rdev grab (optional): {error:?}");
         }
     });
 
@@ -441,6 +466,10 @@ pub fn run_daemon() -> i32 {
     overlay::kill_existing_overlay();
     release_worker_pid();
     0
+}
+
+fn is_section_key(key: Key) -> bool {
+    matches!(key, Key::Unknown(code) if code == u32::from(SECTION_KEY_CODE))
 }
 
 fn apply_hold(
@@ -485,7 +514,7 @@ fn apply_hold(
                 let state = control.lock();
                 (state.model_name.clone(), state.backend.clone())
             };
-            write_worker_status("starting", "Control held", Some(&model), Some(&backend), None);
+            write_worker_status("starting", "§ held", Some(&model), Some(&backend), None);
         }
         HoldAction::Start => {
             start_flag.store(true, Ordering::SeqCst);
@@ -563,7 +592,7 @@ fn handle_control_tap(control: &Arc<Mutex<SharedControl>>) {
         write_worker_status(
             "inactive",
             if muted {
-                "Narration muted (double-tap Control to unmute)"
+                "Narration muted (double-tap § to unmute)"
             } else {
                 "Narration unmuted"
             },
@@ -602,11 +631,7 @@ fn refine_clipboard_prompt() -> Result<(), String> {
     let original = macos_clipboard_text()?;
     let refined = crate::refine::refine_with_prefs(&original, &prefs)?;
     write_macos_clipboard(&refined)?;
-    write_refinement_status(
-        "ready",
-        "Refined prompt copied — press ⌘V to paste",
-        10.0,
-    );
+    write_refinement_status("ready", "Refined prompt copied — press ⌘V to paste", 10.0);
     // Speak via narrate path if available (one-shot speak is fine).
     let _ = tts::speak_markdown(&refined);
     Ok(())
@@ -764,4 +789,15 @@ unsafe fn libc_kill(pid: i32, sig: i32) -> i32 {
         fn kill(pid: i32, sig: i32) -> i32;
     }
     kill(pid, sig)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn identifies_section_key_for_suppression() {
+        assert!(is_section_key(Key::Unknown(0x0A)));
+        assert!(!is_section_key(Key::Escape));
+    }
 }

@@ -331,7 +331,7 @@ export const writeBagConfigPatch = (scope: CliScope, patch: Partial<BagConfig>) 
 export const writeSpeechNarrationPolicy = (scope: CliScope, mode: SpeechNarrationPolicy) =>
   writeBagConfigPatch(scope, { speechResponseMode: mode });
 
-const holdControlHint = "Hold Control to dictate; release to finish.";
+const holdControlHint = "Hold § to dictate; release to finish.";
 const ttsHint = "Agent responses are narrated when speech-response-mode is not off.";
 
 // ── voice (full surface, kept for speak/refine/devin/status) ─────────────────
@@ -353,7 +353,7 @@ const onCommand = CliCommand.make(
           : "TTS narration: off (enable with `dufflebag tts on`).",
       );
       if (config.promptRefinementMode === "review" || config.promptRefinementMode === "both") {
-        yield* TerminalUI.detail("Double-tap Control to refine the copied prompt, then press ⌘V to paste it.");
+        yield* TerminalUI.detail("Double-tap § to refine the copied prompt, then press ⌘V to paste it.");
       }
       if (config.promptRefinementMode === "stt" || config.promptRefinementMode === "both") {
         let delivery = "caret";
@@ -521,7 +521,7 @@ export const voiceCommand = CliCommand.make("voice").pipe(
   CliCommand.withSubcommands([onCommand, offCommand, statusCommand, speakCommand, refineCommand, devinCommand]),
 );
 
-// ── stt (dictation / hold-Control) ───────────────────────────────────────────
+// ── stt (dictation / hold-§) ─────────────────────────────────────────────────
 
 const sttOnCommand = CliCommand.make(
   "on",
@@ -541,7 +541,7 @@ const sttOnCommand = CliCommand.make(
       }
       yield* TerminalUI.outro("Ready.");
     }),
-).pipe(CliCommand.withDescription("Install and start local dictation (hold Control to speak)"));
+).pipe(CliCommand.withDescription("Install and start local dictation (hold § to speak)"));
 
 const sttOffCommand = CliCommand.make(
   "off",
@@ -561,7 +561,7 @@ const sttOffCommand = CliCommand.make(
 ).pipe(CliCommand.withDescription("Stop dictation and remove the local voice worker"));
 
 const micOffDelayMilliseconds = Args.integer({ name: "milliseconds" }).pipe(
-  Args.withDescription("Milliseconds to keep the mic open after Control is released (0–2000)"),
+  Args.withDescription("Milliseconds to keep the mic open after § is released (0–2000)"),
   Args.optional,
 );
 
@@ -581,7 +581,7 @@ const sttMicOffDelayCommand = CliCommand.make(
           "dictation release tail",
         );
         yield* TerminalUI.detail(
-          "After you release Control, the mic stays open this long so trailing words are not clipped.",
+          "After you release §, the mic stays open this long so trailing words are not clipped.",
         );
         yield* TerminalUI.outro("Set with `dufflebag stt mic-off-delay <milliseconds>` (0–2000).");
         return;
@@ -602,7 +602,7 @@ const sttMicOffDelayCommand = CliCommand.make(
           ? `mic-off-delay → ${String(config.dictationMicOffDelayMs)} ms (${location.scope}).`
           : `mic-off-delay already ${String(config.dictationMicOffDelayMs)} ms (${location.scope}).`,
       );
-      yield* TerminalUI.detail("Applied on the next Control release (no worker restart needed).");
+      yield* TerminalUI.detail("Applied on the next § release (no worker restart needed).");
       yield* TerminalUI.outro("Done.");
     }),
 ).pipe(
@@ -673,7 +673,7 @@ const sttLangCommand = CliCommand.make(
 ).pipe(CliCommand.withDescription("Show or set dictation language (en default; he = ivrit.ai Hebrew model)"));
 
 export const sttCommand = CliCommand.make("stt").pipe(
-  CliCommand.withDescription("Speech-to-text dictation (hold Control)"),
+  CliCommand.withDescription("Speech-to-text dictation (hold §)"),
   CliCommand.withSubcommands([sttOnCommand, sttOffCommand, sttMicOffDelayCommand, sttLangCommand]),
 );
 
