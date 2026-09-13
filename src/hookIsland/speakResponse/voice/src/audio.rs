@@ -1,5 +1,5 @@
 //! Primed microphone: stream stays open for the daemon lifetime.
-//! Recording only flips a flag — no cold open on Control-down.
+//! Recording only flips a flag — no cold open on hotkey down.
 //!
 //! `PrimedMic` owns the cpal Stream (!Send) and must live on one thread.
 //! `SharedCapture` is Send/Sync so live-preview can read the buffer safely.

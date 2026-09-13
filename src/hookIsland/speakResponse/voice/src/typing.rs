@@ -21,14 +21,14 @@ pub fn type_text(text: &str) -> Result<(), String> {
     if text.is_empty() {
         return Ok(());
     }
-    // Wait for Control to fully release so modifiers do not corrupt injection.
+    // Wait for the dictation hotkey to fully release so it does not corrupt injection.
     ensure_control_released(900)?;
 
     let char_len = text.chars().count();
     let control_down = crate::hotkey::control_modifier_down();
 
     // Short/medium STT text: type characters directly. This avoids the classic
-    // hold-Control bug where Meta+V loses Command and only `v` appears in the caret
+    // hotkey-hold bug where paste can race and only `v` appears in the caret
     // while the HUD shows the full transcript.
     if char_len <= CLIPBOARD_PREFERS_CHARS || control_down {
         match type_via_enigo_text(text) {
@@ -72,7 +72,7 @@ pub fn type_text(text: &str) -> Result<(), String> {
 
 fn type_via_enigo_text(text: &str) -> Result<(), String> {
     let mut enigo = Enigo::new(&Settings::default()).map_err(|e| format!("enigo: {e}"))?;
-    // Small settle so the focused app accepts key events after Control release.
+    // Small settle so the focused app accepts key events after hotkey release.
     thread::sleep(Duration::from_millis(25));
     enigo.text(text).map_err(|e| format!("enigo.text: {e}"))
 }

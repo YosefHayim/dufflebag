@@ -95,7 +95,7 @@ enum Commands {
         #[arg(long, default_value_t = false)]
         auto_submit: bool,
     },
-    /// Debug: poll HID Control for N seconds (hold Control to verify detection)
+    /// Debug: poll HID § for N seconds (hold § to verify detection)
     ControlCheck {
         #[arg(long, default_value_t = 8)]
         seconds: u64,
@@ -212,27 +212,27 @@ fn main() {
         Commands::ControlCheck { seconds } => {
             use std::io::Write;
             use std::time::{Duration, Instant};
-            println!("Hold Control… (polling HID {seconds}s)");
+            println!("Hold §... (polling HID {seconds}s)");
             let deadline = Instant::now() + Duration::from_secs(seconds);
             let mut was = false;
             let mut saw = false;
             while Instant::now() < deadline {
                 let down = hotkey::control_modifier_down();
                 if down && !was {
-                    println!("CONTROL DOWN");
+                    println!("SECTION DOWN");
                     saw = true;
                 } else if !down && was {
-                    println!("CONTROL UP");
+                    println!("SECTION UP");
                 }
                 was = down;
                 let _ = std::io::stdout().flush();
                 std::thread::sleep(Duration::from_millis(20));
             }
             if saw {
-                println!("ok — Control detection works");
+                println!("ok — § detection works");
                 0
             } else {
-                eprintln!("no Control edge seen — try physical Control key");
+                eprintln!("no § edge seen — try the physical § key under Esc");
                 1
             }
         }
