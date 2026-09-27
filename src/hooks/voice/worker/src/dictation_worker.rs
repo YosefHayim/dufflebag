@@ -4,8 +4,8 @@
 use crate::config::voice_preferences;
 use crate::dictation_queue::{DictationJob, DictationQueue};
 use crate::hotkey::{
-    other_key_down, shift_hold_transition, shift_key_down, HoldAction, HoldEvent, HoldState, SHIFT_DOUBLE_TAP_SECONDS,
-    SHIFT_HOLD_SECONDS, SHIFT_POLL_MS,
+    newly_pressed, other_keys_down, shift_hold_transition, shift_key_down, HoldAction, HoldEvent, HoldState,
+    SHIFT_DOUBLE_TAP_SECONDS, SHIFT_HOLD_SECONDS, SHIFT_POLL_MS,
 };
 use crate::live_preview::{self, LiveCaption};
 use crate::microphone::{OpenMicrophone, SharedCapture};
@@ -182,12 +182,11 @@ fn run_capture_loop(hotkey: &Hotkey, running: &Arc<AtomicBool>, queue: &Dictatio
         // and showing the HUD wait until the hold is confirmed (start). Never inject a key-up
         // here: the poller would see a fake release (tap → HUD flash), and enigo key events
         // can glitch system audio under other music apps.
-        if hotkey.prepare.swap(false, Ordering::SeqCst) {
-            hotkey.cancel.store(false, Ordering::SeqCst);
-            if !capture.is_recording() {
-                capture.begin_capture();
-                live_caption.clear();
-            }
+        // A cancel raised in the same instant as this prepare must still run below,
+        // or the mic keeps recording with no hold to stop it.
+        if hotkey.prepare.swap(false, Ordering::SeqCst) && !capture.is_recording() {
+            capture.begin_capture();
+            live_caption.clear();
         }
         if hotkey.start.swap(false, Ordering::SeqCst) {
             if tts::narration_busy() {
@@ -271,6 +270,7 @@ fn finish_clip(
 /// CGEventTap often never delivers keys when TCC isn't granted to this exact binary path.
 fn poll_shift(hotkey: &Hotkey, running: &AtomicBool) {
     let mut was_down = false;
+    let mut held_at_shift_down = 0u128;
     // Debounce both edges (~16 ms down, ~32 ms up) so HID blips or other apps probing
     // modifiers don't end a real hold mid-recording.
     let (mut down_streak, mut up_streak) = (0u8, 0u8);
@@ -283,6 +283,7 @@ fn poll_shift(hotkey: &Hotkey, running: &AtomicBool) {
             down_streak = 0;
         }
         if down_streak >= 2 && !was_down {
+            held_at_shift_down = other_keys_down();
             hotkey.apply(HoldEvent::ShiftDown);
             was_down = true;
         } else if up_streak >= 4 && was_down {
@@ -290,8 +291,13 @@ fn poll_shift(hotkey: &Hotkey, running: &AtomicBool) {
             was_down = false;
         }
         // Shift + another key is typing or a shortcut, not a hold.
-        if was_down && other_key_down() {
-            hotkey.apply(HoldEvent::OtherDown);
+        if was_down {
+            let held = other_keys_down();
+            if newly_pressed(held_at_shift_down, held) {
+                hotkey.apply(HoldEvent::OtherDown);
+            }
+            // A key released during the hold counts again if it is pressed again.
+            held_at_shift_down &= held;
         }
         thread::sleep(Duration::from_millis(SHIFT_POLL_MS));
     }

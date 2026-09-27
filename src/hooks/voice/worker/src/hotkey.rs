@@ -75,12 +75,13 @@ pub fn shift_key_down() -> bool {
     }
 }
 
-/// True while any key other than Shift is held (letters, modifiers, Fn).
+/// Bit `n` is set while key code `n` (other than Shift and Caps Lock) is held.
 #[cfg(target_os = "macos")]
-pub fn other_key_down() -> bool {
+pub fn other_keys_down() -> u128 {
     (0u16..0x80)
         .filter(|key| !SHIFT_KEYS.contains(key) && *key != CAPS_LOCK_KEY)
-        .any(|key| unsafe { CGEventSourceKeyState(HID_SYSTEM_STATE, key) })
+        .filter(|key| unsafe { CGEventSourceKeyState(HID_SYSTEM_STATE, *key) })
+        .fold(0, |keys, key| keys | (1u128 << key))
 }
 
 #[cfg(not(target_os = "macos"))]
@@ -89,8 +90,14 @@ pub fn shift_key_down() -> bool {
 }
 
 #[cfg(not(target_os = "macos"))]
-pub fn other_key_down() -> bool {
-    false
+pub fn other_keys_down() -> u128 {
+    0
+}
+
+/// True when a key went down after Shift did. Keys already held at Shift down do not count:
+/// macOS can report a key as held forever (seen with key code 0), which would cancel every hold.
+pub fn newly_pressed(held_at_shift_down: u128, held_now: u128) -> bool {
+    held_now & !held_at_shift_down != 0
 }
 
 /// `hotkey-check`: print Shift edges for `seconds` so detection can be verified by hand.
@@ -154,5 +161,14 @@ mod tests {
                 .fold((State::Idle, Action::None), |(state, _), event| shift_hold_transition(state, *event));
             assert_eq!((state, action), (final_state, last_action), "{name}");
         }
+    }
+
+    #[test]
+    fn only_keys_pressed_after_shift_count() {
+        let stuck_key = 1u128;
+        let letter = 1u128 << 12;
+        assert!(!newly_pressed(stuck_key, stuck_key), "a key held before Shift is not typing");
+        assert!(newly_pressed(stuck_key, stuck_key | letter), "a new key while Shift is held is typing");
+        assert!(!newly_pressed(0, 0), "no keys, no typing");
     }
 }

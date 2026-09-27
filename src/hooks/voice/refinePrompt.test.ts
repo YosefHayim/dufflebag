@@ -84,6 +84,7 @@ const replyVerdicts: ReadonlyArray<readonly [string, string, boolean]> = [
   ["is_quota_or_limit_error", "can only afford 100 tokens", true],
   ["is_quota_or_limit_error", "connection refused", false],
   ["_looks_like_cli_auth_or_config_failure", "No API key found for the selected model.\nUse /login", true],
+  ["looks_like_failed_model_output", "Not signed in. To authenticate without a browser, run:\n  grok login", true],
   ["_looks_like_cli_auth_or_config_failure", "Ship the fix for STT refine", false],
   ["looks_like_failed_model_output", '402: {"message":"requires more credits","code":402}', true],
   ["looks_like_failed_model_output", "Fix the STT refine help paste bug.", false],

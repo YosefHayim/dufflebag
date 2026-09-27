@@ -82,6 +82,7 @@ _CLI_AUTH_OR_CONFIG_FAIL_MARKERS = (
     "no api key found",
     "use /login",
     "not logged in",
+    "not signed in",
     "no models available",
     "please log in",
     "authentication required",
