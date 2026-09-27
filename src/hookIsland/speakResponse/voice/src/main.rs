@@ -61,6 +61,8 @@ enum Commands {
     },
     /// Stop the local worker
     Stop,
+    /// Stop response narration / TTS only (keep dictation worker running)
+    StopNarrate,
     /// Kill every voice daemon/overlay/TTS process and clear locks (fresh slate)
     Reset,
     /// Print local worker status
@@ -95,8 +97,8 @@ enum Commands {
         #[arg(long, default_value_t = false)]
         auto_submit: bool,
     },
-    /// Debug: poll HID Control for N seconds (hold Control to verify detection)
-    ControlCheck {
+    /// Debug: poll HID § for N seconds (hold § to verify detection)
+    CommandCheck {
         #[arg(long, default_value_t = 8)]
         seconds: u64,
     },
@@ -161,6 +163,17 @@ fn main() {
             println!("{}", serde_json::to_string(&status).unwrap_or_default());
             0
         }
+        Commands::StopNarrate => {
+            narrate::stop_narrate();
+            println!(
+                "{}",
+                serde_json::json!({
+                    "narration": "off",
+                    "stopped": true,
+                })
+            );
+            0
+        }
         Commands::Reset => {
             let _ = tts::shutdown_warm();
             state::reset_voice_runtime();
@@ -209,30 +222,30 @@ fn main() {
                 1
             }
         },
-        Commands::ControlCheck { seconds } => {
+        Commands::CommandCheck { seconds } => {
             use std::io::Write;
             use std::time::{Duration, Instant};
-            println!("Hold Control… (polling HID {seconds}s)");
+            println!("Hold §... (polling HID {seconds}s)");
             let deadline = Instant::now() + Duration::from_secs(seconds);
             let mut was = false;
             let mut saw = false;
             while Instant::now() < deadline {
-                let down = hotkey::control_modifier_down();
+                let down = hotkey::command_modifier_down();
                 if down && !was {
-                    println!("CONTROL DOWN");
+                    println!("SECTION DOWN");
                     saw = true;
                 } else if !down && was {
-                    println!("CONTROL UP");
+                    println!("SECTION UP");
                 }
                 was = down;
                 let _ = std::io::stdout().flush();
                 std::thread::sleep(Duration::from_millis(20));
             }
             if saw {
-                println!("ok — Control detection works");
+                println!("ok — § detection works");
                 0
             } else {
-                eprintln!("no Control edge seen — try physical Control key");
+                eprintln!("no § edge seen — try the physical § key under Esc");
                 1
             }
         }
@@ -286,6 +299,13 @@ fn prepare() -> Result<serde_json::Value, String> {
             .with_model_name(engine.model_name()),
     )
     .unwrap_or_default();
+    let prefs = config::voice_preferences();
+    if !prefs.narration_enabled() {
+        if let Some(obj) = report.as_object_mut() {
+            obj.insert("narration".into(), serde_json::json!("off"));
+        }
+        return Ok(report);
+    }
     match tts::prepare_tts() {
         Ok(tts_report) => {
             if let Some(obj) = report.as_object_mut() {

@@ -111,14 +111,24 @@ pub fn run_narrate_daemon() -> i32 {
         }
     }
 
-    {
-        let prefs = voice_preferences();
-        if let Err(error) = tts::ensure_warm(&prefs.speech_voice) {
-            eprintln!("tts warm: {error}");
-        }
+    let prefs = voice_preferences();
+    if !prefs.narration_enabled() {
+        // STT-only: do not warm Supertonic or hold a narrate process.
+        clear_pending_inbox();
+        release_narrate_pid();
+        return 0;
+    }
+    if let Err(error) = tts::ensure_warm(&prefs.speech_voice) {
+        eprintln!("tts warm: {error}");
     }
 
     while !stop_requested() {
+        let prefs = voice_preferences();
+        if !prefs.narration_enabled() {
+            let _ = tts::shutdown_warm();
+            clear_pending_inbox();
+            break;
+        }
         // Pause while dictate owns audio (status listening/starting) or TTS busy.
         if dictate_owns_audio() || tts::narration_busy() {
             thread::sleep(Duration::from_millis(80));
@@ -128,7 +138,6 @@ pub fn run_narrate_daemon() -> i32 {
             thread::sleep(Duration::from_millis(200));
             continue;
         }
-        let prefs = voice_preferences();
         if let Some((path, envelope)) = next_envelope(&prefs) {
             match tts::speak_markdown(&envelope.markdown) {
                 Ok(status) if status.trim().eq_ignore_ascii_case("busy") => {
@@ -150,6 +159,20 @@ pub fn run_narrate_daemon() -> i32 {
     0
 }
 
+fn clear_pending_inbox() {
+    let inbox = voice_state_home().join("inbox");
+    let Ok(entries) = fs::read_dir(&inbox) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
+        if matches!(ext, "json" | "speaking") {
+            let _ = fs::remove_file(path);
+        }
+    }
+}
+
 /// Dictate is active when status.json says starting/listening (mic open).
 fn dictate_owns_audio() -> bool {
     let path = voice_state_home().join("status.json");
@@ -167,6 +190,10 @@ fn dictate_owns_audio() -> bool {
 
 pub fn start_narrate_detached() -> Result<(), String> {
     ensure_state_home().map_err(|e| e.to_string())?;
+    if !voice_preferences().narration_enabled() {
+        stop_narrate();
+        return Ok(());
+    }
     if narrate_already_running() {
         return Ok(());
     }
@@ -215,4 +242,5 @@ pub fn stop_narrate() {
     let home = voice_state_home();
     let _ = fs::remove_file(home.join(NARRATE_PID));
     let _ = fs::remove_file(home.join(NARRATE_LOCK));
+    clear_pending_inbox();
 }

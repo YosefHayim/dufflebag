@@ -335,7 +335,7 @@ export const featureCatalog = Schema.decodeUnknownSync(featureCatalogSchema, {
     installedSkill: { _tag: "none" },
     title: "Speak responses (TTS)",
     summary:
-      "Read complete agent responses with local speech, hold-Control dictation via whisper.cpp large-v3-turbo (Metal), Cmux focus gating, and optional on-device prompt refinement on macOS.",
+      "Read complete agent responses with local speech, hold-§ dictation via whisper.cpp large-v3-turbo (Metal), Cmux focus gating, and optional on-device prompt refinement on macOS.",
     selectedByDefault: false,
     dependencies: [],
     platform: "any",

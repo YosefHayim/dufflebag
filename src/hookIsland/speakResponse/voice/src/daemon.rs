@@ -1,11 +1,11 @@
-//! Dictate worker: primed mic + hold Control + serial STT queue.
+//! Dictate worker: primed mic + hold § + serial STT queue.
 //! Narration runs in a separate process (`narrate-daemon`).
 
 use crate::audio::PrimedMic;
 use crate::config::voice_preferences;
 use crate::hotkey::{
-    control_hold_transition, control_modifier_down, HoldAction, HoldEvent, HoldState,
-    CONTROL_DOUBLE_TAP_SECONDS, CONTROL_HOLD_SECONDS, CONTROL_POLL_MS,
+    command_hold_transition, command_modifier_down, HoldAction, HoldEvent, HoldState,
+    COMMAND_DOUBLE_TAP_SECONDS, COMMAND_HOLD_SECONDS, COMMAND_POLL_MS,
 };
 use crate::live_preview::{self, LiveCaption};
 use crate::models::{self, selected_model_key};
@@ -18,16 +18,16 @@ use crate::state::{
 };
 use crate::stt::SttEngine;
 use crate::tts;
-// release_control_keys is only used when inserting text (typing.rs), never while holding.
+// release_command_keys is only used when inserting text (typing.rs), never while holding.
 use parking_lot::Mutex;
-use rdev::{listen, EventType, Key};
+use rdev::{listen, EventType};
 use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::thread;
 use std::time::{Duration, Instant};
 
-struct SharedControl {
+struct SharedCommand {
     hold: HoldState,
     hold_deadline: Option<Instant>,
     dictation_generation: u64,
@@ -97,11 +97,12 @@ pub fn run_daemon() -> i32 {
     spawn_overlay(pid);
 
     // Narration is a sibling process — not on this critical path.
+    // When speechResponseMode is off, skip narrate entirely (STT-only).
     if let Err(error) = narrate::start_narrate_detached() {
         eprintln!("narrate start: {error}");
     }
 
-    // Warm STT only (TTS warms inside narrate-daemon).
+    // Warm STT only (TTS warms inside narrate-daemon when enabled).
     {
         let engine = engine.clone();
         thread::spawn(move || {
@@ -116,7 +117,7 @@ pub fn run_daemon() -> i32 {
     let recording_flag = Arc::new(AtomicBool::new(false));
     let live_caption = LiveCaption::new();
 
-    let control = Arc::new(Mutex::new(SharedControl {
+    let command = Arc::new(Mutex::new(SharedCommand {
         hold: HoldState::Idle,
         hold_deadline: None,
         dictation_generation: 0,
@@ -131,9 +132,9 @@ pub fn run_daemon() -> i32 {
     let cancel_prepare = Arc::new(AtomicBool::new(false));
     let running = Arc::new(AtomicBool::new(true));
 
-    // Capture control loop: prime mic here (Stream !Send), flip buffer + enqueue only.
+    // Capture hotkey loop: prime mic here (Stream !Send), flip buffer + enqueue only.
     {
-        let control = control.clone();
+        let command = command.clone();
         let start_flag = start_flag.clone();
         let prepare_flag = prepare_flag.clone();
         let cancel_prepare = cancel_prepare.clone();
@@ -145,7 +146,7 @@ pub fn run_daemon() -> i32 {
         let model_name_c = model_name.clone();
         let backend_c = backend.clone();
         thread::spawn(move || {
-            // Prime mic once on this thread — Control never pays device-open latency.
+            // Prime mic once on this thread — the hotkey never pays device-open latency.
             let mic = match PrimedMic::prime() {
                 Ok(m) => m,
                 Err(error) => {
@@ -178,10 +179,10 @@ pub fn run_daemon() -> i32 {
                 }
 
                 {
-                    let mut state = control.lock();
+                    let mut state = command.lock();
                     if let Some(deadline) = state.hold_deadline {
                         if Instant::now() >= deadline && state.hold == HoldState::Waiting {
-                            let (next, action) = control_hold_transition(
+                            let (next, action) = command_hold_transition(
                                 state.hold,
                                 HoldEvent::HoldElapsed,
                                 false,
@@ -195,8 +196,8 @@ pub fn run_daemon() -> i32 {
                     }
                 }
 
-                // Control-down: soft-stop TTS if any, begin buffer.
-                // NEVER inject Control key-up here — that made the poller see a
+                // Hotkey-down: soft-stop TTS if any, begin buffer.
+                // NEVER inject key-up here — that made the poller see a
                 // fake release → Tap → HUD "Connecting…" then vanish, and enigo
                 // key events can glitch system audio under other music apps.
                 if prepare_flag.swap(false, Ordering::SeqCst) {
@@ -205,7 +206,7 @@ pub fn run_daemon() -> i32 {
                         let _ = tts::cancel_narration();
                     }
                     let (model, backend_s) = {
-                        let mut state = control.lock();
+                        let mut state = command.lock();
                         state.dictation_active = true;
                         (state.model_name.clone(), state.backend.clone())
                     };
@@ -217,7 +218,7 @@ pub fn run_daemon() -> i32 {
                     if cancel_prepare.load(Ordering::SeqCst) {
                         mic.cancel_capture();
                         recording_flag.store(false, Ordering::SeqCst);
-                        control.lock().dictation_active = false;
+                        command.lock().dictation_active = false;
                         write_worker_status("inactive", "", Some(&model), Some(&backend_s), None);
                     } else if start_flag.load(Ordering::SeqCst) {
                         start_flag.store(false, Ordering::SeqCst);
@@ -233,7 +234,7 @@ pub fn run_daemon() -> i32 {
 
                 if start_flag.swap(false, Ordering::SeqCst) {
                     let (model, backend_s) = {
-                        let mut state = control.lock();
+                        let mut state = command.lock();
                         state.dictation_active = true;
                         (state.model_name.clone(), state.backend.clone())
                     };
@@ -257,21 +258,21 @@ pub fn run_daemon() -> i32 {
                 // Tap (not hold): cancel prepare, drop buffer.
                 if cancel_prepare.swap(false, Ordering::SeqCst) {
                     let (model, backend_s) = {
-                        let state = control.lock();
+                        let state = command.lock();
                         (state.model_name.clone(), state.backend.clone())
                     };
                     mic.cancel_capture();
                     recording_flag.store(false, Ordering::SeqCst);
                     live_caption.clear();
-                    control.lock().dictation_active = false;
+                    command.lock().dictation_active = false;
                     write_worker_status("inactive", "", Some(&model), Some(&backend_s), None);
                 }
 
                 // Release: grace → freeze samples → enqueue (never block on STT).
-                let stop_gen = control.lock().stop_request.take();
+                let stop_gen = command.lock().stop_request.take();
                 if let Some(generation) = stop_gen {
                     let (model, backend_s) = {
-                        let state = control.lock();
+                        let state = command.lock();
                         (state.model_name.clone(), state.backend.clone())
                     };
                     // Wait briefly for prepare thread to open the buffer if needed.
@@ -279,13 +280,13 @@ pub fn run_daemon() -> i32 {
                         if mic.is_recording() || cancel_prepare.load(Ordering::SeqCst) {
                             break;
                         }
-                        // Kick prepare if Control-down hasn't been processed yet.
+                        // Kick prepare if hotkey-down hasn't been processed yet.
                         if !prepare_flag.load(Ordering::SeqCst) && !mic.is_recording() {
                             // Capture may still be priming from Schedule — wait.
                         }
                         thread::sleep(Duration::from_millis(5));
                     }
-                    // Release tail: keep capturing after Control-up so the last word is not clipped.
+                    // Release tail: keep capturing after hotkey-up so the last word is not clipped.
                     let grace_ms = voice_preferences().dictation_mic_off_delay_ms;
                     if grace_ms > 0 {
                         thread::sleep(Duration::from_millis(grace_ms));
@@ -293,7 +294,7 @@ pub fn run_daemon() -> i32 {
                     recording_flag.store(false, Ordering::SeqCst);
                     // Prefer capturing whatever is buffered; generation mismatch only
                     // discards when a *newer* session already replaced this one.
-                    let current_gen = control.lock().dictation_generation;
+                    let current_gen = command.lock().dictation_generation;
                     let still_current = current_gen == generation;
                     if still_current && mic.is_recording() {
                         let samples = mic.end_capture();
@@ -337,7 +338,7 @@ pub fn run_daemon() -> i32 {
                         mic.cancel_capture();
                         live_caption.clear();
                     }
-                    control.lock().dictation_active = false;
+                    command.lock().dictation_active = false;
                 }
 
                 thread::sleep(Duration::from_millis(5));
@@ -346,11 +347,11 @@ pub fn run_daemon() -> i32 {
         });
     }
 
-    // Primary Control path: poll HID modifier flags (works without Input Monitoring).
-    // rdev CGEventTap often never delivers pure Control on macOS when TCC isn't granted
+    // Primary § path: poll HID key state (works without Input Monitoring).
+    // rdev CGEventTap often never delivers some keys on macOS when TCC isn't granted
     // to this exact binary path — that left status stuck on "inactive" and no HUD.
     {
-        let control = control.clone();
+        let command = command.clone();
         let start_flag = start_flag.clone();
         let prepare_flag = prepare_flag.clone();
         let cancel_prepare = cancel_prepare.clone();
@@ -365,7 +366,7 @@ pub fn run_daemon() -> i32 {
                 if stop_requested() {
                     break;
                 }
-                let down = control_modifier_down();
+                let down = command_modifier_down();
                 if down {
                     down_streak = down_streak.saturating_add(1);
                     up_streak = 0;
@@ -376,31 +377,31 @@ pub fn run_daemon() -> i32 {
                 // ~16ms down to start, ~32ms up to end (survives one-frame blips).
                 if down_streak >= 2 && !was_down {
                     apply_hold(
-                        &control,
+                        &command,
                         &start_flag,
                         &prepare_flag,
                         &cancel_prepare,
-                        HoldEvent::ControlDown,
+                        HoldEvent::CommandDown,
                     );
                     was_down = true;
                 } else if up_streak >= 4 && was_down {
                     apply_hold(
-                        &control,
+                        &command,
                         &start_flag,
                         &prepare_flag,
                         &cancel_prepare,
-                        HoldEvent::ControlUp,
+                        HoldEvent::CommandUp,
                     );
                     was_down = false;
                 }
-                thread::sleep(Duration::from_millis(CONTROL_POLL_MS));
+                thread::sleep(Duration::from_millis(COMMAND_POLL_MS));
             }
         });
     }
 
-    // Optional: rdev for "other key while waiting" cancel (⌘C etc.). Best-effort;
-    // if the tap has no permission, Control still works via the poller above.
-    let control_keys = control.clone();
+    // Optional: rdev for "other key while waiting" cancel. Best-effort;
+    // if the tap has no permission, § still works via the poller above.
+    let command_keys = command.clone();
     let start_flag_keys = start_flag.clone();
     let prepare_flag_keys = prepare_flag.clone();
     let cancel_prepare_keys = cancel_prepare.clone();
@@ -410,13 +411,13 @@ pub fn run_daemon() -> i32 {
             if !running_keys.load(Ordering::SeqCst) {
                 return;
             }
-            if let EventType::KeyPress(key) = event.event_type {
-                // Ignore Control — poller owns those edges (avoids double-fire).
-                if matches!(key, Key::ControlLeft | Key::ControlRight) {
+            if let EventType::KeyPress(_) = event.event_type {
+                // Ignore the hotkey while held; the poller owns those edges.
+                if command_modifier_down() {
                     return;
                 }
                 apply_hold(
-                    &control_keys,
+                    &command_keys,
                     &start_flag_keys,
                     &prepare_flag_keys,
                     &cancel_prepare_keys,
@@ -444,20 +445,20 @@ pub fn run_daemon() -> i32 {
 }
 
 fn apply_hold(
-    control: &Arc<Mutex<SharedControl>>,
+    command: &Arc<Mutex<SharedCommand>>,
     start_flag: &Arc<AtomicBool>,
     prepare_flag: &Arc<AtomicBool>,
     cancel_prepare: &Arc<AtomicBool>,
     event: HoldEvent,
 ) {
     let action = {
-        let mut state = control.lock();
-        let (next, action) = control_hold_transition(state.hold, event, false);
+        let mut state = command.lock();
+        let (next, action) = command_hold_transition(state.hold, event, false);
         state.hold = next;
         match action {
             HoldAction::Schedule => {
                 state.hold_deadline =
-                    Some(Instant::now() + Duration::from_secs_f64(CONTROL_HOLD_SECONDS));
+                    Some(Instant::now() + Duration::from_secs_f64(COMMAND_HOLD_SECONDS));
             }
             HoldAction::Cancel | HoldAction::Tap => {
                 state.hold_deadline = None;
@@ -476,21 +477,21 @@ fn apply_hold(
         HoldAction::Schedule => {
             // Bump generation here (single source of truth) so Stop always matches.
             {
-                let mut state = control.lock();
+                let mut state = command.lock();
                 state.dictation_generation = state.dictation_generation.wrapping_add(1);
                 state.dictation_active = true;
             }
             prepare_flag.store(true, Ordering::SeqCst);
             let (model, backend) = {
-                let state = control.lock();
+                let state = command.lock();
                 (state.model_name.clone(), state.backend.clone())
             };
-            write_worker_status("starting", "Control held", Some(&model), Some(&backend), None);
+            write_worker_status("starting", "§ held", Some(&model), Some(&backend), None);
         }
         HoldAction::Start => {
             start_flag.store(true, Ordering::SeqCst);
             let (model, backend) = {
-                let state = control.lock();
+                let state = command.lock();
                 (state.model_name.clone(), state.backend.clone())
             };
             write_worker_status("listening", "Recording", Some(&model), Some(&backend), None);
@@ -498,12 +499,12 @@ fn apply_hold(
         HoldAction::Cancel | HoldAction::Tap => {
             cancel_prepare.store(true, Ordering::SeqCst);
             if action == HoldAction::Tap {
-                handle_control_tap(control);
+                handle_command_tap(command);
             }
         }
         HoldAction::Stop => {
             let (model, backend) = {
-                let state = control.lock();
+                let state = command.lock();
                 (state.model_name.clone(), state.backend.clone())
             };
             write_worker_status("finishing", "Decoding…", Some(&model), Some(&backend), None);
@@ -512,12 +513,12 @@ fn apply_hold(
     }
 }
 
-fn handle_control_tap(control: &Arc<Mutex<SharedControl>>) {
+fn handle_command_tap(command: &Arc<Mutex<SharedCommand>>) {
     let now = Instant::now();
     let is_double = {
-        let mut state = control.lock();
+        let mut state = command.lock();
         if let Some(last) = state.last_tap_at {
-            if now.duration_since(last).as_secs_f64() <= CONTROL_DOUBLE_TAP_SECONDS {
+            if now.duration_since(last).as_secs_f64() <= COMMAND_DOUBLE_TAP_SECONDS {
                 state.last_tap_at = None;
                 true
             } else {
@@ -534,7 +535,7 @@ fn handle_control_tap(control: &Arc<Mutex<SharedControl>>) {
         let was_speaking = tts::hard_cancel_narration();
         if was_speaking {
             let (model, backend) = {
-                let state = control.lock();
+                let state = command.lock();
                 (state.model_name.clone(), state.backend.clone())
             };
             write_worker_status(
@@ -557,13 +558,13 @@ fn handle_control_tap(control: &Arc<Mutex<SharedControl>>) {
         }
         let muted = crate::state::toggle_narration_muted();
         let (model, backend) = {
-            let state = control.lock();
+            let state = command.lock();
             (state.model_name.clone(), state.backend.clone())
         };
         write_worker_status(
             "inactive",
             if muted {
-                "Narration muted (double-tap Control to unmute)"
+                "Narration muted (double-tap § to unmute)"
             } else {
                 "Narration unmuted"
             },
@@ -576,7 +577,7 @@ fn handle_control_tap(control: &Arc<Mutex<SharedControl>>) {
 
     if tts::cancel_narration() {
         let (model, backend) = {
-            let state = control.lock();
+            let state = command.lock();
             (state.model_name.clone(), state.backend.clone())
         };
         write_worker_status(

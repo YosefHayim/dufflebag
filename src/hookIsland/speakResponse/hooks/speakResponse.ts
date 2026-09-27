@@ -108,6 +108,43 @@ const voiceStateHome = () => {
   return path.join(process.env.XDG_STATE_HOME || path.join(homedir(), ".local", "state"), "dufflebag", "voice");
 };
 
+const bagConfigCandidates = () => {
+  const override = process.env.DUFFLEBAG_CONFIG?.trim();
+  // Explicit override wins alone (tests + alternate installs).
+  if (override) {
+    return [path.resolve(override)];
+  }
+  // …/runtime/speakResponse/hooks/speakResponse.js → install root config.json
+  const runtimeRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
+  return [
+    path.join(path.dirname(path.dirname(runtimeRoot)), "config.json"),
+    path.join(homedir(), ".claude/dufflebag/config.json"),
+  ];
+};
+
+/** When speechResponseMode is off, do not queue narration or spawn TTS. */
+const narrationSettingAt = (candidate: string): boolean | undefined => {
+  try {
+    const parsed: unknown = JSON.parse(readFileSync(candidate, "utf8"));
+    if (!isRecord(parsed) || typeof parsed.speechResponseMode !== "string") {
+      return undefined;
+    }
+    return parsed.speechResponseMode !== "off";
+  } catch {
+    return undefined;
+  }
+};
+
+const narrationEnabled = () => {
+  for (const candidate of bagConfigCandidates()) {
+    const enabled = narrationSettingAt(candidate);
+    if (enabled !== undefined) {
+      return enabled;
+    }
+  }
+  return true;
+};
+
 const agentReplyOrigin = (): AgentReplyOrigin => {
   const workspaceId = process.env.CMUX_WORKSPACE_ID?.trim() || "";
   const surfaceId = process.env.CMUX_SURFACE_ID?.trim() || "";
@@ -176,6 +213,9 @@ const startWorker = () => {
 const main = () => {
   const input = parseJson(readFileSync(0, "utf8"));
   if (!isRecord(input)) {
+    return;
+  }
+  if (!narrationEnabled()) {
     return;
   }
   const source = agentId();

@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -16,10 +16,17 @@ const stateHome = () => {
   return home;
 };
 
+const bagConfigForMode = (home: string, narrationPolicy: "off" | "auto") => {
+  const configPath = path.join(home, "config.json");
+  writeFileSync(configPath, `${JSON.stringify({ speechResponseMode: narrationPolicy })}\n`);
+  return configPath;
+};
+
 const runHook = (request: {
   readonly input: unknown;
   readonly agentId: string;
   readonly home: string;
+  readonly narrationPolicy?: "off" | "auto";
   readonly environment?: Record<string, string>;
 }) =>
   spawnSync(process.execPath, ["--import", "tsx", hookPath, "--dufflebag-agent-id", request.agentId], {
@@ -32,6 +39,11 @@ const runHook = (request: {
       CMUX_SURFACE_ID: "",
       CMUX_WORKSPACE_ID: "",
       DUFFLEBAG_VOICE_HOME: request.home,
+      // Isolate from the machine's real bag config (often speechResponseMode=off).
+      DUFFLEBAG_CONFIG: bagConfigForMode(
+        request.home,
+        request.narrationPolicy === undefined ? "auto" : request.narrationPolicy,
+      ),
       PATH: "",
       ...request.environment,
     },
@@ -85,6 +97,20 @@ describe("speak-response hook", () => {
     expect(execution.status).toBe(0);
     expect(execution.stderr).toBe("");
     expect(queued(home)).toMatchObject({ markdown, origin: { kind: "terminal" }, source: "claude-code" });
+  });
+
+  it("skips queueing when speechResponseMode is off (STT-only)", () => {
+    const home = stateHome();
+    const execution = runHook({
+      input: { last_assistant_message: "Should stay silent" },
+      agentId: "claude-code",
+      home,
+      narrationPolicy: "off",
+    });
+
+    expect(execution.status).toBe(0);
+    expect(execution.stderr).toBe("");
+    expect(existsSync(path.join(home, "inbox"))).toBe(false);
   });
 
   it("binds a Cmux response to its originating surface without persisting socket capabilities", () => {

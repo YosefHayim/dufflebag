@@ -29,7 +29,7 @@ pub struct VoicePreferences {
     pub speech_voice: String,
     pub speech_speed: f64,
     pub dictation_replacements: String,
-    /// Keep the mic open this long after Control release (trailing-word tail).
+    /// Keep the mic open this long after § release (trailing-word tail).
     pub dictation_mic_off_delay_ms: u64,
     /// Whisper language code: `en` (default) or `he` (ivrit.ai Hebrew model).
     pub dictation_language: String,
@@ -41,7 +41,7 @@ impl Default for VoicePreferences {
             prompt_refinement: "off".into(),
             prompt_refinement_backend: "codex".into(),
             prompt_refinement_model: "gpt-5.3-codex-spark".into(),
-            // low avoids Codex defaulting reasoning models to xhigh after Ctrl release
+            // low avoids Codex defaulting reasoning models to xhigh after § release
             prompt_refinement_reasoning_effort: "low".into(),
             // Prefer showing STT immediately; pipeline also force raw-first when refining.
             prompt_refinement_show_raw_first: true,
@@ -61,6 +61,10 @@ impl Default for VoicePreferences {
 }
 
 impl VoicePreferences {
+    pub fn narration_enabled(&self) -> bool {
+        self.narration_mode != "off"
+    }
+
     pub fn stt_refine_enabled(&self) -> bool {
         matches!(self.prompt_refinement.as_str(), "stt" | "both")
     }
@@ -84,6 +88,13 @@ pub fn installed_config() -> Value {
 }
 
 fn config_candidates() -> Vec<PathBuf> {
+    // Explicit override wins alone (tests + alternate installs).
+    if let Ok(override_path) = std::env::var("DUFFLEBAG_CONFIG") {
+        let trimmed = override_path.trim();
+        if !trimmed.is_empty() {
+            return vec![PathBuf::from(trimmed)];
+        }
+    }
     let mut paths = Vec::new();
     if let Ok(exe) = std::env::current_exe() {
         // .../runtime/speakResponse/dufflebag-voice → package/install root
@@ -96,6 +107,13 @@ fn config_candidates() -> Vec<PathBuf> {
             paths.push(speak.join("config.json"));
         }
     }
+    // Always include the bag home config. Source-tree / ad-hoc binaries do not
+    // sit under ~/.claude/dufflebag/runtime, so relative lookup alone misses
+    // speechResponseMode=off and defaults to auto narration.
+    let home = std::env::var("HOME")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| PathBuf::from("."));
+    paths.push(home.join(".claude/dufflebag/config.json"));
     if let Ok(manifest) = std::env::var("CARGO_MANIFEST_DIR") {
         let root = PathBuf::from(manifest)
             .join("../../..")
@@ -278,8 +296,13 @@ mod tests {
     #[test]
     fn mode_helpers() {
         let mut p = VoicePreferences::default();
+        assert!(p.narration_enabled());
         assert!(!p.stt_refine_enabled());
         assert!(!p.review_refine_enabled());
+        p.narration_mode = "off".into();
+        assert!(!p.narration_enabled());
+        p.narration_mode = "auto".into();
+        assert!(p.narration_enabled());
         p.prompt_refinement = "stt".into();
         assert!(p.stt_refine_enabled());
         assert!(!p.review_refine_enabled());

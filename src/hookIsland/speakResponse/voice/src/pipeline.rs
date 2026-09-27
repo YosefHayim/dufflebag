@@ -138,7 +138,7 @@ impl DictationPipeline {
                             // Used to backspace-replace without global ⌘A (which blues WebGL).
                             let mut typed_raw: Option<String> = None;
 
-                            // Always paste raw STT first when refine is on so Ctrl release
+                            // Always paste raw STT first when refine is on so hotkey release
                             // writes immediately; refined text later replaces it. Previously
                             // this waited on the model (often multi-second reasoning), so the
                             // input looked stuck until refine finished.

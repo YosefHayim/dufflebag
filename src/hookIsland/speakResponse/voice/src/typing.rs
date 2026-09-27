@@ -21,16 +21,16 @@ pub fn type_text(text: &str) -> Result<(), String> {
     if text.is_empty() {
         return Ok(());
     }
-    // Wait for Control to fully release so modifiers do not corrupt injection.
-    ensure_control_released(900)?;
+    // Wait for the dictation hotkey to fully release so it does not corrupt injection.
+    ensure_command_released(900)?;
 
     let char_len = text.chars().count();
-    let control_down = crate::hotkey::control_modifier_down();
+    let command_down = crate::hotkey::command_modifier_down();
 
     // Short/medium STT text: type characters directly. This avoids the classic
-    // hold-Control bug where Meta+V loses Command and only `v` appears in the caret
+    // hotkey-hold bug where paste can race and only `v` appears in the caret
     // while the HUD shows the full transcript.
-    if char_len <= CLIPBOARD_PREFERS_CHARS || control_down {
+    if char_len <= CLIPBOARD_PREFERS_CHARS || command_down {
         match type_via_enigo_text(text) {
             Ok(()) => {
                 log_type_path("enigo.text", char_len);
@@ -44,7 +44,7 @@ pub fn type_text(text: &str) -> Result<(), String> {
     }
 
     // Long text (or enigo.text failed): clipboard + ⌘V.
-    if !crate::hotkey::control_modifier_down() {
+    if !crate::hotkey::command_modifier_down() {
         match paste_via_clipboard(text) {
             Ok(()) => {
                 log_type_path("clipboard", char_len);
@@ -56,7 +56,7 @@ pub fn type_text(text: &str) -> Result<(), String> {
             }
         }
     } else {
-        log_type_path("skip clipboard (control held)", char_len);
+        log_type_path("skip clipboard (command held)", char_len);
     }
 
     // Last resort.
@@ -72,7 +72,7 @@ pub fn type_text(text: &str) -> Result<(), String> {
 
 fn type_via_enigo_text(text: &str) -> Result<(), String> {
     let mut enigo = Enigo::new(&Settings::default()).map_err(|e| format!("enigo: {e}"))?;
-    // Small settle so the focused app accepts key events after Control release.
+    // Small settle so the focused app accepts key events after hotkey release.
     thread::sleep(Duration::from_millis(25));
     enigo.text(text).map_err(|e| format!("enigo.text: {e}"))
 }
@@ -104,14 +104,14 @@ pub fn replace_previous_with(previous: &str, next: &str) -> Result<(), String> {
     if previous == next {
         return Ok(());
     }
-    ensure_control_released(800)?;
+    ensure_command_released(800)?;
 
     if !previous.is_empty() {
         backspace_chars(previous.chars().count())?;
         thread::sleep(Duration::from_millis(30));
     }
     if !next.is_empty() {
-        // type_text waits for Control again; call paste/type body directly after release.
+        // type_text waits for Command again; call paste/type body directly after release.
         type_text(next)?;
     }
     // Nudge caret so any residual selection (from host quirks) collapses.
@@ -128,7 +128,7 @@ pub fn replace_text(text: &str) -> Result<(), String> {
 
 /// Press Enter / Return in the focused field (submit).
 pub fn press_enter() -> Result<(), String> {
-    ensure_control_released(400)?;
+    ensure_command_released(400)?;
     let mut enigo = Enigo::new(&Settings::default()).map_err(|e| format!("enigo: {e}"))?;
     enigo
         .key(Key::Return, Direction::Click)
@@ -160,28 +160,27 @@ fn collapse_selection() -> Result<(), String> {
     Ok(())
 }
 
-fn wait_control_up(max_ms: u64) {
+fn wait_command_up(max_ms: u64) {
     let steps = max_ms / 10;
     for _ in 0..steps {
-        if !crate::hotkey::control_modifier_down() {
+        if !crate::hotkey::command_modifier_down() {
             return;
         }
         thread::sleep(Duration::from_millis(10));
     }
 }
 
-/// Release Control and wait until the OS reports it up. Cmd+V while Control is
-/// still down commonly injects a bare `v` (Meta chord fails) into the caret.
-fn ensure_control_released(max_ms: u64) -> Result<(), String> {
-    wait_control_up(max_ms / 2);
-    let _ = release_control_keys();
+/// Release modifier keys and wait until the dictation hotkey is up.
+fn ensure_command_released(max_ms: u64) -> Result<(), String> {
+    wait_command_up(max_ms / 2);
+    let _ = release_command_keys();
     thread::sleep(Duration::from_millis(40));
-    wait_control_up(max_ms / 2);
-    if crate::hotkey::control_modifier_down() {
+    wait_command_up(max_ms / 2);
+    if crate::hotkey::command_modifier_down() {
         // One more hard release pulse.
-        let _ = release_control_keys();
+        let _ = release_command_keys();
         thread::sleep(Duration::from_millis(60));
-        wait_control_up(200);
+        wait_command_up(200);
     }
     Ok(())
 }
@@ -293,11 +292,9 @@ fn paste_cmd_v_enigo() -> Result<(), String> {
     Ok(())
 }
 
-pub fn release_control_keys() -> Result<(), String> {
+pub fn release_command_keys() -> Result<(), String> {
     let mut enigo = Enigo::new(&Settings::default()).map_err(|e| format!("enigo: {e}"))?;
-    let _ = enigo.key(Key::Control, Direction::Release);
-    let _ = enigo.key(Key::LControl, Direction::Release);
-    let _ = enigo.key(Key::RControl, Direction::Release);
+    let _ = enigo.key(Key::Meta, Direction::Release);
     Ok(())
 }
 

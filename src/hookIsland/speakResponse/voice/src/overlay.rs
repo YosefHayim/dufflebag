@@ -86,7 +86,7 @@ fn force_kill_process_group(pid: u32) {
     }
 }
 
-/// Kill any previous HUD so Control never shows stacked pills.
+/// Kill any previous HUD so the hotkey never shows stacked pills.
 pub fn kill_existing_overlay() {
     if let Some(pid) = read_overlay_pid() {
         if process_running(Some(pid)) {

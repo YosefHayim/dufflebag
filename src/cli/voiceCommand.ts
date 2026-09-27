@@ -191,13 +191,18 @@ export const enableVoiceWorker = (scope: CliScope) =>
     }
 
     const worker = yield* requireInstalledVoice(location.destination.root);
+    const ttsEnabled = isTtsNarrationEnabled(currentConfig.speechResponseMode);
     // Supertonic prepare still needs uv for the thin TTS bridge.
-    yield* requireUv;
+    if (ttsEnabled) {
+      yield* requireUv;
+    }
     const sttModelHint =
       currentConfig.dictationLanguage === "he"
         ? "ivrit.ai Hebrew whisper-large-v3-turbo (ggml)"
         : "whisper.cpp large-v3-turbo";
-    yield* TerminalUI.step(`preparing ${sttModelHint} + Supertonic`);
+    yield* TerminalUI.step(
+      ttsEnabled ? `preparing ${sttModelHint} + Supertonic` : `preparing ${sttModelHint} (STT only)`,
+    );
     yield* runVoice({ executable: worker, args: ["prepare"], label: "Voice preparation" });
     yield* runVoice({ executable: worker, args: ["stop"], label: "Previous voice worker" });
     yield* runVoice({ executable: worker, args: ["start"], label: "Voice worker" });
@@ -331,7 +336,7 @@ export const writeBagConfigPatch = (scope: CliScope, patch: Partial<BagConfig>) 
 export const writeSpeechNarrationPolicy = (scope: CliScope, mode: SpeechNarrationPolicy) =>
   writeBagConfigPatch(scope, { speechResponseMode: mode });
 
-const holdControlHint = "Hold Control to dictate; release to finish.";
+const holdCommandHint = "Hold § to dictate; release to finish.";
 const ttsHint = "Agent responses are narrated when speech-response-mode is not off.";
 
 // ── voice (full surface, kept for speak/refine/devin/status) ─────────────────
@@ -346,14 +351,14 @@ const onCommand = CliCommand.make(
       yield* TerminalUI.intro("voice on");
       const { location, config } = yield* enableVoiceWorker(args.scope);
       yield* TerminalUI.success(`Voice is on (${location.scope}).`);
-      yield* TerminalUI.detail(holdControlHint);
+      yield* TerminalUI.detail(holdCommandHint);
       yield* TerminalUI.detail(
         isTtsNarrationEnabled(config.speechResponseMode)
           ? `TTS narration: ${config.speechResponseMode} (toggle with \`dufflebag tts on|off\`).`
           : "TTS narration: off (enable with `dufflebag tts on`).",
       );
       if (config.promptRefinementMode === "review" || config.promptRefinementMode === "both") {
-        yield* TerminalUI.detail("Double-tap Control to refine the copied prompt, then press ⌘V to paste it.");
+        yield* TerminalUI.detail("Double-tap § to refine the copied prompt, then press ⌘V to paste it.");
       }
       if (config.promptRefinementMode === "stt" || config.promptRefinementMode === "both") {
         let delivery = "caret";
@@ -446,7 +451,7 @@ const statusCommand = CliCommand.make(
           `feature  on\nscope    ${location.scope}\nstt      on\ntts      ${config.speechResponseMode}\nworker   ${status.trim()}`,
           "Voice",
         );
-        yield* TerminalUI.outro(`${holdControlHint} Toggle TTS with \`dufflebag tts on|off\`.`);
+        yield* TerminalUI.outro(`${holdCommandHint} Toggle TTS with \`dufflebag tts on|off\`.`);
       }
     }),
 ).pipe(CliCommand.withDescription("Show install, worker, STT, and TTS state"));
@@ -521,7 +526,7 @@ export const voiceCommand = CliCommand.make("voice").pipe(
   CliCommand.withSubcommands([onCommand, offCommand, statusCommand, speakCommand, refineCommand, devinCommand]),
 );
 
-// ── stt (dictation / hold-Control) ───────────────────────────────────────────
+// ── stt (dictation / hold-§) ─────────────────────────────────────────────────
 
 const sttOnCommand = CliCommand.make(
   "on",
@@ -533,7 +538,7 @@ const sttOnCommand = CliCommand.make(
       yield* TerminalUI.intro("stt on");
       const { location, config } = yield* enableVoiceWorker(args.scope);
       yield* TerminalUI.success(`STT is on (${location.scope}).`);
-      yield* TerminalUI.detail(holdControlHint);
+      yield* TerminalUI.detail(holdCommandHint);
       if (!isTtsNarrationEnabled(config.speechResponseMode)) {
         yield* TerminalUI.detail("TTS is off — agent replies stay silent. Enable with `dufflebag tts on`.");
       } else {
@@ -541,7 +546,7 @@ const sttOnCommand = CliCommand.make(
       }
       yield* TerminalUI.outro("Ready.");
     }),
-).pipe(CliCommand.withDescription("Install and start local dictation (hold Control to speak)"));
+).pipe(CliCommand.withDescription("Install and start local dictation (hold § to speak)"));
 
 const sttOffCommand = CliCommand.make(
   "off",
@@ -561,7 +566,7 @@ const sttOffCommand = CliCommand.make(
 ).pipe(CliCommand.withDescription("Stop dictation and remove the local voice worker"));
 
 const micOffDelayMilliseconds = Args.integer({ name: "milliseconds" }).pipe(
-  Args.withDescription("Milliseconds to keep the mic open after Control is released (0–2000)"),
+  Args.withDescription("Milliseconds to keep the mic open after § is released (0–2000)"),
   Args.optional,
 );
 
@@ -581,7 +586,7 @@ const sttMicOffDelayCommand = CliCommand.make(
           "dictation release tail",
         );
         yield* TerminalUI.detail(
-          "After you release Control, the mic stays open this long so trailing words are not clipped.",
+          "After you release §, the mic stays open this long so trailing words are not clipped.",
         );
         yield* TerminalUI.outro("Set with `dufflebag stt mic-off-delay <milliseconds>` (0–2000).");
         return;
@@ -602,7 +607,7 @@ const sttMicOffDelayCommand = CliCommand.make(
           ? `mic-off-delay → ${String(config.dictationMicOffDelayMs)} ms (${location.scope}).`
           : `mic-off-delay already ${String(config.dictationMicOffDelayMs)} ms (${location.scope}).`,
       );
-      yield* TerminalUI.detail("Applied on the next Control release (no worker restart needed).");
+      yield* TerminalUI.detail("Applied on the next § release (no worker restart needed).");
       yield* TerminalUI.outro("Done.");
     }),
 ).pipe(
@@ -673,7 +678,7 @@ const sttLangCommand = CliCommand.make(
 ).pipe(CliCommand.withDescription("Show or set dictation language (en default; he = ivrit.ai Hebrew model)"));
 
 export const sttCommand = CliCommand.make("stt").pipe(
-  CliCommand.withDescription("Speech-to-text dictation (hold Control)"),
+  CliCommand.withDescription("Speech-to-text dictation (hold §)"),
   CliCommand.withSubcommands([sttOnCommand, sttOffCommand, sttMicOffDelayCommand, sttLangCommand]),
 );
 
@@ -696,10 +701,27 @@ const ttsOnCommand = CliCommand.make(
           : `TTS is on (${location.scope}) — speech-response-mode already ${config.speechResponseMode}.`,
       );
       yield* TerminalUI.detail(ttsHint);
-      yield* TerminalUI.detail(`${holdControlHint} (STT is available while the worker runs.)`);
+      yield* TerminalUI.detail(`${holdCommandHint} (STT is available while the worker runs.)`);
       yield* TerminalUI.outro("Ready.");
     }),
 ).pipe(CliCommand.withDescription("Enable agent response narration (speech-response-mode auto)"));
+
+const stopNarrationIfInstalled = (root: string) =>
+  Effect.gen(function* () {
+    const fileSystem = yield* FileSystem.FileSystem;
+    const path = yield* Path.Path;
+    const binary = voiceBinaryPath(root, path);
+    if (!(yield* fileSystem.exists(binary))) {
+      return false as const;
+    }
+    // Prefer stop-narrate (keeps STT). Older binaries fall back to killing via reset-safe path.
+    const stopNarrate = withProcessEnv(PlatformCommand.make(binary, "stop-narrate"));
+    const code = yield* PlatformCommand.exitCode(stopNarrate).pipe(Effect.catchAll(() => Effect.succeed(1)));
+    if (code === 0) {
+      return true as const;
+    }
+    return false as const;
+  });
 
 const ttsOffCommand = CliCommand.make(
   "off",
@@ -710,11 +732,15 @@ const ttsOffCommand = CliCommand.make(
     Effect.gen(function* () {
       yield* TerminalUI.intro("tts off");
       const { location, changed } = yield* writeSpeechNarrationPolicy(args.scope, "off");
+      const stopped = yield* stopNarrationIfInstalled(location.destination.root);
       yield* TerminalUI.success(
         changed
           ? `TTS is off (${location.scope}) — speech-response-mode → off.`
           : `TTS is already off (${location.scope}).`,
       );
+      if (stopped) {
+        yield* TerminalUI.detail("Stopped the narrate daemon and TTS bridge; dictation worker left running.");
+      }
       yield* TerminalUI.detail(
         "Dictation is unchanged. Turn STT off with `dufflebag stt off` if you want the worker stopped too.",
       );
