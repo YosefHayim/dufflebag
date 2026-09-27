@@ -1,7 +1,9 @@
-//! Section-key hold finite state machine (tap / hold-to-dictate / release).
+//! Shift-key hold finite state machine (tap / hold-to-dictate / release).
 //!
-//! The §/± key is detected by polling HID key state so we do not
-//! depend on CGEventTap / Input Monitoring (often missing for a rebuilt binary).
+//! Shift is detected by polling HID key state so we do not depend on
+//! CGEventTap / Input Monitoring (often missing for a rebuilt binary).
+//! Shift is also a typing key, so any other key pressed while Shift is held
+//! means the user is typing or using a shortcut: the hold is cancelled.
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum HoldState {
@@ -13,8 +15,8 @@ pub enum HoldState {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum HoldEvent {
-    CommandDown,
-    CommandUp,
+    ShiftDown,
+    ShiftUp,
     OtherDown,
     HoldElapsed,
 }
@@ -29,7 +31,7 @@ pub enum HoldAction {
     Stop,
 }
 
-pub fn command_hold_transition(
+pub fn shift_hold_transition(
     state: HoldState,
     event: HoldEvent,
     injected: bool,
@@ -38,24 +40,25 @@ pub fn command_hold_transition(
         return (state, HoldAction::None);
     }
     match (state, event) {
-        (HoldState::Idle, HoldEvent::CommandDown) => (HoldState::Waiting, HoldAction::Schedule),
-        (HoldState::Waiting, HoldEvent::CommandUp) => (HoldState::Idle, HoldAction::Tap),
+        (HoldState::Idle, HoldEvent::ShiftDown) => (HoldState::Waiting, HoldAction::Schedule),
+        (HoldState::Waiting, HoldEvent::ShiftUp) => (HoldState::Idle, HoldAction::Tap),
         (HoldState::Waiting, HoldEvent::OtherDown) => (HoldState::Shortcut, HoldAction::Cancel),
         (HoldState::Waiting, HoldEvent::HoldElapsed) => (HoldState::Listening, HoldAction::Start),
-        (HoldState::Shortcut, HoldEvent::CommandUp) => (HoldState::Idle, HoldAction::None),
-        (HoldState::Listening, HoldEvent::CommandUp) => (HoldState::Idle, HoldAction::Stop),
+        (HoldState::Shortcut, HoldEvent::ShiftUp) => (HoldState::Idle, HoldAction::None),
+        // A slow capital letter can outlast the hold threshold: drop the clip.
+        (HoldState::Listening, HoldEvent::OtherDown) => (HoldState::Shortcut, HoldAction::Cancel),
+        (HoldState::Listening, HoldEvent::ShiftUp) => (HoldState::Idle, HoldAction::Stop),
         _ => (state, HoldAction::None),
     }
 }
 
-/// Hold threshold before listening (short, but long enough to beat key bounce).
-pub const COMMAND_HOLD_SECONDS: f64 = 0.12;
-/// Max gap between taps for double-tap § (cancel TTS / mute / refine).
-pub const COMMAND_DOUBLE_TAP_SECONDS: f64 = 0.4;
-/// Default release tail (ms) when config is missing — keep the mic open after § up.
-pub const DICTATION_RELEASE_GRACE_MS: u64 = 200;
-/// How often to sample HID § state (edge-detect hold).
-pub const COMMAND_POLL_MS: u64 = 8;
+/// Hold threshold before listening. Longer than a Shift press for a capital
+/// letter; the mic buffer already started at Shift down, so no audio is lost.
+pub const SHIFT_HOLD_SECONDS: f64 = 0.3;
+/// Max gap between taps for double-tap Shift (cancel TTS / mute / refine).
+pub const SHIFT_DOUBLE_TAP_SECONDS: f64 = 0.4;
+/// How often to sample HID Shift state (edge-detect hold).
+pub const SHIFT_POLL_MS: u64 = 8;
 
 #[cfg(target_os = "macos")]
 #[link(name = "CoreGraphics", kind = "framework")]
@@ -64,20 +67,41 @@ extern "C" {
     fn CGEventSourceKeyState(state_id: u32, key: u16) -> bool;
 }
 
-/// True while the MacBook §/± key is held.
 #[cfg(target_os = "macos")]
-pub fn command_modifier_down() -> bool {
-    const HID_SYSTEM_STATE: u32 = 1;
-    // kVK_ISO_Section: the physical §/± key under Esc on ISO MacBook keyboards.
-    const SECTION_KEY: u16 = 0x0A;
+const HID_SYSTEM_STATE: u32 = 1;
+/// kVK_Shift and kVK_RightShift.
+#[cfg(target_os = "macos")]
+const SHIFT_KEYS: [u16; 2] = [0x38, 0x3C];
+/// kVK_CapsLock: its HID state follows the lock light, not a press.
+#[cfg(target_os = "macos")]
+const CAPS_LOCK_KEY: u16 = 0x39;
+
+/// True while either Shift key is held.
+#[cfg(target_os = "macos")]
+pub fn shift_key_down() -> bool {
     unsafe {
         let _ = CGEventSourceFlagsState(HID_SYSTEM_STATE);
-        CGEventSourceKeyState(HID_SYSTEM_STATE, SECTION_KEY)
+        SHIFT_KEYS
+            .iter()
+            .any(|key| CGEventSourceKeyState(HID_SYSTEM_STATE, *key))
     }
 }
 
+/// True while any key other than Shift is held (letters, modifiers, Fn).
+#[cfg(target_os = "macos")]
+pub fn other_key_down() -> bool {
+    (0u16..0x80)
+        .filter(|key| !SHIFT_KEYS.contains(key) && *key != CAPS_LOCK_KEY)
+        .any(|key| unsafe { CGEventSourceKeyState(HID_SYSTEM_STATE, key) })
+}
+
 #[cfg(not(target_os = "macos"))]
-pub fn command_modifier_down() -> bool {
+pub fn shift_key_down() -> bool {
+    false
+}
+
+#[cfg(not(target_os = "macos"))]
+pub fn other_key_down() -> bool {
     false
 }
 
@@ -87,20 +111,39 @@ mod tests {
 
     #[test]
     fn hold_becomes_listening() {
-        let (state, action) =
-            command_hold_transition(HoldState::Idle, HoldEvent::CommandDown, false);
+        let (state, action) = shift_hold_transition(HoldState::Idle, HoldEvent::ShiftDown, false);
         assert_eq!(state, HoldState::Waiting);
         assert_eq!(action, HoldAction::Schedule);
-        let (state, action) = command_hold_transition(state, HoldEvent::HoldElapsed, false);
+        let (state, action) = shift_hold_transition(state, HoldEvent::HoldElapsed, false);
         assert_eq!(state, HoldState::Listening);
         assert_eq!(action, HoldAction::Start);
     }
 
     #[test]
     fn short_press_is_tap() {
-        let (state, _) = command_hold_transition(HoldState::Idle, HoldEvent::CommandDown, false);
-        let (state, action) = command_hold_transition(state, HoldEvent::CommandUp, false);
+        let (state, _) = shift_hold_transition(HoldState::Idle, HoldEvent::ShiftDown, false);
+        let (state, action) = shift_hold_transition(state, HoldEvent::ShiftUp, false);
         assert_eq!(state, HoldState::Idle);
         assert_eq!(action, HoldAction::Tap);
+    }
+
+    #[test]
+    fn typing_a_capital_letter_cancels_the_hold() {
+        let (state, _) = shift_hold_transition(HoldState::Idle, HoldEvent::ShiftDown, false);
+        let (state, action) = shift_hold_transition(state, HoldEvent::OtherDown, false);
+        assert_eq!(state, HoldState::Shortcut);
+        assert_eq!(action, HoldAction::Cancel);
+        let (state, action) = shift_hold_transition(state, HoldEvent::ShiftUp, false);
+        assert_eq!(state, HoldState::Idle);
+        assert_eq!(action, HoldAction::None);
+    }
+
+    #[test]
+    fn a_key_pressed_while_listening_drops_the_clip() {
+        let (state, _) = shift_hold_transition(HoldState::Idle, HoldEvent::ShiftDown, false);
+        let (state, _) = shift_hold_transition(state, HoldEvent::HoldElapsed, false);
+        let (state, action) = shift_hold_transition(state, HoldEvent::OtherDown, false);
+        assert_eq!(state, HoldState::Shortcut);
+        assert_eq!(action, HoldAction::Cancel);
     }
 }

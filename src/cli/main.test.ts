@@ -90,7 +90,7 @@ describe("CLI help", () => {
       expect(stt.stdout).toContain("off");
       expect(stt.stdout).toContain("mic-off-delay");
       expect(stt.stdout).toContain("lang");
-      expect(stt.stdout.toLowerCase()).toMatch(/dictation|speech-to-text|hold §/);
+      expect(stt.stdout.toLowerCase()).toMatch(/dictation|speech-to-text|hold shift/);
 
       expect(tts.exitCode).toBe(0);
       expect(tts.stdout).toContain("on");

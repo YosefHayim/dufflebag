@@ -154,10 +154,11 @@ frontmost app; older unread responses from the same surface coalesce into the
 latest one. Use `dufflebag config set speech-response-mode immediate` for the old global behavior or
 `dufflebag config set speech-response-mode off` to suppress narration without uninstalling voice.
 
-Tap § to stop narration. Hold § for 120 ms to dictate locally into
-the active caret. A small
-bottom-center pill moves through **Starting microphone**, **Listening**, and
-**Finishing**; release § to finish the phrase. Dufflebag keeps a short
+Tap Shift to stop narration. Hold Shift on its own for 300 ms to dictate
+locally into the active caret. Pressing any other key while Shift is down
+cancels, so typing capital letters and Shift shortcuts never start dictation.
+A small bottom-center pill moves through **Listening** and **Finishing**;
+release Shift to finish the phrase. Dufflebag keeps a short
 release tail so the final word is not clipped. Say punctuation and structure
 directly, for example:
 
@@ -175,7 +176,7 @@ dufflebag config set dictation-replacements "Joseph=Yosef;type script=TypeScript
 ```
 
 On macOS 26+, prompt refinement can use Apple's on-device Foundation Models
-framework. Enable review mode, copy a draft, then double-tap §. Dufflebag
+framework. Enable review mode, copy a draft, then double-tap Shift. Dufflebag
 preserves code, commands, paths, URLs, and quoted literals; copies only the
 validated refined draft; and reads it with the same active-word highlight. Press
 Command-V to paste and review it—the feature never submits for you.
@@ -201,7 +202,7 @@ to prepare a compatible Python, pinned packages, and both local speech models
 before starting the worker. Later runs reuse uv and model caches; narration and
 transcription stay on the machine.
 
-There is intentionally no Docker image. Global § capture, the host
+There is intentionally no Docker image. Global Shift capture, the host
 microphone, the focused caret, and the desktop listening pill must run in the
 host session; a container would add a second dependency/model cache while still
 requiring platform-specific host access. Grant microphone and input-control
@@ -227,7 +228,7 @@ Override one launched agent without changing persistent config, for example
 | --- | --- | --- |
 | **context-guard** | Guard long sessions near their context cap and optionally compact idle Claude Code, Codex, or Grok sessions in their exact Ghostty terminal. | 🟢 any OS |
 | **autonomous-loop** | A skill that arms the context-guard SessionStart daemon to auto-/compact and resume hands-free once context nears the guardrail and a fresh handoff exists. macOS + Ghostty only (it types into your terminal window). Hook runtime lives under context-guard. | 🔴 macOS + Ghostty |
-| **speak-response** | Read complete agent responses with local speech, hold-§ dictation via whisper.cpp large-v3-turbo (Metal), Cmux focus gating, and optional on-device prompt refinement on macOS. | 🟢 any OS |
+| **speak-response** | Read complete agent responses with local speech, hold-Shift dictation via whisper.cpp large-v3-turbo (Metal), Cmux focus gating, and optional on-device prompt refinement on macOS. | 🟢 any OS |
 | **dedup-guard** | Block a Write/Edit that pastes a function body or interface/type shape already defined elsewhere in the repo — DRY enforced at the moment of the write. Uses the repo's own TypeScript; deny by default (tune with dufflebagDedupEnforcement). Also wires Cursor (warn) + an AGENTS.md rule for Codex. | 🟢 any OS |
 | **png-to-code** | A skill that turns a PNG design (illustration, logo, UI mockup) into SVG/HTML/CSS that measurably converges to a 1:1 match — a decompose → reuse-or-build → render → screenshot-diff → refine loop, plus a rig-first doctrine for animation. Pure skill (no hooks); its diff harness needs Node + Playwright. | 🟢 any OS |
 | **github-repo-metadata** | A skill that writes and audits GitHub repository About metadata: concise descriptions, homepage/demo links, and topics/tags grounded in official GitHub guidance. Pure skill (no hooks). | 🟢 any OS |

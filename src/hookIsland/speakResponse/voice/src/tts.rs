@@ -76,7 +76,7 @@ pub fn cancel_narration() -> bool {
     was
 }
 
-/// Hard cancel: stop + kill audio process group + rewarm (double-tap §).
+/// Hard cancel: stop + kill audio process group + rewarm (double-tap Shift).
 pub fn hard_cancel_narration() -> bool {
     let was = NARRATING.swap(false, Ordering::SeqCst);
     CANCEL.store(true, Ordering::SeqCst);

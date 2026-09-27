@@ -97,8 +97,8 @@ enum Commands {
         #[arg(long, default_value_t = false)]
         auto_submit: bool,
     },
-    /// Debug: poll HID § for N seconds (hold § to verify detection)
-    CommandCheck {
+    /// Debug: poll HID Shift for N seconds (hold Shift to verify detection)
+    HotkeyCheck {
         #[arg(long, default_value_t = 8)]
         seconds: u64,
     },
@@ -222,30 +222,30 @@ fn main() {
                 1
             }
         },
-        Commands::CommandCheck { seconds } => {
+        Commands::HotkeyCheck { seconds } => {
             use std::io::Write;
             use std::time::{Duration, Instant};
-            println!("Hold §... (polling HID {seconds}s)");
+            println!("Hold Shift... (polling HID {seconds}s)");
             let deadline = Instant::now() + Duration::from_secs(seconds);
             let mut was = false;
             let mut saw = false;
             while Instant::now() < deadline {
-                let down = hotkey::command_modifier_down();
+                let down = hotkey::shift_key_down();
                 if down && !was {
-                    println!("SECTION DOWN");
+                    println!("SHIFT DOWN");
                     saw = true;
                 } else if !down && was {
-                    println!("SECTION UP");
+                    println!("SHIFT UP");
                 }
                 was = down;
                 let _ = std::io::stdout().flush();
                 std::thread::sleep(Duration::from_millis(20));
             }
             if saw {
-                println!("ok — § detection works");
+                println!("ok — Shift detection works");
                 0
             } else {
-                eprintln!("no § edge seen — try the physical § key under Esc");
+                eprintln!("no Shift edge seen — check Input Monitoring for dufflebag-voice");
                 1
             }
         }

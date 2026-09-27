@@ -1,11 +1,11 @@
-//! Dictate worker: primed mic + hold § + serial STT queue.
+//! Dictate worker: primed mic + hold Shift + serial STT queue.
 //! Narration runs in a separate process (`narrate-daemon`).
 
 use crate::audio::PrimedMic;
 use crate::config::voice_preferences;
 use crate::hotkey::{
-    command_hold_transition, command_modifier_down, HoldAction, HoldEvent, HoldState,
-    COMMAND_DOUBLE_TAP_SECONDS, COMMAND_HOLD_SECONDS, COMMAND_POLL_MS,
+    other_key_down, shift_hold_transition, shift_key_down, HoldAction, HoldEvent, HoldState,
+    SHIFT_DOUBLE_TAP_SECONDS, SHIFT_HOLD_SECONDS, SHIFT_POLL_MS,
 };
 use crate::live_preview::{self, LiveCaption};
 use crate::models::{self, selected_model_key};
@@ -18,9 +18,9 @@ use crate::state::{
 };
 use crate::stt::SttEngine;
 use crate::tts;
-// release_command_keys is only used when inserting text (typing.rs), never while holding.
+// release_shift_key is only used when inserting text (typing.rs), never while holding.
 use parking_lot::Mutex;
-use rdev::{listen, EventType};
+use rdev::{listen, EventType, Key};
 use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -172,6 +172,8 @@ pub fn run_daemon() -> i32 {
                 running.clone(),
             );
 
+            // True once the HUD says "listening" for the current hold.
+            let mut announced_listening = false;
             while running.load(Ordering::SeqCst) {
                 if stop_requested() {
                     running.store(false, Ordering::SeqCst);
@@ -182,7 +184,7 @@ pub fn run_daemon() -> i32 {
                     let mut state = command.lock();
                     if let Some(deadline) = state.hold_deadline {
                         if Instant::now() >= deadline && state.hold == HoldState::Waiting {
-                            let (next, action) = command_hold_transition(
+                            let (next, action) = shift_hold_transition(
                                 state.hold,
                                 HoldEvent::HoldElapsed,
                                 false,
@@ -196,12 +198,23 @@ pub fn run_daemon() -> i32 {
                     }
                 }
 
-                // Hotkey-down: soft-stop TTS if any, begin buffer.
+                // Shift down: begin buffering so the first word is not clipped.
+                // Shift is also pressed for every capital letter, so stopping TTS
+                // and showing the HUD wait until the hold is confirmed (Start).
                 // NEVER inject key-up here — that made the poller see a
                 // fake release → Tap → HUD "Connecting…" then vanish, and enigo
                 // key events can glitch system audio under other music apps.
                 if prepare_flag.swap(false, Ordering::SeqCst) {
                     cancel_prepare.store(false, Ordering::SeqCst);
+                    command.lock().dictation_active = true;
+                    if !mic.is_recording() {
+                        mic.begin_capture();
+                        recording_flag.store(true, Ordering::SeqCst);
+                        live_caption.clear();
+                    }
+                }
+
+                if start_flag.swap(false, Ordering::SeqCst) {
                     if tts::narration_busy() {
                         let _ = tts::cancel_narration();
                     }
@@ -215,37 +228,6 @@ pub fn run_daemon() -> i32 {
                         recording_flag.store(true, Ordering::SeqCst);
                         live_caption.clear();
                     }
-                    if cancel_prepare.load(Ordering::SeqCst) {
-                        mic.cancel_capture();
-                        recording_flag.store(false, Ordering::SeqCst);
-                        command.lock().dictation_active = false;
-                        write_worker_status("inactive", "", Some(&model), Some(&backend_s), None);
-                    } else if start_flag.load(Ordering::SeqCst) {
-                        start_flag.store(false, Ordering::SeqCst);
-                        write_worker_status(
-                            "listening",
-                            "Recording",
-                            Some(&model),
-                            Some(&backend_s),
-                            None,
-                        );
-                    }
-                }
-
-                if start_flag.swap(false, Ordering::SeqCst) {
-                    let (model, backend_s) = {
-                        let mut state = command.lock();
-                        state.dictation_active = true;
-                        (state.model_name.clone(), state.backend.clone())
-                    };
-                    if !mic.is_recording() {
-                        if tts::narration_busy() {
-                            let _ = tts::cancel_narration();
-                        }
-                        mic.begin_capture();
-                        recording_flag.store(true, Ordering::SeqCst);
-                        live_caption.clear();
-                    }
                     write_worker_status(
                         "listening",
                         "Recording",
@@ -253,9 +235,10 @@ pub fn run_daemon() -> i32 {
                         Some(&backend_s),
                         None,
                     );
+                    announced_listening = true;
                 }
 
-                // Tap (not hold): cancel prepare, drop buffer.
+                // Tap, capital letter, or shortcut (not a hold): drop the buffer.
                 if cancel_prepare.swap(false, Ordering::SeqCst) {
                     let (model, backend_s) = {
                         let state = command.lock();
@@ -265,12 +248,17 @@ pub fn run_daemon() -> i32 {
                     recording_flag.store(false, Ordering::SeqCst);
                     live_caption.clear();
                     command.lock().dictation_active = false;
-                    write_worker_status("inactive", "", Some(&model), Some(&backend_s), None);
+                    // Only clear the HUD we showed; typing must not wipe other HUD messages.
+                    if announced_listening {
+                        write_worker_status("inactive", "", Some(&model), Some(&backend_s), None);
+                        announced_listening = false;
+                    }
                 }
 
                 // Release: grace → freeze samples → enqueue (never block on STT).
                 let stop_gen = command.lock().stop_request.take();
                 if let Some(generation) = stop_gen {
+                    announced_listening = false;
                     let (model, backend_s) = {
                         let state = command.lock();
                         (state.model_name.clone(), state.backend.clone())
@@ -347,7 +335,7 @@ pub fn run_daemon() -> i32 {
         });
     }
 
-    // Primary § path: poll HID key state (works without Input Monitoring).
+    // Primary Shift path: poll HID key state (works without Input Monitoring).
     // rdev CGEventTap often never delivers some keys on macOS when TCC isn't granted
     // to this exact binary path — that left status stuck on "inactive" and no HUD.
     {
@@ -366,7 +354,7 @@ pub fn run_daemon() -> i32 {
                 if stop_requested() {
                     break;
                 }
-                let down = command_modifier_down();
+                let down = shift_key_down();
                 if down {
                     down_streak = down_streak.saturating_add(1);
                     up_streak = 0;
@@ -381,7 +369,7 @@ pub fn run_daemon() -> i32 {
                         &start_flag,
                         &prepare_flag,
                         &cancel_prepare,
-                        HoldEvent::CommandDown,
+                        HoldEvent::ShiftDown,
                     );
                     was_down = true;
                 } else if up_streak >= 4 && was_down {
@@ -390,17 +378,27 @@ pub fn run_daemon() -> i32 {
                         &start_flag,
                         &prepare_flag,
                         &cancel_prepare,
-                        HoldEvent::CommandUp,
+                        HoldEvent::ShiftUp,
                     );
                     was_down = false;
                 }
-                thread::sleep(Duration::from_millis(COMMAND_POLL_MS));
+                // Shift + another key is typing or a shortcut, not a hold.
+                if was_down && other_key_down() {
+                    apply_hold(
+                        &command,
+                        &start_flag,
+                        &prepare_flag,
+                        &cancel_prepare,
+                        HoldEvent::OtherDown,
+                    );
+                }
+                thread::sleep(Duration::from_millis(SHIFT_POLL_MS));
             }
         });
     }
 
-    // Optional: rdev for "other key while waiting" cancel. Best-effort;
-    // if the tap has no permission, § still works via the poller above.
+    // Optional: rdev for "other key while Shift is held" cancel. Best-effort;
+    // if the tap has no permission, the poller above still sees other keys.
     let command_keys = command.clone();
     let start_flag_keys = start_flag.clone();
     let prepare_flag_keys = prepare_flag.clone();
@@ -411,9 +409,9 @@ pub fn run_daemon() -> i32 {
             if !running_keys.load(Ordering::SeqCst) {
                 return;
             }
-            if let EventType::KeyPress(_) = event.event_type {
-                // Ignore the hotkey while held; the poller owns those edges.
-                if command_modifier_down() {
+            if let EventType::KeyPress(key) = event.event_type {
+                // Shift itself is the hotkey; the poller owns its edges.
+                if matches!(key, Key::ShiftLeft | Key::ShiftRight) {
                     return;
                 }
                 apply_hold(
@@ -453,12 +451,12 @@ fn apply_hold(
 ) {
     let action = {
         let mut state = command.lock();
-        let (next, action) = command_hold_transition(state.hold, event, false);
+        let (next, action) = shift_hold_transition(state.hold, event, false);
         state.hold = next;
         match action {
             HoldAction::Schedule => {
                 state.hold_deadline =
-                    Some(Instant::now() + Duration::from_secs_f64(COMMAND_HOLD_SECONDS));
+                    Some(Instant::now() + Duration::from_secs_f64(SHIFT_HOLD_SECONDS));
             }
             HoldAction::Cancel | HoldAction::Tap => {
                 state.hold_deadline = None;
@@ -482,11 +480,6 @@ fn apply_hold(
                 state.dictation_active = true;
             }
             prepare_flag.store(true, Ordering::SeqCst);
-            let (model, backend) = {
-                let state = command.lock();
-                (state.model_name.clone(), state.backend.clone())
-            };
-            write_worker_status("starting", "§ held", Some(&model), Some(&backend), None);
         }
         HoldAction::Start => {
             start_flag.store(true, Ordering::SeqCst);
@@ -499,7 +492,7 @@ fn apply_hold(
         HoldAction::Cancel | HoldAction::Tap => {
             cancel_prepare.store(true, Ordering::SeqCst);
             if action == HoldAction::Tap {
-                handle_command_tap(command);
+                handle_shift_tap(command);
             }
         }
         HoldAction::Stop => {
@@ -513,12 +506,12 @@ fn apply_hold(
     }
 }
 
-fn handle_command_tap(command: &Arc<Mutex<SharedCommand>>) {
+fn handle_shift_tap(command: &Arc<Mutex<SharedCommand>>) {
     let now = Instant::now();
     let is_double = {
         let mut state = command.lock();
         if let Some(last) = state.last_tap_at {
-            if now.duration_since(last).as_secs_f64() <= COMMAND_DOUBLE_TAP_SECONDS {
+            if now.duration_since(last).as_secs_f64() <= SHIFT_DOUBLE_TAP_SECONDS {
                 state.last_tap_at = None;
                 true
             } else {
@@ -564,7 +557,7 @@ fn handle_command_tap(command: &Arc<Mutex<SharedCommand>>) {
         write_worker_status(
             "inactive",
             if muted {
-                "Narration muted (double-tap § to unmute)"
+                "Narration muted (double-tap Shift to unmute)"
             } else {
                 "Narration unmuted"
             },

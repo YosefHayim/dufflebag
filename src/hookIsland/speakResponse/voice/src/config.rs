@@ -29,7 +29,7 @@ pub struct VoicePreferences {
     pub speech_voice: String,
     pub speech_speed: f64,
     pub dictation_replacements: String,
-    /// Keep the mic open this long after § release (trailing-word tail).
+    /// Keep the mic open this long after Shift release (trailing-word tail).
     pub dictation_mic_off_delay_ms: u64,
     /// Whisper language code: `en` (default) or `he` (ivrit.ai Hebrew model).
     pub dictation_language: String,
@@ -41,7 +41,7 @@ impl Default for VoicePreferences {
             prompt_refinement: "off".into(),
             prompt_refinement_backend: "codex".into(),
             prompt_refinement_model: "gpt-5.3-codex-spark".into(),
-            // low avoids Codex defaulting reasoning models to xhigh after § release
+            // low avoids Codex defaulting reasoning models to xhigh after Shift release
             prompt_refinement_reasoning_effort: "low".into(),
             // Prefer showing STT immediately; pipeline also force raw-first when refining.
             prompt_refinement_show_raw_first: true,

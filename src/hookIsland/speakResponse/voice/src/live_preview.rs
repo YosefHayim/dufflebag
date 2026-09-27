@@ -1,4 +1,4 @@
-//! Live HUD preview while holding §.
+//! Live HUD preview while holding Shift.
 //!
 //! OSW uses Parakeet/FluidAudio for a cheap sliding-window caption, then offline
 //! STT for the final insert. We mirror that shape with a Whisper sliding-window

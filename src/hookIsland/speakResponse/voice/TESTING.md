@@ -41,7 +41,7 @@ pnpm cli voice off
 pnpm cli voice on
 ```
 
-Optional: `both` also enables § double-tap clipboard refine.
+Optional: `both` also enables Shift double-tap clipboard refine.
 
 ## Offline refine (no mic) — prove Codex path first
 
@@ -62,11 +62,11 @@ Expect a single paste-ready line (often starting with a skill id like `finish-an
 ## Live STT test
 
 1. Focus an agent input (Claude Code, Codex, Cursor, Grok terminal, TextEdit, etc.).
-2. **Hold §**, speak something messy, e.g.:
+2. **Hold Shift**, speak something messy, e.g.:
 
    > “yeah so um can you finish and ship this, make a branch, commit the voice refine stuff, open a pr, don’t merge it”
 
-3. **Release §**.
+3. **Release Shift**.
 4. **Immediately** (after offline STT decode, ~100–300ms) raw transcript lands in the input and the HUD **hides** (no lingering “Refining…” spinner over already-pasted text).
 5. Refine runs in the background. If the rewrite differs from raw, a brief `Updating…` flash appears while the caret is replaced; if it’s the same, nothing else is shown.
 6. If the preferred model is missing / not allowed for your Codex account (e.g. Spark on ChatGPT login), the worker **rotates** to a working model (`gpt-5.4-mini`, `gpt-5.6-terra`, …) and remembers the last-good id.
@@ -116,7 +116,7 @@ If refine fails, the raw transcript is typed anyway (`stt refine failed …; typ
 | --- | --- |
 | `off` | Type STT as-is (default) |
 | `stt` | Refine after final transcript, then deliver |
-| `review` | Double-tap § refines **clipboard** only |
+| `review` | Double-tap Shift refines **clipboard** only |
 | `both` | STT refine + double-tap clipboard |
 
 | `promptRefinementBackend` | Engine (ytcap-style; pair with `promptRefinementModel`) |

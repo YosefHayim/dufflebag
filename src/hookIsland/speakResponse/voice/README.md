@@ -6,14 +6,14 @@ Native local voice worker for the speak-response feature.
 
 - **STT:** whisper.cpp via `whisper-rs`, **Whisper large-v3-turbo** (default `q5_0`), Metal on Apple Silicon
 - **TTS:** separate `narrate-daemon` process + warm `tts_bridge.py serve` (Supertonic)
-- **UX:** hold § to dictate; floating OSW-style pill with **live preview** caption
+- **UX:** hold Shift to dictate (any other key cancels); floating OSW-style pill with **live preview** caption
 - **Devin:** `watch-devin --path <atif.json>` debounces and enqueues agent turns
-- **Refine:** route-aware rewrite before paste/type — STT inject (`promptRefinementMode=stt|both`), § double-tap clipboard (`review|both`), or `refine --text …`. Backend: `codex` (default `gpt-5.3-codex-spark`), `local` (Apple FM), or `auto`
+- **Refine:** route-aware rewrite before paste/type — STT inject (`promptRefinementMode=stt|both`), Shift double-tap clipboard (`review|both`), or `refine --text …`. Backend: `codex` (default `gpt-5.3-codex-spark`), `local` (Apple FM), or `auto`
 
 ## Architecture (OpenSuperWhisper-shaped)
 
 ```
-hold § → primed mic (always open) → release → enqueue clip
+hold Shift → primed mic (always open) → release → enqueue clip
                                                     ↓
                               serial offline STT queue → clean → type once
                                                     ↑

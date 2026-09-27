@@ -665,7 +665,7 @@ const runStt = Effect.gen(function* () {
       steps: [
         {
           label: "Action",
-          detail: action === "on" ? "enable hold-§ dictation" : "disable dictation worker",
+          detail: action === "on" ? "enable hold-Shift dictation" : "disable dictation worker",
         },
         { label: "Scope", detail: scope },
         { label: "Equivalent CLI", detail: `dufflebag stt ${action} --scope ${scope}` },
