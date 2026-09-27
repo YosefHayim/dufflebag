@@ -7,14 +7,20 @@ use crate::microphone::SAMPLE_RATE;
 use crate::refine::refine_with_prefs;
 use crate::state_home::append_dictation_log;
 use crate::stt::{clean_transcript, SttEngine};
-use crate::typing::{press_enter, replace_previous_with, type_text};
+use crate::typing::{press_enter, type_text};
 use crate::worker_status::StatusWriter;
 use parking_lot::Mutex;
 use std::collections::{HashMap, VecDeque};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::Arc;
+use std::sync::{mpsc, Arc};
 use std::thread;
 use std::time::{Duration, Instant};
+
+/// Below this many words there is nothing to rewrite, and models answer a short phrase with
+/// commentary instead of a prompt.
+const MIN_REFINE_WORDS: usize = 5;
+/// Typing waits this long for the refined prompt, then types the raw transcript instead.
+const REFINE_WAIT: Duration = Duration::from_secs(20);
 
 #[derive(Debug, Clone)]
 pub struct DictationJob {
@@ -128,35 +134,24 @@ fn transcribe_and_deliver(engine: &SttEngine, status: &StatusWriter, job: &Dicta
 
     let prefs = voice_preferences();
     let refine = prefs.stt_refine_enabled();
-    // With refine on, the raw transcript is typed at once and the refined text replaces it
-    // later, so release never waits on a multi-second model.
-    let typed_raw = if refine { type_raw_first(&text, job, status) } else { None };
+    // Text is typed once. Typed text is never erased and retyped: by the time a model answers,
+    // the caret may have moved and backspacing would delete other text.
     if refine {
-        text = refined_or_raw(text, typed_raw.is_some(), &prefs, status, job.generation);
+        text = refined_or_raw(text, &prefs, status, job.generation);
     }
 
     let type_started = Instant::now();
-    let delivered = if typed_raw.as_deref() == Some(format_dictation(&text, &job.replacements).as_str()) {
-        // Refined equals what is already typed: leave the caret (and the hidden HUD) alone.
-        append_dictation_log(&format!("stt refine no-op gen={} (same as raw-first)", job.generation));
-        Ok(typed_raw.unwrap_or_default())
-    } else {
-        // Only flash the pill when the input is about to change.
-        if typed_raw.is_some() {
-            status.write("typing", "Updating…");
-        }
-        let caret = || deliver_to_caret(&text, &job.replacements, typed_raw.as_deref(), prefs.refine_press_enter);
-        if refine && is_cmux_delivery(&prefs.refine_send_to) {
-            deliver_text(&text, &prefs).or_else(|error| {
-                append_dictation_log(&format!(
-                    "cmux deliver failed gen={}: {error}; falling back to caret",
-                    job.generation
-                ));
-                caret()
-            })
-        } else {
+    let caret = || deliver_to_caret(&text, &job.replacements, prefs.refine_press_enter);
+    let delivered = if refine && is_cmux_delivery(&prefs.refine_send_to) {
+        deliver_text(&text, &prefs).or_else(|error| {
+            append_dictation_log(&format!(
+                "cmux deliver failed gen={}: {error}; falling back to caret",
+                job.generation
+            ));
             caret()
-        }
+        })
+    } else {
+        caret()
     };
 
     match delivered {
@@ -177,41 +172,28 @@ fn transcribe_and_deliver(engine: &SttEngine, status: &StatusWriter, job: &Dicta
     }
 }
 
-/// Type the raw transcript before refining. Returns the exact string typed (for replacing it
-/// later without ⌘A), or `None` when nothing was typed.
-fn type_raw_first(transcript: &str, job: &DictationJob, status: &StatusWriter) -> Option<String> {
-    status.write("typing", "Pasting…");
-    let typed = format_dictation(transcript, &job.replacements);
-    if typed.is_empty() {
-        append_dictation_log(&format!("stt raw-first empty gen={}", job.generation));
-        return None;
-    }
-    if let Err(error) = type_text(&typed) {
-        append_dictation_log(&format!("raw-first type failed gen={}: {error}", job.generation));
-        return None;
-    }
-    append_dictation_log(&format!("stt raw-first gen={} text={typed:?}", job.generation));
-    // The text is in the caret already: hide the pill while the model rewrites in the background
-    // (a spinner over pasted text looks stuck).
-    status.write("inactive", "");
-    Some(typed)
+fn is_short_phrase(transcript: &str) -> bool {
+    transcript.split_whitespace().count() < MIN_REFINE_WORDS
 }
 
-fn refined_or_raw(
-    raw: String,
-    raw_on_screen: bool,
-    prefs: &VoicePreferences,
-    status: &StatusWriter,
-    generation: u64,
-) -> String {
-    // Show a spinner only when nothing is on screen yet (raw-first failed).
-    if !raw_on_screen {
-        let effort = if prefs.refine_effort.is_empty() { String::new() } else { format!("/{}", prefs.refine_effort) };
-        status.write("refining", &format!("Refining ({}/{}{effort})…", prefs.refine_provider, prefs.refine_model));
+/// The refined prompt, or the raw transcript when the phrase is short or the model fails, answers
+/// empty, or takes longer than `REFINE_WAIT`.
+fn refined_or_raw(raw: String, prefs: &VoicePreferences, status: &StatusWriter, generation: u64) -> String {
+    if is_short_phrase(&raw) {
+        append_dictation_log(&format!("stt refine skipped gen={generation}: short phrase"));
+        return raw;
     }
+    let effort = if prefs.refine_effort.is_empty() { String::new() } else { format!("/{}", prefs.refine_effort) };
+    status.write("refining", &format!("Refining ({}/{}{effort})…", prefs.refine_provider, prefs.refine_model));
     let refine_started = Instant::now();
-    match refine_with_prefs(&raw, prefs) {
-        Ok(refined) if !refined.trim().is_empty() => {
+    let (sender, receiver) = mpsc::channel();
+    let (text, thread_prefs) = (raw.clone(), prefs.clone());
+    // A model slower than REFINE_WAIT finishes in the background and its answer is dropped.
+    thread::spawn(move || {
+        let _ = sender.send(refine_with_prefs(&text, &thread_prefs));
+    });
+    match receiver.recv_timeout(REFINE_WAIT) {
+        Ok(Ok(refined)) if !refined.trim().is_empty() => {
             let refine_ms = refine_started.elapsed().as_secs_f64() * 1000.0;
             append_dictation_log(&format!(
                 "stt refine gen={generation} backend={} model={} effort={} refine_ms={refine_ms:.1} raw={raw:?} refined={refined:?}",
@@ -219,12 +201,19 @@ fn refined_or_raw(
             ));
             refined
         }
-        Ok(_) => {
+        Ok(Ok(_)) => {
             append_dictation_log(&format!("stt refine empty gen={generation}; keeping raw transcript"));
             raw
         }
-        Err(error) => {
+        Ok(Err(error)) => {
             append_dictation_log(&format!("stt refine failed gen={generation}: {error}; keeping raw transcript"));
+            raw
+        }
+        Err(_) => {
+            append_dictation_log(&format!(
+                "stt refine timed out gen={generation} after {}s; keeping raw transcript",
+                REFINE_WAIT.as_secs()
+            ));
             raw
         }
     }
@@ -239,22 +228,17 @@ fn prompt_boost_from_replacements(replacements: &HashMap<String, String>) -> Opt
     (!joined.is_empty()).then_some(joined)
 }
 
-/// Type the final text at the caret. With `previous` (raw-first), backspace exactly that string
-/// and type the new one — never global ⌘A, which selects whole WebGL terminals.
+/// Type the final text at the caret, then press Enter when auto-submit is on.
 fn deliver_to_caret(
     transcript: &str,
     replacements: &HashMap<String, String>,
-    previous: Option<&str>,
     auto_submit: bool,
 ) -> Result<String, String> {
     let mut out = format_dictation(transcript, replacements);
     if out.is_empty() {
         return Ok(out);
     }
-    match previous {
-        Some(previous) => replace_previous_with(previous, &out)?,
-        None => type_text(&out)?,
-    }
+    type_text(&out)?;
     if auto_submit {
         press_enter()?;
         out.push_str(" [Enter]");
@@ -276,5 +260,12 @@ mod tests {
         assert!(boost.contains("TypeScript"));
         assert!(boost.contains("Yosef"));
         assert!(prompt_boost_from_replacements(&HashMap::new()).is_none());
+    }
+
+    #[test]
+    fn short_phrases_skip_refine() {
+        assert!(is_short_phrase("Thank you."));
+        assert!(is_short_phrase("I'm going to go."));
+        assert!(!is_short_phrase("Check the worktrees folder and push every branch."));
     }
 }

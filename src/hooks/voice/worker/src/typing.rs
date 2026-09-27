@@ -81,53 +81,10 @@ fn log_type_path(detail: &str, char_len: usize) {
     append_dictation_log(&format!("type_path chars={char_len} {detail}"));
 }
 
-/// Replace `previous` (just typed into the caret) with `next` without ⌘A.
-///
-/// Global ⌘A selects the whole cmux/Grok WebGL session (blue highlight) and
-/// often fails to replace only the input field — raw + refined double-paste.
-/// We backspace the exact previous string, then paste `next`.
-pub fn replace_previous_with(previous: &str, next: &str) -> Result<(), String> {
-    if previous == next {
-        return Ok(());
-    }
-    ensure_shift_released(800);
-
-    if !previous.is_empty() {
-        backspace_chars(previous.chars().count())?;
-        thread::sleep(Duration::from_millis(30));
-    }
-    if !next.is_empty() {
-        type_text(next)?;
-    }
-    // Nudge caret so any residual selection (from host quirks) collapses.
-    let _ = collapse_selection();
-    Ok(())
-}
-
 pub fn press_enter() -> Result<(), String> {
     ensure_shift_released(400);
     let mut enigo = Enigo::new(&Settings::default()).map_err(|e| format!("enigo: {e}"))?;
     enigo.key(Key::Return, Direction::Click).map_err(|e| format!("return: {e}"))?;
-    Ok(())
-}
-
-fn backspace_chars(count: usize) -> Result<(), String> {
-    if count == 0 {
-        return Ok(());
-    }
-    let mut enigo = Enigo::new(&Settings::default()).map_err(|e| format!("enigo: {e}"))?;
-    for _ in 0..count {
-        enigo.key(Key::Backspace, Direction::Click).map_err(|e| format!("backspace: {e}"))?;
-        // Tiny gap so WebGL/React inputs don't drop key events under load.
-        thread::sleep(Duration::from_millis(2));
-    }
-    Ok(())
-}
-
-fn collapse_selection() -> Result<(), String> {
-    let mut enigo = Enigo::new(&Settings::default()).map_err(|e| format!("enigo: {e}"))?;
-    // Right arrow collapses a range selection to the caret end in most inputs.
-    enigo.key(Key::RightArrow, Direction::Click).map_err(|e| format!("right: {e}"))?;
     Ok(())
 }
 
