@@ -31,6 +31,9 @@ describe("hook config resolution", () => {
       const installedConfig = path.join(installRoot, managedConfigPath);
       mkdirSync(path.dirname(installedModule), { recursive: true });
       copyFileSync(configModuleSource, installedModule);
+      // Installed hooks are .js that Node detects as ES modules. On Node 22, tsx loads a .ts copy outside any
+      // package as CommonJS and drops its named exports, so mark the temp tree as ESM.
+      writeFileSync(path.join(installRoot, "package.json"), `${JSON.stringify({ type: "module" })}\n`);
       writeFileSync(
         installedConfig,
         `${JSON.stringify({ contextWarnPercent: 31, duplicateCodeMode: "warn", duplicateCodeSkipFolders: ["vendor"] })}\n`,
