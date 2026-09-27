@@ -1,13 +1,26 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { afterEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, describe, expect, it } from "vitest";
 
-const hookPath = fileURLToPath(new URL("./speakReply.ts", import.meta.url));
-const packageRoot = path.resolve(path.dirname(hookPath), "../../../..");
+const hookSource = fileURLToPath(new URL("./speakReply.ts", import.meta.url));
+const hooksRoot = path.resolve(path.dirname(hookSource), "../..");
+const packageRoot = path.resolve(hooksRoot, "../..");
+
+// Run a copy of the hook with no dufflebag-voice binary beside it, so no test ever starts a real worker.
+const hookCopyRoot = mkdtempSync(path.join(tmpdir(), "dufflebag-voice-hook-code-"));
+const hookPath = path.join(hookCopyRoot, "voice/hooks/speakReply.ts");
+cpSync(path.join(hooksRoot, "lib"), path.join(hookCopyRoot, "lib"), {
+  recursive: true,
+  filter: (source) => !source.endsWith(".test.ts"),
+});
+mkdirSync(path.dirname(hookPath), { recursive: true });
+cpSync(hookSource, hookPath);
+afterAll(() => rmSync(hookCopyRoot, { recursive: true, force: true }));
+
 const temporaryHomes: Array<string> = [];
 
 const stateHome = () => {
@@ -60,31 +73,9 @@ const queued = (home: string) => {
   return candidate;
 };
 
-const stopDetachedWorkerIfPresent = (home: string): void => {
-  const pidPath = path.join(home, "worker.pid");
-  let pidText: string;
-  try {
-    pidText = readFileSync(pidPath, "utf8").trim();
-  } catch {
-    return;
-  }
-  const pid = Number(pidText);
-  if (!Number.isFinite(pid) || pid <= 0) {
-    return;
-  }
-  try {
-    process.kill(pid, "SIGTERM");
-  } catch {
-    // already gone
-  }
-};
-
 afterEach(() => {
   for (const home of temporaryHomes.splice(0)) {
-    // The hook may have detached dufflebag-voice into this state home; stop it before rmdir.
-    stopDetachedWorkerIfPresent(home);
-    writeFileSync(path.join(home, "stop"), "");
-    rmSync(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
+    rmSync(home, { recursive: true, force: true });
   }
 });
 
