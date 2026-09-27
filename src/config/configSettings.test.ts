@@ -1,0 +1,49 @@
+import { FileSystem, Path } from "@effect/platform";
+import { NodeContext } from "@effect/platform-node";
+import { expect, layer } from "@effect/vitest";
+import { Effect } from "effect";
+
+import { managedConfigPath } from "./configFile.js";
+import { defaultConfig } from "./configSchema.js";
+import { readConfigAt } from "./configSettings.js";
+
+const writeConfig = (request: { readonly root: string; readonly config: object }) =>
+  Effect.gen(function* () {
+    const fileSystem = yield* FileSystem.FileSystem;
+    const path = yield* Path.Path;
+    const configPath = path.join(request.root, managedConfigPath);
+    yield* fileSystem.makeDirectory(path.dirname(configPath), { recursive: true });
+    yield* fileSystem.writeFileString(configPath, `${JSON.stringify(request.config)}\n`);
+  });
+
+const makeRoots = Effect.gen(function* () {
+  const fileSystem = yield* FileSystem.FileSystem;
+  const homeRoot = yield* fileSystem.makeTempDirectoryScoped({ prefix: "dufflebag-config-settings-home-" });
+  const projectRoot = yield* fileSystem.makeTempDirectoryScoped({ prefix: "dufflebag-config-settings-project-" });
+  return { homeRoot, projectRoot };
+});
+
+layer(NodeContext.layer)("readConfigAt", (it) => {
+  it.scoped("reads the root's own config.json before the global one", () =>
+    Effect.gen(function* () {
+      const { homeRoot, projectRoot } = yield* makeRoots;
+      yield* writeConfig({ root: homeRoot, config: { duplicateCodeMode: "warn" } });
+      yield* writeConfig({ root: projectRoot, config: { duplicateCodeSkipFolders: ["vendor"] } });
+
+      const config = yield* readConfigAt({ root: projectRoot, homeRoot });
+
+      expect(config).toEqual({ ...defaultConfig, duplicateCodeSkipFolders: ["vendor"] });
+    }),
+  );
+
+  it.scoped("falls back to the global config.json, then to defaults", () =>
+    Effect.gen(function* () {
+      const { homeRoot, projectRoot } = yield* makeRoots;
+
+      expect(yield* readConfigAt({ root: projectRoot, homeRoot })).toEqual(defaultConfig);
+
+      yield* writeConfig({ root: homeRoot, config: { duplicateCodeMode: "warn" } });
+      expect((yield* readConfigAt({ root: projectRoot, homeRoot })).duplicateCodeMode).toBe("warn");
+    }),
+  );
+});

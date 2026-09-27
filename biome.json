@@ -4,57 +4,36 @@
   "files": {
     "includes": [
       "src/**/*.{ts,tsx,js,mjs,json,jsonc}",
-      "scripts/**/*.{ts,tsx,js,mjs,json,jsonc}",
-      "templates/**/*.{ts,tsx,js,mjs,json,jsonc}",
       "*.{ts,tsx,js,mjs,json,jsonc}",
-      "!src/skills/makeATrailer/scripts/assembleCut.mjs"
+      "!src/skills/makePromoVideo/scripts/assembleCut.mjs"
     ]
   },
-  "formatter": {
-    "enabled": true,
-    "indentStyle": "space",
-    "indentWidth": 2,
-    "lineWidth": 120
-  },
-  "assist": {
-    "enabled": true,
-    "actions": { "source": { "organizeImports": "on" } }
-  },
-  "javascript": {
-    "formatter": { "quoteStyle": "double", "trailingCommas": "all", "semicolons": "always" }
-  },
+  "formatter": { "enabled": true, "indentStyle": "space", "indentWidth": 2, "lineWidth": 120 },
+  "assist": { "enabled": true, "actions": { "source": { "organizeImports": "on" } } },
+  "javascript": { "formatter": { "quoteStyle": "double", "trailingCommas": "all", "semicolons": "always" } },
   "linter": {
     "enabled": true,
     "rules": {
       "preset": "recommended",
-      "style": {
-        "noNonNullAssertion": "off"
-      }
+      "style": { "noNonNullAssertion": "off", "noNestedTernary": "error" },
+      "suspicious": { "noFocusedTests": "error" }
     }
   },
-  "plugins": [
-    "./biome-rules/no-focused-tests.grit",
-    "./biome-rules/no-nullish-coalescing.grit",
-    "./biome-rules/no-nested-ternary.grit"
-  ],
   "overrides": [
     {
-      "includes": ["src/hookIsland/**", "src/runtime/**"],
+      "includes": ["src/hooks/**"],
       "linter": {
         "rules": {
           "style": {
             "noRestrictedImports": {
               "level": "error",
               "options": {
-                "paths": {
-                  "commander": "Zero-dep hook/gate runtime: import only node:*, src/runtime/*, and the feature's own lib/ (CODE-STYLE.md -> Never; ADR 0001).",
-                  "@clack/prompts": "Zero-dep hook/gate runtime: import only node:*, src/runtime/*, and the feature's own lib/ (CODE-STYLE.md -> Never; ADR 0001).",
-                  "picocolors": "Zero-dep hook/gate runtime: import only node:*, src/runtime/*, and the feature's own lib/ (CODE-STYLE.md -> Never; ADR 0001).",
-                  "effect": "Zero-dep hook/gate runtime: import only node:*, src/runtime/*, and the feature's own lib/ (CODE-STYLE.md -> Never; ADR 0001).",
-                  "@effect/cli": "Zero-dep hook/gate runtime: import only node:*, src/runtime/*, and the feature's own lib/ (CODE-STYLE.md -> Never; ADR 0001).",
-                  "@effect/platform": "Zero-dep hook/gate runtime: import only node:*, src/runtime/*, and the feature's own lib/ (CODE-STYLE.md -> Never; ADR 0001).",
-                  "@effect/platform-node": "Zero-dep hook/gate runtime: import only node:*, src/runtime/*, and the feature's own lib/ (CODE-STYLE.md -> Never; ADR 0001)."
-                }
+                "patterns": [
+                  {
+                    "group": ["commander", "@clack/prompts", "picocolors", "effect", "@effect/*"],
+                    "message": "Hooks run without dependencies: import only node:*, src/hooks/lib/*, and the feature's own lib/."
+                  }
+                ]
               }
             }
           }

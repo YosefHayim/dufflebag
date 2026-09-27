@@ -2,19 +2,9 @@ import { Schema } from "effect";
 
 export const providerIdSchema = Schema.NonEmptyTrimmedString.pipe(Schema.brand("ProviderId"));
 export const modelIdSchema = Schema.NonEmptyTrimmedString.pipe(Schema.brand("ModelId"));
-export const poolIdSchema = Schema.NonEmptyTrimmedString.pipe(Schema.brand("PoolId"));
+const poolIdSchema = Schema.NonEmptyTrimmedString.pipe(Schema.brand("PoolId"));
 export const credentialIdSchema = Schema.NonEmptyTrimmedString.pipe(Schema.brand("CredentialId"));
-export const oauthStateSchema = Schema.NonEmptyTrimmedString.pipe(Schema.brand("OAuthState"));
-export const oauthCodeVerifierSchema = Schema.NonEmptyTrimmedString.pipe(Schema.brand("OAuthCodeVerifier"));
-export const protocolFamilySchema = Schema.Literal(
-  "openai-chat",
-  "openai-responses",
-  "anthropic-messages",
-  "google-generative",
-);
 export const termsStatusSchema = Schema.Literal("ok", "caution", "ambiguous", "unknown", "avoid");
-export const authenticationRequirementSchema = Schema.Literal("api-key", "keyless");
-export const providerActivationSchema = Schema.Literal("active", "unavailable");
 export const providerUnavailabilitySchema = Schema.Literal(
   "browser-cookie",
   "retired-contract",
@@ -44,23 +34,21 @@ export const documentedFreePoolSchema = Schema.Struct({
   termsStatus: termsStatusSchema,
 });
 
-const providerManifestFieldsSchema = Schema.Struct({
+export const providerManifestSchema = Schema.Struct({
   providerId: providerIdSchema,
   displayName: Schema.NonEmptyTrimmedString,
-  protocolFamily: protocolFamilySchema,
+  protocolFamily: Schema.Literal("openai-chat", "openai-responses", "anthropic-messages", "google-generative"),
   endpoint: Schema.URL,
-  authentication: authenticationRequirementSchema,
+  authentication: Schema.Literal("api-key", "keyless"),
   credentialId: Schema.optional(credentialIdSchema),
   termsStatus: termsStatusSchema,
   acknowledgementVersion: Schema.optional(Schema.NonEmptyTrimmedString),
-  activation: providerActivationSchema,
+  activation: Schema.Literal("active", "unavailable"),
   unavailableReason: Schema.optional(providerUnavailabilitySchema),
   freeTierWindow: freeTierWindowSchema,
   models: Schema.NonEmptyArray(modelCapabilitySchema),
   source: Schema.URL,
-});
-
-export const providerManifestSchema = providerManifestFieldsSchema.pipe(
+}).pipe(
   Schema.filter(
     (providerManifest) =>
       (providerManifest.authentication === "api-key" && providerManifest.credentialId !== undefined) ||
@@ -75,13 +63,10 @@ export const providerManifestSchema = providerManifestFieldsSchema.pipe(
   ),
 );
 
-export const chatTurnSchema = Schema.Struct({
-  role: Schema.Literal("system", "user", "assistant", "tool"),
-  text: Schema.String,
-});
-
 export const chatRequestSchema = Schema.Struct({
-  turns: Schema.NonEmptyArray(chatTurnSchema),
+  turns: Schema.NonEmptyArray(
+    Schema.Struct({ role: Schema.Literal("system", "user", "assistant", "tool"), text: Schema.String }),
+  ),
   requiredCapabilities: Schema.Array(capabilitySchema),
   maximumOutputTokens: Schema.optional(Schema.Positive),
 });
@@ -123,6 +108,7 @@ export const healthRecordSchema = Schema.Struct({
   modelId: modelIdSchema,
   observedAt: Schema.DateTimeUtc,
   cooldownUntil: Schema.optional(Schema.DateTimeUtc),
+  // End of the pause that providerIsPaused checks; the health file format fixes this field name.
   circuitUntil: Schema.optional(Schema.DateTimeUtc),
   quotaUsedTokens: Schema.NonNegative,
   quotaWindowStartedAt: Schema.DateTimeUtc,
@@ -132,46 +118,32 @@ export const healthRecordSchema = Schema.Struct({
   failureClass: Schema.optional(Schema.Literal("authentication", "quota", "upstream", "cancelled")),
 });
 
-/** Describes one classified failure from an attempted provider/model route. */
-export class ProviderFailure extends Schema.TaggedError<ProviderFailure>()("ProviderFailure", {
+export class ProviderError extends Schema.TaggedError<ProviderError>()("ProviderError", {
   providerId: providerIdSchema,
   modelId: modelIdSchema,
   failureClass: Schema.Literal("authentication", "quota", "upstream", "cancelled", "configuration"),
   statusCode: Schema.optional(Schema.Int),
 }) {}
 
-/** Reports that no declared provider satisfies a routing request. */
-export class NoEligibleProvider extends Schema.TaggedError<NoEligibleProvider>()("NoEligibleProvider", {
+export class NoProviderError extends Schema.TaggedError<NoProviderError>()("NoProviderError", {
   requiredCapabilities: Schema.Array(capabilitySchema),
 }) {}
 
-/** Describes a failure reading or writing caller-owned provider routing state. */
-export class RoutingStateFailure extends Schema.TaggedError<RoutingStateFailure>()("RoutingStateFailure", {
+export class HealthStoreError extends Schema.TaggedError<HealthStoreError>()("HealthStoreError", {
   issue: Schema.NonEmptyTrimmedString,
 }) {}
 
-/** Describes a failed OpenRouter browser-consent operation. */
-export class OpenRouterOAuthFailure extends Schema.TaggedError<OpenRouterOAuthFailure>()("OpenRouterOAuthFailure", {
+export class OpenRouterOAuthError extends Schema.TaggedError<OpenRouterOAuthError>()("OpenRouterOAuthError", {
   failureClass: Schema.Literal("callback", "exchange", "state"),
 }) {}
 
-/** A validated provider declaration used by routing and HTTP boundaries. */
 export type ProviderManifest = Schema.Schema.Type<typeof providerManifestSchema>;
-/** One pool-deduplicated entry from the attributed free-tier snapshot. */
 export type DocumentedFreePool = Schema.Schema.Type<typeof documentedFreePoolSchema>;
-/** Provider-neutral chat turns and required model capabilities. */
 export type ChatRequest = Schema.Schema.Type<typeof chatRequestSchema>;
-/** A validated target, chat request, acknowledgement, and observation time. */
 export type RoutingRequest = Schema.Schema.Type<typeof routingRequestSchema>;
-/** A provider-neutral streamed text, reasoning, tool, usage, or completion event. */
 export type StreamEvent = Schema.Schema.Type<typeof streamEventSchema>;
-/** Persistable provider health and quota counters without conversation content. */
 export type HealthRecord = Schema.Schema.Type<typeof healthRecordSchema>;
-/** A branded provider identity. */
 export type ProviderId = Schema.Schema.Type<typeof providerIdSchema>;
-/** A branded model identity. */
 export type ModelId = Schema.Schema.Type<typeof modelIdSchema>;
-/** Local callback settings for OpenRouter browser consent. */
 export type OpenRouterOAuthRequest = Schema.Schema.Type<typeof openRouterOAuthRequestSchema>;
-/** The credential returned by a successful OpenRouter key exchange. */
 export type OpenRouterCredential = Schema.Schema.Type<typeof openRouterCredentialSchema>;

@@ -1,255 +1,63 @@
-import { createHash } from "node:crypto";
-
 import { FileSystem, Path } from "@effect/platform";
-import type { PlatformError } from "@effect/platform/Error";
-import { Effect, Either, Option, Predicate, Schema, ParseResult as SchemaParseIssue } from "effect";
-import { findNodeAtLocation, type Node, parseTree } from "jsonc-parser";
+import { Effect, Either, Schema, ParseResult as SchemaParseIssue } from "effect";
 
-import { type AgentDefinition, agentCatalog, classifyAgents } from "../catalog/agentCatalog.js";
+import { type AgentDefinition, agentCatalog, detectAgents } from "../catalog/agentCatalog.js";
+import { addDependencies, defaultFeatureIds, type FeatureId, featureCatalog } from "../catalog/featureCatalog.js";
 import {
-  featureCatalog,
-  type featureIdSchema,
-  installedSkillSchema,
-  installedSkillsFor,
-  resolveFeatureSelection,
-  selectedFeatureIds,
-} from "../catalog/featureCatalog.js";
-import { defaultBagConfig } from "../config/bagConfigSchema.js";
-import { type ConfigFileSnapshot, readConfigFile } from "../config/configFile.js";
-import {
-  type ConfigureRequest,
-  hasLegacySettingsCandidate,
-  type LegacySettingsPlan,
+  type ConfigFileSnapshot,
   type ManagedConfigPlan,
+  type ManagedConfigRequest,
   managedConfigPath,
   planManagedConfig,
-  settingsPath,
-} from "../config/configure.js";
-import { findDuplicateJsonProperty } from "../config/jsonDocument.js";
-import { planConfigReference } from "./agentFormats/configReference.js";
-import { planInstructionFile } from "./agentFormats/instructionFile.js";
-import { planRuleFiles } from "./agentFormats/ruleFile.js";
-import { planSkillDirectory, renderSkillBytes } from "./agentFormats/skillDirectory.js";
-import { applyArtifactPlan } from "./applyArtifactPlan.js";
+  readConfigFile,
+} from "../config/configFile.js";
+import { defaultConfig } from "../config/configSchema.js";
+import { createAgentWrites } from "./agentFiles.js";
+import { applyPlan } from "./applyPlan.js";
+import { hashBytes } from "./fileBytes.js";
+import { type DecodedSettings, decodeSettings, desiredHookGroups, planSettings } from "./hookSettings.js";
 import {
-  type ArtifactExpectedCurrent,
-  type ArtifactOperation,
-  absoluteRootSchema,
-  artifactOperationSchema,
-  createUpdatePlan,
-  type ReceiptTarget,
-} from "./artifactPlan.js";
-import {
-  type ArtifactOwner,
-  type ArtifactReceipt,
-  artifactReceiptJsonSchema,
-  artifactReceiptSnapshotSchema,
-  type JsonValuesOwnership,
-  type OwnedJsonValue,
-  type PreviousFileValue,
-  type PreviousJsonLexical,
-  type PreviousJsonValue,
-  type ReceiptEntry,
-  readArtifactReceiptSnapshot,
-  receiptEntrySchema,
-} from "./artifactReceipt.js";
+  applicationOwner,
+  checkFileChange,
+  expectedCurrent,
+  type FileSnapshot,
+  previousFileValue,
+  previousReceiptFile,
+  previousWholeFile,
+  readFileSnapshot,
+} from "./hostFiles.js";
+import { receiptPath, settingsPath } from "./installPaths.js";
 import {
   InstallError,
   type InstallRequest,
   type InstallSummary,
   installRequestSchema,
-  installSummarySchema,
-  receiptPath,
-  runtimePath,
-} from "./installSchemas.js";
+  toInstallError,
+} from "./installRequest.js";
+import type { PreviousFileValue } from "./ownership.js";
+import { createHookWrites, readPreparedSkills } from "./packageFiles.js";
+import type { FileChange, ReceiptTarget } from "./plan.js";
+import { planInstall } from "./planChanges.js";
+import { type Receipt, readReceipt, receiptJsonSchema, receiptSnapshotSchema } from "./receipt.js";
+import { createStaleRestorations } from "./restore.js";
 
-export {
-  agentChoiceSchema,
-  configurationChoiceSchema,
-  InstallError,
-  type InstallRequest,
-  type InstallSummary,
-  installationDestinationSchema,
-  installationHostSchema,
-  installationLocationSchema,
-  installRequestSchema,
-  installSummarySchema,
-  interactionSchema,
-  platformRequirementSchema,
-  receiptPath,
-  runtimePath,
-  selectedFeatureChoiceSchema,
-  stagedPackageSchema,
-} from "./installSchemas.js";
-
-const textEncoder = new TextEncoder();
-const textDecoder = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
-const jsonValueSchema = Schema.parseJson();
-const receiptEqual = (left: ArtifactReceipt, right: ArtifactReceipt): boolean =>
-  Schema.encodeSync(artifactReceiptJsonSchema)(left) === Schema.encodeSync(artifactReceiptJsonSchema)(right);
-const applicationOwner: ArtifactOwner = { _tag: "application" };
-
-const fileSnapshotSchema = Schema.Union(
-  Schema.TaggedStruct("missing", {}),
-  Schema.TaggedStruct("file", {
-    bytes: Schema.Uint8ArrayFromSelf.annotations({
-      description: "Exact bytes observed at one planned artifact path.",
-    }),
-  }),
-);
-
-type FileSnapshot = Schema.Schema.Type<typeof fileSnapshotSchema>;
-
-const stagedRuntimeFileSchema = Schema.Struct({
-  path: Schema.NonEmptyTrimmedString.annotations({
-    description: "Feature-runtime-relative staged file path.",
-  }),
-  bytes: Schema.Uint8ArrayFromSelf.annotations({
-    description: "Exact staged runtime bytes copied into the installation.",
-  }),
-});
-
-type StagedRuntimeFile = Schema.Schema.Type<typeof stagedRuntimeFileSchema>;
-
-const stagedSkillPathIssues = (stagedSkill: {
-  installedSkill: Schema.Schema.Type<typeof installedSkillSchema>;
-  sourceFiles: ReadonlyArray<StagedRuntimeFile>;
-}) => [
-  ...stagedSkill.sourceFiles.flatMap((sourceFile, index) =>
-    stagedSkill.installedSkill.shippedPaths.some(
-      (shippedPath) => sourceFile.path === shippedPath || sourceFile.path.startsWith(`${shippedPath}/`),
-    )
-      ? []
-      : [
-          {
-            path: ["sourceFiles", index, "path"],
-            message: `Staged skill file ${sourceFile.path} is not catalog-shipped.`,
-          },
-        ],
-  ),
-  ...stagedSkill.installedSkill.shippedPaths.flatMap((shippedPath, index) =>
-    stagedSkill.sourceFiles.some(
-      (sourceFile) => sourceFile.path === shippedPath || sourceFile.path.startsWith(`${shippedPath}/`),
-    )
-      ? []
-      : [
-          {
-            path: ["installedSkill", "shippedPaths", index],
-            message: `Catalog-shipped path ${shippedPath} is missing from the staged skill.`,
-          },
-        ],
-  ),
-];
-
-const stagedInstalledSkillSchema = Schema.Struct({
-  installedSkill: installedSkillSchema.annotations({
-    description: "Catalog skill identity paired with its verified staged files.",
-  }),
-  sourceFiles: Schema.Array(stagedRuntimeFileSchema).annotations({
-    description: "Complete verified staged skill file tree.",
-  }),
-  markdown: Schema.NonEmptyString.annotations({
-    description: "Strict UTF-8 SKILL.md text used by native rule and instruction formats.",
-  }),
-}).pipe(Schema.filter(stagedSkillPathIssues));
-
-type StagedInstalledSkill = Schema.Schema.Type<typeof stagedInstalledSkillSchema>;
-
-const inspectedArtifactSchema = Schema.Struct({
-  path: Schema.NonEmptyTrimmedString,
-  snapshot: fileSnapshotSchema,
-});
-
-type InspectedArtifact = Schema.Schema.Type<typeof inspectedArtifactSchema>;
-
-const settingsHooksSchema = Schema.Record({
-  key: Schema.String,
-  value: Schema.Array(Schema.Unknown),
-});
-
-const settingsEnvironmentSchema = Schema.Record({
-  key: Schema.String,
-  value: Schema.Unknown,
-});
-
-const settingsDocumentSchema = Schema.Struct(
-  {
-    hooks: Schema.optional(settingsHooksSchema),
-    env: Schema.optional(settingsEnvironmentSchema),
-  },
-  Schema.Record({ key: Schema.String, value: Schema.Unknown }),
-);
-
-type SettingsDocument = Schema.Schema.Type<typeof settingsDocumentSchema>;
-
-const decodedSettingsSchema = Schema.Struct({
-  source: Schema.String.annotations({
-    description: "Exact decoded settings text retained for byte-preserving JSON edits.",
-  }),
-  document: settingsDocumentSchema.annotations({
-    description: "Strict settings document decoded from the same source text.",
-  }),
-});
-
-type DecodedSettings = Schema.Schema.Type<typeof decodedSettingsSchema>;
-
-const formatParseError = (error: SchemaParseIssue.ParseError): string =>
-  SchemaParseIssue.TreeFormatter.formatErrorSync(error);
-
-const formatUnknownError = (error: unknown): string => (error instanceof Error ? error.message : String(error));
-
-const toInstallError = (error: unknown): InstallError =>
-  error instanceof InstallError ? error : new InstallError({ issue: formatUnknownError(error) });
-
-const effectFromEither = <Value, Error>(either: Either.Either<Value, Error>): Effect.Effect<Value, Error> =>
-  Either.isLeft(either) ? Effect.fail(either.left) : Effect.succeed(either.right);
-
-const validateArtifactOperation = (input: unknown): Either.Either<ArtifactOperation, InstallError> =>
-  Either.mapLeft(
-    Schema.validateEither(artifactOperationSchema, {
-      onExcessProperty: "error",
-    })(input),
-    (error) => new InstallError({ issue: `Generated artifact operation is invalid: ${formatParseError(error)}` }),
-  );
-
-const hashBytes = (bytes: Uint8Array): string => createHash("sha256").update(bytes).digest("hex");
-
-const bytesEqual = (left: Uint8Array, right: Uint8Array): boolean =>
-  left.byteLength === right.byteLength && left.every((value, index) => value === right[index]);
-
-const hashJsonValue = (value: unknown): string =>
-  hashBytes(textEncoder.encode(Schema.encodeSync(jsonValueSchema)(value)));
-
-const isNotFound = (error: PlatformError): boolean => error._tag === "SystemError" && error.reason === "NotFound";
-
-const readFileSnapshot = (filePath: string) =>
-  Effect.gen(function* () {
-    const fileSystem = yield* FileSystem.FileSystem;
-
-    return yield* fileSystem.readFile(filePath).pipe(
-      Effect.map((bytes): FileSnapshot => ({ _tag: "file", bytes })),
-      Effect.catchIf(isNotFound, (): Effect.Effect<FileSnapshot> => Effect.succeed({ _tag: "missing" })),
-    );
-  });
-
-const expectedCurrent = (snapshot: FileSnapshot): ArtifactExpectedCurrent =>
-  snapshot._tag === "missing" ? { _tag: "missing" } : { _tag: "file", sha256: hashBytes(snapshot.bytes) };
-
-const previousFile = (snapshot: FileSnapshot): PreviousFileValue =>
-  snapshot._tag === "missing" ? { _tag: "missing" } : { _tag: "priorFile", bytes: snapshot.bytes };
+const receiptEqual = (left: Receipt, right: Receipt): boolean =>
+  Schema.encodeSync(receiptJsonSchema)(left) === Schema.encodeSync(receiptJsonSchema)(right);
 
 const configSnapshotFile = (snapshot: ConfigFileSnapshot): FileSnapshot =>
   snapshot._tag === "missing" ? { _tag: "missing" } : { _tag: "file", bytes: snapshot.bytes };
 
-const decodeInstallRequest = (input: unknown) =>
-  Schema.decodeUnknown(installRequestSchema, {
-    onExcessProperty: "error",
-  })(input).pipe(Effect.mapError((error) => new InstallError({ issue: formatParseError(error) })));
+const decodeStrictly =
+  <Decoded, Encoded>(schema: Schema.Schema<Decoded, Encoded>) =>
+  (input: unknown) =>
+    Schema.decodeUnknown(schema, { onExcessProperty: "error" })(input).pipe(
+      Effect.mapError((error) => new InstallError({ issue: SchemaParseIssue.TreeFormatter.formatErrorSync(error) })),
+    );
 
 const resolveFeatures = (request: InstallRequest) => {
-  const ids = request.features._tag === "defaults" ? selectedFeatureIds : request.features.ids;
+  const ids = request.features._tag === "defaults" ? defaultFeatureIds : request.features.ids;
 
-  return Either.mapLeft(resolveFeatureSelection(ids), (error) => new InstallError({ issue: error.message }));
+  return Either.mapLeft(addDependencies(ids), (error) => new InstallError({ issue: error.message }));
 };
 
 const resolveSelectedAgents = (
@@ -264,9 +72,7 @@ const resolveSelectedAgents = (
     return Either.left(new InstallError({ issue: "Agent selection contains duplicate IDs." }));
   }
 
-  const selectedIds = new Set(ids);
-
-  return Either.right(agentCatalog.filter((agent) => selectedIds.has(agent.id)));
+  return Either.right(agentCatalog.filter((agent) => ids.includes(agent.id)));
 };
 
 const resolveAgents = (request: InstallRequest): Either.Either<ReadonlyArray<AgentDefinition>, InstallError> => {
@@ -274,1635 +80,24 @@ const resolveAgents = (request: InstallRequest): Either.Either<ReadonlyArray<Age
     return resolveSelectedAgents(request.agents.ids);
   }
 
-  const detectedIds = classifyAgents(request.agents.evidence).flatMap((agent) => (agent.installed ? [agent.id] : []));
-
-  return resolveSelectedAgents(detectedIds);
-};
-
-const decodeSettings = (snapshot: FileSnapshot): Either.Either<DecodedSettings, InstallError> => {
-  if (snapshot._tag === "missing") {
-    return Either.right(decodedSettingsSchema.make({ source: "{}\n", document: {} }));
-  }
-
-  const decodedText = Either.try({
-    try: () => textDecoder.decode(snapshot.bytes),
-    catch: (error) => new InstallError({ issue: `settings.json is not strict UTF-8: ${formatUnknownError(error)}` }),
-  });
-
-  return Either.flatMap(decodedText, (source) => {
-    if (source.startsWith("\uFEFF")) {
-      return Either.left(new InstallError({ issue: "settings.json must not start with a UTF-8 byte-order mark." }));
-    }
-
-    const duplicateProperty = findDuplicateJsonProperty(source);
-    if (duplicateProperty !== undefined) {
-      return Either.left(
-        new InstallError({
-          issue: `settings.json contains duplicate JSON property ${JSON.stringify(duplicateProperty)}.`,
-        }),
-      );
-    }
-
-    return Either.mapLeft(
-      Schema.decodeUnknownEither(Schema.parseJson(settingsDocumentSchema), {
-        onExcessProperty: "preserve",
-      })(source),
-      (error) => new InstallError({ issue: `settings.json is invalid: ${formatParseError(error)}` }),
-    ).pipe(Either.map((document) => decodedSettingsSchema.make({ source, document })));
-  });
-};
-
-const hookEventFromPointer = (pointer: string): string | undefined => {
-  const prefix = "/hooks/";
-
-  return pointer.startsWith(prefix) && !pointer.slice(prefix.length).includes("/")
-    ? pointer.slice(prefix.length)
-    : undefined;
-};
-
-const previousHookGroups = (ownership: JsonValuesOwnership | undefined, event: string): PreviousJsonValue | undefined =>
-  ownership?.values.find((value) => value.pointer === `/hooks/${event}`)?.previous;
-
-const decodeHookGroups = (value: unknown, event: string): Either.Either<ReadonlyArray<unknown>, InstallError> =>
-  Either.mapLeft(
-    Schema.decodeUnknownEither(Schema.Array(Schema.Unknown))(value),
-    () => new InstallError({ issue: `settings.json hook event ${event} must contain an array.` }),
-  );
-
-const baseHookGroups = (input: {
-  ownership: JsonValuesOwnership | undefined;
-  document: SettingsDocument;
-  event: string;
-  source: string;
-}): Either.Either<{ groups: ReadonlyArray<unknown>; previous: PreviousJsonValue }, InstallError> => {
-  const history = previousHookGroups(input.ownership, input.event);
-  if (history?._tag === "value") {
-    if (history.lexical === undefined) {
-      return Either.left(
-        new InstallError({ issue: `Receipted hook event ${input.event} lacks lexical restoration evidence.` }),
-      );
-    }
-
-    return Either.map(decodeHookGroups(history.value, input.event), (groups) => ({ groups, previous: history }));
-  }
-
-  if (history?._tag === "missing") {
-    return Either.right({ groups: [], previous: history });
-  }
-
-  const current = input.document.hooks?.[input.event];
-  if (current === undefined) {
-    return Either.right({ groups: [], previous: { _tag: "missing" } });
-  }
-
-  const groups = decodeHookGroups(current, input.event);
-  if (Either.isLeft(groups)) {
-    return Either.left(groups.left);
-  }
-
-  const lexical = captureJsonValueLexical({ source: input.source, path: ["hooks", input.event] });
-
-  return Either.map(lexical, (sourceEvidence) => ({
-    groups: groups.right,
-    previous: { _tag: "value", value: groups.right, lexical: sourceEvidence },
-  }));
-};
-
-const decodeJsonPointerSegment = (segment: string): string => segment.replaceAll("~1", "/").replaceAll("~0", "~");
-
-const jsonPointerPath = (pointer: string): ReadonlyArray<string> =>
-  pointer.slice(1).split("/").map(decodeJsonPointerSegment);
-
-const settingsValueAtPointer = (document: SettingsDocument, pointer: string): unknown => {
-  const [container, key, extra] = jsonPointerPath(pointer);
-  if (extra !== undefined || key === undefined) {
-    return undefined;
-  }
-
-  if (container === "hooks") {
-    return document.hooks?.[key];
-  }
-
-  return container === "env" ? document.env?.[key] : undefined;
-};
-
-const installedJsonValueMatches = (value: OwnedJsonValue, current: unknown): boolean =>
-  value.installed._tag === "missing"
-    ? current === undefined
-    : current !== undefined && hashJsonValue(current) === value.installed.hash;
-
-const validateCurrentSettingsOwnership = (
-  document: SettingsDocument,
-  ownership: JsonValuesOwnership | undefined,
-): Either.Either<void, InstallError> => {
-  if (ownership === undefined) {
-    return Either.right(undefined);
-  }
-
-  const conflict = ownership.values.find((value) => {
-    const current = settingsValueAtPointer(document, value.pointer);
-
-    return !installedJsonValueMatches(value, current);
-  });
-
-  return conflict === undefined
-    ? Either.right(undefined)
-    : Either.left(
-        new InstallError({ issue: `Receipted settings value ${conflict.pointer} changed after installation.` }),
-      );
-};
-
-const settingsOperationSchema = (artifactPath: string) =>
-  artifactOperationSchema.pipe(
-    Schema.filter((operation) => {
-      const identityIssues = [
-        ...(operation.artifact.path === artifactPath
-          ? []
-          : [{ path: ["artifact", "path"], message: `Settings operations must target ${artifactPath}.` }]),
-        ...(operation.artifact.kind._tag === "settings"
-          ? []
-          : [{ path: ["artifact", "kind"], message: "Settings operations must use the settings artifact kind." }]),
-        ...(operation.artifact.owner._tag === "application"
-          ? []
-          : [{ path: ["artifact", "owner"], message: "Settings operations must use the application owner." }]),
-      ];
-      if (identityIssues.length > 0 || operation._tag === "remove") {
-        return identityIssues;
-      }
-
-      const decoded = decodeSettings({ _tag: "file", bytes: operation.bytes });
-      if (Either.isLeft(decoded)) {
-        return [...identityIssues, { path: ["bytes"], message: decoded.left.issue }];
-      }
-
-      if (operation._tag !== "write" || operation.artifact.ownership._tag !== "jsonValues") {
-        return identityIssues;
-      }
-
-      return [
-        ...identityIssues,
-        ...operation.artifact.ownership.values.flatMap((value, index) =>
-          installedJsonValueMatches(value, settingsValueAtPointer(decoded.right.document, value.pointer))
-            ? []
-            : [
-                {
-                  path: ["artifact", "ownership", "values", index],
-                  message: `Settings operation bytes do not match owned pointer ${value.pointer}.`,
-                },
-              ],
-        ),
-      ];
-    }),
-  );
-
-const validateSettingsOperation = (
-  input: unknown,
-  artifactPath = settingsPath,
-): Either.Either<ArtifactOperation, InstallError> =>
-  Either.mapLeft(
-    Schema.validateEither(settingsOperationSchema(artifactPath), {
-      onExcessProperty: "error",
-    })(input),
-    (error) => new InstallError({ issue: `Generated settings operation is invalid: ${formatParseError(error)}` }),
-  );
-
-const managedHookCommandSchema = Schema.Struct({
-  type: Schema.Literal("command").annotations({
-    description: "Claude hook leaf kind used for a spawned command.",
-  }),
-  command: Schema.NonEmptyString.annotations({
-    description: "Fully resolved command invoking one installed runtime entrypoint.",
-  }),
-});
-
-const managedHookGroupSchema = Schema.Struct({
-  matcher: Schema.optional(
-    Schema.NonEmptyString.annotations({
-      description: "Optional tool matcher copied from the feature registration.",
-    }),
-  ),
-  hooks: Schema.Tuple(managedHookCommandSchema).annotations({
-    description: "Single dufflebag-authored command leaf for this registration.",
-  }),
-});
-
-type ManagedHookGroup = Schema.Schema.Type<typeof managedHookGroupSchema>;
-
-const stagedRuntimeEntrypoint = (sourceEntrypoint: string): string => `${sourceEntrypoint.slice(0, -3)}.js`;
-
-const installedRuntimeFile = (sourceDirectory: string, filePath: string): string =>
-  `${runtimePath}/${sourceDirectory}/${filePath}`;
-
-const runtimeCommand = (input: {
-  root: string;
-  sourceDirectory: string;
-  sourceEntrypoint: string;
-  path: Path.Path;
-}): string => {
-  const installedEntrypoint = installedRuntimeFile(
-    input.sourceDirectory,
-    stagedRuntimeEntrypoint(input.sourceEntrypoint),
-  );
-
-  return `node "${input.path.join(input.root, installedEntrypoint)}"`;
-};
-
-const registrationSourceEntrypoint = (
-  feature: (typeof featureCatalog)[number],
-  registration: {
-    entrypoint: { _tag: "featureDefault" } | { _tag: "path"; value: string };
-  },
-): string => {
-  if (feature.runtime._tag !== "hook") {
-    return "";
-  }
-
-  return registration.entrypoint._tag === "path" ? registration.entrypoint.value : feature.runtime.sourceEntrypoint;
-};
-
-const desiredHookGroups = (input: {
-  root: string;
-  featureIds: ReadonlyArray<string>;
-  selectedAgents: ReadonlyArray<AgentDefinition>;
-  agent: AgentDefinition;
-  idleAutoCompact: string;
-  path: Path.Path;
-}) => {
-  if (
-    !input.selectedAgents.some((agent) => agent.id === input.agent.id) ||
-    input.agent.nativeHooks._tag === "unsupported"
-  ) {
-    return new Map<string, ReadonlyArray<ManagedHookGroup>>();
-  }
-  const nativeHooks = input.agent.nativeHooks;
-
-  const selectedIds = new Set(input.featureIds);
-  const groups = new Map<string, ReadonlyArray<ManagedHookGroup>>();
-
-  featureCatalog.forEach((feature) => {
-    if (!selectedIds.has(feature.id) || feature.runtime._tag === "none") {
-      return;
-    }
-
-    feature.runtime.registrations.forEach((registration) => {
-      const entrypoint = registrationSourceEntrypoint(feature, registration);
-      const executable = input.agent.detection.commands.at(0) || input.agent.id;
-      const runtime = runtimeCommand({
-        root: input.root,
-        sourceDirectory: feature.sourceDirectory,
-        sourceEntrypoint: entrypoint,
-        path: input.path,
-      });
-      const command =
-        feature.id === "speak-response"
-          ? `${runtime} --dufflebag-agent-id ${input.agent.id}`
-          : `DUFFLEBAG_AGENT_ID=${input.agent.id} DUFFLEBAG_AGENT_COMMAND=${executable} ` +
-            `DUFFLEBAG_COMPACT_COMMAND=${nativeHooks.compactCommand} ` +
-            `dufflebagIdleAutoCompact=${input.idleAutoCompact} ${runtime}`;
-      const group = managedHookGroupSchema.make({
-        ...(registration.matcher._tag === "pattern" ? { matcher: registration.matcher.value } : {}),
-        hooks: [{ type: "command", command }],
-      });
-      const current = groups.get(registration.event) || [];
-
-      groups.set(registration.event, [...current, group]);
-    });
-  });
-
-  return groups;
-};
-
-const propertyKey = (property: Node): string | undefined => {
-  const key = property.children?.[0];
-
-  return typeof key?.value === "string" ? key.value : undefined;
-};
-
-const objectProperties = (node: Node): ReadonlyArray<Node> => node.children || [];
-
-const commaBetween = (input: { source: string; start: number; end: number }): number | undefined => {
-  const offset = input.source.indexOf(",", input.start);
-
-  return offset >= input.start && offset < input.end ? offset : undefined;
-};
-
-const removeJsonProperty = (input: {
-  source: string;
-  parent: Node;
-  property: Node;
-}): Either.Either<string, InstallError> => {
-  const properties = objectProperties(input.parent);
-  const index = properties.indexOf(input.property);
-  const previous = properties[index - 1];
-  const next = properties[index + 1];
-
-  if (next !== undefined) {
-    const comma = commaBetween({
-      source: input.source,
-      start: input.property.offset + input.property.length,
-      end: next.offset,
-    });
-    if (comma === undefined) {
-      return Either.left(
-        new InstallError({ issue: "settings.json property separators could not be preserved safely." }),
-      );
-    }
-
-    return Either.right(input.source.slice(0, input.property.offset) + input.source.slice(comma + 1));
-  }
-
-  if (previous !== undefined) {
-    const comma = commaBetween({
-      source: input.source,
-      start: previous.offset + previous.length,
-      end: input.property.offset,
-    });
-    if (comma === undefined) {
-      return Either.left(
-        new InstallError({ issue: "settings.json property separators could not be preserved safely." }),
-      );
-    }
-
-    return Either.right(
-      input.source.slice(0, comma) + input.source.slice(input.property.offset + input.property.length),
-    );
-  }
-
-  return Either.right(
-    input.source.slice(0, input.property.offset) + input.source.slice(input.property.offset + input.property.length),
+  return resolveSelectedAgents(
+    detectAgents(request.agents.evidence).flatMap((agent) => (agent.installed ? [agent.id] : [])),
   );
 };
 
-const editJsonValue = (input: {
-  source: string;
-  path: ReadonlyArray<string>;
-  value: unknown;
-}): Either.Either<string, InstallError> => {
-  const root = parseTree(input.source);
-  const key = input.path.at(-1);
-  const parent = root === undefined ? undefined : findNodeAtLocation(root, input.path.slice(0, -1));
-  if (root === undefined || key === undefined || parent?.type !== "object") {
-    return Either.left(
-      new InstallError({ issue: `settings.json path /${input.path.join("/")} is not an editable object property.` }),
-    );
-  }
-
-  const properties = objectProperties(parent);
-  const property = properties.find((candidate) => propertyKey(candidate) === key);
-  if (property !== undefined) {
-    if (input.value === undefined) {
-      return removeJsonProperty({ source: input.source, parent, property });
-    }
-
-    const currentValue = property.children?.[1];
-    if (currentValue === undefined) {
-      return Either.left(new InstallError({ issue: `settings.json property ${key} has no value.` }));
-    }
-
-    const encoded = Schema.encodeSync(jsonValueSchema)(input.value);
-    return Either.right(
-      input.source.slice(0, currentValue.offset) +
-        encoded +
-        input.source.slice(currentValue.offset + currentValue.length),
-    );
-  }
-
-  if (input.value === undefined) {
-    return Either.right(input.source);
-  }
-
-  const previous = properties.at(-1);
-  const previousKey = previous?.children?.[0];
-  const previousValue = previous?.children?.[1];
-  const keyValueSeparator =
-    previousKey === undefined || previousValue === undefined
-      ? ":"
-      : input.source.slice(previousKey.offset + previousKey.length, previousValue.offset);
-  const encodedProperty = `${JSON.stringify(key)}${keyValueSeparator}${Schema.encodeSync(jsonValueSchema)(input.value)}`;
-  const offset = previous === undefined ? parent.offset + 1 : previous.offset + previous.length;
-  const closingOffset = parent.offset + parent.length - 1;
-  const closingWhitespace = previous === undefined ? "" : input.source.slice(offset, closingOffset);
-  const prefix = previous === undefined ? "" : `,${closingWhitespace}`;
-
-  return Either.right(input.source.slice(0, offset) + prefix + encodedProperty + input.source.slice(offset));
-};
-
-const jsonPropertyAtPath = (input: {
-  source: string;
-  path: ReadonlyArray<string>;
-}): Either.Either<{ parent: Node; property: Node }, InstallError> => {
-  const root = parseTree(input.source);
-  const key = input.path.at(-1);
-  const parent = root === undefined ? undefined : findNodeAtLocation(root, input.path.slice(0, -1));
-  const property =
-    parent?.type === "object" && key !== undefined
-      ? objectProperties(parent).find((candidate) => propertyKey(candidate) === key)
-      : undefined;
-
-  return property === undefined || parent === undefined
-    ? Either.left(new InstallError({ issue: `settings.json property /${input.path.join("/")} could not be located.` }))
-    : Either.right({ parent, property });
-};
-
-const captureJsonValueLexical = (input: {
-  source: string;
-  path: ReadonlyArray<string>;
-}): Either.Either<PreviousJsonLexical, InstallError> => {
-  const located = jsonPropertyAtPath(input);
-  if (Either.isLeft(located)) {
-    return Either.left(located.left);
-  }
-
-  const value = located.right.property.children?.[1];
-
-  return value === undefined
-    ? Either.left(new InstallError({ issue: `settings.json property /${input.path.join("/")} has no value.` }))
-    : Either.right({
-        _tag: "value",
-        source: input.source.slice(value.offset, value.offset + value.length),
-      });
-};
-
-const removeJsonPropertyWithLexical = (input: {
-  source: string;
-  path: ReadonlyArray<string>;
-}): Either.Either<{ source: string; lexical: PreviousJsonLexical }, InstallError> => {
-  const located = jsonPropertyAtPath(input);
-  if (Either.isLeft(located)) {
-    return Either.left(located.left);
-  }
-
-  const { parent, property } = located.right;
-  const properties = objectProperties(parent);
-  const index = properties.indexOf(property);
-  const previous = properties[index - 1];
-  const next = properties[index + 1];
-  const propertySource = input.source.slice(property.offset, property.offset + property.length);
-
-  if (next !== undefined) {
-    const separator = input.source.slice(property.offset + property.length, next.offset);
-    const comma = commaBetween({ source: separator, start: 0, end: separator.length });
-    const nextKey = propertyKey(next);
-    if (comma === undefined || nextKey === undefined) {
-      return Either.left(
-        new InstallError({ issue: "settings.json next-property evidence could not be captured safely." }),
-      );
-    }
-
-    return Either.right({
-      source: input.source.slice(0, property.offset) + input.source.slice(next.offset),
-      lexical: { _tag: "beforeProperty", property: propertySource, separator, nextKey },
-    });
-  }
-
-  if (previous !== undefined) {
-    const separator = input.source.slice(previous.offset + previous.length, property.offset);
-    const comma = commaBetween({ source: separator, start: 0, end: separator.length });
-    const previousKey = propertyKey(previous);
-    if (comma === undefined || previousKey === undefined) {
-      return Either.left(
-        new InstallError({ issue: "settings.json previous-property evidence could not be captured safely." }),
-      );
-    }
-
-    return Either.right({
-      source:
-        input.source.slice(0, previous.offset + previous.length) +
-        input.source.slice(property.offset + property.length),
-      lexical: { _tag: "afterProperty", previousKey, separator, property: propertySource },
-    });
-  }
-
-  const parentStart = parent.offset + 1;
-  const parentEnd = parent.offset + parent.length - 1;
-
-  return Either.right({
-    source: input.source.slice(0, property.offset) + input.source.slice(property.offset + property.length),
-    lexical: {
-      _tag: "onlyProperty",
-      prefix: input.source.slice(parentStart, property.offset),
-      property: propertySource,
-      suffix: input.source.slice(property.offset + property.length, parentEnd),
-    },
-  });
-};
-
-const restoreJsonLexical = (input: {
-  source: string;
-  path: ReadonlyArray<string>;
-  lexical: PreviousJsonLexical;
-}): Either.Either<string, InstallError> => {
-  const lexical = input.lexical;
-
-  if (lexical._tag === "value") {
-    const located = jsonPropertyAtPath(input);
-    if (Either.isLeft(located)) {
-      return Either.left(located.left);
-    }
-
-    const value = located.right.property.children?.[1];
-
-    return value === undefined
-      ? Either.left(new InstallError({ issue: `settings.json property /${input.path.join("/")} has no value.` }))
-      : Either.right(
-          input.source.slice(0, value.offset) + lexical.source + input.source.slice(value.offset + value.length),
-        );
-  }
-
-  const root = parseTree(input.source);
-  const parentPath = input.path.slice(0, -1);
-  const parent = root === undefined ? undefined : findNodeAtLocation(root, parentPath);
-  const key = input.path.at(-1);
-  if (parent?.type !== "object" || key === undefined) {
-    return Either.left(
-      new InstallError({ issue: `Settings parent /${parentPath.join("/")} cannot be restored safely.` }),
-    );
-  }
-
-  const properties = objectProperties(parent);
-  if (properties.some((property) => propertyKey(property) === key)) {
-    return Either.left(new InstallError({ issue: `Settings property /${input.path.join("/")} unexpectedly exists.` }));
-  }
-
-  if (lexical._tag === "beforeProperty") {
-    const next = properties.find((property) => propertyKey(property) === lexical.nextKey);
-
-    return next === undefined
-      ? Either.left(new InstallError({ issue: `Settings restoration anchor ${lexical.nextKey} is missing.` }))
-      : Either.right(
-          input.source.slice(0, next.offset) + lexical.property + lexical.separator + input.source.slice(next.offset),
-        );
-  }
-
-  if (lexical._tag === "afterProperty") {
-    const previous = properties.find((property) => propertyKey(property) === lexical.previousKey);
-
-    return previous === undefined
-      ? Either.left(new InstallError({ issue: `Settings restoration anchor ${lexical.previousKey} is missing.` }))
-      : Either.right(
-          input.source.slice(0, previous.offset + previous.length) +
-            lexical.separator +
-            lexical.property +
-            input.source.slice(previous.offset + previous.length),
-        );
-  }
-
-  const parentStart = parent.offset + 1;
-  const parentEnd = parent.offset + parent.length - 1;
-  const currentInterior = input.source.slice(parentStart, parentEnd);
-  if (properties.length > 0 || currentInterior !== lexical.prefix + lexical.suffix) {
-    return Either.left(
-      new InstallError({ issue: `Settings sole-property framing changed at /${parentPath.join("/")}.` }),
-    );
-  }
-
-  return Either.right(
-    input.source.slice(0, parentStart) +
-      lexical.prefix +
-      lexical.property +
-      lexical.suffix +
-      input.source.slice(parentEnd),
-  );
-};
-
-const decodeGeneratedSettings = (source: string): Either.Either<SettingsDocument, InstallError> =>
-  Either.mapLeft(
-    Schema.decodeUnknownEither(Schema.parseJson(settingsDocumentSchema), {
-      onExcessProperty: "preserve",
-    })(source),
-    (error) => new InstallError({ issue: `Generated settings.json is invalid: ${formatParseError(error)}` }),
-  );
-
-const legacyOwnershipValues = (input: {
-  snapshot: FileSnapshot;
-  decoded: DecodedSettings;
-  legacySettings: LegacySettingsPlan;
-}): Either.Either<ReadonlyArray<{ pointer: string; value: unknown }>, InstallError> => {
-  if (input.legacySettings._tag === "none") {
-    return Either.right([]);
-  }
-
-  if (input.snapshot._tag !== "file" || !bytesEqual(input.snapshot.bytes, input.legacySettings.originalBytes)) {
-    return Either.left(
-      new InstallError({ issue: "Legacy settings evidence does not match the inspected settings bytes." }),
-    );
-  }
-
-  return Either.all(
-    input.legacySettings.values.map((evidence) => {
-      const current = settingsValueAtPointer(input.decoded.document, evidence.pointer);
-      if (current === undefined || hashJsonValue(current) !== evidence.currentValueHash) {
-        return Either.left(
-          new InstallError({
-            issue: `Legacy settings value ${evidence.pointer} changed after configuration planning.`,
-          }),
-        );
-      }
-
-      return Either.right({ pointer: evidence.pointer, value: current });
-    }),
-  );
-};
-
-const retainedDeletedSettingsValues = (
-  previous: JsonValuesOwnership | undefined,
-  legacy: ReadonlyArray<OwnedJsonValue>,
-): ReadonlyArray<OwnedJsonValue> => {
-  const retained = previous?.values.filter((value) => value.installed._tag === "missing") || [];
-
-  return [...retained, ...legacy.filter((value) => !retained.some((candidate) => candidate.pointer === value.pointer))];
-};
-
-const planSettings = (input: {
-  artifactPath?: string;
-  snapshot: FileSnapshot;
-  decoded: DecodedSettings;
-  previousArtifact: ReceiptEntry | undefined;
-  desiredGroups: ReadonlyMap<string, ReadonlyArray<ManagedHookGroup>>;
-  legacySettings: LegacySettingsPlan;
-}): Either.Either<ArtifactOperation | undefined, InstallError> => {
-  const artifactPath = input.artifactPath === undefined ? settingsPath : input.artifactPath;
-  const previousOwnership =
-    input.previousArtifact?.ownership._tag === "jsonValues" ? input.previousArtifact.ownership : undefined;
-  if (
-    input.previousArtifact !== undefined &&
-    (input.previousArtifact.path !== artifactPath ||
-      input.previousArtifact.kind._tag !== "settings" ||
-      input.previousArtifact.owner._tag !== "application" ||
-      previousOwnership === undefined)
-  ) {
-    return Either.left(
-      new InstallError({ issue: "Receipted settings entry must keep its exact path, kind, and application owner." }),
-    );
-  }
-
-  if (previousOwnership !== undefined && input.snapshot._tag === "missing") {
-    return Either.left(new InstallError({ issue: "Receipted settings.json was removed after installation." }));
-  }
-
-  const currentOwnership = validateCurrentSettingsOwnership(input.decoded.document, previousOwnership);
-  if (Either.isLeft(currentOwnership)) {
-    return Either.left(currentOwnership.left);
-  }
-
-  const legacyCandidates = legacyOwnershipValues(input);
-  if (Either.isLeft(legacyCandidates)) {
-    return Either.left(legacyCandidates.left);
-  }
-
-  let source = input.decoded.source;
-  const legacyValues: Array<OwnedJsonValue> = [];
-
-  // Remove only the exact legacy pointers proven by Task 8 evidence.
-  for (const candidate of legacyCandidates.right) {
-    const removed = removeJsonPropertyWithLexical({
-      source,
-      path: jsonPointerPath(candidate.pointer),
-    });
-    if (Either.isLeft(removed)) {
-      return Either.left(removed.left);
-    }
-
-    source = removed.right.source;
-    legacyValues.push({
-      pointer: candidate.pointer,
-      installed: { _tag: "missing" },
-      previous: { _tag: "value", value: candidate.value, lexical: removed.right.lexical },
-    });
-  }
-
-  let previousEvents: ReadonlyArray<string> = [];
-  if (previousOwnership !== undefined) {
-    previousEvents = previousOwnership.values.flatMap((value) => {
-      const event = hookEventFromPointer(value.pointer);
-
-      return event === undefined ? [] : [event];
-    });
-  }
-  const removedEvents = previousEvents.filter((event) => !input.desiredGroups.has(event)).reverse();
-  const events = [...new Set([...removedEvents, ...input.desiredGroups.keys()])];
-  const createdHooksContainer =
-    previousOwnership?.createdContainers.includes("/hooks") === true ||
-    (input.decoded.document.hooks === undefined && input.desiredGroups.size > 0);
-  const ownershipValues: Array<OwnedJsonValue> = [...retainedDeletedSettingsValues(previousOwnership, legacyValues)];
-
-  if (input.decoded.document.hooks === undefined && input.desiredGroups.size > 0) {
-    const edited = editJsonValue({ source, path: ["hooks"], value: {} });
-    if (Either.isLeft(edited)) {
-      return Either.left(edited.left);
-    }
-
-    source = edited.right;
-  }
-
-  // Restore removed events and materialize every desired event from its original value plus catalog hook groups.
-  for (const event of events) {
-    const base = baseHookGroups({
-      ownership: previousOwnership,
-      document: input.decoded.document,
-      event,
-      source,
-    });
-    if (Either.isLeft(base)) {
-      return Either.left(base.left);
-    }
-
-    const desired = input.desiredGroups.get(event);
-    const value = desired === undefined ? undefined : [...base.right.groups, ...desired];
-    let edited: Either.Either<string, InstallError>;
-    if (desired === undefined && base.right.previous._tag === "value" && base.right.previous.lexical !== undefined) {
-      edited = restoreJsonLexical({ source, path: ["hooks", event], lexical: base.right.previous.lexical });
-    } else {
-      edited = editJsonValue({
-        source,
-        path: ["hooks", event],
-        value: desired === undefined ? undefined : value,
-      });
-    }
-    if (Either.isLeft(edited)) {
-      return Either.left(edited.left);
-    }
-
-    source = edited.right;
-    if (desired !== undefined) {
-      ownershipValues.push({
-        pointer: `/hooks/${event}`,
-        installed: { _tag: "value", hash: hashJsonValue(value) },
-        previous: base.right.previous,
-      });
-    }
-  }
-
-  let mergedDocument = decodeGeneratedSettings(source);
-  if (Either.isLeft(mergedDocument)) {
-    return Either.left(mergedDocument.left);
-  }
-
-  if (
-    createdHooksContainer &&
-    mergedDocument.right.hooks !== undefined &&
-    Object.keys(mergedDocument.right.hooks).length === 0
-  ) {
-    const edited = editJsonValue({ source, path: ["hooks"], value: undefined });
-    if (Either.isLeft(edited)) {
-      return Either.left(edited.left);
-    }
-
-    source = edited.right;
-    mergedDocument = decodeGeneratedSettings(source);
-    if (Either.isLeft(mergedDocument)) {
-      return Either.left(mergedDocument.left);
-    }
-  }
-
-  if (ownershipValues.length === 0) {
-    if (input.previousArtifact === undefined) {
-      return Either.right(undefined);
-    }
-
-    const removeFile = !previousOwnership?.filePreviouslyPresent && Object.keys(mergedDocument.right).length === 0;
-    const operation = removeFile
-      ? {
-          _tag: "remove",
-          artifact: input.previousArtifact,
-          unownedBytes: new Uint8Array(),
-          expectedCurrent: expectedCurrent(input.snapshot),
-        }
-      : {
-          _tag: "restore",
-          artifact: input.previousArtifact,
-          bytes: textEncoder.encode(source),
-          expectedCurrent: expectedCurrent(input.snapshot),
-        };
-
-    return validateSettingsOperation(operation, artifactPath);
-  }
-
-  const containerCandidates = [
-    ...(previousOwnership?.createdContainers || []),
-    ...(createdHooksContainer ? ["/hooks"] : []),
-  ];
-  const createdContainers = containerCandidates.filter(
-    (container, index) =>
-      containerCandidates.indexOf(container) === index &&
-      ownershipValues.some((value) => value.pointer.startsWith(`${container}/`)),
-  );
-
-  const ownership: JsonValuesOwnership = {
-    _tag: "jsonValues",
-    filePreviouslyPresent:
-      previousOwnership === undefined ? input.snapshot._tag === "file" : previousOwnership.filePreviouslyPresent,
-    createdContainers,
-    values: ownershipValues,
-  };
-  const operation = {
-    _tag: "write",
-    artifact: {
-      owner: applicationOwner,
-      path: artifactPath,
-      kind: { _tag: "settings" },
-      ownership,
-    },
-    bytes: textEncoder.encode(source),
-    expectedCurrent: expectedCurrent(input.snapshot),
-  };
-
-  const mismatchedValue = ownership.values.find((ownedValue) => {
-    const value = settingsValueAtPointer(mergedDocument.right, ownedValue.pointer);
-
-    return !installedJsonValueMatches(ownedValue, value);
-  });
-
-  if (mismatchedValue !== undefined) {
-    return Either.left(
-      new InstallError({ issue: `Generated settings ownership drifted at ${mismatchedValue.pointer}.` }),
-    );
-  }
-
-  return validateSettingsOperation(operation, artifactPath);
-};
-
-const readStagedFiles = (directory: string) =>
-  Effect.gen(function* () {
-    const fileSystem = yield* FileSystem.FileSystem;
-    const path = yield* Path.Path;
-    const entries = (yield* fileSystem.readDirectory(directory, { recursive: true })).sort();
-    const files = yield* Effect.forEach(entries, (entry) =>
-      Effect.gen(function* () {
-        const sourcePath = path.join(directory, entry);
-        const stagedEntry = yield* fileSystem.stat(sourcePath);
-        if (stagedEntry.type === "Directory") {
-          return Option.none<StagedRuntimeFile>();
-        }
-
-        if (stagedEntry.type !== "File") {
-          return yield* new InstallError({ issue: `Staged path ${sourcePath} must be a regular file.` });
-        }
-
-        return Option.some({ path: entry.replaceAll("\\", "/"), bytes: yield* fileSystem.readFile(sourcePath) });
-      }),
-    );
-
-    return files.flatMap((file) => (Option.isSome(file) ? [file.value] : []));
-  });
-
-const createRuntimeWrites = (input: {
-  request: InstallRequest;
-  featureIds: ReadonlyArray<string>;
-  previousReceipt: ArtifactReceipt | undefined;
-}) =>
-  Effect.gen(function* () {
-    const path = yield* Path.Path;
-    const selectedIds = new Set(input.featureIds);
-    const runtimeFeatures = featureCatalog.filter(
-      (feature) => selectedIds.has(feature.id) && feature.runtime._tag === "hook",
-    );
-    const writes = yield* Effect.forEach(runtimeFeatures, (feature) =>
-      Effect.gen(function* () {
-        if (feature.runtime._tag === "none") {
-          return [];
-        }
-
-        const directory = path.join(input.request.stagedPackage.root, "runtime", feature.sourceDirectory);
-        const files = yield* readStagedFiles(directory);
-        const entrypoints = feature.runtime.registrations.map((registration) =>
-          stagedRuntimeEntrypoint(registrationSourceEntrypoint(feature, registration)),
-        );
-        // Prove every registration entrypoint is present in the staged feature tree.
-        for (const entrypoint of entrypoints) {
-          if (!files.some((file) => file.path === entrypoint)) {
-            return yield* new InstallError({
-              issue: `Staged runtime entrypoint is missing: ${feature.sourceDirectory}/${entrypoint}`,
-            });
-          }
-        }
-
-        return yield* Effect.forEach(files, (file) =>
-          Effect.gen(function* () {
-            const artifactPath = installedRuntimeFile(feature.sourceDirectory, file.path);
-            const snapshot = yield* readFileSnapshot(path.join(input.request.destination.root, artifactPath));
-            const previous = yield* effectFromEither(
-              previousWholeFile({
-                receipt: input.previousReceipt,
-                artifactPath,
-                snapshot,
-                desiredBytes: file.bytes,
-              }),
-            );
-
-            return yield* effectFromEither(
-              validateArtifactOperation({
-                _tag: "write",
-                artifact: {
-                  owner: applicationOwner,
-                  path: artifactPath,
-                  kind: { _tag: "runtime" },
-                  ownership: {
-                    _tag: "wholeFile",
-                    installedHash: hashBytes(file.bytes),
-                    previous,
-                  },
-                },
-                bytes: file.bytes,
-                expectedCurrent: expectedCurrent(snapshot),
-              }),
-            );
-          }),
-        );
-      }),
-    );
-
-    return writes.flat();
-  });
-
-const decodeStagedMarkdown = (bytes: Uint8Array, filePath: string): Either.Either<string, InstallError> => {
-  const decoded = Either.try({
-    try: () => textDecoder.decode(bytes),
-    catch: (error) => new InstallError({ issue: `${filePath} is not strict UTF-8: ${formatUnknownError(error)}` }),
-  });
-
-  return Either.flatMap(decoded, (markdown) =>
-    markdown.startsWith("\uFEFF")
-      ? Either.left(new InstallError({ issue: `${filePath} must not start with a UTF-8 byte-order mark.` }))
-      : Either.right(markdown),
-  );
-};
-
-const readStagedSkills = (input: {
-  request: InstallRequest;
-  featureIds: ReadonlyArray<Schema.Schema.Type<typeof featureIdSchema>>;
-}) =>
-  Effect.gen(function* () {
-    const path = yield* Path.Path;
-    const skills = installedSkillsFor(input.featureIds);
-
-    return yield* Effect.forEach(skills, (installedSkill) =>
-      Effect.gen(function* () {
-        const directory = path.join(input.request.stagedPackage.root, "skills", installedSkill.id);
-        const sourceFiles = yield* readStagedFiles(directory);
-        const skillFile = sourceFiles.find((file) => file.path === "SKILL.md");
-        if (skillFile === undefined) {
-          return yield* new InstallError({ issue: `Staged skill ${installedSkill.id} is missing SKILL.md.` });
-        }
-
-        const markdown = yield* effectFromEither(
-          decodeStagedMarkdown(skillFile.bytes, path.join(directory, "SKILL.md")),
-        );
-
-        return yield* Schema.validate(stagedInstalledSkillSchema, {
-          onExcessProperty: "error",
-        })({ installedSkill, sourceFiles, markdown }).pipe(
-          Effect.mapError(
-            (error) =>
-              new InstallError({ issue: `Staged skill ${installedSkill.id} is invalid: ${formatParseError(error)}` }),
-          ),
-        );
-      }),
-    );
-  });
-
-const inspectArtifacts = (root: string, artifactPaths: ReadonlyArray<string>) =>
-  Effect.gen(function* () {
-    const path = yield* Path.Path;
-
-    return yield* Effect.forEach(
-      artifactPaths,
-      (artifactPath): Effect.Effect<InspectedArtifact, PlatformError, FileSystem.FileSystem> =>
-        readFileSnapshot(path.join(root, artifactPath)).pipe(
-          Effect.map((snapshot) => ({ path: artifactPath, snapshot })),
-        ),
-    );
-  });
-
-const inspectedSnapshot = (
-  inspected: ReadonlyArray<InspectedArtifact>,
-  artifactPath: string,
-): Either.Either<FileSnapshot, InstallError> => {
-  const found = inspected.find((artifact) => artifact.path === artifactPath);
-
-  return found === undefined
-    ? Either.left(new InstallError({ issue: `Missing inspected state for ${artifactPath}.` }))
-    : Either.right(found.snapshot);
-};
-
-// A receipted file whose current bytes are exactly the bytes this install is about to write is
-// adopted instead of refused: an external skill sync can reproduce our own content, and rewriting
-// identical bytes can destroy nothing. Callers that cannot name their desired bytes stay strict.
-const previousWholeFile = (input: {
-  receipt: ArtifactReceipt | undefined;
-  artifactPath: string;
-  snapshot: FileSnapshot;
-  desiredBytes?: Uint8Array;
-}): Either.Either<PreviousFileValue, InstallError> => {
-  const artifact = previousReceiptArtifact(input.receipt, input.artifactPath);
-  if (artifact === undefined) {
-    return Either.right(previousFile(input.snapshot));
-  }
-
-  if (artifact.ownership._tag !== "wholeFile") {
-    return Either.left(
-      new InstallError({ issue: `Receipted whole-file artifact ${input.artifactPath} has incompatible ownership.` }),
-    );
-  }
-
-  const snapshot = input.snapshot;
-  const installedContent = snapshot._tag === "file" && hashBytes(snapshot.bytes) === artifact.ownership.installedHash;
-  const desiredContent =
-    snapshot._tag === "file" && input.desiredBytes !== undefined && bytesEqual(snapshot.bytes, input.desiredBytes);
-  if (!installedContent && !desiredContent) {
-    return Either.left(
-      new InstallError({ issue: `Receipted whole-file artifact ${input.artifactPath} changed after installation.` }),
-    );
-  }
-
-  return Either.right(artifact.ownership.previous);
-};
-
-const guardHandlerOperations = (
-  operations: ReadonlyArray<unknown>,
-  inspected: ReadonlyArray<InspectedArtifact>,
-): Either.Either<ReadonlyArray<ArtifactOperation>, InstallError> =>
-  Either.all(
-    operations.map((operation) => {
-      if (!Predicate.isRecord(operation)) {
-        return Either.left(new InstallError({ issue: "Format handler returned a non-object operation." }));
-      }
-
-      const artifact = Schema.decodeUnknownEither(
-        Schema.Struct(
-          { artifact: Schema.Struct({ path: Schema.String }) },
-          Schema.Record({ key: Schema.String, value: Schema.Unknown }),
-        ),
-        { onExcessProperty: "preserve" },
-      )(operation);
-      if (Either.isLeft(artifact)) {
-        return Either.left(
-          new InstallError({
-            issue: `Format handler returned an invalid operation: ${formatParseError(artifact.left)}`,
-          }),
-        );
-      }
-
-      return Either.flatMap(inspectedSnapshot(inspected, artifact.right.artifact.path), (snapshot) =>
-        validateArtifactOperation({
-          ...operation,
-          expectedCurrent: expectedCurrent(snapshot),
-        }),
-      );
-    }),
-  );
-
-const mapFormatError = <Value>(installation: Either.Either<Value, unknown>): Either.Either<Value, InstallError> =>
-  Either.mapLeft(installation, toInstallError);
-
-const controlPath = (root: string, path: Path.Path): Either.Either<string, InstallError> => {
-  // Loop control lives under context-guard (ctxLoopCtl), not the skill-only autorun feature.
-  const feature = featureCatalog.find((candidate) => candidate.id === "context-guard");
-  if (feature?.runtime._tag !== "hook") {
-    return Either.left(
-      new InstallError({ issue: "The context-guard catalog feature must declare one runtime entrypoint." }),
-    );
-  }
-
-  return Either.right(path.join(root, installedRuntimeFile(feature.sourceDirectory, "hooks/ctxLoopCtl.js")));
-};
-
-const createSkillDirectoryWrites = (input: {
-  request: InstallRequest;
-  agent: AgentDefinition;
-  stagedSkills: ReadonlyArray<StagedInstalledSkill>;
-  previousReceipt: ArtifactReceipt | undefined;
-  ctl: string;
-}) =>
-  Effect.gen(function* () {
-    if (input.agent.target._tag !== "skillDirectory") {
-      return [];
-    }
-
-    const target = input.agent.target;
-    const desired = new Map(
-      input.stagedSkills.flatMap((skill) =>
-        skill.sourceFiles.map((file): [string, Uint8Array] => [
-          `${target.path}/${skill.installedSkill.id}/${file.path}`,
-          renderSkillBytes(file.bytes, input.ctl),
-        ]),
-      ),
-    );
-    const inspected = yield* inspectArtifacts(input.request.destination.root, [...desired.keys()]);
-    const previousFiles = yield* Effect.forEach(inspected, (artifact) =>
-      effectFromEither(
-        previousWholeFile({
-          receipt: input.previousReceipt,
-          artifactPath: artifact.path,
-          snapshot: artifact.snapshot,
-          desiredBytes: desired.get(artifact.path),
-        }),
-      ).pipe(Effect.map((previous) => ({ path: artifact.path, previous }))),
-    );
-    const plan = yield* effectFromEither(
-      mapFormatError(
-        planSkillDirectory({
-          agent: input.agent,
-          ctl: input.ctl,
-          skills: input.stagedSkills.map((skill) => ({
-            installedSkill: skill.installedSkill,
-            sourceFiles: skill.sourceFiles,
-          })),
-          previousFiles,
-        }),
-      ),
-    );
-
-    return yield* effectFromEither(guardHandlerOperations(plan.writes, inspected));
-  });
-
-const createRuleFileWrites = (input: {
-  request: InstallRequest;
-  agent: AgentDefinition;
-  stagedSkills: ReadonlyArray<StagedInstalledSkill>;
-  previousReceipt: ArtifactReceipt | undefined;
-  ctl: string;
-}) =>
-  Effect.gen(function* () {
-    if (input.agent.target._tag !== "ruleFile") {
-      return [];
-    }
-
-    const target = input.agent.target;
-    const paths = input.stagedSkills.map(
-      (skill) => `${target.directory}/${skill.installedSkill.id}${target.extension}`,
-    );
-    const inspected = yield* inspectArtifacts(input.request.destination.root, paths);
-    const previousFiles = yield* Effect.forEach(inspected, (artifact) =>
-      effectFromEither(
-        previousWholeFile({
-          receipt: input.previousReceipt,
-          artifactPath: artifact.path,
-          snapshot: artifact.snapshot,
-        }),
-      ).pipe(Effect.map((previous) => ({ path: artifact.path, previous }))),
-    );
-    const plan = yield* effectFromEither(
-      mapFormatError(
-        planRuleFiles({
-          agent: input.agent,
-          ctl: input.ctl,
-          skills: input.stagedSkills.map((skill) => ({
-            installedSkill: skill.installedSkill,
-            markdown: skill.markdown,
-          })),
-          previousFiles,
-        }),
-      ),
-    );
-
-    return yield* effectFromEither(guardHandlerOperations(plan.writes, inspected));
-  });
-
-const instructionPathForAgent = (agent: AgentDefinition): string | undefined => {
-  if (agent.target._tag === "instructionFile") {
-    return agent.target.path;
-  }
-
-  return agent.target._tag === "configReference" ? agent.target.instructionPath : undefined;
-};
-
-const createInstructionWrites = (input: {
-  request: InstallRequest;
-  selectedAgents: ReadonlyArray<AgentDefinition>;
-  stagedSkills: ReadonlyArray<StagedInstalledSkill>;
-  previousReceipt: ArtifactReceipt | undefined;
-  ctl: string;
-}) =>
-  Effect.gen(function* () {
-    if (input.stagedSkills.length === 0) {
-      return [];
-    }
-
-    const candidatePaths = input.selectedAgents.flatMap((agent) => {
-      const artifactPath = instructionPathForAgent(agent);
-
-      return artifactPath === undefined ? [] : [artifactPath];
-    });
-    const instructionPaths = candidatePaths.filter(
-      (artifactPath, index) => candidatePaths.indexOf(artifactPath) === index,
-    );
-    const path = yield* Path.Path;
-    const operations = yield* Effect.forEach(instructionPaths, (artifactPath) =>
-      Effect.gen(function* () {
-        const owners = input.selectedAgents.filter((agent) => instructionPathForAgent(agent) === artifactPath);
-        const snapshot = yield* readFileSnapshot(path.join(input.request.destination.root, artifactPath));
-        const previousArtifact = previousReceiptArtifact(input.previousReceipt, artifactPath);
-        if (previousArtifact !== undefined && previousArtifact.kind._tag !== "instruction") {
-          return yield* new InstallError({
-            issue: `Receipted instruction path ${artifactPath} has an incompatible artifact kind.`,
-          });
-        }
-
-        const plan = yield* effectFromEither(
-          mapFormatError(
-            planInstructionFile({
-              path: artifactPath,
-              desired: {
-                _tag: "present",
-                agentIds: owners.map((agent) => agent.id),
-                skills: input.stagedSkills.map((skill) => ({
-                  installedSkill: skill.installedSkill,
-                  markdown: skill.markdown,
-                })),
-                ctl: input.ctl,
-              },
-              currentFile: snapshot._tag === "missing" ? { _tag: "missing" } : { _tag: "file", bytes: snapshot.bytes },
-              previousArtifact:
-                previousArtifact === undefined ? { _tag: "missing" } : { _tag: "owned", artifact: previousArtifact },
-            }),
-          ),
-        );
-        if (plan._tag === "none") {
-          return [];
-        }
-
-        return [
-          yield* effectFromEither(validateArtifactOperation({ ...plan, expectedCurrent: expectedCurrent(snapshot) })),
-        ];
-      }),
-    );
-
-    return operations.flat();
-  });
-
-const createConfigReferenceWrites = (input: {
-  request: InstallRequest;
-  selectedAgents: ReadonlyArray<AgentDefinition>;
-  stagedSkills: ReadonlyArray<StagedInstalledSkill>;
-  previousReceipt: ArtifactReceipt | undefined;
-}) =>
-  Effect.gen(function* () {
-    if (input.stagedSkills.length === 0) {
-      return [];
-    }
-
-    const path = yield* Path.Path;
-    const agents = input.selectedAgents.filter((agent) => agent.target._tag === "configReference");
-    const operations = yield* Effect.forEach(agents, (agent) =>
-      Effect.gen(function* () {
-        if (agent.target._tag !== "configReference") {
-          return [];
-        }
-
-        const snapshot = yield* readFileSnapshot(path.join(input.request.destination.root, agent.target.configPath));
-        const previousArtifact = previousReceiptArtifact(input.previousReceipt, agent.target.configPath);
-        if (previousArtifact !== undefined && previousArtifact.kind._tag !== "configReference") {
-          return yield* new InstallError({
-            issue: `Receipted native config path ${agent.target.configPath} has an incompatible artifact kind.`,
-          });
-        }
-
-        const plan = yield* effectFromEither(
-          mapFormatError(
-            planConfigReference({
-              agent,
-              desired: { _tag: "present" },
-              currentFile: snapshot._tag === "missing" ? { _tag: "missing" } : { _tag: "file", bytes: snapshot.bytes },
-              previousArtifact:
-                previousArtifact === undefined ? { _tag: "missing" } : { _tag: "owned", artifact: previousArtifact },
-            }),
-          ),
-        );
-        if (plan._tag === "none") {
-          return [];
-        }
-
-        return [
-          yield* effectFromEither(validateArtifactOperation({ ...plan, expectedCurrent: expectedCurrent(snapshot) })),
-        ];
-      }),
-    );
-
-    return operations.flat();
-  });
-
-const createAgentWrites = (input: {
-  request: InstallRequest;
-  selectedAgents: ReadonlyArray<AgentDefinition>;
-  stagedSkills: ReadonlyArray<StagedInstalledSkill>;
-  previousReceipt: ArtifactReceipt | undefined;
-}) =>
-  Effect.gen(function* () {
-    const path = yield* Path.Path;
-    const ctl = yield* effectFromEither(controlPath(input.request.destination.root, path));
-    const directoryWrites = yield* Effect.forEach(input.selectedAgents, (agent) =>
-      createSkillDirectoryWrites({
-        request: input.request,
-        agent,
-        stagedSkills: input.stagedSkills,
-        previousReceipt: input.previousReceipt,
-        ctl,
-      }),
-    );
-    const ruleWrites = yield* Effect.forEach(input.selectedAgents, (agent) =>
-      createRuleFileWrites({
-        request: input.request,
-        agent,
-        stagedSkills: input.stagedSkills,
-        previousReceipt: input.previousReceipt,
-        ctl,
-      }),
-    );
-    const instructionWrites = yield* createInstructionWrites({ ...input, ctl });
-    const configReferenceWrites = yield* createConfigReferenceWrites(input);
-
-    return [...directoryWrites.flat(), ...ruleWrites.flat(), ...instructionWrites, ...configReferenceWrites];
-  });
-
-const restoreWholeFile = (input: {
-  artifact: ReceiptEntry;
-  snapshot: FileSnapshot;
-}): Either.Either<ArtifactOperation, InstallError> => {
-  if (input.artifact.ownership._tag !== "wholeFile") {
-    return Either.left(
-      new InstallError({ issue: `Artifact ${input.artifact.path} requires a format-specific restoration.` }),
-    );
-  }
-
-  const ownership = input.artifact.ownership;
-  const matchesInstalled =
-    input.snapshot._tag === "file" && hashBytes(input.snapshot.bytes) === ownership.installedHash;
-
-  // We created this path from nothing: uninstall must not stick on drift, upgrades, or prior deletion.
-  // expectedCurrent still binds the transaction to the bytes we observed at plan time.
-  if (ownership.previous._tag === "missing") {
-    return validateArtifactOperation({
-      _tag: "remove",
-      artifact: input.artifact,
-      unownedBytes: new Uint8Array(),
-      expectedCurrent: expectedCurrent(input.snapshot),
-    });
-  }
-
-  // Replaced a prior host file: restore when current matches installed, or when the path is gone.
-  if (matchesInstalled || input.snapshot._tag === "missing") {
-    return validateArtifactOperation({
-      _tag: "restore",
-      artifact: input.artifact,
-      bytes: ownership.previous.bytes,
-      expectedCurrent: expectedCurrent(input.snapshot),
-    });
-  }
-
-  return Either.left(
-    new InstallError({ issue: `Receipted artifact ${input.artifact.path} changed after installation.` }),
-  );
-};
-
-const restoreInstructionFile = (input: {
-  artifact: ReceiptEntry;
-  snapshot: FileSnapshot;
-}): Either.Either<ArtifactOperation, InstallError> => {
-  const plan = mapFormatError(
-    planInstructionFile({
-      path: input.artifact.path,
-      desired: { _tag: "absent" },
-      currentFile:
-        input.snapshot._tag === "missing" ? { _tag: "missing" } : { _tag: "file", bytes: input.snapshot.bytes },
-      previousArtifact: { _tag: "owned", artifact: input.artifact },
-    }),
-  );
-
-  return Either.flatMap(plan, (operation) =>
-    operation._tag === "none"
-      ? Either.left(
-          new InstallError({ issue: `Instruction restoration for ${input.artifact.path} returned no operation.` }),
-        )
-      : validateArtifactOperation({ ...operation, expectedCurrent: expectedCurrent(input.snapshot) }),
-  );
-};
-
-const restoreConfigReference = (input: {
-  artifact: ReceiptEntry;
-  snapshot: FileSnapshot;
-}): Either.Either<ArtifactOperation, InstallError> => {
-  if (input.artifact.owner._tag !== "agent" || input.artifact.owner.agentIds.length !== 1) {
-    return Either.left(
-      new InstallError({ issue: `Native config restoration for ${input.artifact.path} requires one agent owner.` }),
-    );
-  }
-
-  const agentId = input.artifact.owner.agentIds.at(0);
-  const agent = agentCatalog.find((candidate) => candidate.id === agentId);
-  if (agent === undefined || agent.target._tag !== "configReference") {
-    return Either.left(
-      new InstallError({ issue: `Native config restoration for ${input.artifact.path} has no catalog agent.` }),
-    );
-  }
-
-  const plan = mapFormatError(
-    planConfigReference({
-      agent,
-      desired: { _tag: "absent" },
-      currentFile:
-        input.snapshot._tag === "missing" ? { _tag: "missing" } : { _tag: "file", bytes: input.snapshot.bytes },
-      previousArtifact: { _tag: "owned", artifact: input.artifact },
-    }),
-  );
-
-  return Either.flatMap(plan, (operation) =>
-    operation._tag === "none"
-      ? Either.left(
-          new InstallError({ issue: `Native config restoration for ${input.artifact.path} returned no operation.` }),
-        )
-      : validateArtifactOperation({ ...operation, expectedCurrent: expectedCurrent(input.snapshot) }),
-  );
-};
-
-const restoreSettingsArtifact = (input: {
-  artifact: ReceiptEntry;
-  snapshot: FileSnapshot;
-}): Either.Either<ArtifactOperation, InstallError> => {
-  if (
-    input.artifact.kind._tag !== "settings" ||
-    input.artifact.owner._tag !== "application" ||
-    input.artifact.ownership._tag !== "jsonValues"
-  ) {
-    return Either.left(
-      new InstallError({ issue: `Settings restoration for ${input.artifact.path} has invalid ownership.` }),
-    );
-  }
-
-  if (input.snapshot._tag === "missing") {
-    return Either.left(
-      new InstallError({ issue: `Receipted settings file ${input.artifact.path} was removed after installation.` }),
-    );
-  }
-
-  const decoded = decodeSettings(input.snapshot);
-  if (Either.isLeft(decoded)) {
-    return Either.left(decoded.left);
-  }
-
-  const currentOwnership = validateCurrentSettingsOwnership(decoded.right.document, input.artifact.ownership);
-  if (Either.isLeft(currentOwnership)) {
-    return Either.left(currentOwnership.left);
-  }
-
-  let source = decoded.right.source;
-
-  const values = [...input.artifact.ownership.values].reverse();
-
-  // Reverse append order while restoring each pointer to its original state.
-  for (const value of values) {
-    const pointerPath = jsonPointerPath(value.pointer);
-    let restored: Either.Either<string, InstallError>;
-    if (value.previous._tag === "missing") {
-      restored = editJsonValue({ source, path: pointerPath, value: undefined });
-    } else if (value.previous.lexical === undefined) {
-      restored = Either.left(
-        new InstallError({ issue: `Settings value ${value.pointer} lacks lexical restoration evidence.` }),
-      );
-    } else {
-      restored = restoreJsonLexical({ source, path: pointerPath, lexical: value.previous.lexical });
-    }
-    if (Either.isLeft(restored)) {
-      return Either.left(restored.left);
-    }
-
-    source = restored.right;
-  }
-
-  const containers = [...input.artifact.ownership.createdContainers].reverse();
-
-  // Remove only installer-created containers that became empty after pointer restoration.
-  for (const pointer of containers) {
-    const pointerPath = jsonPointerPath(pointer);
-    const root = parseTree(source);
-    const container = root === undefined ? undefined : findNodeAtLocation(root, [...pointerPath]);
-    if (container?.type !== "object" || objectProperties(container).length > 0) {
-      continue;
-    }
-
-    const restored = editJsonValue({ source, path: pointerPath, value: undefined });
-    if (Either.isLeft(restored)) {
-      return Either.left(restored.left);
-    }
-
-    source = restored.right;
-  }
-
-  const document = decodeGeneratedSettings(source);
-  if (Either.isLeft(document)) {
-    return Either.left(document.left);
-  }
-
-  const operation =
-    !input.artifact.ownership.filePreviouslyPresent && Object.keys(document.right).length === 0
-      ? {
-          _tag: "remove",
-          artifact: input.artifact,
-          unownedBytes: new Uint8Array(),
-          expectedCurrent: expectedCurrent(input.snapshot),
-        }
-      : {
-          _tag: "restore",
-          artifact: input.artifact,
-          bytes: textEncoder.encode(source),
-          expectedCurrent: expectedCurrent(input.snapshot),
-        };
-
-  return validateArtifactOperation(operation);
-};
-
-export const artifactRestorationRequestSchema = Schema.Struct({
-  root: absoluteRootSchema.annotations({
-    description: "Canonical installation root containing the receipted artifacts.",
-  }),
-  artifacts: Schema.Array(Schema.typeSchema(receiptEntrySchema)).annotations({
-    description: "Exact receipt entries whose final unowned state must be materialized.",
-  }),
-}).annotations({
-  description: "Receipt-authorized artifact restoration request with no detection authority.",
-});
-
-export type ArtifactRestorationRequest = Schema.Schema.Type<typeof artifactRestorationRequestSchema>;
-
-const decodeArtifactRestorationRequest = (input: unknown) =>
-  Schema.decodeUnknown(artifactRestorationRequestSchema, {
-    onExcessProperty: "error",
-  })(input).pipe(Effect.mapError((error) => new InstallError({ issue: formatParseError(error) })));
-
-// Materialize final unowned bytes from exact receipt entries without mutating the filesystem.
-export const materializeArtifactRestorations = (input: unknown) =>
-  Effect.gen(function* () {
-    // 1. Decode receipt authority before inspecting any artifact target.
-    const request = yield* decodeArtifactRestorationRequest(input);
-    const path = yield* Path.Path;
-
-    // 2. Inspect every authorized artifact once and delegate to its format owner.
-    return yield* Effect.forEach(request.artifacts, (artifact) =>
-      Effect.gen(function* () {
-        const snapshot = yield* readFileSnapshot(path.join(request.root, artifact.path));
-        if (artifact.kind._tag === "instruction") {
-          return yield* effectFromEither(restoreInstructionFile({ artifact, snapshot }));
-        }
-
-        if (artifact.kind._tag === "configReference") {
-          return yield* effectFromEither(restoreConfigReference({ artifact, snapshot }));
-        }
-
-        if (artifact.kind._tag === "settings") {
-          return yield* effectFromEither(restoreSettingsArtifact({ artifact, snapshot }));
-        }
-
-        return yield* effectFromEither(restoreWholeFile({ artifact, snapshot }));
-      }),
-    );
-  }).pipe(Effect.mapError(toInstallError));
-
-const createStaleRestorations = (input: {
-  root: string;
-  previousReceipt: ArtifactReceipt | undefined;
-  desiredWrites: ReadonlyArray<ArtifactOperation>;
-  settingsPlans: ReadonlyArray<ArtifactOperation>;
-}) =>
-  Effect.gen(function* () {
-    if (input.previousReceipt === undefined) {
-      return [];
-    }
-
-    const desiredPaths = new Set(input.desiredWrites.map((write) => write.artifact.path));
-    const plannedSettingsRestorations = input.settingsPlans.filter((operation) => operation._tag !== "write");
-    const preplannedPaths = new Set(plannedSettingsRestorations.map((operation) => operation.artifact.path));
-    const staleArtifacts = input.previousReceipt.artifacts.filter(
-      (artifact) => !desiredPaths.has(artifact.path) && !preplannedPaths.has(artifact.path),
-    );
-    const restorations = yield* materializeArtifactRestorations({ root: input.root, artifacts: staleArtifacts });
-
-    return [...plannedSettingsRestorations, ...restorations];
-  });
-
-const receiptTarget = (): ReceiptTarget => ({
+const receiptTarget: ReceiptTarget = {
   path: receiptPath,
   kind: { _tag: "receipt" },
   owner: applicationOwner,
-});
-
-const previousReceiptArtifact = (
-  receipt: ArtifactReceipt | undefined,
-  artifactPath: string,
-): ReceiptEntry | undefined => receipt?.artifacts.find((artifact) => artifact.path === artifactPath);
+};
 
 const automaticConfigSelection = (input: {
   request: InstallRequest;
   target: ConfigFileSnapshot;
   global: ConfigFileSnapshot | undefined;
-  settings: DecodedSettings;
-  settingsSnapshot: FileSnapshot;
-}): ConfigureRequest["selection"] => {
+}): ManagedConfigRequest["selection"] => {
   if (input.target._tag === "present") {
     return { _tag: "selected", config: input.target.config };
-  }
-
-  if (hasLegacySettingsCandidate(input.settings.document.env || {}) && input.settingsSnapshot._tag === "file") {
-    return { _tag: "legacyEnvironment", settingsBytes: input.settingsSnapshot.bytes };
   }
 
   if (input.request.destination._tag === "project") {
@@ -1912,206 +107,234 @@ const automaticConfigSelection = (input: {
     };
   }
 
-  return { _tag: "selected", config: defaultBagConfig };
+  return { _tag: "selected", config: defaultConfig };
+};
+
+type ManagedConfigInspection = {
+  readonly file: FileSnapshot;
+  readonly selection: ManagedConfigRequest["selection"];
+};
+
+// Decode config.json only when the automatic selection reuses or inherits it; an explicit or reset
+// configuration needs just its bytes, so a file the schema no longer accepts cannot block replacing it.
+const inspectManagedConfig = (request: InstallRequest) =>
+  Effect.gen(function* () {
+    const path = yield* Path.Path;
+    const configPath = path.join(request.destination.root, managedConfigPath);
+    switch (request.configuration._tag) {
+      case "selected":
+        return {
+          file: yield* readFileSnapshot(configPath),
+          selection: { _tag: "selected", config: request.configuration.config },
+        } satisfies ManagedConfigInspection;
+      case "reset":
+        return {
+          file: yield* readFileSnapshot(configPath),
+          selection: { _tag: "selected", config: defaultConfig },
+        } satisfies ManagedConfigInspection;
+      case "automatic": {
+        const target = yield* readConfigFile(configPath);
+        const global =
+          request.destination._tag === "project" && target._tag === "missing"
+            ? yield* readConfigFile(path.join(request.host.homeRoot, managedConfigPath))
+            : undefined;
+        return {
+          file: configSnapshotFile(target),
+          selection: automaticConfigSelection({ request, target, global }),
+        } satisfies ManagedConfigInspection;
+      }
+    }
+  });
+
+// A reset replaces config.json whatever it holds now, so it keeps the receipt's restoration value
+// without requiring the current bytes to still match what was installed.
+const resetPreviousConfigFile = (input: {
+  receipt: Receipt | undefined;
+  snapshot: FileSnapshot;
+}): Either.Either<PreviousFileValue, InstallError> => {
+  const file = previousReceiptFile(input.receipt, managedConfigPath);
+  if (file === undefined) {
+    return Either.right(previousFileValue(input.snapshot));
+  }
+
+  return file.ownership._tag === "wholeFile"
+    ? Either.right(file.ownership.previous)
+    : Either.left(
+        new InstallError({ issue: `Receipted whole-file file ${managedConfigPath} has incompatible ownership.` }),
+      );
 };
 
 const createManagedConfigPlan = (input: {
   request: InstallRequest;
-  snapshot: ConfigFileSnapshot;
-  globalSnapshot: ConfigFileSnapshot | undefined;
-  settings: DecodedSettings;
-  settingsSnapshot: FileSnapshot;
-  previousReceipt: ArtifactReceipt | undefined;
+  inspection: ManagedConfigInspection;
+  previousReceipt: Receipt | undefined;
 }): Either.Either<ManagedConfigPlan, InstallError> => {
-  const snapshot = configSnapshotFile(input.snapshot);
-  const previous = previousWholeFile({
-    receipt: input.previousReceipt,
-    artifactPath: managedConfigPath,
-    snapshot,
-  });
+  const previous =
+    input.request.configuration._tag === "reset"
+      ? resetPreviousConfigFile({ receipt: input.previousReceipt, snapshot: input.inspection.file })
+      : previousWholeFile({
+          receipt: input.previousReceipt,
+          filePath: managedConfigPath,
+          snapshot: input.inspection.file,
+        });
   if (Either.isLeft(previous)) {
     return Either.left(previous.left);
   }
 
-  const selection =
-    input.request.configuration._tag === "selected"
-      ? input.request.configuration
-      : automaticConfigSelection({
-          request: input.request,
-          target: input.snapshot,
-          global: input.globalSnapshot,
-          settings: input.settings,
-          settingsSnapshot: input.settingsSnapshot,
-        });
-
   return Either.mapLeft(
     planManagedConfig({
       scope: input.request.destination._tag,
-      selection,
+      selection: input.inspection.selection,
       previousConfigFile: previous.right,
     }),
     toInstallError,
   );
 };
 
-const createInstallSummary = (input: {
-  tag: "installed" | "unchanged";
+const installSummary = (input: {
+  tag: InstallSummary["_tag"];
   request: InstallRequest;
-  featureIds: ReadonlyArray<Schema.Schema.Type<typeof featureIdSchema>>;
+  featureIds: ReadonlyArray<FeatureId>;
   selectedAgents: ReadonlyArray<AgentDefinition>;
-}): InstallSummary =>
-  Schema.validateSync(installSummarySchema, {
-    onExcessProperty: "error",
-  })({
-    _tag: input.tag,
-    scope: input.request.destination._tag,
-    features: input.featureIds,
-    agents: input.selectedAgents.map((agent) => agent.id),
-    platformRequirements: featureCatalog
-      .filter((feature) => input.featureIds.includes(feature.id))
-      .map((feature) => ({ featureId: feature.id, platform: feature.platform })),
-    interaction: input.request.interaction,
-  });
+}): InstallSummary => ({
+  _tag: input.tag,
+  scope: input.request.destination._tag,
+  features: input.featureIds,
+  agents: input.selectedAgents.map((agent) => agent.id),
+  platformRequirements: featureCatalog
+    .filter((feature) => input.featureIds.includes(feature.id))
+    .map((feature) => ({ featureId: feature.id, platform: feature.platform })),
+  interaction: input.request.interaction,
+});
 
-export const installationReconciliationSchema = Schema.Struct({
+// The receipt snapshot is decoded with the request so its bytes and decoded receipt must agree.
+const installSyncSchema = Schema.Struct({
   request: Schema.typeSchema(installRequestSchema).annotations({
-    description: "Decoded install request being reconciled.",
+    description: "Decoded install request being synced.",
   }),
-  receiptSnapshot: artifactReceiptSnapshotSchema.annotations({
-    description: "Exact receipt state inspected once before reconciliation.",
+  receiptSnapshot: receiptSnapshotSchema.annotations({
+    description: "Exact receipt state inspected once before the sync.",
   }),
 }).annotations({
   description: "Decoded install request paired with its single ownership-receipt snapshot.",
 });
 
-export type InstallationReconciliation = Schema.Schema.Type<typeof installationReconciliationSchema>;
-
-const decodeReconciliation = (input: unknown) =>
-  Schema.decodeUnknown(installationReconciliationSchema, {
-    onExcessProperty: "error",
-  })(input).pipe(Effect.mapError((error) => new InstallError({ issue: formatParseError(error) })));
-
-// Reconcile one decoded installation through a visible inspect, resolve, plan, validate, apply, and result pipeline.
-export const reconcileInstallation = (input: unknown) =>
+// Claude's settings are always planned, so deselecting Claude restores the hooks it received earlier.
+const planHookSettings = (input: {
+  request: InstallRequest;
+  featureIds: ReadonlyArray<FeatureId>;
+  selectedAgents: ReadonlyArray<AgentDefinition>;
+  previousReceipt: Receipt | undefined;
+  claudeSettings: { snapshot: FileSnapshot; decoded: DecodedSettings };
+}) =>
   Effect.gen(function* () {
-    const reconciliation = yield* decodeReconciliation(input);
-    const fileSystem = yield* FileSystem.FileSystem;
     const path = yield* Path.Path;
-    const canonicalRoot = yield* fileSystem.realPath(reconciliation.request.destination.root);
-    const canonicalHomeRoot = yield* fileSystem.realPath(reconciliation.request.host.homeRoot);
-    const request = yield* decodeInstallRequest({
-      ...reconciliation.request,
-      destination: { ...reconciliation.request.destination, root: canonicalRoot },
-      host: { homeRoot: canonicalHomeRoot },
-    });
-
-    // 2. Inspect the prior receipt and every application-owned host file exactly once.
-    const configSnapshot = yield* readConfigFile(path.join(request.destination.root, managedConfigPath));
-    const settingsSnapshot = yield* readFileSnapshot(path.join(request.destination.root, settingsPath));
-    const settings = yield* effectFromEither(decodeSettings(settingsSnapshot));
-    const previousReceipt =
-      reconciliation.receiptSnapshot._tag === "present" ? reconciliation.receiptSnapshot.receipt : undefined;
-    if (previousReceipt !== undefined && previousReceipt.scope !== request.destination._tag) {
-      return yield* new InstallError({ issue: "Existing receipt scope does not match the requested destination." });
-    }
-
-    // 3. Resolve feature dependencies and agent identities only from the decoded catalogs.
-    const featureIds = yield* effectFromEither(resolveFeatures(request));
-    const selectedAgents = yield* effectFromEither(resolveAgents(request));
-
-    // 4. Create pure format writes from staged bytes and exact inspected host snapshots.
-    const runtimeWrites = yield* createRuntimeWrites({ request, featureIds, previousReceipt });
-    const stagedSkills = yield* readStagedSkills({ request, featureIds });
-    const agentWrites = yield* createAgentWrites({ request, selectedAgents, stagedSkills, previousReceipt });
-    const shouldReadGlobalConfig =
-      request.configuration._tag === "automatic" &&
-      request.destination._tag === "project" &&
-      configSnapshot._tag === "missing" &&
-      !hasLegacySettingsCandidate(settings.document.env || {});
-    const globalConfigSnapshot = shouldReadGlobalConfig
-      ? yield* readConfigFile(path.join(request.host.homeRoot, managedConfigPath))
-      : undefined;
-    const managedConfigPlan = yield* effectFromEither(
-      createManagedConfigPlan({
-        request,
-        snapshot: configSnapshot,
-        globalSnapshot: globalConfigSnapshot,
-        settings,
-        settingsSnapshot,
-        previousReceipt,
-      }),
-    );
-    const managedConfigWrite = yield* effectFromEither(
-      validateArtifactOperation({
-        ...managedConfigPlan.managedConfigWrite,
-        expectedCurrent: expectedCurrent(configSnapshotFile(configSnapshot)),
-      }),
-    );
     const claude = agentCatalog.find((agent) => agent.id === "claude-code");
     if (claude === undefined) {
       return yield* new InstallError({ issue: "Claude Code catalog entry is missing." });
     }
-    const selectedNativeAgents = selectedAgents.filter((agent) => agent.nativeHooks._tag !== "unsupported");
-    const hookConfigAgents = [claude, ...selectedNativeAgents.filter((agent) => agent.id !== claude.id)];
-    const settingsPlans = yield* Effect.forEach(hookConfigAgents, (agent) =>
+
+    const agents = [claude, ...input.selectedAgents.filter((agent) => agent.id !== claude.id)];
+    const plans = yield* Effect.forEach(agents, (agent) =>
       Effect.gen(function* () {
-        if (agent.nativeHooks._tag === "unsupported") return undefined;
-        const artifactPath = agent.nativeHooks.configPath;
-        const snapshot =
-          artifactPath === settingsPath
-            ? settingsSnapshot
-            : yield* readFileSnapshot(path.join(request.destination.root, artifactPath));
-        const decoded = artifactPath === settingsPath ? settings : yield* effectFromEither(decodeSettings(snapshot));
-        const desiredGroups = desiredHookGroups({
-          root: request.destination.root,
-          featureIds,
-          selectedAgents,
-          agent,
-          idleAutoCompact: managedConfigPlan.config.idleAutoCompact,
-          path,
-        });
-        return yield* effectFromEither(
-          planSettings({
-            artifactPath,
-            snapshot,
-            decoded,
-            previousArtifact: previousReceiptArtifact(previousReceipt, artifactPath),
-            desiredGroups,
-            legacySettings: artifactPath === settingsPath ? managedConfigPlan.legacySettings : { _tag: "none" },
+        if (agent.nativeHooks._tag === "unsupported") {
+          return undefined;
+        }
+
+        const filePath = agent.nativeHooks.configPath;
+        const isClaudeSettings = filePath === settingsPath;
+        const snapshot = isClaudeSettings
+          ? input.claudeSettings.snapshot
+          : yield* readFileSnapshot(path.join(input.request.destination.root, filePath));
+
+        return yield* planSettings({
+          filePath,
+          snapshot,
+          decoded: isClaudeSettings ? input.claudeSettings.decoded : yield* decodeSettings(snapshot),
+          previousFile: previousReceiptFile(input.previousReceipt, filePath),
+          desiredGroups: desiredHookGroups({
+            root: input.request.destination.root,
+            featureIds: input.featureIds,
+            selectedAgents: input.selectedAgents,
+            agent,
+            path,
           }),
-        );
+        });
       }),
     );
-    const concreteSettingsPlans = settingsPlans.filter((plan): plan is ArtifactOperation => plan !== undefined);
-    const settingsWrites = concreteSettingsPlans.filter((plan) => plan._tag === "write");
-    const writes = [...runtimeWrites, ...agentWrites, managedConfigWrite, ...settingsWrites];
+
+    return plans.filter((plan): plan is FileChange => plan !== undefined);
+  });
+
+export const syncInstall = (input: unknown) =>
+  Effect.gen(function* () {
+    const { request: requested, receiptSnapshot } = yield* decodeStrictly(installSyncSchema)(input);
+    const fileSystem = yield* FileSystem.FileSystem;
+    const path = yield* Path.Path;
+    const request = yield* decodeStrictly(installRequestSchema)({
+      ...requested,
+      destination: { ...requested.destination, root: yield* fileSystem.realPath(requested.destination.root) },
+      host: { homeRoot: yield* fileSystem.realPath(requested.host.homeRoot) },
+    });
+
+    const configInspection = yield* inspectManagedConfig(request);
+    const settingsSnapshot = yield* readFileSnapshot(path.join(request.destination.root, settingsPath));
+    const settings = yield* decodeSettings(settingsSnapshot);
+    const previousReceipt = receiptSnapshot._tag === "present" ? receiptSnapshot.receipt : undefined;
+    if (previousReceipt !== undefined && previousReceipt.scope !== request.destination._tag) {
+      return yield* new InstallError({ issue: "Existing receipt scope does not match the requested destination." });
+    }
+
+    const featureIds = yield* resolveFeatures(request);
+    const selectedAgents = yield* resolveAgents(request);
+    const hookWrites = yield* createHookWrites({ request, featureIds, previousReceipt });
+    const preparedSkills = yield* readPreparedSkills({ request, featureIds });
+    const agentWrites = yield* createAgentWrites({ request, selectedAgents, preparedSkills, previousReceipt });
+    const managedConfigPlan = yield* createManagedConfigPlan({
+      request,
+      inspection: configInspection,
+      previousReceipt,
+    });
+    const managedConfigWrite = yield* checkFileChange({
+      ...managedConfigPlan.managedConfigWrite,
+      expectedCurrent: expectedCurrent(configInspection.file),
+    });
+    const settingsPlans = yield* planHookSettings({
+      request,
+      featureIds,
+      selectedAgents,
+      previousReceipt,
+      claudeSettings: { snapshot: settingsSnapshot, decoded: settings },
+    });
+    const writes = [
+      ...hookWrites,
+      ...agentWrites,
+      managedConfigWrite,
+      ...settingsPlans.filter((plan) => plan._tag === "write"),
+    ];
     const restorations = yield* createStaleRestorations({
       root: request.destination.root,
       previousReceipt,
       desiredWrites: writes,
-      settingsPlans: concreteSettingsPlans,
+      settingsPlans,
     });
-    const receipt: ArtifactReceipt = {
-      version: request.stagedPackage.version,
+    const receipt: Receipt = {
+      version: request.preparedPackage.version,
       scope: request.destination._tag,
       features: featureIds,
-      artifacts: writes.map((write) => write.artifact),
+      artifacts: writes.map((write) => write.file),
     };
-
-    // 5. Validate one complete update plan, including expected-current preconditions and receipt correlations.
-    const plan = yield* effectFromEither(
-      createUpdatePlan({
-        root: request.destination.root,
-        previous: previousReceipt === undefined ? { _tag: "missing" } : { _tag: "receipt", receipt: previousReceipt },
-        restorations,
-        desired: { receipt, writes },
-        receiptTarget: receiptTarget(),
-        receiptExpectedCurrent:
-          reconciliation.receiptSnapshot._tag === "missing"
-            ? { _tag: "missing" }
-            : { _tag: "file", sha256: hashBytes(reconciliation.receiptSnapshot.bytes) },
-      }),
-    );
+    const plan = yield* planInstall({
+      root: request.destination.root,
+      previous: previousReceipt === undefined ? { _tag: "missing" } : { _tag: "receipt", receipt: previousReceipt },
+      restorations,
+      desired: { receipt, writes },
+      receiptTarget,
+      receiptExpectedCurrent:
+        receiptSnapshot._tag === "missing"
+          ? { _tag: "missing" }
+          : { _tag: "file", sha256: hashBytes(receiptSnapshot.bytes) },
+    });
 
     const unchanged =
       previousReceipt !== undefined &&
@@ -2119,23 +342,19 @@ export const reconcileInstallation = (input: unknown) =>
       plan.receipt._tag === "receiptPublish" &&
       receiptEqual(previousReceipt, plan.receipt.receipt);
     if (unchanged) {
-      return createInstallSummary({ tag: "unchanged", request, featureIds, selectedAgents });
+      return installSummary({ tag: "unchanged", request, featureIds, selectedAgents });
     }
 
-    // 6. Apply the validated plan through the single transactional filesystem writer.
-    yield* applyArtifactPlan(plan);
+    yield* applyPlan(plan);
 
-    // 7. Return one schema-validated presentation value without leaking planning internals.
-    return createInstallSummary({ tag: "installed", request, featureIds, selectedAgents });
+    return installSummary({ tag: "installed", request, featureIds, selectedAgents });
   }).pipe(Effect.mapError(toInstallError));
 
-// Decode one install request, inspect its receipt once, then enter the shared reconciliation pipeline.
 export const install = (input: unknown) =>
   Effect.gen(function* () {
-    // 1. Decode the complete capability request before reading external state.
-    const request = yield* decodeInstallRequest(input);
+    const request = yield* decodeStrictly(installRequestSchema)(input);
     const path = yield* Path.Path;
-    const receiptSnapshot = yield* readArtifactReceiptSnapshot(path.join(request.destination.root, receiptPath));
+    const receiptSnapshot = yield* readReceipt(path.join(request.destination.root, receiptPath));
 
-    return yield* reconcileInstallation({ request, receiptSnapshot });
+    return yield* syncInstall({ request, receiptSnapshot });
   }).pipe(Effect.mapError(toInstallError));

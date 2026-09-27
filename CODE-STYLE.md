@@ -1,14 +1,14 @@
 # Dufflebag code style
 
-This file is the **project dialect** (prescriptive SSOT) for maintained code in this repository. The rule-card format is owned by this package: `src/skills/grillMeCodeStyle/_shared/CODE-STYLE-FORMAT.md`, with this file as the living exemplar and `templates/mdFiles/CODE-STYLE.md` as the greenfield scaffold. When another guide elsewhere conflicts with this one, **this file wins for dufflebag**.
+This file is the **project dialect** (prescriptive SSOT) for maintained code in this repository. The rule-card format is owned by this package: `src/skills/codeStyleNewProject/_shared/CODE-STYLE-FORMAT.md`, with this file as the living exemplar and `src/templates/projectDocs/CODE-STYLE.md` as the greenfield scaffold. When another guide elsewhere conflicts with this one, **this file wins for dufflebag**.
 
 The maintained tree conforms to this contract. A new rule is not complete until its verifier gates the same change when the rule is mechanically decidable.
 
-Generated provider projections, copied skill payload, and `dist/` are not application source. The three named make-a-trailer files in `code-style.rules.json` are the only protected authored-content exceptions; never broaden them to a directory or wildcard.
+Generated provider projections, copied skill payload, and `dist/` are not application source. `src/skills/makePromoVideo/scripts/assembleCut.mjs` is the only authored exception (`NULLISH_EXCEPTION` in `src/scripts/checkCodeStyle.ts`): Biome skips it and it may use `??`; never broaden this to a directory or wildcard.
 
 ## How to read a rule
 
-Every rule is one card with the same five slots in the same order. The shape is machine-checked by `scripts/checkStyleGuide.ts`, so a card that drifts fails `pnpm verify`:
+Every rule is one card with the same five slots in the same order. The shape is machine-checked by `src/scripts/checkRuleCards.ts`, so a card that drifts fails `pnpm verify`:
 
 | Slot | Content |
 | --- | --- |
@@ -21,7 +21,7 @@ Every rule is one card with the same five slots in the same order. The shape is 
 Two consequences worth knowing when you audit an agent's work:
 
 - **The assertion is the verdict.** It is one sentence on purpose. If you need a second sentence, that is a second rule with its own ID.
-- **Every ID appears exactly once here and exactly once in `code-style.rules.json`, and the assertion text must match that file's `statement` byte for byte.** So the JSON is always an accurate index of this document — audit from whichever is easier.
+- **Every ID appears exactly once here.** These cards are the only rule index; there is no JSON mirror to keep in sync.
 
 `verify:` names the command that actually proves the rule. `judgment` means no detector exists and a reviewer owns it; it is not a synonym for "unimportant".
 
@@ -33,11 +33,11 @@ Two consequences worth knowing when you audit an agent's work:
 Behavior lives in the named capability directory that owns it.
 
 ```ts
-// ✓ src/install/applyArtifactPlan.ts — the capability that owns applying plans
-export const applyArtifactPlan = (request: ApplyArtifactPlanRequest) => Effect.gen(function* () {});
+// ✓ src/install/applyPlan.ts — the capability that owns applying plans
+export const applyPlan = (request: ApplyPlanRequest) => Effect.gen(function* () {});
 
 // ✗ src/core/services/planService.ts — technical layer, retired tree
-export const planService = { apply: (request: ApplyArtifactPlanRequest) => Effect.void };
+export const planService = { apply: (request: ApplyPlanRequest) => Effect.void };
 ```
 
 Why: a reader finds behavior by the capability it belongs to, not by guessing which technical tier it landed in.
@@ -48,8 +48,8 @@ Why: a reader finds behavior by the capability it belongs to, not by guessing wh
 Every authored file and directory name states the domain job it performs.
 
 ```ts
-// ✓ src/install/artifactReceipt.ts
-export const writeArtifactReceipt = (request: WriteReceiptRequest) => Effect.void;
+// ✓ src/install/receipt.ts
+export const writeReceipt = (request: WriteReceiptRequest) => Effect.void;
 
 // ✗ also index, types, utils, helpers, common, shared, misc, constants, models, base, core
 // src/install/utils.ts
@@ -64,27 +64,27 @@ Why: bucket files collect unrelated code forever, because nothing in the name sa
 Authored source directories use camelCase.
 
 ```ts
-// ✓ src/hookIsland/dedupGuard/hooks/dedupGuard.js — public ID stays hyphenated data
-export const featureId = "dedup-guard";
+// ✓ src/hooks/duplicateCodeGuard/hooks/duplicateCodeGuard.ts — public ID stays hyphenated data
+export const featureId = "duplicate-code-guard";
 
-// ✗ src/hookIsland/dedup-guard/... or src/skills/DedupGuard/...
+// ✗ src/hooks/duplicate-code-guard/... or src/skills/DuplicateCodeGuard/...
 ```
 
 Why: the public hyphenated ID is decoded catalog data; letting it dictate directory names makes the authored tree inconsistent with UI files, which are PascalCase.
 
-### Payload and runtime live in different trees
+### Payload and hook code live in different trees
 [rule:path.payload-runtime-split] · verify: `pnpm style`
 
-Executable feature runtime lives under `src/hookIsland/`, never under `src/skills/`.
+Executable feature hook code lives under `src/hooks/`, never under `src/skills/`.
 
 ```ts
-// ✓ src/hookIsland/contextGuard/hooks/ctxWatch.ts — compiled, assembled, installed
-// ✓ src/skills/pngToCode/scripts/src/bin/pixelDiff.ts — copied verbatim into the skill
+// ✓ src/hooks/contextGuard/hooks/autorunWatcher.ts — compiled and installed
+// ✓ src/skills/imageToCode/scripts/src/bin/pixelDiff.ts — copied verbatim into the skill
 
-// ✗ src/skills/contextGuard/hooks/ctxWatch.ts — runtime hiding in the payload tree
+// ✗ src/skills/contextGuard/hooks/autorunWatcher.ts — hook code hiding in the payload tree
 ```
 
-Why: the two trees ship by different mechanisms and answer to different rules, so mixing them is what let application rules be applied to standalone scripts and let an entry hook importing its own `lib/` look like an island breach.
+Why: the two trees ship by different mechanisms and answer to different rules, so mixing them is what let application rules be applied to standalone scripts and let an entry hook importing its own `lib/` look like a broken hook import.
 
 ### No wrapper layers
 [rule:architecture.no-wrapper-layer] · verify: judgment
@@ -92,8 +92,8 @@ Why: the two trees ship by different mechanisms and answer to different rules, s
 A repository-owned layer exists only when it owns policy the official service does not.
 
 ```ts
-// ✓ src/install/stageArtifacts.ts — owns real policy: validate every replacement before the first write
-const stageArtifacts = (request: StageRequest) =>
+// ✓ src/install/applyPlan.ts — owns real policy: validate every replacement before the first write
+const stageFile = (request: StageRequest) =>
   Effect.gen(function* () {
     const file = yield* FileSystem.FileSystem;
     return yield* validateStagedBytes(yield* file.readFileString(request.source));
@@ -118,7 +118,7 @@ const decideDuplicateEdit = (edit: CandidateEdit, knownEdits: ReadonlyArray<Know
   knownEdits.some((knownEdit) => overlaps(edit, knownEdit)) ? "deny" : "allow";
 
 // ✗ policy is buried inside stdin, filesystem, and exit handling
-const runDedupGuard = () => readStdinAndMaybeExitAfterScanningFiles();
+const runDuplicateCodeGuard = () => readStdinAndMaybeExitAfterScanningFiles();
 ```
 
 Why: business rules and mutable mechanisms change for different reasons and deserve independent tests, while local mutation inside an owned mechanism remains valid.
@@ -159,12 +159,12 @@ Why: fake robustness hides broken contracts and multiplies states nobody tests.
 Named functions are arrow constants declared before first use.
 
 ```ts
-// ✓ src/config/bagConfig.ts
-const decodeConfig = (input: unknown) => Schema.decodeUnknown(bagConfigSchema)(input);
+// ✓ src/config/configSchema.ts
+const decodeConfig = (input: unknown) => Schema.decodeUnknown(configSchema)(input);
 
 // ✗ hoisted declaration, plus function expressions and object methods
 function decodeConfig(input: unknown) {
-  return Schema.decodeUnknown(bagConfigSchema)(input);
+  return Schema.decodeUnknown(configSchema)(input);
 }
 ```
 
@@ -197,7 +197,7 @@ A function takes one cohesive input, or two only as a natural pair.
 ```ts
 // ✓ a natural pair, and a named request for anything wider
 export const joinPath = (root: string, relative: string) => `${root}/${relative}`;
-export const applyArtifactPlan = (request: ApplyArtifactPlanRequest) => Effect.void;
+export const applyPlan = (request: ApplyPlanRequest) => Effect.void;
 
 // ✗ three positionals, a rest parameter, or a positional boolean flag
 export const write = (path: string, bytes: string, mode: string) => Effect.void;
@@ -213,10 +213,10 @@ A function performs one job its name fully describes.
 
 ```ts
 // ✓ the name covers the whole body
-const writeArtifactReceipt = (request: WriteReceiptRequest) =>
+const writeReceipt = (request: WriteReceiptRequest) =>
   Effect.gen(function* () {
     const file = yield* FileSystem.FileSystem;
-    yield* file.writeFileString(request.path, formatReceipt(request.artifacts));
+    yield* file.writeFileString(request.path, formatReceipt(request.ownedFiles));
   });
 
 // ✗ policy + I/O + presentation + persistence under one name
@@ -238,13 +238,13 @@ Adjacent function declarations are separated by exactly one blank line.
 
 ```ts
 // ✓
-const decodeConfig = (input: unknown) => Schema.decodeUnknown(bagConfigSchema)(input);
+const decodeConfig = (input: unknown) => Schema.decodeUnknown(configSchema)(input);
 
-const formatConfig = (config: BagConfig) => JSON.stringify(config, null, 2);
+const formatConfig = (config: Config) => JSON.stringify(config, null, 2);
 
 // ✗ no gap between declarations, or vertical noise inside a body
-const decodeConfig = (input: unknown) => Schema.decodeUnknown(bagConfigSchema)(input);
-const formatConfig = (config: BagConfig) => JSON.stringify(config, null, 2);
+const decodeConfig = (input: unknown) => Schema.decodeUnknown(configSchema)(input);
+const formatConfig = (config: Config) => JSON.stringify(config, null, 2);
 ```
 
 Why: the blank line is the boundary between units; spending it between every statement instead removes the only vertical cue the reader has.
@@ -375,10 +375,10 @@ The CLI translates tagged failures once and maps usage, operation, health, dupli
 
 ```ts
 // ✓ src/cli/main.ts owns the terminal edge
-cliEffect.pipe(Effect.catchAllCause(presentCliFailure), Effect.runPromise);
+program.pipe(Effect.catchAll(showCliFailure), Effect.runPromise);
 
 // ✗ a command swallows a failure and exits successfully
-install(request).pipe(Effect.catchAll((failure) => terminalUI.presentError(failure)));
+install(request).pipe(Effect.catchAll((failure) => TerminalUI.showError(failure)));
 ```
 
 Why: one terminal edge prevents contradictory messages and false zero exit codes, while defects remain defects.
@@ -410,7 +410,7 @@ Comments explain a constraint or decision that names, types, and structure canno
 
 ```ts
 // ✓ A receipt is deletion authority, so persist it only after every destination write succeeds.
-yield* writeArtifactReceipt(committedArtifacts);
+yield* writeReceipt(committedFiles);
 
 // ✗ Fetch the feature.
 const feature = featureCatalogById.get(featureId);
@@ -440,7 +440,7 @@ export type FeatureDefinition = { id: string; selectedByDefault: boolean };
 const FEATURE_DEFAULTS = { selectedByDefault: false };
 ```
 
-Why: one executable definition cannot drift from itself, and every derived concern — decoding, defaults, messages, docs — stays attached to the property it governs. The dependency-free hook island is the narrow exception, because Effect does not ship there.
+Why: one executable definition cannot drift from itself, and every derived concern — decoding, defaults, messages, docs — stays attached to the property it governs. Dependency-free hook code is the narrow exception, because Effect does not ship there.
 
 ### Model valid states directly
 [rule:type.valid-states] · verify: judgment
@@ -479,8 +479,8 @@ The owning Schema defines decoding, encoding, defaults, and persisted migrations
 
 ```ts
 // ✓ one config Schema owns both directions and migration
-const decodeBagConfig = Schema.decodeUnknown(bagConfigSchema);
-const encodeBagConfig = Schema.encode(bagConfigSchema);
+const decodeConfig = Schema.decodeUnknown(configSchema);
+const encodeConfig = Schema.encode(configSchema);
 
 // ✗ independent clone-and-patch migration beside the Schema
 const migrateConfig = (config: LegacyConfig) => ({ ...config, version: 2 });
@@ -510,24 +510,24 @@ Each application boundary decodes through its owning Schema once and downstream 
 
 ```ts
 // ✓ application: Schema owns the mode
-export const dedupModeSchema = Schema.Literal("deny", "warn", "off");
-const decodeDedupMode = Schema.decodeUnknown(dedupModeSchema);
+export const duplicateCodeModeSchema = Schema.Literal("block", "warn", "off");
+const decodeDuplicateCodeMode = Schema.decodeUnknown(duplicateCodeModeSchema);
 
 // ✗ a parallel validation surface next to Schema
-export const isDedupMode = (value: string): value is DedupMode => DEDUP_MODES.some((mode) => mode === value);
-export const parseDedupMode = (text?: string): DedupMode => (isDedupMode(text || "") ? "warn" : "deny");
+export const isDuplicateCodeMode = (value: string): value is DuplicateCodeMode => MODES.some((mode) => mode === value);
+export const parseDuplicateCodeMode = (text?: string): DuplicateCodeMode => (isDuplicateCodeMode(text || "") ? "warn" : "block");
 ```
 
 Why: repeated defensive checks duplicate the boundary contract and make valid application states look untrusted forever. A dependency-free hook instead owns one private entry decoder because Effect does not ship there.
 
 ### No nullish fallback operator
-[rule:syntax.no-nullish] · verify: `biome ci .`
+[rule:syntax.no-nullish] · verify: `pnpm style`
 
 Authored TypeScript and JavaScript never use the nullish coalescing operator.
 
 ```ts
 // ✓ let the boundary Schema supply the default
-const config = yield* decodeBagConfig(configSource);
+const config = yield* decodeConfig(configSource);
 
 // ✗ a fallback chain hides which boundary owns the default
 const scope = invocation.scope ?? environment.scope ?? fileConfig.scope ?? "global";
@@ -544,12 +544,12 @@ Interfaces appear only for declaration merging or an external interoperability c
 // ✓ src/types/environment.d.ts
 declare global {
   interface ProcessEnv {
-    DUFFLEBAG_HOME?: string;
+    DUFFLEBAG_VOICE_DIR?: string;
   }
 }
 
 // ✗ an ordinary product-owned object shape
-export interface BagConfig {
+export interface Config {
   debug: boolean;
 }
 ```
@@ -597,12 +597,12 @@ Unknown input is decoded or narrowed, while `as const`, `satisfies`, and a docum
 
 ```ts
 // ✓
-const config = yield * Schema.decodeUnknown(bagConfigSchema)(input);
+const config = yield * Schema.decodeUnknown(configSchema)(input);
 const scopes = ["global", "project"] as const;
-const feature = { id: "dedup-guard" } satisfies FeatureSummary;
+const feature = { id: "duplicate-code-guard" } satisfies FeatureSummary;
 
 // ✗ boundary escape
-const config = input as BagConfig;
+const config = input as Config;
 const required = value!;
 ```
 
@@ -616,11 +616,11 @@ A suppression is allowed only for a reasoned negative type test or a narrow exte
 ```ts
 // ✓ negative type test states the contract being proved
 // @ts-expect-error Feature IDs cannot contain spaces.
-const invalidFeatureId: FeatureId = "dedup guard";
+const invalidFeatureId: FeatureId = "duplicate code guard";
 
 // ✗ vague escape with no contract or issue
 // @ts-expect-error close enough
-const config: BagConfig = input;
+const config: Config = input;
 ```
 
 Why: an unexplained suppression turns a caught error into an invisible one, while an explicit proof or tracked upstream defect has a reviewable lifetime.
@@ -632,10 +632,10 @@ Authored modules export their own capability directly and never exist only to re
 
 ```ts
 // ✓ import the capability from its owning module
-import { applyArtifactPlan } from "./install/applyArtifactPlan.js";
+import { applyPlan } from "./install/applyPlan.js";
 
 // ✗ src/install/index.ts
-export * from "./artifactPlan.js";
+export * from "./plan.js";
 ```
 
 Why: a passive barrel adds another path and export surface without owning behavior.
@@ -647,7 +647,7 @@ Every authored identifier and path names its domain job and contains none of the
 
 ```ts
 // ✓
-const artifactReceipt = yield * writeArtifactReceipt(request);
+const receipt = yield * writeReceipt(request);
 const featureCatalog = yield * decodeFeatureCatalog(catalogSource);
 
 // ✗ forbidden tokens: data, raw, result(s), response, payload, body, info, temp/tmp, final, outcome
@@ -681,7 +681,7 @@ Collections use direct transformations, explicit loops for sequential or early-e
 ```ts
 // ✓ direct transformation and genuine aggregation
 const byId = Object.fromEntries(features.map((feature) => [feature.id, feature]));
-const totalBytes = artifacts.reduce((total, artifact) => total + artifact.size, 0);
+const totalBytes = files.reduce((total, file) => total + file.size, 0);
 
 // ✗ building a collection
 const byId = features.reduce((accumulator, feature) => ({ ...accumulator, [feature.id]: feature }), {});
@@ -696,11 +696,11 @@ Application code composes concurrency with Effect operators, never `Promise.all`
 
 ```ts
 // ✓ sequential by default; bounded concurrency is opted into explicitly
-const staged = yield * Effect.forEach(artifacts, stageArtifact);
+const staged = yield * Effect.forEach(files, stageFile);
 const fetched = yield * Effect.forEach(sources, readSource, { concurrency: 4 });
 
 // ✗
-const staged = yield * Effect.promise(() => Promise.all(artifacts.map(stageArtifact)));
+const staged = yield * Effect.promise(() => Promise.all(files.map(stageFile)));
 ```
 
 Why: `Promise.all` leaves the Effect world, so interruption, typed failures, and the concurrency bound all stop applying.
@@ -715,7 +715,7 @@ Only `src/cli/main.ts` starts the Effect runtime.
 Effect.runPromise(cli(process.argv));
 
 // ✗ a capability starting its own nested runtime
-export const install = (request: InstallRequest) => Effect.runSync(applyArtifactPlan(request));
+export const install = (request: InstallRequest) => Effect.runSync(applyPlan(request));
 ```
 
 Why: capabilities that return Effect values stay composable and testable; a nested runtime severs them from the caller's context and interruption.
@@ -735,36 +735,35 @@ const fileReader = { read: (path: string) => readFileString(path) };
 
 Why: the official service is already the abstraction; a second one owns no policy and only hides which library is really in use. Add a repository-owned service when it owns real policy or a stable external boundary.
 
-### Dependency-free hook island
+### Dependency-free hooks
 [rule:import.hook-runtime] · verify: `pnpm style`
 
-An installed hook imports only `node:*` builtins, shared `src/runtime/**`, and its own feature runtime.
+An installed hook imports only `node:*` builtins, the shared `src/hooks/lib/**`, and its own feature code.
 
 ```ts
-// ✓ src/hookIsland/dedupGuard/hooks/dedupGuard.js
+// ✓ src/hooks/duplicateCodeGuard/hooks/duplicateCodeGuard.ts
 import { readFileSync } from "node:fs";
-import { readTransport } from "../../../runtime/transport.js";
-import { buildIndex } from "../lib/dupIndex.js";
+import { printDecisionAndExit } from "../../lib/hookOutput.js";
+import { buildDuplicateIndex } from "../lib/duplicateIndex.js";
 
 // ✗ Effect, third-party packages, CLI, catalog, or install code
 import { Effect } from "effect";
 ```
 
-Why: installed hooks run inside the user's agent with no install step of ours, so any import beyond this set is a runtime failure on their machine. Hooks also fail open. Co-located tests never ship, and a type-only import of a bare package is erased before emit, so neither can break the island.
+Why: installed hooks run inside the user's agent with no install step of ours, so any import beyond this set is a runtime failure on their machine. Hooks also fail open. Co-located tests never ship, and a type-only import of a bare package is erased before emit, so neither can break an installed hook.
 
-### Application enters the island only at a command surface
+### Application reaches hook code only through a command module
 [rule:import.application-boundary] · verify: `pnpm style`
 
-Application code reaches the hook island only through a feature `command/` module.
+Application code reaches hook code only through a feature `command/` module.
 
 ```ts
-// ✓ shared transport parsing lives under src/runtime and is imported by both sides
-import { parseTransportLine } from "../runtime/transport.js";
-// ✓ a CLI command wrapping the island's own runnable surface
-import { dedupCheck } from "../hookIsland/dedupGuard/command/dedupCheck.js";
+// ✓ a CLI command wrapping the feature's own runnable surface
+import { checkDuplicates } from "../hooks/duplicateCodeGuard/command/checkDuplicates.js";
 
-// ✗ reaching into an installed hook or its feature library from a capability
-import { readDedupState } from "../hookIsland/dedupGuard/hooks/dedupGuard.js";
+// ✗ reaching into an installed hook, its feature library, or the shared hook library from a capability
+import { readDuplicateState } from "../hooks/duplicateCodeGuard/hooks/duplicateCodeGuard.js";
+import { readConfig } from "../hooks/lib/hookConfig.js";
 ```
 
 Why: hooks and their libraries are shipped code the user's agent owns at runtime, so importing them back couples our orchestration to them; a `command/` module is the one surface built to be called from both sides, which is why it stays dependency-free.
@@ -776,7 +775,7 @@ Managed configuration combines invocation, environment, file, and Schema default
 
 ```ts
 // ✓ one capability owns the full precedence decision
-const bagConfig = yield* resolveBagConfig({ invocationConfig, environmentConfig, fileConfig });
+const config = yield* resolveConfig({ invocationConfig, environmentConfig, fileConfig });
 
 // ✗ every command reconstructs partial fallback precedence
 const scope = invocationScope || environmentScope || fileScope || "global";
@@ -850,11 +849,11 @@ Why: behavior tests survive internal refactors and make ownership invariants exe
 Maintained scripts exist only for repository-specific lifecycle work that an installed tool cannot perform directly.
 
 ```ts
-// ✓ root script owns Dufflebag package assembly
-// scripts/assembleHooks.mjs
+// ✓ maintained script owns Dufflebag README generation
+// src/scripts/generateReadme.ts
 
 // ✗ wrapper only forwards to Biome
-// scripts/lint.ts -> execa("biome", ["ci", "."])
+// src/scripts/lint.ts -> execa("biome", ["ci", "."])
 ```
 
 Why: direct tools keep commands recognizable and remove repository-owned forwarding code.
@@ -887,7 +886,7 @@ const preCommitCommand = "pnpm verify";
 const preCommitCommand = "pnpm generate-readme && git add README.md";
 ```
 
-Why: a commit hook must report stale artifacts without silently changing the commit the author reviewed.
+Why: a commit hook must report stale generated files without silently changing the commit the author reviewed.
 
 ### Feature branch for product work
 [rule:git.feature-branch] · verify: judgment
@@ -905,10 +904,10 @@ Why: keeps main releasable, reviews scoped, and parallel agents isolated.
 
 ## Canonical example
 
-The dependency-free `dedupGuard` slice is the litmus test for policy/mechanism separation: one private boundary decoder, one pure decision, one outer fail-open catch, and subprocess tests for the executable contract.
+The dependency-free `duplicateCodeGuard` slice is the litmus test for policy/mechanism separation: one private boundary decoder, one pure decision, one outer fail-open catch, and subprocess tests for the executable contract.
 
 ```ts
-// src/hookIsland/dedupGuard/hooks/dedupGuard.ts
+// src/hooks/duplicateCodeGuard/hooks/duplicateCodeGuard.ts
 const decideDuplicateEdit = (candidateEdit: CandidateEdit, knownEdits: ReadonlyArray<KnownEdit>): HookDecision =>
   knownEdits.some((knownEdit) => overlaps(candidateEdit, knownEdit)) ? "deny" : "allow";
 
@@ -920,7 +919,7 @@ const decodeHookEvent = (candidate: unknown): HookEvent | undefined => {
   return normalizeHookEvent(candidate);
 };
 
-const runDedupGuard = async (): Promise<void> => {
+const runDuplicateCodeGuard = async (): Promise<void> => {
   const hookEvent = decodeHookEvent(await readTransport());
   if (!hookEvent) {
     return;
@@ -930,21 +929,21 @@ const runDedupGuard = async (): Promise<void> => {
   writeHookDecision(hookDecision);
 };
 
-runDedupGuard().catch(() => process.exit(0));
+runDuplicateCodeGuard().catch(() => process.exit(0));
 ```
 
 The feature catalog owns its shipped files, the hook process owns transport, the pure decision owns business policy, and the test suite proves duplicate, non-duplicate, malformed-input, and fail-open scenarios through the executable boundary.
 
 ## Golden path — adding a feature
 
-A **feature** is dufflebag's unit of extension: a catalog entry plus the artifacts it installs.
+A **feature** is dufflebag's unit of extension: a catalog entry plus the files it installs.
 
 1. Define the user-visible contract and its public feature ID before choosing files.
-2. Choose exactly one authored tree: copied skill content under `src/skills/<sourceDirectory>/` or executable runtime under `src/hookIsland/<sourceDirectory>/`.
-3. Build the smallest capability by mirroring `src/skills/githubRepoMetadata/` for copied content or the canonical `src/hookIsland/dedupGuard/` slice for runtime.
+2. Choose exactly one authored tree: copied skill content under `src/skills/<sourceDirectory>/` or executable hook code under `src/hooks/<sourceDirectory>/`.
+3. Build the smallest capability by mirroring `src/skills/githubRepoAbout/` for copied content or the canonical `src/hooks/duplicateCodeGuard/` slice for hook code.
 4. Register the feature once in `src/catalog/featureCatalog.ts` with exact shipped paths; workflow skills declare the existing `type: flow` frontmatter instead of joining a second repeated list.
 5. Prove public behavior, fail-open behavior when applicable, catalog closure, and receipt-last ownership with colocated tests and real temporary workspaces.
-6. Update only the owning docs, regenerate README explicitly, and run the feature's narrow checks plus the png-to-code harness when that skill changes.
+6. Update only the owning docs, regenerate README explicitly, and run the feature's narrow checks plus the image-to-code harness when that skill changes.
 7. Run `pnpm verify`, `npm pack --dry-run`, then inspect README, the package file list, index, and worktree.
 
 **Definition of done**
@@ -960,7 +959,7 @@ A **feature** is dufflebag's unit of extension: a catalog entry plus the artifac
 
 ### Branching & PR
 
-See rule `git.feature-branch` under **Rules**. Skills: `finish-and-ship`, `organized-commits`, `sdlc-tasks-executions`. Remote branches stay unless the user explicitly asks to delete them.
+See rule `git.feature-branch` under **Rules**. Skills: `finish-and-push`, `organize-commits`, `run-tasks-in-parallel`. Remote branches stay unless the user explicitly asks to delete them.
 
 ### Adding a CLI command
 
@@ -973,21 +972,20 @@ See rule `git.feature-branch` under **Rules**. Skills: `finish-and-ship`, `organ
 ### Adding a rule to this document
 
 1. Add the card here with all five slots and a one-sentence assertion.
-2. Add the same `id` to `code-style.rules.json` with a `statement` byte-identical to the assertion.
-3. Point `verify` at a real command, or `judgment` if no detector exists.
-4. Implement the detector in `scripts/checkCodeStyle.ts` when the shape is mechanically checkable.
-5. Run `pnpm verify` — `scripts/checkStyleGuide.ts` fails the build if a slot is missing or the texts diverge.
+2. Point `verify` at a real command, or `judgment` if no detector exists.
+3. Implement the detector in `src/scripts/checkCodeStyle.ts` when the shape is mechanically checkable.
+4. Run `pnpm verify` — `src/scripts/checkRuleCards.ts` fails the build if a slot is missing or an ID repeats.
 
 ## Exemplars
 
 Write new code like these files:
 
-- `src/skills/githubRepoMetadata/` — smallest copied-skill feature shape.
-- `src/hookIsland/dedupGuard/` — policy/mechanism separation, one decoder, outer fail-open, and subprocess proof.
+- `src/skills/githubRepoAbout/` — smallest copied-skill feature shape.
+- `src/hooks/duplicateCodeGuard/` — policy/mechanism separation, one decoder, outer fail-open, and subprocess proof.
 - `src/catalog/featureCatalog.ts` — cohesive Schema-owned catalog declaration; keep it declarative rather than splitting by line count.
-- `src/install/applyArtifactPlan.ts` — inspect, validate, apply, and receipt-last ownership expressed through named operations.
+- `src/install/applyPlan.ts` — inspect, validate, apply, and receipt-last ownership expressed through named operations.
 - `src/cli/TerminalUI.ts` — the single presentation owner.
-- `src/runtime/io.ts` — a real shared dependency-free boundary, not a generic helper bucket.
+- `src/hooks/lib/hookOutput.ts` — a real shared dependency-free boundary, not a generic helper bucket.
 
 ## Never
 
@@ -1012,12 +1010,12 @@ The slop fingerprint for this repository. Each entry is a concrete shape, not an
 
 ## Formatting and verification
 
-Biome owns 2-space indentation, double quotes, semicolons, trailing commas, 120-column width, organized imports, the nullish-operator ban, and the nested-ternary ban across maintained TS, TSX, JS, MJS, JSON, and JSONC. Pinned Ruff owns Python linting and formatting for the voice island.
+Biome owns 2-space indentation, double quotes, semicolons, trailing commas, 120-column width, organized imports, and the nested-ternary ban across maintained TS, TSX, JS, MJS, JSON, and JSONC; `pnpm style` owns the nullish-operator ban. Pinned Ruff owns Python linting and formatting for the voice feature's scripts.
 
 | Command | Covers |
 | --- | --- |
 | `pnpm verify` | Biome → Ruff → typecheck → code-style contract → style-guide contract → tests → build → generated-document check. |
-| `pnpm style` | Repository-specific architecture, path, declaration, and import-graph checks over every maintained runtime tree. |
+| `pnpm style` | Repository-specific architecture, path, declaration, `??`, and import-graph checks over every maintained runtime tree. |
 
 The complete target verification order is:
 
@@ -1025,4 +1023,4 @@ The complete target verification order is:
 Biome → Ruff → typecheck → code-style contract → style-guide contract → tests → build → generated-document check
 ```
 
-The custom checker does not duplicate ordinary syntax checks that Biome, its Grit plugins, TypeScript, or Ruff already own. Hook-island findings gate with application and tooling findings. Broad legacy allowlists are forbidden; the only exceptions are the three exact protected authored-content paths in `code-style.rules.json`.
+The custom checker does not duplicate ordinary syntax checks that Biome, TypeScript, or Ruff already own. Hook code findings gate with application and tooling findings. Broad legacy allowlists are forbidden; the only exception is the one exact path in `NULLISH_EXCEPTION`.

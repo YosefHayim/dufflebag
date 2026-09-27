@@ -2,7 +2,7 @@ name: CI
 
 # One install and one `pnpm verify` run cover formatting, types, tests, the
 # production build, and repository gates. Dufflebag additionally needs uv for
-# its shipped voice integration test. See ADR 0018.
+# its shipped voice integration test.
 
 on:
   push:

@@ -7,7 +7,7 @@ import {
   agentDefinitionSchema,
   agentEvidenceSchema,
   agentTargetSchema,
-  classifyAgents,
+  detectAgents,
   findAgent,
 } from "./agentCatalog.js";
 
@@ -17,7 +17,7 @@ const expectedAgents = [
     displayName: "Claude Code",
     detection: { homePaths: [".claude"], absolutePaths: [], commands: ["claude"] },
     target: { _tag: "skillDirectory", path: ".claude/skills" },
-    nativeHooks: { _tag: "claudeJson", configPath: ".claude/settings.json", compactCommand: "/compact" },
+    nativeHooks: { _tag: "claudeJson", configPath: ".claude/settings.json" },
   },
   {
     id: "kiro",
@@ -66,14 +66,14 @@ const expectedAgents = [
     displayName: "Codex",
     detection: { homePaths: [".codex"], absolutePaths: [], commands: ["codex"] },
     target: { _tag: "skillDirectory", path: ".agents/skills" },
-    nativeHooks: { _tag: "codexJson", configPath: ".codex/hooks.json", compactCommand: "/compact" },
+    nativeHooks: { _tag: "codexJson", configPath: ".codex/hooks.json" },
   },
   {
     id: "grok",
     displayName: "Grok",
     detection: { homePaths: [".grok"], absolutePaths: [], commands: ["grok"] },
     target: { _tag: "skillDirectory", path: ".grok/skills" },
-    nativeHooks: { _tag: "grokJson", configPath: ".grok/hooks/dufflebag.json", compactCommand: "/compact" },
+    nativeHooks: { _tag: "grokJson", configPath: ".grok/hooks/dufflebag.json" },
   },
   {
     id: "gemini",
@@ -87,7 +87,7 @@ const expectedAgents = [
     displayName: "Aider",
     detection: { homePaths: [], absolutePaths: [], commands: ["aider"] },
     target: {
-      _tag: "configReference",
+      _tag: "instructionLink",
       instructionPath: "AGENTS.md",
       configPath: ".aider.conf.yml",
       referenceFormat: "yamlReadArray",
@@ -99,7 +99,7 @@ const expectedAgents = [
     displayName: "Continue",
     detection: { homePaths: [".continue"], absolutePaths: [], commands: [] },
     target: {
-      _tag: "configReference",
+      _tag: "instructionLink",
       instructionPath: "AGENTS.md",
       configPath: ".continue/config.json",
       referenceFormat: "jsonRulesArray",
@@ -130,98 +130,23 @@ const validAgentFixture = {
   nativeHooks: { _tag: "unsupported" },
 };
 
-const decodeCatalog = (input: unknown) =>
-  Schema.decodeUnknownEither(agentCatalogSchema, {
-    onExcessProperty: "error",
-  })(input);
+const decodeStrict =
+  <Value, Encoded>(schema: Schema.Schema<Value, Encoded>) =>
+  (input: unknown) =>
+    Schema.decodeUnknownEither(schema, { onExcessProperty: "error" })(input);
 
-const decodeDefinition = (input: unknown) =>
-  Schema.decodeUnknownEither(agentDefinitionSchema, {
-    onExcessProperty: "error",
-  })(input);
+const decodeDefinition = decodeStrict(agentDefinitionSchema);
 
-const decodeTarget = (input: unknown) =>
-  Schema.decodeUnknownEither(agentTargetSchema, {
-    onExcessProperty: "error",
-  })(input);
-
-const decodeEvidence = (input: unknown) =>
-  Schema.decodeUnknownEither(agentEvidenceSchema, {
-    onExcessProperty: "error",
-  })(input);
+const decodeTarget = decodeStrict(agentTargetSchema);
 
 describe("agentCatalog", () => {
   it("decodes the exact approved agents in stable display order", () => {
     expect(agentCatalog).toEqual(expectedAgents);
-    expect(agentCatalog).toHaveLength(14);
-  });
-
-  it("uses every target format and keeps IDs unique", () => {
-    expect(new Set(agentCatalog.map((agent) => agent.id)).size).toBe(agentCatalog.length);
-    expect({
-      skillDirectory: agentCatalog.filter((agent) => agent.target._tag === "skillDirectory").length,
-      ruleFile: agentCatalog.filter((agent) => agent.target._tag === "ruleFile").length,
-      instructionFile: agentCatalog.filter((agent) => agent.target._tag === "instructionFile").length,
-      configReference: agentCatalog.filter((agent) => agent.target._tag === "configReference").length,
-    }).toEqual({ skillDirectory: 6, ruleFile: 1, instructionFile: 5, configReference: 2 });
-  });
-
-  it("keeps human-facing display names in the catalog", () => {
-    expect(agentCatalog.map((agent) => agent.displayName)).toEqual([
-      "Claude Code",
-      "Kiro",
-      "Kimi Code CLI",
-      "Devin CLI",
-      "Cursor",
-      "Windsurf",
-      "Cline",
-      "Codex",
-      "Grok",
-      "Gemini CLI",
-      "Aider",
-      "Continue",
-      "Cody",
-      "Junie",
-    ]);
   });
 
   it("finds agents with Option and represents absence", () => {
     expect(Option.map(findAgent("kimi-code"), (agent) => agent.displayName)).toEqual(Option.some("Kimi Code CLI"));
     expect(findAgent("missing-agent")).toEqual(Option.none());
-  });
-
-  it("declares verified native hook adapters without inferring support from detection", () => {
-    expect(Option.map(findAgent("claude-code"), (agent) => agent.nativeHooks)).toEqual(
-      Option.some({ _tag: "claudeJson", configPath: ".claude/settings.json", compactCommand: "/compact" }),
-    );
-    expect(Option.map(findAgent("codex"), (agent) => agent.nativeHooks)).toEqual(
-      Option.some({ _tag: "codexJson", configPath: ".codex/hooks.json", compactCommand: "/compact" }),
-    );
-    expect(Option.map(findAgent("grok"), (agent) => agent.nativeHooks)).toEqual(
-      Option.some({ _tag: "grokJson", configPath: ".grok/hooks/dufflebag.json", compactCommand: "/compact" }),
-    );
-    expect(Option.map(findAgent("kimi-code"), (agent) => agent.nativeHooks)).toEqual(
-      Option.some({ _tag: "unsupported" }),
-    );
-  });
-
-  it("stores Aider and Continue behavior in referenceFormat data", () => {
-    expect(Option.map(findAgent("aider"), (agent) => agent.target)).toEqual(
-      Option.some({
-        _tag: "configReference",
-        instructionPath: "AGENTS.md",
-        configPath: ".aider.conf.yml",
-        referenceFormat: "yamlReadArray",
-      }),
-    );
-    expect(Option.map(findAgent("continue"), (agent) => agent.target)).toEqual(
-      Option.some({
-        _tag: "configReference",
-        instructionPath: "AGENTS.md",
-        configPath: ".continue/config.json",
-        referenceFormat: "jsonRulesArray",
-      }),
-    );
   });
 });
 
@@ -229,7 +154,7 @@ describe("agentCatalogSchema", () => {
   it("accepts a complete definition and rejects duplicate IDs", () => {
     expect(Either.isRight(decodeDefinition(validAgentFixture))).toBe(true);
 
-    const agentCatalogCheck = decodeCatalog([
+    const agentCatalogCheck = decodeStrict(agentCatalogSchema)([
       validAgentFixture,
       { ...validAgentFixture, displayName: "Duplicate Agent" },
     ]);
@@ -265,9 +190,9 @@ describe("agentCatalogSchema", () => {
       decode: decodeTarget,
     },
     {
-      name: "config-reference targets",
+      name: "instruction-link targets",
       input: {
-        _tag: "configReference",
+        _tag: "instructionLink",
         instructionPath: "EXAMPLE.md",
         configPath: ".example/config.json",
         referenceFormat: "jsonRulesArray",
@@ -282,22 +207,24 @@ describe("agentCatalogSchema", () => {
     expect(String(Option.getOrThrow(Either.getLeft(agentCatalogCheck)))).toContain("is unexpected");
   });
 
-  it("requires all three explicit detection arrays", () => {
-    expect(Either.isLeft(decodeEvidence({ homePaths: [], absolutePaths: [] }))).toBe(true);
-    expect(Either.isLeft(decodeEvidence({ homePaths: [], commands: [] }))).toBe(true);
-    expect(Either.isLeft(decodeEvidence({ absolutePaths: [], commands: [] }))).toBe(true);
+  it.each([
+    { homePaths: [], absolutePaths: [] },
+    { homePaths: [], commands: [] },
+    { absolutePaths: [], commands: [] },
+  ])("requires all three explicit detection arrays (%o)", (evidence) => {
+    expect(Either.isLeft(decodeStrict(agentEvidenceSchema)(evidence))).toBe(true);
   });
 });
 
-describe("classifyAgents", () => {
+describe("detectAgents", () => {
   it("uses OR semantics across every evidence kind and preserves catalog order", () => {
-    const classified = classifyAgents({
+    const detected = detectAgents({
       homePaths: [".continue", ".claude"],
       absolutePaths: ["/Applications/Windsurf.app"],
       commands: ["gemini", "cursor", "grok"],
     });
 
-    expect(classified.filter((agent) => agent.installed).map((agent) => agent.id)).toEqual([
+    expect(detected.filter((agent) => agent.installed).map((agent) => agent.id)).toEqual([
       "claude-code",
       "cursor",
       "windsurf",
@@ -305,25 +232,25 @@ describe("classifyAgents", () => {
       "gemini",
       "continue",
     ]);
-    expect(classified.map((agent) => agent.id)).toEqual(agentCatalog.map((agent) => agent.id));
+    expect(detected.map((agent) => agent.id)).toEqual(agentCatalog.map((agent) => agent.id));
   });
 
   it("returns every agent as not installed for empty evidence", () => {
-    const classified = classifyAgents({ homePaths: [], absolutePaths: [], commands: [] });
+    const detected = detectAgents({ homePaths: [], absolutePaths: [], commands: [] });
 
-    expect(classified).toHaveLength(14);
-    expect(classified.every((agent) => !agent.installed)).toBe(true);
+    expect(detected).toHaveLength(agentCatalog.length);
+    expect(detected.every((agent) => !agent.installed)).toBe(true);
   });
 
   it("derives display names from the catalog without a redundant supported flag", () => {
-    const classified = classifyAgents({ homePaths: [], absolutePaths: [], commands: ["aider"] });
+    const detected = detectAgents({ homePaths: [], absolutePaths: [], commands: ["aider"] });
 
-    expect(classified.map((agent) => agent.displayName)).toEqual(agentCatalog.map((agent) => agent.displayName));
-    expect(classified.find((agent) => agent.id === "aider")).toEqual({
+    expect(detected.map((agent) => agent.displayName)).toEqual(agentCatalog.map((agent) => agent.displayName));
+    expect(detected.find((agent) => agent.id === "aider")).toEqual({
       id: "aider",
       displayName: "Aider",
       installed: true,
     });
-    expect(classified.every((agent) => !("supported" in agent))).toBe(true);
+    expect(detected.every((agent) => !("supported" in agent))).toBe(true);
   });
 });

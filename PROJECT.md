@@ -16,13 +16,13 @@ configuration, and workflow templates behind a surgical installer.
 ## Who it is for
 
 Dufflebag serves its owner first and other coding-agent users who deliberately want
-this exact bag. It is not a plugin marketplace, a hosted agent platform, or a team
+this exact set. It is not a plugin marketplace, a hosted agent platform, or a team
 service with compatibility guarantees.
 
 ## Product promise
 
-A user can install, update, diagnose, configure, and remove the bag without losing
-unowned bytes. Catalog entries declare what may ship; receipts declare what may be
+A user can install, update, diagnose, configure, and remove what dufflebag installed
+without losing unowned bytes. Catalog entries declare what may ship; receipts declare what may be
 removed. Installed hooks run without package dependencies and fail open so a guard
 cannot block the editor because its own execution failed.
 
@@ -33,7 +33,7 @@ cannot block the editor because its own execution failed.
 - Warn and wind down long sessions before they exhaust context.
 - Detect structurally duplicated TypeScript while edits are being made and in CI.
 - Narrate complete agent replies locally and support local dictation/refinement.
-- Turn PNG references into code through a measured screenshot-difference loop.
+- Turn image references into code through a measured screenshot-difference loop.
 - Scaffold owned CI and publishing workflows into another repository.
 - Keep every supported agent format catalog-driven and evidence-backed.
 
@@ -49,19 +49,21 @@ cannot block the editor because its own execution failed.
 ## Direction
 
 The current product owns installation lifecycle, managed configuration, diagnostics,
-feature and agent catalogs, dependency-free hook islands, copied skills, local voice,
+feature and agent catalogs, dependency-free hooks, copied skills, local voice,
 and CI/publishing workflow scaffolding. Near-term work strengthens verified agent
 adapters, makes the command surface predictable for both people and automation, and
-keeps the authored bag consistent through one enforceable code-style contract.
+keeps the authored skills and hooks consistent through one enforceable code-style contract.
 
 Additional template kinds or agent integrations are considered only when an actual
 repository or verified tool contract needs them.
 
 ## Guiding principles
 
-- One source of truth for each fact.
+- One source of truth for each fact, including one generated list of every setting and
+  environment variable.
 - Business policy separated from mutable mechanisms by reason to change.
-- Honest domain names instead of generic placeholders.
+- Honest, plain-English domain names, one word per idea, instead of generic placeholders
+  or jargon.
 - Schema-owned runtime and persisted contracts.
 - Catalog-authorized shipping and receipt-authorized removal.
 - Dependency-free, fail-open installed hooks.

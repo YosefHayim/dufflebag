@@ -3,18 +3,21 @@
 The human↔agent glossary: names only. Use these exact terms in code, comments,
 commits, and docs; avoid the listed aliases. Orientation lives in `CONTEXT.md`.
 
+Names are plain English, one word per idea. A file is named after what is inside it,
+and a command file is named after its command.
+
 ## Terms
 
-**bag** / **bag-owned**
-Anything the installer manages, identified by the `/dufflebag/` path marker or receipt ownership.
-_Avoid_: "owned", "managed" (without marker context).
+**owned file**
+A file the installer manages, recorded in the receipt or marked by the `/dufflebag/` path.
+_Avoid_: "managed" (without receipt context).
 
 **feature**
-An installable unit such as `context-guard`, `dedup-guard`, `autonomous-loop`, `speak-response`, or `png-to-code` (public kebab-case IDs).
+An installable unit such as `context-guard`, `duplicate-code-guard`, `autorun`, `voice`, or `image-to-code` (public kebab-case IDs).
 _Avoid_: "plugin", "extension".
 
 **sourceDirectory**
-Authored camelCase directory naming a feature under `src/skills/` (payload) or `src/hookIsland/` (runtime) — e.g. `contextGuard`, `pngToCode`. Distinct from the public feature ID.
+Authored camelCase directory naming a feature under `src/skills/` (payload) or `src/hooks/` (hook code) — e.g. `contextGuard`, `duplicateCodeGuard`, `imageToCode`. Distinct from the public feature ID.
 _Avoid_: "skill folder name" when used as public ID.
 
 **skill**
@@ -25,25 +28,37 @@ _Avoid_: "prompt", "instruction file".
 Approved compound for authored content under `src/skills/` copied verbatim into an installed skill directory, including its `scripts/` and `templates/`.
 _Avoid_: standalone "payload", "skill code".
 
-**hook island**
-Executable dependency-free runtime under `src/hookIsland/<sourceDirectory>/` plus the shared `src/runtime/` kernel. Compiled, assembled flat, installed to `.claude/dufflebag/runtime/`.
+**hook code**
+Executable dependency-free code under `src/hooks/<sourceDirectory>/` plus the shared `src/hooks/lib/`. Compiled and installed to `.claude/dufflebag/hooks/`.
 _Avoid_: "skills", "payload".
 
 **hook**
-Zero-dependency runtime script that runs on an agent hook event. Must be **fail-open**.
+Zero-dependency script that runs on an agent hook event. Must be **fail-open**.
 _Avoid_: "callback", "handler" (imprecise).
 
-**runtime**
-Dependency-free hook kernel under `src/runtime/` and the flat `dist/hooks/` output.
-_Avoid_: "payload" (legacy), "bundle", "binary".
+**hook library**
+Dependency-free code every hook feature shares (`hookConfig`, `hookOutput`) under `src/hooks/lib/`, copied into each hook feature's `lib/` at install.
+_Avoid_: "payload", "bundle", "binary".
+
+**watcher**
+Background Node process a hook starts so it can act later: the autorun watcher and the idle compact watcher.
+_Avoid_: "service", "background job".
+
+**worker**
+Background process of the Rust voice binary: the dictation worker and the narration worker.
+_Avoid_: "service", "background job".
+
+**decision**
+Pure function that says what should happen next (`autorunDecision`, `idleCompactDecision`, `duplicateDecision`), kept apart from the code that acts on it.
+_Avoid_: "policy engine", "rule engine".
 
 **catalog**
 The allowlist in `src/catalog/featureCatalog.ts` that declares every feature and what it ships.
 _Avoid_: "registry", "manifest", "`FEATURES`" alone.
 
 **receipt**
-Ownership record at `.claude/dufflebag/receipt.json` authorizing install/update/uninstall mutations.
-_Avoid_: "manifest" (legacy).
+Ownership record at `.claude/dufflebag/receipt.json` authorizing install/update/uninstall changes.
+_Avoid_: "manifest".
 
 **ships / shippedPaths**
 Per-feature allowlist of paths copied into a user's install. Fail-safe: unlisted paths ship nothing.
@@ -53,11 +68,19 @@ _Avoid_: "includes", "files".
 Receipt-authorized edits that restore prior bytes on uninstall.
 _Avoid_: "merge", "patch".
 
+**setting**
+One `config.json` key defined in `src/config/configSchema.ts`. The key starts with its area word (`contextWarnPercent`); the CLI name is its kebab-case form (`context-warn-percent`).
+_Avoid_: "option", "flag" (those are CLI arguments).
+
+**environment variable**
+A `DUFFLEBAG_<AREA>_<SETTING>` name listed in `src/config/environmentVariables.ts`, for example `DUFFLEBAG_IDLE_COMPACT_AFTER`.
+_Avoid_: "env key".
+
 **context-guard**
-Nudge `/handoff` at the warn fraction and hard-deny new code edits near the cap.
+Nudge `/handoff` at the warn percent and hard-deny new code edits at the block percent.
 _Avoid_: "context manager".
 
-**idle auto-compact**
+**idle compact**
 Optional native-hook loop that submits one idle draft, waits for any resulting turn, compacts once, then parks.
 _Avoid_: "autorun" (different context-budget loop), "timer wrapper".
 
@@ -69,32 +92,31 @@ _Avoid_: "supported" without evidence.
 Session-start proof binding automation to one stable Ghostty terminal ID, including tabs and splits.
 _Avoid_: "focused pane", "front window".
 
-**dedup-guard**
-DRY guard that blocks duplicate function/type bodies at write time.
+**duplicate-code-guard**
+Guard that blocks a copied function body or type shape at write time. `dufflebag duplicates` runs the same check from the CLI or CI.
 _Avoid_: "duplicate checker".
 
-**autonomous-loop / `autorun`**
-Skill that arms the context-guard SessionStart daemon for hands-free compact/resume (`stop`/`exit` verbs). Hook runtime is owned by **context-guard**.
-_Avoid_: "auto-compact", "daemon" (alone).
+**autorun**
+Feature and skill that arms the context-guard autorun watcher for hands-free compact/resume (`stop`/`exit` verbs). Its hook code is owned by **context-guard**.
+_Avoid_: "auto-compact", "autopilot".
 
-**speak-response**
-Public feature ID for the stop hook that narrates a complete agent reply locally. Internal code uses domain terms such as `agentReply`.
+**voice**
+Public feature ID for local voice: the stop hook that reads a complete agent reply aloud, dictation, and prompt refinement. Internal code uses domain terms such as `agentReply`.
 _Avoid_: standalone "response" in authored identifiers.
 
-**png-to-code**
-PNG → measured pixel-perfect code skill (SVG/HTML/CSS) with screenshot-diff harness.
-_Avoid_: "image-to-code".
+**image-to-code**
+Image (PNG, screenshot, design) → measured pixel-perfect code skill (SVG/HTML/CSS) with screenshot-diff harness.
 
 **workflow scaffold**
 CLI command that copies the owned single-gate CI/publish set into another repository.
-_Avoid_: "scaffold-ci", "scaffold-workflows", "ci-setup".
+_Avoid_: "ci-setup".
 
 **fail-open**
 Hooks must exit successfully on any error so a guard bug never blocks the user.
 _Avoid_: "graceful degrade".
 
 **capability layout**
-Folders group by product capability (`cli`, `catalog`, `config`, `install`, `runtime`, `skills`, `hookIsland`).
+Folders group by product capability (`cli`, `catalog`, `config`, `install`, `hooks`, `skills`, `doctor`, `workflows`, `voiceControl`, `providerRouting`).
 _Avoid_: "src/core layers", pure-core/imperative-shell folders.
 
 **biome**
@@ -106,7 +128,7 @@ _Avoid_: "linter", "prettier" (only half).
 _Avoid_: "test/ dir".
 
 **vertical per feature**
-Each feature owns one folder named for its `sourceDirectory` — under `src/skills/` when it ships payload, under `src/hookIsland/` when it ships runtime.
+Each feature owns one folder named for its `sourceDirectory` — under `src/skills/` when it ships payload, under `src/hooks/` when it ships hook code.
 _Avoid_: "horizontal layers".
 
 **single command per tool surface**
@@ -114,15 +136,15 @@ One `autorun` skill with verbs instead of multiple thin skills.
 _Avoid_: "one skill per verb".
 
 **agent root contract**
-Root `AGENTS.md`, authoritative for agent behavior and the routing map to delegated subject SSOTs; `CLAUDE.md` and `GEMINI.md` are symlinks to it.
+Root `AGENTS.md`, authoritative for agent behavior and the routing map to delegated subject SSOTs.
 _Avoid_: "agent digest" when implying it is non-authoritative.
 
 **SSOT**
-Single source of truth; the full managed-configuration contract lives in `src/config/bagConfigSchema.ts`, while `src/runtime/config.ts` holds only the dependency-free hook projection.
+Single source of truth; the full managed-configuration contract lives in `src/config/configSchema.ts`, every environment variable in `src/config/environmentVariables.ts`, while `src/hooks/lib/hookConfig.ts` holds only the dependency-free hook projection.
 _Avoid_: "source of truth" (acceptable, but the acronym is established).
 
 **clean break**
-No back-compat shims on renames/pivots.
+No back-compat shims on renames/pivots. Old installs upgrade by uninstalling with the old version, then installing the new one.
 _Avoid_: "migration", "deprecation".
 
 **verify**

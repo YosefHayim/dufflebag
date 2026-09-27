@@ -1,6 +1,6 @@
 ---
 name: fix-bug
-description: Use when the user runs /fix-bug, says "fix this bug", "fix these bugs", "reproduce then fix", "debug this failure", or describes one or more concrete defects and wants senior-engineer proof (env, logs, edge cases, verification) before code changes — never patch from the report alone.
+description: Use when you want to fix real bugs with proof. It reproduces the bug first, finds the real cause, fixes it, tests edge cases, and shows that the fix works. Say "fix this bug", "reproduce then fix", or "debug this failure".
 type: flow
 ---
 

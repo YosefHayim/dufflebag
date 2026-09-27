@@ -1,39 +1,27 @@
-import { createHash } from "node:crypto";
+/** A managed block of skills inside a shared instruction file (AGENTS.md, GEMINI.md, …), framed so it can be removed byte for byte. */
 
 import { Either, Schema, ParseResult as SchemaParseIssue } from "effect";
+import { type AgentDefinition, agentCatalog, agentIdSchema } from "../../catalog/agentCatalog.js";
+import { installedSkillSchema } from "../../catalog/featureCatalog.js";
+import { bytesEqual, hashBytes } from "../fileBytes.js";
+import { fileKindSchema, fileOwnerSchema, managedBlockOwnershipSchema, relativePathSchema } from "../ownership.js";
+import { isCatalogSkill } from "./catalogChecks.js";
+import { controlScriptSchema, fillControlScript, stripFrontmatter, withCompleteFrontmatter } from "./skillText.js";
 
-import { agentCatalog, agentIdSchema } from "../../catalog/agentCatalog.js";
-import { featureCatalog, installedSkillDefinitionSchema } from "../../catalog/featureCatalog.js";
-import {
-  artifactKindSchema,
-  artifactOwnerSchema,
-  managedBlockOwnershipSchema,
-  relativeArtifactPathSchema,
-} from "../artifactReceipt.js";
-
-export const instructionBlockStartMarker = "<!-- dufflebag:skills start -->";
-export const instructionBlockEndMarker = "<!-- dufflebag:skills end -->";
-
-const templateToken = "@@CTL@@";
+const startMarker = "<!-- dufflebag:skills start -->";
+const endMarker = "<!-- dufflebag:skills end -->";
 const textEncoder = new TextEncoder();
-const startMarkerBytes = textEncoder.encode(instructionBlockStartMarker);
-const endMarkerBytes = textEncoder.encode(instructionBlockEndMarker);
+const startMarkerBytes = textEncoder.encode(startMarker);
+const endMarkerBytes = textEncoder.encode(endMarker);
 const lineFeedBytes = textEncoder.encode("\n");
 const carriageReturnBytes = textEncoder.encode("\r");
 const blockSeparatorBytes = textEncoder.encode("\n\n");
-const leadingFrontmatterOpeningPattern = /^---(?:\r\n|\n)/;
-const leadingFrontmatterBlockPattern = /^---(?:\r\n|\n)(?:[\s\S]*?(?:\r\n|\n))?---(?:(?:\r\n|\n)|$)/;
-const catalogSkillDefinitionSchema = installedSkillDefinitionSchema.members[1];
-const installedSkillsEqual = Schema.equivalence(catalogSkillDefinitionSchema);
-const catalogInstalledSkills = featureCatalog.flatMap((feature) =>
-  feature.installedSkill._tag === "skill" ? [feature.installedSkill] : [],
-);
 
 export class InstructionFilePlanError extends Schema.TaggedError<InstructionFilePlanError>()(
   "InstructionFilePlanError",
   {
     issue: Schema.NonEmptyString.annotations({
-      description: "Actionable instruction-file request or materialization issue.",
+      description: "Actionable instruction-file request or planning issue.",
     }),
   },
 ) {
@@ -42,36 +30,43 @@ export class InstructionFilePlanError extends Schema.TaggedError<InstructionFile
   }
 }
 
-const formatParseError = (error: SchemaParseIssue.ParseError): string =>
-  SchemaParseIssue.TreeFormatter.formatErrorSync(error);
+const planError = (issue: string) => new InstructionFilePlanError({ issue });
 
-const hashBytes = (bytes: Uint8Array): string => createHash("sha256").update(bytes).digest("hex");
-
-const bytesEqual = (left: Uint8Array, right: Uint8Array): boolean =>
-  left.byteLength === right.byteLength && left.every((value, index) => value === right[index]);
-
-const concatenateBytes = (values: ReadonlyArray<Uint8Array>): Uint8Array => {
-  const length = values.reduce((total, value) => total + value.byteLength, 0);
-  const instructionMerge = new Uint8Array(length);
-  let offset = 0;
-
-  // Copy each owned byte segment into one deterministic result.
-  for (const value of values) {
-    instructionMerge.set(value, offset);
-    offset += value.byteLength;
+export const instructionPath = (agent: AgentDefinition): string | undefined => {
+  if (agent.target._tag === "instructionFile") {
+    return agent.target.path;
   }
 
-  return instructionMerge;
+  return agent.target._tag === "instructionLink" ? agent.target.instructionPath : undefined;
 };
 
-const findByteIndexes = (input: { bytes: Uint8Array; pattern: Uint8Array }): ReadonlyArray<number> => {
-  const indexes: Array<number> = [];
-  const lastStart = input.bytes.byteLength - input.pattern.byteLength;
+const agentIdsMatchPath = (agentIds: ReadonlyArray<string>, path: string): boolean =>
+  agentIds.every((agentId) => {
+    const agent = agentCatalog.find((candidate) => candidate.id === agentId);
 
-  // Find every exact marker without decoding or normalizing surrounding bytes.
-  for (let offset = 0; offset <= lastStart; offset += 1) {
-    const matches = input.pattern.every((value, index) => input.bytes[offset + index] === value);
-    if (matches) {
+    return agent !== undefined && instructionPath(agent) === path;
+  });
+
+// Codex once owned AGENTS.md directly, so its receipts must still be restorable.
+const previousAgentIdsMatchPath = (agentIds: ReadonlyArray<string>, path: string): boolean =>
+  agentIds.every((agentId) => agentIdsMatchPath([agentId], path) || (agentId === "codex" && path === "AGENTS.md"));
+
+const concatenateBytes = (parts: ReadonlyArray<Uint8Array>): Uint8Array => {
+  const bytes = new Uint8Array(parts.reduce((total, part) => total + part.byteLength, 0));
+  let offset = 0;
+  for (const part of parts) {
+    bytes.set(part, offset);
+    offset += part.byteLength;
+  }
+
+  return bytes;
+};
+
+// Markers are matched on raw bytes so nothing around them is decoded or normalized.
+const findByteIndexes = (bytes: Uint8Array, pattern: Uint8Array): ReadonlyArray<number> => {
+  const indexes: Array<number> = [];
+  for (let offset = 0; offset <= bytes.byteLength - pattern.byteLength; offset += 1) {
+    if (pattern.every((value, index) => bytes[offset + index] === value)) {
       indexes.push(offset);
     }
   }
@@ -79,35 +74,31 @@ const findByteIndexes = (input: { bytes: Uint8Array; pattern: Uint8Array }): Rea
   return indexes;
 };
 
-const missingManagedBlockSchema = Schema.TaggedStruct("missing", {});
-const managedBlockLocationSchema = Schema.TaggedStruct("block", {
-  start: Schema.NonNegativeInt,
-  bodyStart: Schema.NonNegativeInt,
-  bodyEnd: Schema.NonNegativeInt,
-  end: Schema.NonNegativeInt,
-});
-const currentManagedBlockSchema = Schema.Union(missingManagedBlockSchema, managedBlockLocationSchema);
+type ManagedBlock = {
+  readonly _tag: "block";
+  readonly start: number;
+  readonly bodyStart: number;
+  readonly bodyEnd: number;
+  readonly end: number;
+};
 
-type ManagedBlockLocation = Schema.Schema.Type<typeof managedBlockLocationSchema>;
-type CurrentManagedBlock = Schema.Schema.Type<typeof currentManagedBlockSchema>;
+type CurrentBlock = { readonly _tag: "missing" } | ManagedBlock;
 
-const inspectManagedBlock = (bytes: Uint8Array): Either.Either<CurrentManagedBlock, InstructionFilePlanError> => {
-  const starts = findByteIndexes({ bytes, pattern: startMarkerBytes });
-  const ends = findByteIndexes({ bytes, pattern: endMarkerBytes });
+const inspectManagedBlock = (bytes: Uint8Array): Either.Either<CurrentBlock, InstructionFilePlanError> => {
+  const starts = findByteIndexes(bytes, startMarkerBytes);
+  const ends = findByteIndexes(bytes, endMarkerBytes);
   if (starts.length === 0 && ends.length === 0) {
     return Either.right({ _tag: "missing" });
   }
 
   if (starts.length !== 1 || ends.length !== 1) {
-    return Either.left(
-      new InstructionFilePlanError({ issue: "managed block markers must occur exactly once as a pair." }),
-    );
+    return Either.left(planError("managed block markers must occur exactly once as a pair."));
   }
 
   const start = starts[0];
   const end = ends[0];
   if (start === undefined || end === undefined || end < start + startMarkerBytes.byteLength) {
-    return Either.left(new InstructionFilePlanError({ issue: "managed block markers are reversed or overlap." }));
+    return Either.left(planError("managed block markers are reversed or overlap."));
   }
 
   return Either.right({
@@ -119,87 +110,51 @@ const inspectManagedBlock = (bytes: Uint8Array): Either.Either<CurrentManagedBlo
   });
 };
 
-const hasCompleteLeadingFrontmatter = (markdown: string): boolean =>
-  !leadingFrontmatterOpeningPattern.test(markdown) || leadingFrontmatterBlockPattern.test(markdown);
-
-const stripLeadingFrontmatter = (markdown: string): string =>
-  markdown.replace(leadingFrontmatterBlockPattern, "").replaceAll("\r\n", "\n");
-
 const instructionSkillSchema = Schema.Struct({
-  installedSkill: catalogSkillDefinitionSchema.pipe(
-    Schema.filter(
-      (installedSkill) => catalogInstalledSkills.some((candidate) => installedSkillsEqual(candidate, installedSkill)),
-      {
-        message: () => "Instruction-file installed skills must exactly match the decoded feature catalog.",
-      },
-    ),
+  installedSkill: installedSkillSchema.pipe(
+    Schema.filter(isCatalogSkill, {
+      message: () => "Instruction-file installed skills must exactly match the decoded feature catalog.",
+    }),
     Schema.annotations({
       description: "Catalog-owned installed skill rendered into the managed instruction block.",
     }),
   ),
-  markdown: Schema.NonEmptyString.pipe(
-    Schema.filter(hasCompleteLeadingFrontmatter, {
-      message: () => "Leading YAML frontmatter must have exact opening and closing delimiter lines.",
-    }),
-    Schema.annotations({
-      description: "Complete installed SKILL.md text before frontmatter removal and control-path substitution.",
-    }),
-  ),
+  markdown: withCompleteFrontmatter(Schema.NonEmptyString).annotations({
+    description: "Complete installed SKILL.md text before frontmatter removal and control-path substitution.",
+  }),
 });
 
-export type InstructionSkill = Schema.Schema.Type<typeof instructionSkillSchema>;
+type InstructionSkill = Schema.Schema.Type<typeof instructionSkillSchema>;
 
-const renderSkillSection = (skill: InstructionSkill, ctl: string) => {
-  const documentText = stripLeadingFrontmatter(skill.markdown).split(templateToken).join(ctl).trim();
+const renderSkillSection = (skill: InstructionSkill, controlScript: string) => {
+  const documentText = fillControlScript(
+    stripFrontmatter(skill.markdown).replaceAll("\r\n", "\n"),
+    controlScript,
+  ).trim();
   if (documentText.length === 0) {
-    return Either.left(
-      new InstructionFilePlanError({
-        issue: `skill ${skill.installedSkill.id} has no markdown body after frontmatter.`,
-      }),
-    );
+    return Either.left(planError(`skill ${skill.installedSkill.id} has no markdown body after frontmatter.`));
   }
 
-  if (documentText.includes(instructionBlockStartMarker) || documentText.includes(instructionBlockEndMarker)) {
-    return Either.left(
-      new InstructionFilePlanError({
-        issue: `skill ${skill.installedSkill.id} contains a reserved managed block marker.`,
-      }),
-    );
+  if (documentText.includes(startMarker) || documentText.includes(endMarker)) {
+    return Either.left(planError(`skill ${skill.installedSkill.id} contains a reserved managed block marker.`));
   }
 
   return Either.right(`## ${skill.installedSkill.id}\n\n${documentText}`);
 };
 
-const renderManagedSection = (skills: ReadonlyArray<InstructionSkill>, ctl: string) => {
-  const sections = Either.all(skills.map((skill) => renderSkillSection(skill, ctl)));
+const renderManagedSection = (skills: ReadonlyArray<InstructionSkill>, controlScript: string) =>
+  Either.map(Either.all(skills.map((skill) => renderSkillSection(skill, controlScript))), (sections) =>
+    textEncoder.encode(`\n${sections.join("\n\n---\n\n")}\n`),
+  );
 
-  return Either.map(sections, (values) => textEncoder.encode(`\n${values.join("\n\n---\n\n")}\n`));
-};
-
-const replaceManagedBlock = (input: {
+// The block owns one trailing line feed, plus the blank-line separator before it when the file already existed.
+const receiptedBlockRange = (input: {
   currentBytes: Uint8Array;
-  block: ManagedBlockLocation;
-  desiredBlock: Uint8Array;
-}): Uint8Array =>
-  concatenateBytes([
-    input.currentBytes.slice(0, input.block.start),
-    input.desiredBlock,
-    input.currentBytes.slice(input.block.end),
-  ]);
-
-const appendedInstructionBytes = (currentBytes: Uint8Array, block: Uint8Array): Uint8Array =>
-  concatenateBytes([currentBytes, blockSeparatorBytes, block, lineFeedBytes]);
-
-const receiptedBlockRemovalRange = (input: {
-  currentBytes: Uint8Array;
-  block: ManagedBlockLocation;
+  block: ManagedBlock;
   filePreviouslyPresent: boolean;
 }): Either.Either<readonly [number, number], InstructionFilePlanError> => {
-  const hasTrailingFrame = input.currentBytes[input.block.end] === lineFeedBytes[0];
-  if (!hasTrailingFrame) {
-    return Either.left(
-      new InstructionFilePlanError({ issue: "managed block framing changed after the closing marker." }),
-    );
+  if (input.currentBytes[input.block.end] !== lineFeedBytes[0]) {
+    return Either.left(planError("managed block framing changed after the closing marker."));
   }
 
   const end = input.block.end + lineFeedBytes.byteLength;
@@ -208,22 +163,20 @@ const receiptedBlockRemovalRange = (input: {
   }
 
   const frameStart = input.block.start - blockSeparatorBytes.byteLength;
-  const frame = input.currentBytes.slice(frameStart, input.block.start);
-  if (frameStart < 0 || !bytesEqual(frame, blockSeparatorBytes)) {
-    return Either.left(
-      new InstructionFilePlanError({ issue: "managed block framing changed before the opening marker." }),
-    );
+  if (frameStart < 0 || !bytesEqual(input.currentBytes.slice(frameStart, input.block.start), blockSeparatorBytes)) {
+    return Either.left(planError("managed block framing changed before the opening marker."));
   }
 
   return Either.right([frameStart, end]);
 };
 
+// User text written after the block stays on its own line once the block is gone.
 const stripReceiptedBlock = (input: {
   currentBytes: Uint8Array;
-  block: ManagedBlockLocation;
+  block: ManagedBlock;
   filePreviouslyPresent: boolean;
 }) =>
-  Either.map(receiptedBlockRemovalRange(input), ([start, end]) => {
+  Either.map(receiptedBlockRange(input), ([start, end]) => {
     const prefix = input.currentBytes.slice(0, start);
     const suffix = input.currentBytes.slice(end);
     const suffixStartsLineEnding =
@@ -237,82 +190,105 @@ const stripReceiptedBlock = (input: {
     return concatenateBytes([prefix, ...(needsSeparator ? [lineFeedBytes] : []), suffix]);
   });
 
-const instructionAgentIdsSchema = Schema.NonEmptyArray(agentIdSchema).pipe(
-  Schema.filter(
-    (agentIds) =>
-      Schema.is(artifactOwnerSchema)({
-        _tag: "agent",
-        agentIds,
-      }),
-    {
-      message: () => "Instruction agents must be unique and use exact catalog order.",
-    },
-  ),
-);
-
-const instructionArtifactSchema = Schema.Struct({
-  owner: artifactOwnerSchema.members[1].annotations({
-    description: "Catalog agents that share this exact instruction artifact.",
+const ownedInstructionFileSchema = Schema.Struct({
+  owner: fileOwnerSchema.members[1].annotations({
+    description: "Catalog agents that share this exact instruction file.",
   }),
-  path: relativeArtifactPathSchema.annotations({
+  path: relativePathSchema.annotations({
     description: "Catalog instruction path owned by the complete agent set.",
   }),
-  kind: artifactKindSchema.members[3].annotations({
-    description: "Artifact kind fixed to one shared instruction file.",
+  kind: fileKindSchema.members[3].annotations({
+    description: "File kind fixed to one shared instruction file.",
   }),
   ownership: managedBlockOwnershipSchema.annotations({
     description: "Exact managed block history and installed-body evidence.",
   }),
 });
 
-type InstructionArtifact = Schema.Schema.Type<typeof instructionArtifactSchema>;
+type OwnedInstructionFile = Schema.Schema.Type<typeof ownedInstructionFileSchema>;
 
-const instructionWriteOperationFieldsSchema = Schema.TaggedStruct("write", {
-  artifact: instructionArtifactSchema,
-  bytes: Schema.Uint8ArrayFromSelf.annotations({
-    description: "Complete desired instruction-file bytes.",
+const instructionOperationSchema = Schema.Union(
+  Schema.TaggedStruct("write", {
+    file: ownedInstructionFileSchema,
+    bytes: Schema.Uint8ArrayFromSelf.annotations({
+      description: "Complete desired instruction-file bytes.",
+    }),
   }),
-});
-
-const instructionRestoreOperationSchema = Schema.TaggedStruct("restore", {
-  artifact: instructionArtifactSchema,
-  bytes: Schema.Uint8ArrayFromSelf.annotations({
-    description: "Exact surrounding bytes left after the managed block is removed.",
+  Schema.TaggedStruct("restore", {
+    file: ownedInstructionFileSchema,
+    bytes: Schema.Uint8ArrayFromSelf.annotations({
+      description: "Exact surrounding bytes left after the managed block is removed.",
+    }),
   }),
-});
-
-const emptyInstructionBytesSchema = Schema.Uint8ArrayFromSelf.pipe(
-  Schema.filter((bytes) => bytes.byteLength === 0, {
-    message: () => "Instruction-file removal requires no remaining unowned bytes.",
-  }),
-);
-
-const instructionRemoveOperationSchema = Schema.TaggedStruct("remove", {
-  artifact: instructionArtifactSchema,
-  unownedBytes: emptyInstructionBytesSchema,
-}).pipe(
-  Schema.filter((operation) =>
-    operation.artifact.ownership.filePreviouslyPresent
-      ? {
-          path: ["artifact", "ownership", "filePreviouslyPresent"],
-          message: "A pre-existing instruction file must be restored instead of removed.",
-        }
-      : undefined,
+  Schema.TaggedStruct("remove", {
+    file: ownedInstructionFileSchema,
+    unownedBytes: Schema.Uint8ArrayFromSelf.pipe(
+      Schema.filter((bytes) => bytes.byteLength === 0, {
+        message: () => "Instruction-file removal requires no remaining unowned bytes.",
+      }),
+    ),
+  }).pipe(
+    Schema.filter((operation) =>
+      operation.file.ownership.filePreviouslyPresent
+        ? {
+            path: ["file", "ownership", "filePreviouslyPresent"],
+            message: "A pre-existing instruction file must be restored instead of removed.",
+          }
+        : undefined,
+    ),
   ),
+).pipe(
+  Schema.filter((operation) => {
+    const ownership = operation.file.ownership;
+    const ownerMatchesPath = operation._tag === "write" ? agentIdsMatchPath : previousAgentIdsMatchPath;
+    const identityIssues = [
+      ownerMatchesPath(operation.file.owner.agentIds, operation.file.path)
+        ? undefined
+        : { path: ["file", "owner"], message: "Instruction plan owners must consume the file path from the catalog." },
+      ownership.startMarker === startMarker && ownership.endMarker === endMarker
+        ? undefined
+        : {
+            path: ["file", "ownership"],
+            message: "Instruction ownership must use the canonical managed-block markers.",
+          },
+    ];
+    if (operation._tag !== "write") {
+      return identityIssues;
+    }
+
+    const block = inspectManagedBlock(operation.bytes);
+    if (Either.isLeft(block) || block.right._tag === "missing") {
+      return [
+        ...identityIssues,
+        { path: ["bytes"], message: "Instruction writes must contain exactly one valid managed block." },
+      ];
+    }
+
+    return [
+      ...identityIssues,
+      hashBytes(operation.bytes.slice(block.right.bodyStart, block.right.bodyEnd)) === ownership.installedBodyHash
+        ? undefined
+        : {
+            path: ["file", "ownership", "installedBodyHash"],
+            message: "Instruction ownership hash must match the exact managed body bytes.",
+          },
+    ];
+  }),
 );
 
-const instructionOperationFieldsSchema = Schema.Union(
-  instructionWriteOperationFieldsSchema,
-  instructionRestoreOperationSchema,
-  instructionRemoveOperationSchema,
-);
+export const instructionFilePlanSchema = Schema.Union(Schema.TaggedStruct("none", {}), instructionOperationSchema);
 
-type InstructionOperationFields = Schema.Schema.Type<typeof instructionOperationFieldsSchema>;
+export type InstructionFilePlan = Schema.Schema.Type<typeof instructionFilePlanSchema>;
 
 const presentInstructionSchema = Schema.TaggedStruct("present", {
-  agentIds: instructionAgentIdsSchema.annotations({
-    description: "Catalog-ordered agents that share the desired instruction path.",
-  }),
+  agentIds: Schema.NonEmptyArray(agentIdSchema).pipe(
+    Schema.filter((agentIds) => Schema.is(fileOwnerSchema)({ _tag: "agent", agentIds }), {
+      message: () => "Instruction agents must be unique and use exact catalog order.",
+    }),
+    Schema.annotations({
+      description: "Catalog-ordered agents that share the desired instruction path.",
+    }),
+  ),
   skills: Schema.NonEmptyArray(instructionSkillSchema).pipe(
     Schema.filter((skills) => skills.length === new Set(skills.map((skill) => skill.installedSkill.id)).size, {
       message: () => "Instruction-file installed skills must be unique.",
@@ -321,190 +297,102 @@ const presentInstructionSchema = Schema.TaggedStruct("present", {
       description: "Ordered catalog skills rendered into the desired managed block.",
     }),
   ),
-  ctl: Schema.NonEmptyTrimmedString.pipe(
-    Schema.filter((command) => !command.includes(templateToken), {
-      message: () => "The control command cannot contain the unresolved template token.",
-    }),
-    Schema.annotations({
-      description: "Concrete control command substituted for every @@CTL@@ placeholder.",
-    }),
-  ),
+  controlScript: controlScriptSchema.annotations({
+    description: "Concrete control command substituted for every @@AUTORUN_CONTROL@@ placeholder.",
+  }),
 });
 
 type PresentInstruction = Schema.Schema.Type<typeof presentInstructionSchema>;
 
-const desiredInstructionSchema = Schema.Union(Schema.TaggedStruct("absent", {}), presentInstructionSchema);
-
-const currentInstructionFileSchema = Schema.Union(
-  Schema.TaggedStruct("missing", {}),
-  Schema.TaggedStruct("file", {
-    bytes: Schema.Uint8ArrayFromSelf.annotations({
-      description: "Exact current instruction-file bytes inspected without normalization.",
-    }),
-  }),
-);
-
-const previousInstructionArtifactSchema = Schema.Union(
-  Schema.TaggedStruct("missing", {}),
-  Schema.TaggedStruct("owned", {
-    artifact: Schema.typeSchema(instructionArtifactSchema).annotations({
-      description: "Exact prior receipt entry authorizing replacement or restoration.",
-    }),
-  }),
-);
-
 const instructionFileRequestFieldsSchema = Schema.Struct({
-  path: relativeArtifactPathSchema.annotations({
+  path: relativePathSchema.annotations({
     description: "Shared instruction path planned exactly once for all desired consumers.",
   }),
-  desired: desiredInstructionSchema.annotations({
+  desired: Schema.Union(Schema.TaggedStruct("absent", {}), presentInstructionSchema).annotations({
     description: "Desired managed block and owners, or explicit absence for restoration.",
   }),
-  currentFile: currentInstructionFileSchema,
-  previousArtifact: previousInstructionArtifactSchema,
+  currentFile: Schema.Union(
+    Schema.TaggedStruct("missing", {}),
+    Schema.TaggedStruct("file", {
+      bytes: Schema.Uint8ArrayFromSelf.annotations({
+        description: "Exact current instruction-file bytes inspected without normalization.",
+      }),
+    }),
+  ),
+  previousFile: Schema.Union(
+    Schema.TaggedStruct("missing", {}),
+    Schema.TaggedStruct("owned", {
+      file: Schema.typeSchema(ownedInstructionFileSchema).annotations({
+        description: "Exact prior receipt entry authorizing replacement or restoration.",
+      }),
+    }),
+  ),
 });
 
 type InstructionFileRequestFields = Schema.Schema.Type<typeof instructionFileRequestFieldsSchema>;
 
-const instructionPathForAgent = (agentId: string): string | undefined => {
-  const agent = agentCatalog.find((candidate) => candidate.id === agentId);
-  if (agent?.target._tag === "instructionFile") {
-    return agent.target.path;
-  }
-
-  return agent?.target._tag === "configReference" ? agent.target.instructionPath : undefined;
-};
-
-const agentIdsMatchPath = (agentIds: ReadonlyArray<string>, path: string): boolean =>
-  agentIds.every((agentId) => instructionPathForAgent(agentId) === path);
-
-const previousAgentIdsMatchPath = (agentIds: ReadonlyArray<string>, path: string): boolean =>
-  agentIds.every(
-    (agentId) => instructionPathForAgent(agentId) === path || (agentId === "codex" && path === "AGENTS.md"),
-  );
-
 const requestIssues = (request: InstructionFileRequestFields) => {
-  const previousArtifact = request.previousArtifact._tag === "owned" ? request.previousArtifact.artifact : undefined;
-
-  return [
+  const desiredIssue =
     request.desired._tag === "absent" || agentIdsMatchPath(request.desired.agentIds, request.path)
       ? undefined
       : {
           path: ["desired", "agentIds"],
           message: "Every desired agent must consume the exact shared instruction path from the catalog.",
-        },
-    previousArtifact === undefined || previousArtifact.path === request.path
+        };
+  if (request.previousFile._tag === "missing") {
+    return [desiredIssue];
+  }
+
+  const previousFile = request.previousFile.file;
+
+  return [
+    desiredIssue,
+    previousFile.path === request.path
       ? undefined
       : {
-          path: ["previousArtifact", "artifact", "path"],
+          path: ["previousFile", "file", "path"],
           message: "Prior instruction ownership must match the requested path.",
         },
-    previousArtifact === undefined ||
-    (previousArtifact.ownership.startMarker === instructionBlockStartMarker &&
-      previousArtifact.ownership.endMarker === instructionBlockEndMarker)
+    previousFile.ownership.startMarker === startMarker && previousFile.ownership.endMarker === endMarker
       ? undefined
       : {
-          path: ["previousArtifact", "artifact", "ownership"],
+          path: ["previousFile", "file", "ownership"],
           message: "Prior instruction ownership must use the canonical managed-block markers.",
         },
-    previousArtifact === undefined || previousAgentIdsMatchPath(previousArtifact.owner.agentIds, request.path)
+    previousAgentIdsMatchPath(previousFile.owner.agentIds, request.path)
       ? undefined
       : {
-          path: ["previousArtifact", "artifact", "owner"],
+          path: ["previousFile", "file", "owner"],
           message: "Every prior owner must legitimately consume this instruction path from the catalog.",
         },
-    previousArtifact === undefined || request.currentFile._tag === "file"
+    request.currentFile._tag === "file"
       ? undefined
-      : {
-          path: ["currentFile"],
-          message: "A receipted instruction artifact requires current file bytes.",
-        },
+      : { path: ["currentFile"], message: "A receipted instruction file requires current file bytes." },
   ];
 };
 
-export const instructionFileRequestSchema = instructionFileRequestFieldsSchema.pipe(Schema.filter(requestIssues));
+const instructionFileRequestSchema = instructionFileRequestFieldsSchema.pipe(Schema.filter(requestIssues));
 
-export type InstructionFileRequest = Schema.Schema.Type<typeof instructionFileRequestSchema>;
-
-const instructionOperationIssues = (operation: InstructionOperationFields) => {
-  const ownership = operation.artifact.ownership;
-  const ownerMatchesPath = operation._tag === "write" ? agentIdsMatchPath : previousAgentIdsMatchPath;
-  const issues: Array<{ path: ReadonlyArray<string>; message: string } | undefined> = [
-    ownerMatchesPath(operation.artifact.owner.agentIds, operation.artifact.path)
-      ? undefined
-      : {
-          path: ["artifact", "owner"],
-          message: "Instruction plan owners must consume the artifact path from the catalog.",
-        },
-  ];
-
-  if (ownership.startMarker !== instructionBlockStartMarker || ownership.endMarker !== instructionBlockEndMarker) {
-    issues.push({
-      path: ["artifact", "ownership"],
-      message: "Instruction ownership must use the canonical managed-block markers.",
-    });
-  }
-
-  if (operation._tag !== "write") {
-    return issues;
-  }
-
-  const block = inspectManagedBlock(operation.bytes);
-  if (Either.isLeft(block) || block.right._tag === "missing") {
-    issues.push({ path: ["bytes"], message: "Instruction writes must contain exactly one valid managed block." });
-
-    return issues;
-  }
-
-  const documentText = operation.bytes.slice(block.right.bodyStart, block.right.bodyEnd);
-  if (hashBytes(documentText) !== ownership.installedBodyHash) {
-    issues.push({
-      path: ["artifact", "ownership", "installedBodyHash"],
-      message: "Instruction ownership hash must match the exact managed body bytes.",
-    });
-  }
-
-  return issues;
-};
-
-const instructionOperationSchema = instructionOperationFieldsSchema.pipe(Schema.filter(instructionOperationIssues));
-
-export const instructionFilePlanSchema = Schema.Union(Schema.TaggedStruct("none", {}), instructionOperationSchema);
-
-export type InstructionFilePlan = Schema.Schema.Type<typeof instructionFilePlanSchema>;
-
-const decodeInstructionRequest = (input: unknown): Either.Either<InstructionFileRequest, InstructionFilePlanError> =>
-  Either.mapLeft(
-    Schema.decodeUnknownEither(instructionFileRequestSchema, {
-      onExcessProperty: "error",
-    })(input),
-    (error) => new InstructionFilePlanError({ issue: `request is invalid: ${formatParseError(error)}` }),
-  );
+type InstructionFileRequest = Schema.Schema.Type<typeof instructionFileRequestSchema>;
 
 const validateInstructionPlan = (input: unknown): Either.Either<InstructionFilePlan, InstructionFilePlanError> =>
-  Either.mapLeft(
-    Schema.decodeUnknownEither(instructionFilePlanSchema, {
-      onExcessProperty: "error",
-    })(input),
-    (error) => new InstructionFilePlanError({ issue: `generated operation is invalid: ${formatParseError(error)}` }),
+  Either.mapLeft(Schema.decodeUnknownEither(instructionFilePlanSchema, { onExcessProperty: "error" })(input), (error) =>
+    planError(`generated operation is invalid: ${SchemaParseIssue.TreeFormatter.formatErrorSync(error)}`),
   );
 
-const validateReceiptedBlock = (request: InstructionFileRequest, block: ManagedBlockLocation) => {
-  if (request.previousArtifact._tag === "missing" || request.currentFile._tag === "missing") {
-    return Either.left(
-      new InstructionFilePlanError({ issue: "current managed block has no complete prior receipt evidence." }),
-    );
+// A block dufflebag wrote earlier may be replaced or removed only while its body still hashes to the receipt.
+const receiptedOwnership = (request: InstructionFileRequest, block: ManagedBlock) => {
+  if (request.previousFile._tag === "missing" || request.currentFile._tag === "missing") {
+    return Either.left(planError("current managed block has no complete prior receipt evidence."));
   }
 
-  const ownership = request.previousArtifact.artifact.ownership;
-
-  const currentContent = request.currentFile.bytes.slice(block.bodyStart, block.bodyEnd);
-  if (hashBytes(currentContent) !== ownership.installedBodyHash) {
-    return Either.left(new InstructionFilePlanError({ issue: "managed block changed inside its receipted body." }));
+  const ownership = request.previousFile.file.ownership;
+  if (hashBytes(request.currentFile.bytes.slice(block.bodyStart, block.bodyEnd)) !== ownership.installedBodyHash) {
+    return Either.left(planError("managed block changed inside its receipted body."));
   }
 
   return Either.map(
-    receiptedBlockRemovalRange({
+    receiptedBlockRange({
       currentBytes: request.currentFile.bytes,
       block,
       filePreviouslyPresent: ownership.filePreviouslyPresent,
@@ -513,154 +401,108 @@ const validateReceiptedBlock = (request: InstructionFileRequest, block: ManagedB
   );
 };
 
-const createInstructionArtifact = (input: {
+// Where the new block goes: a fresh file, appended after user text, or in place of the receipted block.
+const placeBlock = (input: {
   request: InstructionFileRequest;
-  desired: PresentInstruction;
-  installedBodyHash: string;
-  filePreviouslyPresent: boolean;
-}): InstructionArtifact => ({
-  owner: { _tag: "agent", agentIds: input.desired.agentIds },
-  path: input.request.path,
-  kind: { _tag: "instruction" },
-  ownership: {
-    _tag: "managedBlock",
-    filePreviouslyPresent: input.filePreviouslyPresent,
-    startMarker: instructionBlockStartMarker,
-    endMarker: instructionBlockEndMarker,
-    installedBodyHash: input.installedBodyHash,
-  },
-});
+  currentBlock: CurrentBlock;
+  block: Uint8Array;
+}): Either.Either<{ bytes: Uint8Array; filePreviouslyPresent: boolean }, InstructionFilePlanError> => {
+  const currentFile = input.request.currentFile;
+  if (currentFile._tag === "missing") {
+    return Either.right({ bytes: concatenateBytes([input.block, lineFeedBytes]), filePreviouslyPresent: false });
+  }
+
+  if (input.currentBlock._tag === "missing") {
+    return input.request.previousFile._tag === "owned"
+      ? Either.left(planError("receipted managed block is missing from the current instruction file."))
+      : Either.right({
+          bytes: concatenateBytes([currentFile.bytes, blockSeparatorBytes, input.block, lineFeedBytes]),
+          filePreviouslyPresent: true,
+        });
+  }
+
+  const currentBlock = input.currentBlock;
+
+  return Either.map(receiptedOwnership(input.request, currentBlock), (ownership) => ({
+    bytes: concatenateBytes([
+      currentFile.bytes.slice(0, currentBlock.start),
+      input.block,
+      currentFile.bytes.slice(currentBlock.end),
+    ]),
+    filePreviouslyPresent: ownership.filePreviouslyPresent,
+  }));
+};
 
 const planInstructionWrite = (input: {
   request: InstructionFileRequest;
   desired: PresentInstruction;
-  currentBlock: CurrentManagedBlock;
-}): Either.Either<InstructionFilePlan, InstructionFilePlanError> => {
-  const documentText = renderManagedSection(input.desired.skills, input.desired.ctl);
-  if (Either.isLeft(documentText)) {
-    return Either.left(documentText.left);
-  }
+  currentBlock: CurrentBlock;
+}): Either.Either<InstructionFilePlan, InstructionFilePlanError> =>
+  Either.flatMap(renderManagedSection(input.desired.skills, input.desired.controlScript), (section) =>
+    Either.flatMap(
+      placeBlock({ ...input, block: concatenateBytes([startMarkerBytes, section, endMarkerBytes]) }),
+      ({ bytes, filePreviouslyPresent }) => {
+        const file: OwnedInstructionFile = {
+          owner: { _tag: "agent", agentIds: input.desired.agentIds },
+          path: input.request.path,
+          kind: { _tag: "instruction" },
+          ownership: {
+            _tag: "managedBlock",
+            filePreviouslyPresent,
+            startMarker,
+            endMarker,
+            installedBodyHash: hashBytes(section),
+          },
+        };
 
-  const blockBytes = concatenateBytes([startMarkerBytes, documentText.right, endMarkerBytes]);
-  if (input.request.currentFile._tag === "missing") {
-    return validateInstructionPlan({
-      _tag: "write",
-      artifact: createInstructionArtifact({
-        request: input.request,
-        desired: input.desired,
-        installedBodyHash: hashBytes(documentText.right),
-        filePreviouslyPresent: false,
-      }),
-      bytes: concatenateBytes([blockBytes, lineFeedBytes]),
-    });
-  }
-
-  if (input.currentBlock._tag === "missing") {
-    if (input.request.previousArtifact._tag === "owned") {
-      return Either.left(
-        new InstructionFilePlanError({
-          issue: "receipted managed block is missing from the current instruction file.",
-        }),
-      );
-    }
-
-    return validateInstructionPlan({
-      _tag: "write",
-      artifact: createInstructionArtifact({
-        request: input.request,
-        desired: input.desired,
-        installedBodyHash: hashBytes(documentText.right),
-        filePreviouslyPresent: true,
-      }),
-      bytes: appendedInstructionBytes(input.request.currentFile.bytes, blockBytes),
-    });
-  }
-
-  const ownership = validateReceiptedBlock(input.request, input.currentBlock);
-  if (Either.isLeft(ownership)) {
-    return Either.left(ownership.left);
-  }
-
-  return validateInstructionPlan({
-    _tag: "write",
-    artifact: createInstructionArtifact({
-      request: input.request,
-      desired: input.desired,
-      installedBodyHash: hashBytes(documentText.right),
-      filePreviouslyPresent: ownership.right.filePreviouslyPresent,
-    }),
-    bytes: replaceManagedBlock({
-      currentBytes: input.request.currentFile.bytes,
-      block: input.currentBlock,
-      desiredBlock: blockBytes,
-    }),
-  });
-};
+        return validateInstructionPlan({ _tag: "write", file, bytes });
+      },
+    ),
+  );
 
 const planInstructionRemoval = (
   request: InstructionFileRequest,
-  currentBlock: CurrentManagedBlock,
+  currentBlock: CurrentBlock,
 ): Either.Either<InstructionFilePlan, InstructionFilePlanError> => {
-  if (request.previousArtifact._tag === "missing") {
+  if (request.previousFile._tag === "missing") {
     return validateInstructionPlan({ _tag: "none" });
   }
 
   if (request.currentFile._tag === "missing" || currentBlock._tag === "missing") {
-    return Either.left(
-      new InstructionFilePlanError({ issue: "receipted managed block is missing from the current instruction file." }),
-    );
+    return Either.left(planError("receipted managed block is missing from the current instruction file."));
   }
 
-  const ownership = validateReceiptedBlock(request, currentBlock);
-  if (Either.isLeft(ownership)) {
-    return Either.left(ownership.left);
-  }
+  const file = request.previousFile.file;
+  const currentBytes = request.currentFile.bytes;
 
-  const unownedBytes = stripReceiptedBlock({
-    currentBytes: request.currentFile.bytes,
-    block: currentBlock,
-    filePreviouslyPresent: ownership.right.filePreviouslyPresent,
-  });
-  if (Either.isLeft(unownedBytes)) {
-    return Either.left(unownedBytes.left);
-  }
-
-  const artifact = request.previousArtifact.artifact;
-
-  return validateInstructionPlan(
-    !ownership.right.filePreviouslyPresent && unownedBytes.right.byteLength === 0
-      ? { _tag: "remove", artifact, unownedBytes: unownedBytes.right }
-      : { _tag: "restore", artifact, bytes: unownedBytes.right },
+  return Either.flatMap(receiptedOwnership(request, currentBlock), ({ filePreviouslyPresent }) =>
+    Either.flatMap(stripReceiptedBlock({ currentBytes, block: currentBlock, filePreviouslyPresent }), (unownedBytes) =>
+      validateInstructionPlan(
+        !filePreviouslyPresent && unownedBytes.byteLength === 0
+          ? { _tag: "remove", file, unownedBytes }
+          : { _tag: "restore", file, bytes: unownedBytes },
+      ),
+    ),
   );
 };
 
-const materializeInstructionPlan = (
-  request: InstructionFileRequest,
-): Either.Either<InstructionFilePlan, InstructionFilePlanError> => {
-  if (request.desired._tag === "absent" && request.previousArtifact._tag === "missing") {
-    return validateInstructionPlan({ _tag: "none" });
-  }
+// Plan one shared instruction path: a write, restoration, removal, or no-op, validated before it is returned.
+export const planInstructionFile = (input: unknown): Either.Either<InstructionFilePlan, InstructionFilePlanError> =>
+  Either.mapLeft(
+    Schema.decodeUnknownEither(instructionFileRequestSchema, { onExcessProperty: "error" })(input),
+    (error) => planError(`request is invalid: ${SchemaParseIssue.TreeFormatter.formatErrorSync(error)}`),
+  ).pipe(
+    Either.flatMap((request) => {
+      if (request.desired._tag === "absent" && request.previousFile._tag === "missing") {
+        return validateInstructionPlan({ _tag: "none" });
+      }
 
-  const currentBlock = inspectManagedBlock(
-    request.currentFile._tag === "missing" ? new Uint8Array() : request.currentFile.bytes,
+      const currentBytes = request.currentFile._tag === "missing" ? new Uint8Array() : request.currentFile.bytes;
+
+      return Either.flatMap(inspectManagedBlock(currentBytes), (currentBlock) =>
+        request.desired._tag === "absent"
+          ? planInstructionRemoval(request, currentBlock)
+          : planInstructionWrite({ request, desired: request.desired, currentBlock }),
+      );
+    }),
   );
-  if (Either.isLeft(currentBlock)) {
-    return Either.left(currentBlock.left);
-  }
-
-  return request.desired._tag === "absent"
-    ? planInstructionRemoval(request, currentBlock.right)
-    : planInstructionWrite({ request, desired: request.desired, currentBlock: currentBlock.right });
-};
-
-// Plan one shared instruction path: decode the request, then inspect and validate one direct action.
-export const planInstructionFile = (input: unknown): Either.Either<InstructionFilePlan, InstructionFilePlanError> => {
-  // 1. Decode the complete desired owner set, catalog skills, current bytes, and prior receipt.
-  const request = decodeInstructionRequest(input);
-  if (Either.isLeft(request)) {
-    return Either.left(request.left);
-  }
-
-  // 2. Inspect exact bytes and validate one write, restoration, removal, or no-op.
-  return materializeInstructionPlan(request.right);
-};

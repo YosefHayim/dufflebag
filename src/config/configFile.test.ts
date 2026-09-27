@@ -1,216 +1,283 @@
+import { createHash } from "node:crypto";
+
 import { FileSystem, Path } from "@effect/platform";
 import { NodeContext } from "@effect/platform-node";
-import { expect, layer } from "@effect/vitest";
-import { Effect, Schema } from "effect";
+import { describe, expect, it, layer } from "@effect/vitest";
+import { Effect, Either, Schema } from "effect";
 
-import { bagConfigJsonSchema, defaultBagConfig } from "./bagConfigSchema.js";
-import { ConfigFileParseError, ConfigFileSchemaError, readConfigFile } from "./configFile.js";
+import {
+  ConfigFileParseError,
+  ConfigFileSchemaError,
+  type ManagedConfigPlan,
+  ManagedConfigPlanError,
+  managedConfigPath,
+  managedConfigPlanSchema,
+  managedConfigRequestSchema,
+  planManagedConfig,
+  readConfigFile,
+} from "./configFile.js";
+import { type Config, configJsonSchema, defaultConfig } from "./configSchema.js";
 
-layer(NodeContext.layer)("configFile", (it) => {
-  it.effect("returns a tagged missing snapshot when the managed config is absent", () =>
-    Effect.scoped(
-      Effect.gen(function* () {
-        const fileSystem = yield* FileSystem.FileSystem;
-        const path = yield* Path.Path;
-        const root = yield* fileSystem.makeTempDirectoryScoped({ prefix: "dufflebag-config-file-missing-" });
+const textEncoder = new TextEncoder();
 
-        expect(yield* readConfigFile(path.join(root, "config.json"))).toEqual({ _tag: "missing" });
-      }),
-    ),
+const hashBytes = (bytes: Uint8Array): string => createHash("sha256").update(bytes).digest("hex");
+
+const writeConfigContents = (contents: Uint8Array | string) =>
+  Effect.gen(function* () {
+    const fileSystem = yield* FileSystem.FileSystem;
+    const path = yield* Path.Path;
+    const root = yield* fileSystem.makeTempDirectoryScoped({ prefix: "dufflebag-config-file-" });
+    const configPath = path.join(root, "config.json");
+    yield* fileSystem.writeFile(configPath, typeof contents === "string" ? textEncoder.encode(contents) : contents);
+    return configPath;
+  });
+
+const bytesWithInvalidUtf8 = () => {
+  const marker = "replacement-marker";
+  const json = JSON.stringify({ ...defaultConfig, speechVoice: marker });
+  const markerIndex = json.indexOf(marker);
+  return new Uint8Array([
+    ...textEncoder.encode(json.slice(0, markerIndex)),
+    0xff,
+    ...textEncoder.encode(json.slice(markerIndex + marker.length)),
+  ]);
+};
+
+layer(NodeContext.layer)("readConfigFile", (it) => {
+  it.scoped("returns a tagged missing snapshot when the managed config is absent", () =>
+    Effect.gen(function* () {
+      const fileSystem = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const root = yield* fileSystem.makeTempDirectoryScoped({ prefix: "dufflebag-config-file-missing-" });
+
+      expect(yield* readConfigFile(path.join(root, "config.json"))).toEqual({ _tag: "missing" });
+    }),
   );
 
-  it.effect("returns exact file bytes with one strict complete managed config", () =>
-    Effect.scoped(
-      Effect.gen(function* () {
-        const fileSystem = yield* FileSystem.FileSystem;
-        const path = yield* Path.Path;
-        const root = yield* fileSystem.makeTempDirectoryScoped({ prefix: "dufflebag-config-file-complete-" });
-        const configPath = path.join(root, "config.json");
-        const json = yield* Schema.encode(bagConfigJsonSchema)(defaultBagConfig);
-        const bytes = new TextEncoder().encode(`\n${json}\n`);
+  it.scoped("returns exact file bytes with one strict complete managed config", () =>
+    Effect.gen(function* () {
+      const bytes = textEncoder.encode(`\n${yield* Schema.encode(configJsonSchema)(defaultConfig)}\n`);
 
-        yield* fileSystem.writeFile(configPath, bytes);
+      const snapshot = yield* readConfigFile(yield* writeConfigContents(bytes));
 
-        const snapshot = yield* readConfigFile(configPath);
-        expect(snapshot._tag).toBe("present");
-        if (snapshot._tag === "present") {
-          expect([...snapshot.bytes]).toEqual([...bytes]);
-          expect(snapshot.config).toEqual(defaultBagConfig);
-        }
-      }),
-    ),
+      expect(snapshot._tag === "present" && [...snapshot.bytes]).toEqual([...bytes]);
+      expect(snapshot._tag === "present" && snapshot.config).toEqual(defaultConfig);
+    }),
   );
 
-  it.effect("migrates the exact pre-0.13 config shape with idle compaction off", () =>
-    Effect.scoped(
-      Effect.gen(function* () {
-        const fileSystem = yield* FileSystem.FileSystem;
-        const path = yield* Path.Path;
-        const root = yield* fileSystem.makeTempDirectoryScoped({ prefix: "dufflebag-config-file-012-" });
-        const configPath = path.join(root, "config.json");
-        const {
-          idleAutoCompact: _idleRemoved,
-          speechResponseMode: _speechNarrationModeRemoved,
-          speechReadAlong: _speechReadAlongRemoved,
-          promptRefinementMode: _promptRefinementModeRemoved,
-          dictationReplacements: _dictationRemoved,
-          ...oldConfig
-        } = defaultBagConfig;
+  it.scoped("applies schema defaults to an incomplete config", () =>
+    Effect.gen(function* () {
+      const snapshot = yield* readConfigFile(yield* writeConfigContents(JSON.stringify({ contextWarnPercent: 18 })));
 
-        yield* fileSystem.writeFileString(configPath, JSON.stringify(oldConfig));
-
-        const snapshot = yield* readConfigFile(configPath);
-        expect(snapshot._tag).toBe("present");
-        if (snapshot._tag === "present") expect(snapshot.config).toEqual(defaultBagConfig);
-      }),
-    ),
+      expect(snapshot._tag === "present" && snapshot.config).toEqual(defaultConfig);
+    }),
   );
 
-  it.effect("applies schema defaults to an incomplete config", () =>
-    Effect.scoped(
-      Effect.gen(function* () {
-        const fileSystem = yield* FileSystem.FileSystem;
-        const path = yield* Path.Path;
-        const root = yield* fileSystem.makeTempDirectoryScoped({ prefix: "dufflebag-config-file-incomplete-" });
-        const configPath = path.join(root, "config.json");
+  it.scoped.each([
+    { name: "malformed JSON", contents: "{not-json", error: ConfigFileParseError, mentions: "config.json" },
+    {
+      name: "an excess property",
+      contents: JSON.stringify({ ...defaultConfig, unexpected: true }),
+      error: ConfigFileSchemaError,
+      mentions: "unexpected",
+    },
+    {
+      name: "an out-of-bounds value",
+      contents: JSON.stringify({ ...defaultConfig, speechWordsPerMinute: 79 }),
+      error: ConfigFileSchemaError,
+      mentions: "speechWordsPerMinute",
+    },
+    {
+      name: "a broken cross-field invariant",
+      contents: JSON.stringify({ ...defaultConfig, contextWarnPercent: 30, contextBlockPercent: 20 }),
+      error: ConfigFileSchemaError,
+      mentions: "contextWarnPercent",
+    },
+    { name: "non-UTF-8 bytes", contents: bytesWithInvalidUtf8(), error: ConfigFileParseError, mentions: "UTF-8" },
+    {
+      name: "duplicate properties that JSON parsing would collapse",
+      contents: JSON.stringify(defaultConfig).replace(
+        `"debugLogs":${String(defaultConfig.debugLogs)}`,
+        '"\\u0064ebugLogs":false,"debugLogs":true',
+      ),
+      error: ConfigFileParseError,
+      mentions: 'duplicate JSON property "debugLogs"',
+    },
+    {
+      name: "a UTF-8 byte-order mark",
+      contents: new Uint8Array([0xef, 0xbb, 0xbf, ...textEncoder.encode(JSON.stringify(defaultConfig))]),
+      error: ConfigFileParseError,
+      mentions: "byte-order mark",
+    },
+  ])("rejects $name", ({ contents, error, mentions }) =>
+    Effect.gen(function* () {
+      const failure = yield* Effect.flip(readConfigFile(yield* writeConfigContents(contents)));
 
-        yield* fileSystem.writeFileString(configPath, JSON.stringify({ contextWarnFraction: 0.18 }));
-
-        const snapshot = yield* readConfigFile(configPath);
-        expect(snapshot._tag).toBe("present");
-        if (snapshot._tag === "present") expect(snapshot.config).toEqual(defaultBagConfig);
-      }),
-    ),
+      expect(failure).toBeInstanceOf(error);
+      expect(failure.message).toContain(mentions);
+    }),
   );
 
-  it.effect("separates malformed JSON from strict schema failures", () =>
-    Effect.scoped(
-      Effect.gen(function* () {
-        const fileSystem = yield* FileSystem.FileSystem;
-        const path = yield* Path.Path;
-        const root = yield* fileSystem.makeTempDirectoryScoped({ prefix: "dufflebag-config-file-invalid-" });
-        const malformedPath = path.join(root, "malformed.json");
-        const excessPath = path.join(root, "excess.json");
+  it.scoped("preserves non-missing filesystem errors", () =>
+    Effect.gen(function* () {
+      const fileSystem = yield* FileSystem.FileSystem;
+      const root = yield* fileSystem.makeTempDirectoryScoped({ prefix: "dufflebag-config-file-read-error-" });
 
-        yield* fileSystem.writeFileString(malformedPath, "{not-json");
-        yield* fileSystem.writeFileString(excessPath, JSON.stringify({ ...defaultBagConfig, unexpected: true }));
-
-        const malformed = yield* Effect.flip(readConfigFile(malformedPath));
-        const excess = yield* Effect.flip(readConfigFile(excessPath));
-
-        expect(malformed).toBeInstanceOf(ConfigFileParseError);
-        expect(malformed.message).toContain(malformedPath);
-        expect(excess).toBeInstanceOf(ConfigFileSchemaError);
-        expect(excess.message).toContain("unexpected");
-      }),
-    ),
+      expect((yield* Effect.flip(readConfigFile(root)))._tag).toBe("SystemError");
+    }),
   );
+});
 
-  it.effect("rejects invalid bounds and cross-field invariants", () =>
-    Effect.scoped(
-      Effect.gen(function* () {
-        const fileSystem = yield* FileSystem.FileSystem;
-        const path = yield* Path.Path;
-        const root = yield* fileSystem.makeTempDirectoryScoped({ prefix: "dufflebag-config-file-domain-" });
-        const boundsPath = path.join(root, "bounds.json");
-        const invariantPath = path.join(root, "invariant.json");
+const missingPrevious = { _tag: "missing" };
 
-        yield* fileSystem.writeFileString(
-          boundsPath,
-          JSON.stringify({ ...defaultBagConfig, speechWordsPerMinute: 79 }),
-        );
-        yield* fileSystem.writeFileString(
-          invariantPath,
-          JSON.stringify({ ...defaultBagConfig, contextWarnFraction: 0.3, contextBlockFraction: 0.2 }),
-        );
+const presentConfigSnapshot = (config: Config) => ({
+  _tag: "present",
+  bytes: textEncoder.encode(`${JSON.stringify(config)}\n`),
+  config,
+});
 
-        const bounds = yield* Effect.flip(readConfigFile(boundsPath));
-        const invariant = yield* Effect.flip(readConfigFile(invariantPath));
+const selectedRequest = (scope: "global" | "project", config: Config) => ({
+  scope,
+  selection: { _tag: "selected", config },
+  previousConfigFile: missingPrevious,
+});
 
-        expect(bounds).toBeInstanceOf(ConfigFileSchemaError);
-        expect(bounds.message).toContain("speechWordsPerMinute");
-        expect(invariant).toBeInstanceOf(ConfigFileSchemaError);
-        expect(invariant.message).toContain("contextWarnFraction");
+const unwrap = (plan: Either.Either<ManagedConfigPlan, ManagedConfigPlanError>): ManagedConfigPlan =>
+  Either.getOrThrowWith(plan, (error) => new Error(error.message));
+
+const wholeFileOwnership = (plan: ManagedConfigPlan) => {
+  if (plan.managedConfigWrite.file.ownership._tag !== "wholeFile") {
+    throw new Error("Expected one whole-file managed config write.");
+  }
+
+  return plan.managedConfigWrite.file.ownership;
+};
+
+const expectManagedConfigWrite = (plan: ManagedConfigPlan) => {
+  expect(plan.managedConfigWrite.file.path).toBe(managedConfigPath);
+  expect(plan.managedConfigWrite.file.kind._tag).toBe("managedConfig");
+  expect(wholeFileOwnership(plan).installedHash).toBe(hashBytes(plan.managedConfigWrite.bytes));
+  expect(new TextDecoder().decode(plan.managedConfigWrite.bytes)).toContain('"contextWarnPercent"');
+};
+
+const expectPlanFailure = (request: unknown, mentions: string) => {
+  const plan = planManagedConfig(request);
+
+  expect(Either.isLeft(plan)).toBe(true);
+  if (Either.isLeft(plan)) {
+    expect(plan.left).toBeInstanceOf(ManagedConfigPlanError);
+    expect(plan.left.message).toContain(mentions);
+  }
+};
+
+describe("planManagedConfig", () => {
+  it("copies the global snapshot once for a first project install and otherwise uses defaults", () => {
+    const globalConfig = { ...defaultConfig, speechVoice: "Ava", debugLogs: true };
+    const copied = unwrap(
+      planManagedConfig({
+        scope: "project",
+        selection: { _tag: "firstProjectInstall", globalConfig: presentConfigSnapshot(globalConfig) },
+        previousConfigFile: missingPrevious,
       }),
-    ),
-  );
-
-  it.effect("rejects non-UTF-8 bytes instead of accepting replacement characters", () =>
-    Effect.scoped(
-      Effect.gen(function* () {
-        const fileSystem = yield* FileSystem.FileSystem;
-        const path = yield* Path.Path;
-        const root = yield* fileSystem.makeTempDirectoryScoped({ prefix: "dufflebag-config-file-encoding-" });
-        const configPath = path.join(root, "config.json");
-        const marker = "replacement-marker";
-        const json = JSON.stringify({ ...defaultBagConfig, speechVoice: marker });
-        const markerIndex = json.indexOf(marker);
-        const textEncoder = new TextEncoder();
-        const bytes = new Uint8Array([
-          ...textEncoder.encode(json.slice(0, markerIndex)),
-          0xff,
-          ...textEncoder.encode(json.slice(markerIndex + marker.length)),
-        ]);
-
-        yield* fileSystem.writeFile(configPath, bytes);
-
-        const error = yield* Effect.flip(readConfigFile(configPath));
-        expect(error).toBeInstanceOf(ConfigFileParseError);
-        expect(error.message).toContain("UTF-8");
+    );
+    const defaulted = unwrap(
+      planManagedConfig({
+        scope: "project",
+        selection: { _tag: "firstProjectInstall", globalConfig: { _tag: "missing" } },
+        previousConfigFile: missingPrevious,
       }),
-    ),
-  );
+    );
 
-  it.effect("rejects duplicate properties before JSON parsing can collapse them", () =>
-    Effect.scoped(
-      Effect.gen(function* () {
-        const fileSystem = yield* FileSystem.FileSystem;
-        const path = yield* Path.Path;
-        const root = yield* fileSystem.makeTempDirectoryScoped({ prefix: "dufflebag-config-file-duplicate-" });
-        const configPath = path.join(root, "config.json");
-        const json = JSON.stringify(defaultBagConfig).replace(
-          `"debugEnabled":${String(defaultBagConfig.debugEnabled)}`,
-          '"\\u0064ebugEnabled":false,"debugEnabled":true',
-        );
+    expect(copied.config).toEqual(globalConfig);
+    expect(defaulted.config).toEqual(defaultConfig);
+    expectManagedConfigWrite(copied);
+    expectManagedConfigWrite(defaulted);
+  });
 
-        yield* fileSystem.writeFileString(configPath, json);
+  it("rejects a global snapshot whose decoded config does not match its source bytes", () => {
+    const sourceConfig = { ...defaultConfig, speechVoice: "Ava" };
+    const globalConfig = { ...presentConfigSnapshot(sourceConfig), config: { ...sourceConfig, speechVoice: "Daniel" } };
 
-        const error = yield* Effect.flip(readConfigFile(configPath));
-        expect(error).toBeInstanceOf(ConfigFileParseError);
-        expect(error.message).toContain("duplicate JSON property");
-        expect(error.message).toContain("debugEnabled");
+    expectPlanFailure(
+      {
+        scope: "project",
+        selection: { _tag: "firstProjectInstall", globalConfig },
+        previousConfigFile: missingPrevious,
+      },
+      "source bytes",
+    );
+  });
+
+  it("rejects first-project selection in global scope", () => {
+    expectPlanFailure(
+      {
+        scope: "global",
+        selection: { _tag: "firstProjectInstall", globalConfig: { _tag: "missing" } },
+        previousConfigFile: missingPrevious,
+      },
+      "project",
+    );
+  });
+
+  it("rejects a first project selection when a target config already exists", () => {
+    expectPlanFailure(
+      {
+        scope: "project",
+        selection: { _tag: "firstProjectInstall", globalConfig: { _tag: "missing" } },
+        previousConfigFile: { _tag: "priorFile", bytes: textEncoder.encode("original config") },
+      },
+      "missing target managed config",
+    );
+  });
+
+  it("keeps later global and project selections independent", () => {
+    const global = unwrap(planManagedConfig(selectedRequest("global", { ...defaultConfig, speechVoice: "Daniel" })));
+    const project = unwrap(planManagedConfig(selectedRequest("project", { ...defaultConfig, speechVoice: "Moira" })));
+
+    expect(global.config.speechVoice).toBe("Daniel");
+    expect(project.config.speechVoice).toBe("Moira");
+    expect(global.managedConfigWrite).not.toEqual(project.managedConfigWrite);
+  });
+
+  it("preserves exact prior config bytes and correlates desired bytes with their hash", () => {
+    const priorBytes = textEncoder.encode('{  "user": "format"  }\n');
+    const plan = unwrap(
+      planManagedConfig({
+        scope: "project",
+        selection: { _tag: "selected", config: defaultConfig },
+        previousConfigFile: { _tag: "priorFile", bytes: priorBytes },
       }),
-    ),
-  );
+    );
 
-  it.effect("rejects a UTF-8 BOM instead of silently normalizing the file", () =>
-    Effect.scoped(
-      Effect.gen(function* () {
-        const fileSystem = yield* FileSystem.FileSystem;
-        const path = yield* Path.Path;
-        const root = yield* fileSystem.makeTempDirectoryScoped({ prefix: "dufflebag-config-file-bom-" });
-        const configPath = path.join(root, "config.json");
-        const bytes = new Uint8Array([0xef, 0xbb, 0xbf, ...new TextEncoder().encode(JSON.stringify(defaultBagConfig))]);
+    expect(wholeFileOwnership(plan).previous).toEqual({ _tag: "priorFile", bytes: priorBytes });
+    expect(wholeFileOwnership(plan).installedHash).toBe(hashBytes(plan.managedConfigWrite.bytes));
+  });
 
-        yield* fileSystem.writeFile(configPath, bytes);
+  it("strictly rejects unknown request properties", () => {
+    const decoded = Schema.decodeUnknownEither(managedConfigRequestSchema, { onExcessProperty: "error" })({
+      ...selectedRequest("project", defaultConfig),
+      unexpected: true,
+    });
 
-        const error = yield* Effect.flip(readConfigFile(configPath));
-        expect(error).toBeInstanceOf(ConfigFileParseError);
-        expect(error.message).toContain("byte-order mark");
-      }),
-    ),
-  );
+    expect(Either.isLeft(decoded)).toBe(true);
+  });
 
-  it.effect("preserves non-missing filesystem errors", () =>
-    Effect.scoped(
-      Effect.gen(function* () {
-        const fileSystem = yield* FileSystem.FileSystem;
-        const root = yield* fileSystem.makeTempDirectoryScoped({ prefix: "dufflebag-config-file-read-error-" });
+  it("rejects managed plan data whose config and write drift apart", () => {
+    const plan = unwrap(planManagedConfig(selectedRequest("project", defaultConfig)));
+    const bytes = textEncoder.encode(`${JSON.stringify({ ...defaultConfig, speechVoice: "Different" }, null, 2)}\n`);
 
-        const error = yield* Effect.flip(readConfigFile(root));
+    const decoded = Schema.validateEither(managedConfigPlanSchema, { onExcessProperty: "error" })({
+      ...plan,
+      managedConfigWrite: {
+        ...plan.managedConfigWrite,
+        file: {
+          ...plan.managedConfigWrite.file,
+          ownership: { ...wholeFileOwnership(plan), installedHash: hashBytes(bytes) },
+        },
+        bytes,
+      },
+    });
 
-        expect(error._tag).toBe("SystemError");
-      }),
-    ),
-  );
+    expect(Either.isLeft(decoded)).toBe(true);
+  });
 });

@@ -1,32 +1,21 @@
-import { createHash } from "node:crypto";
-
 import { Either, Schema, ParseResult as SchemaParseIssue } from "effect";
-
-import { agentCatalog, agentDefinitionSchema } from "../../catalog/agentCatalog.js";
-import { featureCatalog, installedSkillDefinitionSchema } from "../../catalog/featureCatalog.js";
-import { writeOperationSchema } from "../artifactPlan.js";
+import { agentDefinitionSchema } from "../../catalog/agentCatalog.js";
+import { installedSkillSchema } from "../../catalog/featureCatalog.js";
+import { hashBytes } from "../fileBytes.js";
 import {
-  artifactKindSchema,
-  artifactOwnerSchema,
+  fileKindSchema,
+  fileOwnerSchema,
   previousFileValueSchema,
-  relativeArtifactPathSchema,
+  relativePathSchema,
   wholeFileOwnershipSchema,
-} from "../artifactReceipt.js";
+} from "../ownership.js";
+import { writeOperationSchema } from "../plan.js";
+import { isCatalogAgent, isCatalogSkill } from "./catalogChecks.js";
+import { controlScriptSchema, fillControlScript, stripFrontmatter, withCompleteFrontmatter } from "./skillText.js";
 
 const textEncoder = new TextEncoder();
-const templateToken = "@@CTL@@";
-// e.g. "---\n" or "---\r\n" at the start of a skill markdown body
-const leadingFrontmatterOpeningPattern = /^---(?:\r\n|\n)/;
-// e.g. "---\nname: x\n---\n# body" → whole leading YAML frontmatter block
-const leadingFrontmatterBlockPattern = /^---(?:\r\n|\n)(?:[\s\S]*?(?:\r\n|\n))?---(?:(?:\r\n|\n)|$)/;
-const agentDefinitionsEqual = Schema.equivalence(agentDefinitionSchema);
-const catalogSkillDefinitionSchema = installedSkillDefinitionSchema.members[1];
-const installedSkillsEqual = Schema.equivalence(catalogSkillDefinitionSchema);
-const catalogInstalledSkills = featureCatalog.flatMap((feature) =>
-  feature.installedSkill._tag === "skill" ? [feature.installedSkill] : [],
-);
 
-export class RuleFilePlanError extends Schema.TaggedError<RuleFilePlanError>()("RuleFilePlanError", {
+class RuleFilePlanError extends Schema.TaggedError<RuleFilePlanError>()("RuleFilePlanError", {
   issue: Schema.NonEmptyString.annotations({
     description: "Actionable rule-file request or generated-plan validation issue.",
   }),
@@ -36,78 +25,36 @@ export class RuleFilePlanError extends Schema.TaggedError<RuleFilePlanError>()("
   }
 }
 
-const formatParseError = (error: SchemaParseIssue.ParseError): string =>
-  SchemaParseIssue.TreeFormatter.formatErrorSync(error);
-
-const hashBytes = (bytes: Uint8Array): string => createHash("sha256").update(bytes).digest("hex");
-
-const hasCompleteLeadingFrontmatter = (markdown: string): boolean =>
-  !leadingFrontmatterOpeningPattern.test(markdown) || leadingFrontmatterBlockPattern.test(markdown);
-
-const stripLeadingFrontmatter = (markdown: string): string => markdown.replace(leadingFrontmatterBlockPattern, "");
-
-const hasRuleContent = (markdown: string): boolean => stripLeadingFrontmatter(markdown).trim().length > 0;
-
-const substituteControlPath = (markdown: string, ctl: string): string => markdown.split(templateToken).join(ctl);
-
-const ruleFileAgentFieldsSchema = Schema.Struct({
+const ruleFileAgentSchema = Schema.Struct({
   ...agentDefinitionSchema.fields,
   target: agentDefinitionSchema.fields.target.members[1],
-});
-
-const ruleFileAgentSchema = ruleFileAgentFieldsSchema.pipe(
-  Schema.filter((agent) => agentCatalog.some((candidate) => agentDefinitionsEqual(candidate, agent)), {
+}).pipe(
+  Schema.filter(isCatalogAgent, {
     message: () => "Rule-file agents must exactly match the decoded agent catalog.",
   }),
 );
 
-const ruleFileMarkdownSchema = Schema.String.pipe(
-  Schema.filter(hasCompleteLeadingFrontmatter, {
-    message: () => "Leading YAML frontmatter must have exact opening and closing delimiter lines.",
-  }),
-  Schema.filter(hasRuleContent, {
-    message: () => "Rule-file markdown requires a non-empty body after frontmatter.",
-  }),
-  Schema.annotations({
-    description: "Exact installed SKILL.md text used to produce one native rule body.",
-  }),
-);
-
 const ruleFileSkillSchema = Schema.Struct({
-  installedSkill: catalogSkillDefinitionSchema.pipe(
-    Schema.filter(
-      (installedSkill) => catalogInstalledSkills.some((candidate) => installedSkillsEqual(candidate, installedSkill)),
-      {
-        message: () => "Rule-file installed skills must exactly match the decoded feature catalog.",
-      },
-    ),
+  installedSkill: installedSkillSchema.pipe(
+    Schema.filter(isCatalogSkill, {
+      message: () => "Rule-file installed skills must exactly match the decoded feature catalog.",
+    }),
     Schema.annotations({
       description: "Catalog-owned installed skill identity used for the output filename.",
     }),
   ),
-  markdown: ruleFileMarkdownSchema,
+  markdown: withCompleteFrontmatter(Schema.String).pipe(
+    Schema.filter((markdown) => stripFrontmatter(markdown).trim().length > 0, {
+      message: () => "Rule-file markdown requires a non-empty body after frontmatter.",
+    }),
+    Schema.annotations({
+      description: "Exact installed SKILL.md text used to produce one native rule body.",
+    }),
+  ),
 });
 
-type RuleFileSkill = Schema.Schema.Type<typeof ruleFileSkillSchema>;
-
-const installedSkillIds = (skills: ReadonlyArray<RuleFileSkill>): ReadonlyArray<string> =>
-  skills.map(({ installedSkill }) => installedSkill.id);
-
-const uniqueRuleFileSkillsSchema = Schema.Array(ruleFileSkillSchema).pipe(
-  Schema.filter(
-    (skills) => {
-      const ids = installedSkillIds(skills);
-
-      return ids.length === new Set(ids).size;
-    },
-    {
-      message: () => "Installed rule-file skill IDs must be unique.",
-    },
-  ),
-);
-
 const previousRuleFileSchema = Schema.Struct({
-  path: relativeArtifactPathSchema.annotations({
+  path: relativePathSchema.annotations({
     description: "Exact rule path whose original state is retained for restoration.",
   }),
   previous: Schema.typeSchema(previousFileValueSchema).annotations({
@@ -115,57 +62,47 @@ const previousRuleFileSchema = Schema.Struct({
   }),
 });
 
-const uniquePreviousRuleFilesSchema = Schema.Array(previousRuleFileSchema).pipe(
-  Schema.filter((files) => files.length === new Set(files.map((file) => file.path)).size, {
-    message: () => "Previous rule-file paths must be unique.",
-  }),
-);
-
 const ruleFileRequestFieldsSchema = Schema.Struct({
   agent: ruleFileAgentSchema.annotations({
     description: "Decoded agent whose target selects the native rule-file format.",
   }),
-  ctl: Schema.NonEmptyTrimmedString.pipe(
-    Schema.filter((command) => !command.includes(templateToken), {
-      message: () => "The control command cannot contain the template token.",
+  controlScript: controlScriptSchema.annotations({
+    description: "Exact installed control-program path substituted for every @@AUTORUN_CONTROL@@ placeholder.",
+  }),
+  skills: Schema.Array(ruleFileSkillSchema).pipe(
+    Schema.filter((skills) => skills.length === new Set(skills.map((skill) => skill.installedSkill.id)).size, {
+      message: () => "Installed rule-file skill IDs must be unique.",
     }),
     Schema.annotations({
-      description: "Exact installed control-program path substituted for every @@CTL@@ placeholder.",
+      description: "Ordered installed skill markdown values rendered into separate rule files.",
     }),
   ),
-  skills: uniqueRuleFileSkillsSchema.annotations({
-    description: "Ordered installed skill markdown values rendered into separate rule files.",
-  }),
-  previousFiles: uniquePreviousRuleFilesSchema.annotations({
-    description: "Exact original file state for every desired rule path, in skill order.",
-  }),
+  previousFiles: Schema.Array(previousRuleFileSchema).pipe(
+    Schema.filter((files) => files.length === new Set(files.map((file) => file.path)).size, {
+      message: () => "Previous rule-file paths must be unique.",
+    }),
+    Schema.annotations({
+      description: "Exact original file state for every desired rule path, in skill order.",
+    }),
+  ),
 });
 
 type RuleFileRequestFields = Schema.Schema.Type<typeof ruleFileRequestFieldsSchema>;
 
-const expectedRuleFilePaths = (request: RuleFileRequestFields): ReadonlyArray<string> => {
-  const target = request.agent.target;
-
-  return installedSkillIds(request.skills).map((skillId) => `${target.directory}/${skillId}${target.extension}`);
-};
+const rulePath = (request: RuleFileRequestFields, skillId: string): string =>
+  `${request.agent.target.directory}/${skillId}${request.agent.target.extension}`;
 
 const exactPreviousFileIssues = (request: RuleFileRequestFields) => {
-  const expectedPaths = expectedRuleFilePaths(request);
+  const expectedPaths = request.skills.map((skill) => rulePath(request, skill.installedSkill.id));
   const previousPaths = request.previousFiles.map((file) => file.path);
   const mismatchIndex = expectedPaths.findIndex((path, index) => path !== previousPaths[index]);
-
   if (mismatchIndex < 0 && expectedPaths.length === previousPaths.length) {
     return [];
   }
 
-  let issueIndex = mismatchIndex;
-  if (issueIndex < 0) {
-    issueIndex = Math.min(expectedPaths.length, previousPaths.length);
-  }
-
   return [
     {
-      path: ["previousFiles", issueIndex],
+      path: ["previousFiles", mismatchIndex < 0 ? Math.min(expectedPaths.length, previousPaths.length) : mismatchIndex],
       message: "Previous rule-file paths must exactly match desired rule paths in skill order.",
     },
   ];
@@ -173,119 +110,80 @@ const exactPreviousFileIssues = (request: RuleFileRequestFields) => {
 
 export const ruleFileRequestSchema = ruleFileRequestFieldsSchema.pipe(Schema.filter(exactPreviousFileIssues));
 
-export type RuleFileRequest = Schema.Schema.Type<typeof ruleFileRequestSchema>;
+type RuleFileRequest = Schema.Schema.Type<typeof ruleFileRequestSchema>;
 
-const ruleArtifactSchema = Schema.Struct({
-  owner: artifactOwnerSchema.members[1],
-  path: relativeArtifactPathSchema,
-  kind: artifactKindSchema.members[2],
-  ownership: wholeFileOwnershipSchema,
-});
-
-const ruleFileWriteFieldsSchema = Schema.TaggedStruct("write", {
-  artifact: ruleArtifactSchema,
-  bytes: writeOperationSchema.fields.bytes,
-});
-
-type RuleFileWrite = Schema.Schema.Type<typeof ruleFileWriteFieldsSchema>;
-
-const ruleFileWriteIssues = (write: RuleFileWrite) => [
-  write.artifact.owner.agentIds.length === 1
-    ? undefined
-    : {
-        path: ["artifact", "owner"],
-        message: "Each rule artifact requires exactly one agent owner.",
-      },
-  write.artifact.ownership.installedHash !== hashBytes(write.bytes)
-    ? {
-        path: ["artifact", "ownership", "installedHash"],
-        message: "Rule ownership hashes must match the exact desired bytes.",
-      }
-    : undefined,
-];
-
-const ruleFileWriteSchema = ruleFileWriteFieldsSchema.pipe(Schema.filter(ruleFileWriteIssues));
-
-const uniqueRuleWritesSchema = Schema.Array(ruleFileWriteSchema).pipe(
-  Schema.filter((writes) => writes.length === new Set(writes.map((write) => write.artifact.path)).size, {
-    message: () => "Rule-file plans cannot contain duplicate artifact paths.",
+const ruleFileWriteSchema = Schema.TaggedStruct("write", {
+  file: Schema.Struct({
+    owner: fileOwnerSchema.members[1],
+    path: relativePathSchema,
+    kind: fileKindSchema.members[2],
+    ownership: wholeFileOwnershipSchema,
   }),
+  bytes: writeOperationSchema.fields.bytes,
+}).pipe(
+  Schema.filter((write) => [
+    write.file.owner.agentIds.length === 1
+      ? undefined
+      : { path: ["file", "owner"], message: "Each rule file requires exactly one agent owner." },
+    write.file.ownership.installedHash === hashBytes(write.bytes)
+      ? undefined
+      : {
+          path: ["file", "ownership", "installedHash"],
+          message: "Rule ownership hashes must match the exact desired bytes.",
+        },
+  ]),
 );
 
+type RuleFileWrite = Schema.Schema.Type<typeof ruleFileWriteSchema>;
+
 export const ruleFilePlanSchema = Schema.Struct({
-  writes: uniqueRuleWritesSchema.annotations({
-    description: "Ordered desired rule writes with matching whole-file ownership.",
-  }),
+  writes: Schema.Array(ruleFileWriteSchema).pipe(
+    Schema.filter((writes) => writes.length === new Set(writes.map((write) => write.file.path)).size, {
+      message: () => "Rule-file plans cannot contain duplicate file paths.",
+    }),
+    Schema.annotations({
+      description: "Ordered desired rule writes with matching whole-file ownership.",
+    }),
+  ),
 });
 
-export type RuleFilePlan = Schema.Schema.Type<typeof ruleFilePlanSchema>;
+type RuleFilePlan = Schema.Schema.Type<typeof ruleFilePlanSchema>;
 
-const decodeRuleFileRequest = (input: unknown): Either.Either<RuleFileRequest, RuleFilePlanError> =>
-  Either.mapLeft(
-    Schema.decodeUnknownEither(ruleFileRequestSchema, {
-      onExcessProperty: "error",
-    })(input),
-    (error) => new RuleFilePlanError({ issue: formatParseError(error) }),
-  );
+const createRuleWrite = (
+  request: RuleFileRequest,
+  skill: RuleFileRequest["skills"][number],
+): Either.Either<RuleFileWrite, RuleFilePlanError> => {
+  const path = rulePath(request, skill.installedSkill.id);
+  const previousFile = request.previousFiles.find((file) => file.path === path);
+  if (previousFile === undefined) {
+    return Either.left(new RuleFilePlanError({ issue: `Missing previous-file state for desired rule file ${path}.` }));
+  }
 
-const validateRuleFilePlan = (input: unknown): Either.Either<RuleFilePlan, RuleFilePlanError> =>
-  Either.mapLeft(
-    Schema.validateEither(ruleFilePlanSchema, {
-      onExcessProperty: "error",
-    })(input),
-    (error) => new RuleFilePlanError({ issue: formatParseError(error) }),
-  );
+  const bytes = textEncoder.encode(fillControlScript(stripFrontmatter(skill.markdown), request.controlScript));
 
-const createRuleWrites = (request: RuleFileRequest): Either.Either<ReadonlyArray<RuleFileWrite>, RuleFilePlanError> => {
-  const target = request.agent.target;
-  const writes = request.skills.map(({ installedSkill, markdown }) => {
-    const path = `${target.directory}/${installedSkill.id}${target.extension}`;
-    const previousFile = request.previousFiles.find((file) => file.path === path);
-    if (previousFile === undefined) {
-      return Either.left(
-        new RuleFilePlanError({ issue: `Missing previous-file state for desired rule file ${path}.` }),
-      );
-    }
-
-    const bytes = textEncoder.encode(substituteControlPath(stripLeadingFrontmatter(markdown), request.ctl));
-    const write: RuleFileWrite = {
-      _tag: "write",
-      artifact: {
-        path,
-        kind: { _tag: "rule" },
-        owner: { _tag: "agent", agentIds: [request.agent.id] },
-        ownership: {
-          _tag: "wholeFile",
-          installedHash: hashBytes(bytes),
-          previous: previousFile.previous,
-        },
-      },
-      bytes,
-    };
-
-    return Either.right(write);
+  return Either.right({
+    _tag: "write",
+    file: {
+      path,
+      kind: { _tag: "rule" },
+      owner: { _tag: "agent", agentIds: [request.agent.id] },
+      ownership: { _tag: "wholeFile", installedHash: hashBytes(bytes), previous: previousFile.previous },
+    },
+    bytes,
   });
-
-  return Either.all(writes);
 };
 
-const materializeRuleFilePlan = (request: RuleFileRequest): Either.Either<RuleFilePlan, RuleFilePlanError> => {
-  const writes = createRuleWrites(request);
-  if (Either.isLeft(writes)) {
-    return Either.left(writes.left);
-  }
+const toPlanError = (error: SchemaParseIssue.ParseError) =>
+  new RuleFilePlanError({ issue: SchemaParseIssue.TreeFormatter.formatErrorSync(error) });
 
-  return validateRuleFilePlan({ writes: writes.right });
-};
-
-// Plan native rule files without I/O: decode source state, then materialize and validate ordered writes.
-export const planRuleFiles = (input: unknown): Either.Either<RuleFilePlan, RuleFilePlanError> => {
-  // 1. Decode the complete target, markdown, substitution, and restoration state.
-  const request = decodeRuleFileRequest(input);
-  if (Either.isLeft(request)) {
-    return Either.left(request.left);
-  }
-
-  // 2. Strip valid leading frontmatter, materialize one write per skill, and validate the direct plan.
-  return materializeRuleFilePlan(request.right);
-};
+// Plan native rule files without I/O: one whole-file write per skill, validated before it is returned.
+export const planRuleFiles = (input: unknown): Either.Either<RuleFilePlan, RuleFilePlanError> =>
+  Either.mapLeft(
+    Schema.decodeUnknownEither(ruleFileRequestSchema, { onExcessProperty: "error" })(input),
+    toPlanError,
+  ).pipe(
+    Either.flatMap((request) => Either.all(request.skills.map((skill) => createRuleWrite(request, skill)))),
+    Either.flatMap((writes) =>
+      Either.mapLeft(Schema.validateEither(ruleFilePlanSchema, { onExcessProperty: "error" })({ writes }), toPlanError),
+    ),
+  );

@@ -3,11 +3,25 @@
 import { Args, Command } from "@effect/cli";
 import { Effect } from "effect";
 
+import { destinationForScope, scanHost } from "../config/hostScan.js";
 import { install } from "../install/install.js";
-import { captureHostEvidence, destinationForScope } from "./hostEvidence.js";
-import { formatOption, scopeOption } from "./scopeOptions.js";
-import { stagePackage } from "./stagePackage.js";
+import { preparePackage } from "../install/preparePackage.js";
+import { formatOption, scopeOption } from "./cliOptions.js";
 import * as TerminalUI from "./TerminalUI.js";
+
+export const showInstallation = (installation: {
+  readonly _tag: "installed" | "unchanged";
+  readonly scope: string;
+  readonly features: ReadonlyArray<string>;
+  readonly agents: ReadonlyArray<string>;
+}) =>
+  Effect.gen(function* () {
+    const features = `${installation.features.join(", ")} (${installation.scope})`;
+    yield* TerminalUI.success(
+      installation._tag === "installed" ? `Installed ${features}` : `Already current: ${features}`,
+    );
+    if (installation.agents.length > 0) yield* TerminalUI.detail(`Agents: ${installation.agents.join(", ")}`);
+  });
 
 const featureIdsArgument = Args.text({ name: "feature-id" }).pipe(
   Args.repeated,
@@ -16,41 +30,26 @@ const featureIdsArgument = Args.text({ name: "feature-id" }).pipe(
 
 export const installCommand = Command.make(
   "install",
-  {
-    featureIds: featureIdsArgument,
-    scope: scopeOption,
-    format: formatOption,
-  },
+  { featureIds: featureIdsArgument, scope: scopeOption, format: formatOption },
   (args) =>
     Effect.gen(function* () {
       if (args.format === "text") yield* TerminalUI.intro("install");
-      const host = yield* captureHostEvidence;
-      const stagedPackage = yield* stagePackage;
+      const host = yield* scanHost;
       const installation = yield* install({
-        destination: destinationForScope({
-          scope: args.scope,
-          homeRoot: host.homeRoot,
-          projectRoot: host.projectRoot,
-        }),
+        destination: destinationForScope({ scope: args.scope, homeRoot: host.homeRoot, projectRoot: host.projectRoot }),
         host: { homeRoot: host.homeRoot },
-        stagedPackage,
+        preparedPackage: yield* preparePackage,
         features: args.featureIds.length === 0 ? { _tag: "defaults" } : { _tag: "selected", ids: args.featureIds },
         agents: { _tag: "detected", evidence: host.agentEvidence },
         interaction: { _tag: "scripted" },
         configuration: { _tag: "automatic" },
       });
-
       if (args.format === "json") {
         yield* TerminalUI.json(installation);
         return;
       }
 
-      yield* TerminalUI.success(
-        installation._tag === "installed"
-          ? `Installed ${installation.features.join(", ")} (${installation.scope})`
-          : `Already current: ${installation.features.join(", ")} (${installation.scope})`,
-      );
-      if (installation.agents.length > 0) yield* TerminalUI.detail(`Agents: ${installation.agents.join(", ")}`);
+      yield* showInstallation(installation);
       yield* TerminalUI.outro("Done.");
     }),
 ).pipe(Command.withDescription("Install catalog defaults or the named features"));

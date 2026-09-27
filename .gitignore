@@ -1,44 +1,35 @@
+# Dependencies
 node_modules/
+
+# Build output
 dist/
-*.log
-.DS_Store
-coverage/
+target/
 *.tsbuildinfo
+src/hooks/voice/dufflebag-voice
+
+# Caches, coverage and logs
+.ruff_cache/
+__pycache__/
+coverage/
+*.log
+
+# Local environment
+.env
+.env.*
+.DS_Store
 .worktrees/
 
-# png-to-code local/demo artifacts (never commit binaries)
-src/skills/pngToCode/demo/*
-!src/skills/pngToCode/demo/README.md
-src/skills/pngToCode/**/out/
-src/skills/pngToCode/**/*.png
-src/skills/pngToCode/**/*.svg
-src/skills/pngToCode/**/*.html
-src/skills/pngToCode/**/diff*.png
-src/skills/pngToCode/scripts/node_modules/
-src/skills/pngToCode/scripts/.playwright/
-
-# Local agent install mirrors (not product source)
+# Agent folders made when dufflebag installs into this repo.
+# AGENTS.md is the only instructions file we commit.
 .agents/
-.devin/
 .claude/
+.cursor/
+.devin/
 .grok/
-__pycache__/
-
-# Kiro CLI agent config (local)
-.kiro
-
-# Kimi Code CLI local config + skills
 .kimi-code/
+.kiro/
+/CLAUDE.md
+/GEMINI.md
 
-# .claude local files (backups, local settings, installed payload)
-.claude/settings.json.bak.*
-.claude/settings.local.json
-.claude/dufflebag/
-
-# .agents installed node_modules
-.agents/skills/**/node_modules/
-src/hookIsland/speakResponse/dufflebag-voice
-src/hookIsland/speakResponse/voice/target/
-
-# Local/private agent session dumps (never ship)
-docs/session-audit-*/
+# Local scratch scripts (see AGENTS.md)
+src/scripts/dev/

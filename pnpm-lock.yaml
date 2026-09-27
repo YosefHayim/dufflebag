@@ -4,9 +4,6 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
-overrides:
-  ys-dufflebag: 'link:'
-
 importers:
 
   .:
@@ -29,9 +26,6 @@ importers:
       yaml:
         specifier: 2.9.0
         version: 2.9.0
-      ys-dufflebag:
-        specifier: 'link:'
-        version: 'link:'
     devDependencies:
       '@biomejs/biome':
         specifier: 2.5.2
