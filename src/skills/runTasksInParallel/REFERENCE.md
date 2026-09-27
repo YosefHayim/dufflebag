@@ -34,23 +34,23 @@
 
 ## Artifact paths
 
-Run-isolated under `docs/agent/sdlc-tasks/<run-id>/` (UTC `date -u +%Y-%m-%dT%H%M%SZ`). Parallel SDLC runs and multi-agent hosts must not share a fixed `BOARD.md`.
+Run-isolated under `docs/agent/run-tasks-in-parallel/<run-id>/` (UTC `date -u +%Y-%m-%dT%H%M%SZ`). Parallel SDLC runs and multi-agent hosts must not share a fixed `BOARD.md`.
 
 | File | Path |
 |------|------|
-| Campaign board | `docs/agent/sdlc-tasks/<run-id>/BOARD.md` |
-| Optional state | `docs/agent/sdlc-tasks/<run-id>/STATE.md` |
-| Active pointer | `docs/agent/sdlc-tasks/CURRENT` (one line: run-id) |
+| Campaign board | `docs/agent/run-tasks-in-parallel/<run-id>/BOARD.md` |
+| Optional state | `docs/agent/run-tasks-in-parallel/<run-id>/STATE.md` |
+| Active pointer | `docs/agent/run-tasks-in-parallel/CURRENT` (one line: run-id) |
 | Lane brief | `<worktree>/LANE-BRIEF.md` only (include `AGENT_DOCS` / run-id) |
 
 ```bash
 RUN_ID=$(date -u +%Y-%m-%dT%H%M%SZ)
-AGENT_DOCS="docs/agent/sdlc-tasks/$RUN_ID"
+AGENT_DOCS="docs/agent/run-tasks-in-parallel/$RUN_ID"
 mkdir -p "$AGENT_DOCS"
-printf '%s\n' "$RUN_ID" > docs/agent/sdlc-tasks/CURRENT
+printf '%s\n' "$RUN_ID" > docs/agent/run-tasks-in-parallel/CURRENT
 ```
 
-Never write campaign boards at the repository root, to a flat fixed path (`docs/agent/sdlc-tasks/BOARD.md` without run-id), or under product `docs/agents/`.
+Never write campaign boards at the repository root, to a flat fixed path (`docs/agent/run-tasks-in-parallel/BOARD.md` without run-id), or under product `docs/agents/`.
 
 ## BOARD.md template
 
@@ -58,7 +58,7 @@ Never write campaign boards at the repository root, to a flat fixed path (`docs/
 # Run tasks in parallel — board
 
 run_id: <YYYY-MM-DDTHHMMSSZ>
-agent_docs: docs/agent/sdlc-tasks/<run-id>/
+agent_docs: docs/agent/run-tasks-in-parallel/<run-id>/
 default: main @ <sha>
 host: A
 merge_authorized: false
@@ -80,7 +80,7 @@ Branch: <type>/<issue>-<slug>
 Worktree: <abs-path>
 Default branch: <main>
 Base SHA: <sha>
-AGENT_DOCS: docs/agent/sdlc-tasks/<run-id>/   # shared run board; do not mint a new run-id
+AGENT_DOCS: docs/agent/run-tasks-in-parallel/<run-id>/   # shared run board; do not mint a new run-id
 Path globs (only yours): <globs>
 Merge authorized: false | true
 

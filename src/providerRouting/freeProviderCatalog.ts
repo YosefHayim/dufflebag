@@ -7,8 +7,6 @@ import {
   providerManifestSchema,
 } from "./providerContract.js";
 
-export const freePoolSnapshotSource =
-  "https://github.com/diegosouzapw/OmniRoute/blob/release/v3.8.50/docs/reference/FREE_TIERS.md";
 export const acknowledgementVersion = "omniroute-3.8.50-2026-06-17";
 const decodeDocumentedFreePool = Schema.decodeUnknownSync(documentedFreePoolSchema);
 const decodeProviderManifest = Schema.decodeUnknownSync(providerManifestSchema);
@@ -60,8 +58,6 @@ export const freePoolSnapshot: ReadonlyArray<DocumentedFreePool> = [
 ].map(([poolId, providerId, modelId, freeType, estimatedMonthlyTokens, termsStatus]) =>
   decodeDocumentedFreePool({ poolId, providerId, modelId, freeType, estimatedMonthlyTokens, termsStatus }),
 );
-
-export const documentedFreePoolCount = freePoolSnapshot.length;
 
 export const documentedRecurringTokenEstimate = freePoolSnapshot.reduce(
   (estimatedTokens, freePool) => estimatedTokens + freePool.estimatedMonthlyTokens,
@@ -525,6 +521,3 @@ export const freeProviderCatalog: ReadonlyArray<ProviderManifest> = [
   ...activeProviderCatalog,
   ...unavailableProviderCatalog,
 ];
-
-export const activeFreeProviderCount = activeProviderCatalog.length;
-export const unavailableFreeProviderCount = unavailableProviderCatalog.length;

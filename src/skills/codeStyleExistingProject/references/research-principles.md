@@ -27,8 +27,8 @@ grilling taste or filling gaps **before** a project has its own CODE-STYLE.
 - Code is source of truth; docs are thin navigation, ADRs, glossary.
 - Instruction files must stay consistent with the tree; nested instructions need
   explicit scope.
-- Prefer mechanical rules agents can check (`code-style.rules.json`) over vague
-  essays.
+- Prefer mechanical rules agents can check (each card's `verify:` command) over
+  vague essays.
 
 ## Honest limits
 

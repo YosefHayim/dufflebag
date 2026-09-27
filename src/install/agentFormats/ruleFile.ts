@@ -10,14 +10,13 @@ import {
   wholeFileOwnershipSchema,
 } from "../ownership.js";
 import { writeOperationSchema } from "../plan.js";
-import { isCatalogAgent, isCatalogSkill } from "./catalogChecks.js";
 import { controlScriptSchema, fillControlScript, stripFrontmatter, withCompleteFrontmatter } from "./skillText.js";
 
 const textEncoder = new TextEncoder();
 
 class RuleFilePlanError extends Schema.TaggedError<RuleFilePlanError>()("RuleFilePlanError", {
   issue: Schema.NonEmptyString.annotations({
-    description: "Actionable rule-file request or generated-plan validation issue.",
+    description: "Actionable rule-file request issue.",
   }),
 }) {
   get message(): string {
@@ -28,21 +27,12 @@ class RuleFilePlanError extends Schema.TaggedError<RuleFilePlanError>()("RuleFil
 const ruleFileAgentSchema = Schema.Struct({
   ...agentDefinitionSchema.fields,
   target: agentDefinitionSchema.fields.target.members[1],
-}).pipe(
-  Schema.filter(isCatalogAgent, {
-    message: () => "Rule-file agents must exactly match the decoded agent catalog.",
-  }),
-);
+});
 
 const ruleFileSkillSchema = Schema.Struct({
-  installedSkill: installedSkillSchema.pipe(
-    Schema.filter(isCatalogSkill, {
-      message: () => "Rule-file installed skills must exactly match the decoded feature catalog.",
-    }),
-    Schema.annotations({
-      description: "Catalog-owned installed skill identity used for the output filename.",
-    }),
-  ),
+  installedSkill: installedSkillSchema.annotations({
+    description: "Catalog-owned installed skill identity used for the output filename.",
+  }),
   markdown: withCompleteFrontmatter(Schema.String).pipe(
     Schema.filter((markdown) => stripFrontmatter(markdown).trim().length > 0, {
       message: () => "Rule-file markdown requires a non-empty body after frontmatter.",
@@ -120,31 +110,14 @@ const ruleFileWriteSchema = Schema.TaggedStruct("write", {
     ownership: wholeFileOwnershipSchema,
   }),
   bytes: writeOperationSchema.fields.bytes,
-}).pipe(
-  Schema.filter((write) => [
-    write.file.owner.agentIds.length === 1
-      ? undefined
-      : { path: ["file", "owner"], message: "Each rule file requires exactly one agent owner." },
-    write.file.ownership.installedHash === hashBytes(write.bytes)
-      ? undefined
-      : {
-          path: ["file", "ownership", "installedHash"],
-          message: "Rule ownership hashes must match the exact desired bytes.",
-        },
-  ]),
-);
+});
 
 type RuleFileWrite = Schema.Schema.Type<typeof ruleFileWriteSchema>;
 
-export const ruleFilePlanSchema = Schema.Struct({
-  writes: Schema.Array(ruleFileWriteSchema).pipe(
-    Schema.filter((writes) => writes.length === new Set(writes.map((write) => write.file.path)).size, {
-      message: () => "Rule-file plans cannot contain duplicate file paths.",
-    }),
-    Schema.annotations({
-      description: "Ordered desired rule writes with matching whole-file ownership.",
-    }),
-  ),
+const ruleFilePlanSchema = Schema.Struct({
+  writes: Schema.Array(ruleFileWriteSchema).annotations({
+    description: "Ordered desired rule writes with matching whole-file ownership.",
+  }),
 });
 
 type RuleFilePlan = Schema.Schema.Type<typeof ruleFilePlanSchema>;
@@ -176,14 +149,12 @@ const createRuleWrite = (
 const toPlanError = (error: SchemaParseIssue.ParseError) =>
   new RuleFilePlanError({ issue: SchemaParseIssue.TreeFormatter.formatErrorSync(error) });
 
-// Plan native rule files without I/O: one whole-file write per skill, validated before it is returned.
+// Plan native rule files without I/O: one whole-file write per skill.
 export const planRuleFiles = (input: unknown): Either.Either<RuleFilePlan, RuleFilePlanError> =>
   Either.mapLeft(
     Schema.decodeUnknownEither(ruleFileRequestSchema, { onExcessProperty: "error" })(input),
     toPlanError,
   ).pipe(
     Either.flatMap((request) => Either.all(request.skills.map((skill) => createRuleWrite(request, skill)))),
-    Either.flatMap((writes) =>
-      Either.mapLeft(Schema.validateEither(ruleFilePlanSchema, { onExcessProperty: "error" })({ writes }), toPlanError),
-    ),
+    Either.map((writes) => ({ writes })),
   );

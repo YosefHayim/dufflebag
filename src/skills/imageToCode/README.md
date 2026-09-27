@@ -81,12 +81,6 @@ edit: reduce blur
 after:  ratio 0.0008; measured pass
 ```
 
-## Local case-study scripts (`src/examples/robot/`)
-
-The repository still includes local-only exploratory scripts from an animated illustration case study. They are useful as implementation references, but their binary assets are not shipped, so do not use them as the canonical example for future work.
-
-Use `scripts/robot.svgo.config.mjs` only for that case-study style of animated SVG where IDs and opacity-zero rest frames must be preserved.
-
 ## SVGO
 
 ```bash

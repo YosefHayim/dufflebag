@@ -46,13 +46,13 @@ Reuse existing skills rather than inventing a second ship path:
 
 ## Artifact paths (run isolation)
 
-Campaign boards and reports go under **`docs/agent/messy-repo/<run-id>/`**, never the repo root and never a fixed flat path that parallel runs overwrite.
+Campaign boards and reports go under **`docs/agent/clean-repo-by-feature/<run-id>/`**, never the repo root and never a fixed flat path that parallel runs overwrite.
 
 ```bash
 RUN_ID=$(date -u +%Y-%m-%dT%H%M%SZ)
-AGENT_DOCS="docs/agent/messy-repo/$RUN_ID"
+AGENT_DOCS="docs/agent/clean-repo-by-feature/$RUN_ID"
 mkdir -p "$AGENT_DOCS"
-printf '%s\n' "$RUN_ID" > docs/agent/messy-repo/CURRENT
+printf '%s\n' "$RUN_ID" > docs/agent/clean-repo-by-feature/CURRENT
 ```
 
 Write MATRIX/STATE/AUDIT under `$AGENT_DOCS`. Resume → use `CURRENT` or an explicit run-id (do not mint a new one). Put `AGENT_DOCS` in every `LANE-BRIEF.md`. Product SSOT stays under `docs/agents/` (plural).

@@ -155,7 +155,7 @@ describe("configSchema", () => {
     expect(
       decodeConfig({
         speechVoice: "  Ava  ",
-        speechMode: " focused ",
+        speechMode: " immediate ",
         refineMode: " clipboard ",
         refineProvider: " auto ",
         refineModel: "  gpt-5.3-codex-spark  ",
@@ -165,7 +165,7 @@ describe("configSchema", () => {
       }),
     ).toMatchObject({
       speechVoice: "Ava",
-      speechMode: "focused",
+      speechMode: "immediate",
       refineMode: "clipboard",
       refineProvider: "auto",
       refineModel: "gpt-5.3-codex-spark",

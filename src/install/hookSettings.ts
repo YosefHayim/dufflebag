@@ -21,14 +21,13 @@ import {
 } from "./jsonEdit.js";
 import type { JsonValuesOwnership, OwnedFile, OwnedJsonValue, PreviousJsonValue } from "./ownership.js";
 import { installedHookFile, registrationEntrypoint } from "./packageFiles.js";
-import { type FileChange, fileChangeSchema } from "./plan.js";
+import type { FileChange } from "./plan.js";
 
 const textEncoder = new TextEncoder();
 
 const settingsDocumentSchema = Schema.Struct(
   {
     hooks: Schema.optional(Schema.Record({ key: Schema.String, value: Schema.Array(Schema.Unknown) })),
-    env: Schema.optional(Schema.Record({ key: Schema.String, value: Schema.Unknown })),
   },
   Schema.Record({ key: Schema.String, value: Schema.Unknown }),
 );
@@ -140,55 +139,6 @@ const validateCurrentSettingsOwnership = (
         new InstallError({ issue: `Receipted settings value ${conflict.pointer} changed after installation.` }),
       );
 };
-
-const settingsOperationSchema = (filePath: string) =>
-  fileChangeSchema.pipe(
-    Schema.filter((operation) => {
-      const identityIssues = [
-        ...(operation.file.path === filePath
-          ? []
-          : [{ path: ["file", "path"], message: `Settings operations must target ${filePath}.` }]),
-        ...(operation.file.kind._tag === "settings"
-          ? []
-          : [{ path: ["file", "kind"], message: "Settings operations must use the settings file kind." }]),
-        ...(operation.file.owner._tag === "application"
-          ? []
-          : [{ path: ["file", "owner"], message: "Settings operations must use the application owner." }]),
-      ];
-      if (identityIssues.length > 0 || operation._tag === "remove") {
-        return identityIssues;
-      }
-
-      const decoded = decodeSettings({ _tag: "file", bytes: operation.bytes });
-      if (Either.isLeft(decoded)) {
-        return [{ path: ["bytes"], message: decoded.left.issue }];
-      }
-
-      if (operation._tag !== "write" || operation.file.ownership._tag !== "jsonValues") {
-        return [];
-      }
-
-      return operation.file.ownership.values.flatMap((value, index) =>
-        installedJsonValueMatches(value, settingsValueAtPointer(decoded.right.document, value.pointer))
-          ? []
-          : [
-              {
-                path: ["file", "ownership", "values", index],
-                message: `Settings operation bytes do not match owned pointer ${value.pointer}.`,
-              },
-            ],
-      );
-    }),
-  );
-
-const validateSettingsOperation = (input: unknown, filePath: string): Either.Either<FileChange, InstallError> =>
-  Either.mapLeft(
-    Schema.validateEither(settingsOperationSchema(filePath), { onExcessProperty: "error" })(input),
-    (error) =>
-      new InstallError({
-        issue: `Generated settings operation is invalid: ${SchemaParseIssue.TreeFormatter.formatErrorSync(error)}`,
-      }),
-  );
 
 // A file dufflebag created and left empty is removed; anything else keeps its remaining user bytes.
 const restoreOrRemove = (input: {
@@ -377,15 +327,15 @@ export const planSettings = (input: {
       return Either.right(undefined);
     }
 
-    const operation = restoreOrRemove({
-      file: input.previousFile,
-      source,
-      document: mergedDocument.right,
-      snapshot: input.snapshot,
-      filePreviouslyPresent: previousOwnership.filePreviouslyPresent,
-    });
-
-    return validateSettingsOperation(operation, filePath);
+    return checkFileChange(
+      restoreOrRemove({
+        file: input.previousFile,
+        source,
+        document: mergedDocument.right,
+        snapshot: input.snapshot,
+        filePreviouslyPresent: previousOwnership.filePreviouslyPresent,
+      }),
+    );
   }
 
   const createdContainers = [
@@ -399,15 +349,12 @@ export const planSettings = (input: {
     values: ownershipValues,
   };
 
-  return validateSettingsOperation(
-    {
-      _tag: "write",
-      file: { owner: applicationOwner, path: filePath, kind: { _tag: "settings" }, ownership },
-      bytes: textEncoder.encode(source),
-      expectedCurrent: expectedCurrent(input.snapshot),
-    },
-    filePath,
-  );
+  return checkFileChange({
+    _tag: "write",
+    file: { owner: applicationOwner, path: filePath, kind: { _tag: "settings" }, ownership },
+    bytes: textEncoder.encode(source),
+    expectedCurrent: expectedCurrent(input.snapshot),
+  });
 };
 
 const restorePointer = (source: string, value: OwnedJsonValue): Either.Either<string, InstallError> => {

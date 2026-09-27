@@ -5,7 +5,7 @@ import { PNG } from "pngjs";
 import { argString, parseArgs } from "../lib/argv.js";
 
 const args = parseArgs(process.argv.slice(2));
-const input = argString(args, "input") || "robot.png";
+const input = argString(args, "input") || "design.png";
 const png = PNG.sync.read(fs.readFileSync(input));
 const { width: W, height: H, data: pixelBytes } = png;
 

@@ -122,7 +122,7 @@ const joinSystemText = (chatRequest: ChatRequest): string | undefined => {
   return systemText === "" ? undefined : systemText;
 };
 
-export const encodeOpenAiChatRequest = (chatRequest: ChatRequest, modelId: string) => ({
+const encodeOpenAiChatRequest = (chatRequest: ChatRequest, modelId: string) => ({
   model: modelId,
   stream: true,
   stream_options: { include_usage: true },
@@ -130,14 +130,14 @@ export const encodeOpenAiChatRequest = (chatRequest: ChatRequest, modelId: strin
   messages: openAiTurns(chatRequest),
 });
 
-export const encodeOpenAiResponsesRequest = (chatRequest: ChatRequest, modelId: string) => ({
+const encodeOpenAiResponsesRequest = (chatRequest: ChatRequest, modelId: string) => ({
   model: modelId,
   stream: true,
   max_output_tokens: chatRequest.maximumOutputTokens,
   input: openAiTurns(chatRequest),
 });
 
-export const encodeAnthropicRequest = (chatRequest: ChatRequest, modelId: string) => ({
+const encodeAnthropicRequest = (chatRequest: ChatRequest, modelId: string) => ({
   model: modelId,
   stream: true,
   max_tokens: chatRequest.maximumOutputTokens === undefined ? 1024 : chatRequest.maximumOutputTokens,
@@ -149,7 +149,7 @@ export const encodeAnthropicRequest = (chatRequest: ChatRequest, modelId: string
 });
 
 // Google names the model in the URL path, not the request.
-export const encodeGoogleGenerativeRequest = (chatRequest: ChatRequest) => {
+const encodeGoogleGenerativeRequest = (chatRequest: ChatRequest) => {
   const systemText = joinSystemText(chatRequest);
   return {
     systemInstruction: systemText === undefined ? undefined : { parts: [{ text: systemText }] },
@@ -260,18 +260,6 @@ const googleChunkEvents = (chunk: GoogleStreamChunk): ReadonlyArray<StreamEvent>
   ];
 };
 
-export const decodeOpenAiStreamChunk = (wireChunk: unknown) =>
-  Either.map(decodeOpenAiChunk(wireChunk), openAiChunkEvents);
-
-export const decodeOpenAiResponsesStreamChunk = (wireChunk: unknown) =>
-  Either.map(decodeOpenAiResponsesChunk(wireChunk), openAiResponsesChunkEvents);
-
-export const decodeAnthropicStreamChunk = (wireChunk: unknown) =>
-  Either.map(decodeAnthropicChunk(wireChunk), anthropicChunkEvents);
-
-export const decodeGoogleStreamChunk = (wireChunk: unknown) =>
-  Either.map(decodeGoogleChunk(wireChunk), googleChunkEvents);
-
 // OpenAI and Anthropic stream a tool call in fragments; they are buffered until the call is finished.
 type PendingToolCall = {
   index: number;
@@ -364,11 +352,13 @@ const decodeWireChunk = (request: {
     case "openai-chat":
       return Either.map(decodeOpenAiChunk(request.wireChunk), (chunk) => openAiStep(request.streamState, chunk));
     case "openai-responses":
-      return Either.map(decodeOpenAiResponsesStreamChunk(request.wireChunk), withState);
+      return Either.map(decodeOpenAiResponsesChunk(request.wireChunk), (chunk) =>
+        withState(openAiResponsesChunkEvents(chunk)),
+      );
     case "anthropic-messages":
       return Either.map(decodeAnthropicChunk(request.wireChunk), (chunk) => anthropicStep(request.streamState, chunk));
     case "google-generative":
-      return Either.map(decodeGoogleStreamChunk(request.wireChunk), withState);
+      return Either.map(decodeGoogleChunk(request.wireChunk), (chunk) => withState(googleChunkEvents(chunk)));
   }
 };
 

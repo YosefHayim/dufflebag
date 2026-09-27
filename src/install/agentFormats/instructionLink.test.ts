@@ -1,11 +1,11 @@
 import { createHash } from "node:crypto";
 
-import { Either, Option, Schema } from "effect";
+import { Either, Option } from "effect";
 import { describe, expect, expectTypeOf, it } from "vitest";
 
 import { findAgent } from "../../catalog/agentCatalog.js";
 import type { FileChange } from "../plan.js";
-import { type InstructionLinkPlan, instructionLinkPlanSchema, planInstructionLink } from "./instructionLink.js";
+import { type InstructionLinkPlan, planInstructionLink } from "./instructionLink.js";
 
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
@@ -227,18 +227,7 @@ describe("planInstructionLink", () => {
     expect(rejects(request({ agent, current: `﻿${bomSource}` }))).toBe(true);
   });
 
-  it("rejects forged or cross-routed catalog agents", () => {
-    const forgedAider = {
-      ...aider,
-      target: {
-        _tag: "instructionLink",
-        instructionPath: "AGENTS.md",
-        configPath: ".continue/config.json",
-        referenceFormat: "jsonRulesArray",
-      },
-    };
-
-    expect(rejects({ ...request(), agent: forgedAider })).toBe(true);
+  it("rejects an agent without a native instruction-link target", () => {
     expect(rejects({ ...request(), agent: Option.getOrThrow(findAgent("cursor")) })).toBe(true);
   });
 
@@ -297,39 +286,6 @@ describe("planInstructionLink", () => {
       ),
     ).toBe(true);
     expect(rejects(request({ current: "read:\n  - USER.md\n", previousFile: aiderWrite.file }))).toBe(true);
-  });
-
-  it("rejects generic result hash and native-reference semantic drift", () => {
-    const continueWrite = write({ agent: continueAgent });
-    const aiderWrite = write();
-    if (continueWrite.file.ownership._tag !== "jsonValues") {
-      throw new Error("Expected Continue JSON ownership.");
-    }
-
-    const continueWithHash = (hash: string) => ({
-      ...continueWrite.file,
-      ownership: {
-        ...continueWrite.file.ownership,
-        values: continueWrite.file.ownership.values.map((value) => ({ ...value, installed: { _tag: "value", hash } })),
-      },
-    });
-    const otherAiderReference = {
-      ...aiderWrite.file,
-      ownership:
-        aiderWrite.file.ownership._tag === "yamlSequenceValue"
-          ? { ...aiderWrite.file.ownership, reference: "OTHER.md" }
-          : aiderWrite.file.ownership,
-    };
-    const drifted = [
-      { ...continueWrite, file: continueWithHash("0".repeat(64)) },
-      { ...aiderWrite, bytes: encode("read:\n  - OTHER.md\n") },
-      { ...aiderWrite, file: otherAiderReference, bytes: encode("read:\n  - OTHER.md\n") },
-      { ...continueWrite, file: continueWithHash(hashJson(["OTHER.md"])), bytes: encode('{"rules":["OTHER.md"]}\n') },
-    ];
-
-    for (const operation of drifted) {
-      expect(Schema.is(instructionLinkPlanSchema)(operation)).toBe(false);
-    }
   });
 
   it("strictly rejects unknown request properties", () => {

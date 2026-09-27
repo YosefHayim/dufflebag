@@ -22,7 +22,7 @@ pub struct VoicePreferences {
     /// Optional cmux-new shell template ({{prompt_file}}, {{prompt}}, {{cwd}}).
     pub refine_cmux_command: String,
     pub refine_cmux_press_enter: bool,
-    /// auto | focused | immediate | off (from `speechMode`)
+    /// auto | immediate | off (from `speechMode`)
     pub narration_mode: String,
     pub speech_voice: String,
     pub speech_speed: f64,
@@ -120,7 +120,7 @@ fn preferences_from(values: &Value) -> VoicePreferences {
         refine_send_to: one_of(text("refineSendTo"), &["caret", "cmux-new", "cmux-resume"], "caret"),
         refine_cmux_command: text("refineCmuxCommand").unwrap_or("").to_string(),
         refine_cmux_press_enter: flag("refineCmuxPressEnter"),
-        narration_mode: one_of(text("speechMode"), &["auto", "focused", "immediate", "off"], "auto"),
+        narration_mode: one_of(text("speechMode"), &["auto", "immediate", "off"], "auto"),
         speech_voice: if is_supertonic_voice(voice) { voice.to_ascii_uppercase() } else { "F4".into() },
         speech_speed: (words_per_minute / 200.0).clamp(0.7, 2.0),
         dictation_replacements: text("dictationReplacements").unwrap_or("").to_string(),

@@ -3,7 +3,7 @@
 ## STATE.md
 
 ```markdown
-# UX-journey STATE — <repo>
+# Improve UX STATE — <repo>
 
 updated: <ISO date>
 phase: audit | taste | implement | land | done
@@ -15,9 +15,9 @@ requested_through: audit | taste | implement | land
 host: A | B | C
 product_tip: <ref> @ <sha>
 run_id: <YYYY-MM-DDTHHMMSSZ>
-matrix: docs/agent/ux-journey/<run-id>/MATRIX.md
-audit: docs/agent/ux-journey/<run-id>/AUDIT.md
-taste: docs/agent/ux-journey/<run-id>/TASTE.md
+matrix: docs/agent/improve-ux/<run-id>/MATRIX.md
+audit: docs/agent/improve-ux/<run-id>/AUDIT.md
+taste: docs/agent/improve-ux/<run-id>/TASTE.md
 next_action: <one concrete verb>
 block_reason: none | waiting for taste pick | …
 lanes_total: N
@@ -29,7 +29,7 @@ notes: <one line>
 ## MATRIX.md
 
 ```markdown
-# UX-journey MATRIX — <repo>
+# Improve UX MATRIX — <repo>
 
 | id | Journey / flow | Surfaces | Paths (globs) | Issue | Branch | Worktree | PR | Head | Proof | Notes |
 |----|----------------|----------|---------------|-------|--------|----------|-----|------|-------|-------|
@@ -39,7 +39,7 @@ notes: <one line>
 ## AUDIT.md
 
 ```markdown
-# UX-journey AUDIT — <repo>
+# Improve UX AUDIT — <repo>
 
 Updated: <ISO date>
 Scope: …
@@ -73,7 +73,7 @@ Score 1–10 (10 = excellent). Cite paths / routes under each low score.
 ## TASTE.md
 
 ```markdown
-# UX-journey TASTE — <repo>
+# Improve UX TASTE — <repo>
 
 Sample flow: <id>
 Variant count: N (why this N)
@@ -96,7 +96,7 @@ compare_state: empty-build | in-progress | proven | ship-ready | <custom>
 
 ## Current reference
 
-- screenshot: docs/agent/ux-journey/<run-id>/current-sample.png (or path)
+- screenshot: docs/agent/improve-ux/<run-id>/current-sample.png (or path)
 - density score production: N/10
 
 ## Variants
@@ -111,7 +111,7 @@ compare_state: empty-build | in-progress | proven | ship-ready | <custom>
 - Color: … (may keep primary; must improve surfaces)
 - Click delta: 9 → 7
 - Density after: N/10
-- Mock: docs/agent/ux-journey/<run-id>/mocks/conservative.html
+- Mock: docs/agent/improve-ux/<run-id>/mocks/conservative.html
 - feel_test: pass|fail — …
 
 ### direction.balanced

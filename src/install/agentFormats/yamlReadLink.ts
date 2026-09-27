@@ -282,13 +282,3 @@ export const removeYamlRead = (input: {
     textEncoder.encode(`${source.right.slice(0, referenceItem.start)}${source.right.slice(referenceItem.end)}`),
   );
 };
-
-export const yamlReadHasReference = (input: { source: string; ownership: YamlSequenceValueOwnership }): boolean => {
-  const document = inspectYamlReadDocument(input.source);
-
-  return (
-    input.ownership.key === "read" &&
-    Either.isRight(document) &&
-    yamlReferenceItems(document.right, input.ownership.reference).length === 1
-  );
-};

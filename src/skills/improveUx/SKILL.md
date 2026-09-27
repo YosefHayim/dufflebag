@@ -63,12 +63,12 @@ Each taste variant **must** change **at least 2** of these four axes vs live, wi
 ### Invocation
 
 ```text
-/ux-journey                         # audit → taste on current repo (wait for pick)
-/ux-journey audit <repo|flow>
-/ux-journey taste                   # mocks only if audit already done
-/ux-journey implement               # only after pick; full through open PRs
-/ux-journey land                    # merge when user says
-/ux-journey full <scope>            # audit → taste → (wait pick) → implement → open PRs
+/improve-ux                         # audit → taste on current repo (wait for pick)
+/improve-ux audit <repo|flow>
+/improve-ux taste                   # mocks only if audit already done
+/improve-ux implement               # only after pick; full through open PRs
+/improve-ux land                    # merge when user says
+/improve-ux full <scope>            # audit → taste → (wait pick) → implement → open PRs
 ```
 
 | Phrase | Behavior |
@@ -97,7 +97,7 @@ Each taste variant **must** change **at least 2** of these four axes vs live, wi
 Run-scoped (UTC `date -u +%Y-%m-%dT%H%M%SZ`) so parallel campaigns do not overwrite:
 
 ```text
-docs/agent/ux-journey/
+docs/agent/improve-ux/
   CURRENT                              # one line: active run-id
   <run-id>/                            # e.g. 2026-08-09T143022Z
     STATE.md
@@ -111,9 +111,9 @@ docs/agent/ux-journey/
 
 ```bash
 RUN_ID=$(date -u +%Y-%m-%dT%H%M%SZ)
-AGENT_DOCS="docs/agent/ux-journey/$RUN_ID"
+AGENT_DOCS="docs/agent/improve-ux/$RUN_ID"
 mkdir -p "$AGENT_DOCS"
-printf '%s\n' "$RUN_ID" > docs/agent/ux-journey/CURRENT
+printf '%s\n' "$RUN_ID" > docs/agent/improve-ux/CURRENT
 ```
 
 Resume → use `CURRENT` / explicit run-id (do not mint a new one).  

@@ -30,7 +30,7 @@ Principle 1 says slice at *the* joint; this is *which* one. The right joint is t
 
 - **Hand already raised, palm forward → wave at the WRIST.** Only the hand turns (rock ±12–15°); the forearm and shoulder stay planted. This is the universal "hello".
 - **Arm down at the side → raise from the SHOULDER,** then rock the wrist.
-- A **whole-arm rigid sweep is the wrong model for an already-raised hand.** A rigid limb can only pivot at its *base*, so the base joint (elbow/shoulder) hinges the entire limb like a gate — the elbow swings sideways and the palm *slides* instead of waving. It reads as a stiff pendulum, not a greeting. (Hard-won: a robot mascot's wave was wrong as a whole-arm shoulder sweep — "rig-first" is not "rig the biggest part" — and only read right once rebuilt as a wrist rock.)
+- A **whole-arm rigid sweep is the wrong model for an already-raised hand.** A rigid limb can only pivot at its *base*, so the base joint (elbow/shoulder) hinges the entire limb like a gate — the elbow swings sideways and the palm *slides* instead of waving. It reads as a stiff pendulum, not a greeting. "Rig-first" is not "rig the biggest part".
 
 This decides **principle 1's slice**: choosing the joint and choosing the cut are one decision. An already-raised wave needs the **hand** as its own part — cut at the wrist, with the forearm left in the base to hide the junction (its planted bulk covers the seam, so the rock never gaps) — *not* the whole arm as one rigid piece. Make this call during decomposition, from the rest pose, not after tracing.
 
@@ -48,7 +48,7 @@ This decides **principle 1's slice**: choosing the joint and choosing the cut ar
     - The part is **open at its joint cut** (it was sliced there, so it has no outline along that edge) — **seal the joint edge first** by stroking a barrier along the mask's joint-side edge, or the flood pours through the cut and fills the whole part.
     - Apply it as `clip-path="url(#id)"` on the rotating group, with `clipPathUnits="userSpaceOnUse"`. The clip lives in the group's coordinate space, so it **rotates with the part** and stays aligned at every angle — cutting only the margin while every part path (palm fill, shading, linework) stays intact. Verify the clip survives minify (`cleanupIds:false`, so `#id` and the `url(#id)` ref aren't renamed apart).
 
-    (Hard-won on the robot: the waving hand's mask polygon left a pale margin above its straight top edge that swung behind the fingers as a white parallelogram; a 1.04% _rest_ diff never saw it. Fixed by clipping the wave group to the hand silhouette flood-filled from the hand's own outline, wrist cut sealed — `handClip.ts`.)
+    `scripts/src/png/handClip.ts` builds this clip for a waving hand: flood-fill from the hand's own outline, wrist cut sealed.
 
 ## Pinning the pivot (the `transform-origin` recipes)
 

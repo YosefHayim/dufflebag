@@ -166,7 +166,7 @@ describe("refine_prompt.py", () => {
       "import mac_picker",
       // The picker must not depend on which agent CLIs this machine has installed.
       "codex = {'id': 'codex', 'binary': 'codex', 'path': '/fake/bin/codex', 'effort': True, 'models': []}",
-      "mac_picker.discover_providers = lambda **_options: [codex]",
+      "mac_picker.discover_providers = lambda: [codex]",
       "models = mac_picker._picker_models_for_backend('codex', preferred='gpt-5.4-mini', exclude={'o4-mini'}, providers=[codex])",
       // Pick provider 1, then the entry after the last model: the skip choice.
       "answers = iter(['1', str(len(models) + 1)])",
@@ -196,7 +196,6 @@ describe("refine_prompt.py", () => {
         path: "/fake/bin/ollama",
         effort: false,
         models: ["llama3.2:latest"],
-        runnable: true,
       },
     ]);
   });

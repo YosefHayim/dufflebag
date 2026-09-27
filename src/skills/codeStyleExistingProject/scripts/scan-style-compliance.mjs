@@ -107,41 +107,6 @@ for (const name of ["CODE-STYLE.md", "AGENTS.md"]) {
   }
 }
 
-const rulesJsonPath = path.join(root, "code-style.rules.json");
-const codeStylePath = ["CODE-STYLE.md", "CodeStyle.md"].map((n) => path.join(root, n)).find((p) => fs.existsSync(p));
-if (fs.existsSync(rulesJsonPath) && codeStylePath) {
-  try {
-    const rulesDoc = JSON.parse(fs.readFileSync(rulesJsonPath, "utf8"));
-    const md = fs.readFileSync(codeStylePath, "utf8");
-    const rules = Array.isArray(rulesDoc.rules) ? rulesDoc.rules : [];
-    for (const rule of rules) {
-      const id = rule.id || rule.ruleId;
-      if (!id) continue;
-      if (!md.includes(id) && !md.includes(`[rule:${id}]`)) {
-        findings.push({
-          ruleId: "docs.orphan-rule",
-          severity: "medium",
-          path: "code-style.rules.json",
-          symbol: id,
-          evidence: `Rule id "${id}" present in JSON but not referenced in ${path.basename(codeStylePath)}`,
-          confidence: "mechanical",
-          remediation: "Add the rule card to CODE-STYLE.md or remove the orphan id.",
-        });
-      }
-    }
-  } catch (err) {
-    findings.push({
-      ruleId: "docs.missing",
-      severity: "low",
-      path: "code-style.rules.json",
-      symbol: null,
-      evidence: `Failed to parse code-style.rules.json: ${err.message}`,
-      confidence: "mechanical",
-      remediation: "Fix JSON syntax.",
-    });
-  }
-}
-
 walk(root, (absPath, relPath, stat) => {
   if (!stat.isFile()) return;
   const ext = path.extname(absPath);

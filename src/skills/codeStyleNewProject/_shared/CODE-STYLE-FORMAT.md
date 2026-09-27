@@ -15,7 +15,7 @@ recommended — see `## Enforce the format` below.
 | --- | --- |
 | Format (how to write the guide) | this file — `CODE-STYLE-FORMAT.md` |
 | Living exemplar (real project guide) | repo root `CODE-STYLE.md` (its cards are the rule index; no JSON mirror) |
-| Scaffold for new projects | `src/templates/projectDocs/CODE-STYLE.md` + `src/templates/projectDocs/code-style.rules.json` |
+| Scaffold for new projects | `src/templates/projectDocs/CODE-STYLE.md` |
 | Machine checker | `src/scripts/checkRuleCards.ts` (`pnpm style:guide`) |
 
 When in doubt, copy **this package’s** root guide and scaffold — not an older product
@@ -31,7 +31,6 @@ pin the format to any external repository.
 | `// [GOOD]` / `// Good` / `// chosen` / `// BAD` / `// not this` | Markers are exactly `// ✓` and `// ✗` |
 | Multi-sentence / multi-paragraph rule bodies under `## Rules` | One assertion sentence per card; extra clauses are new cards or live in the ✗ block |
 | Prose sections instead of rule cards (`## Naming`, `## Shape`, bullet lists of rules) | Everything enforceable is a five-slot card under `## Rules` |
-| `code-style.rules.json` with `channel` / `enforcedBy` / `summary` as the primary fields | v3+ mirror is only `{ id, statement, verify }` per rule (extra top-level keys ok) |
 | Uncle Bob / generic clean-code scaffolds as the project guide | Project-specific decisions only; philosophy books are not this file |
 
 ## The rule card
@@ -60,7 +59,7 @@ Why: {one line}
 | --- | --- |
 | `###` heading | Short human name only. No ID, no tags, no `· [taste]`. |
 | Metadata line | First non-blank line under the heading. Exactly `[rule:<id>] · verify: \`<command>\`` — or `· verify: judgment` when no detector exists. |
-| Assertion | **Exactly one sentence, ending in a period.** Must match the machine mirror's `statement` byte for byte. |
+| Assertion | **Exactly one sentence, ending in a period.** |
 | Example | One fenced block containing both a `// ✓` and a `// ✗` case. |
 | `Why:` | One line. Rationale, not restatement. |
 
@@ -81,34 +80,7 @@ Rules for the slots:
 - **Dotted IDs preferred** (`functions.arrow-constants`, `names.domain-specific`).
   Hyphenated legacy IDs may stay if already wired to detectors.
 
-## The machine mirror
-
-`code-style.rules.json` is **optional**. The cards already carry each rule's id, verify command, and statement, so tools can read the rules from `CODE-STYLE.md` alone. When a repo keeps a JSON mirror beside the guide, it mirrors the cards exactly:
-
-```json
-{
-  "version": 3,
-  "guide": "CODE-STYLE.md",
-  "rules": [
-    {
-      "id": "functions.arrow-constants",
-      "statement": "Named non-framework functions are arrow constants declared before first use.",
-      "verify": "npm run style:code"
-    }
-  ]
-}
-```
-
-- `statement` is byte-identical to the card's assertion.
-- `verify` is byte-identical to the card's command, or `judgment`.
-- Every ID appears exactly once in each file, **in the same order**.
-- A project may add its own top-level keys (allowlists, protected paths). Keep them
-  out of `rules[]`.
-- Do **not** use the old channel schema (`channel`, `enforcedBy`, `summary`,
-  `docSection`) as the primary rule object — those are obsolete. If a repo still has
-  them, convert to `{ id, statement, verify }` on the next rewrite.
-
-Exemplar to copy: `src/templates/projectDocs/code-style.rules.json` in this package.
+There is no JSON mirror: tools read the rules from the cards in `CODE-STYLE.md`.
 
 ## Required document shape
 
@@ -181,18 +153,15 @@ A documented format that only agents are asked to follow is the format that most
 repositories ignore. Wire it to the gate:
 
 - Copy `src/scripts/checkRuleCards.ts` from dufflebag. It is a pure function over
-  the guide text (plus the optional JSON rules) with no repo-specific assumptions.
+  the guide text with no repo-specific assumptions.
 - Add a test that runs it against the repo's **real** `CODE-STYLE.md` and asserts
   zero violations.
 - Check any repository from dufflebag without installing anything:
   `pnpm style:guide /path/to/repo`.
 
 The linter catches: a missing or malformed metadata line, a multi-sentence assertion,
-an assertion that drifts from the machine `statement`, a `verify` that drifts from the
-mirror, a missing ✓ or ✗ case, a missing `Why:` line, a duplicated card, a rule with
-no card, a card with no machine entry, and a missing required section. The mirror checks
-run only when the repo keeps a `code-style.rules.json`. It deliberately ignores `###`/`##`
-lines inside fenced examples.
+a missing ✓ or ✗ case, a missing `Why:` line, a duplicated card, and a missing required
+section. It deliberately ignores `###`/`##` lines inside fenced examples.
 
 ## Stack and framework practices
 
@@ -228,7 +197,7 @@ This file covers only what is specific to THIS project on top of those.
 | --- | --- |
 | `code-style-new-project` | Greenfield — write the full guide on approval |
 | `code-style-existing-project` | Existing codebase — rewrite/refresh from evidence |
-| `code-style-teach-me` / `code-style-review` | **Read** the `CODE-STYLE.md` cards (plus `code-style.rules.json` when the repo has one); do not invent alternate formats |
+| `code-style-teach-me` / `code-style-review` | **Read** the `CODE-STYLE.md` cards; do not invent alternate formats |
 | `make-code-readable` / `simplify-code` | Enforce `## Never` + golden path per-diff |
 
 When refreshing an existing guide that uses a forbidden shape, **convert it** to this

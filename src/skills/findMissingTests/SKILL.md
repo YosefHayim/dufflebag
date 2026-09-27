@@ -27,7 +27,7 @@ Load sibling `SKILL.md` files; do not reimplement them.
 | Over-engineering scan + lean with parity prove | `simplify-repo-with-tests` (different job; may call this skill for business test gaps only) |
 | Multi-feature cleanup (not tests) | `clean-repo-by-feature` |
 
-This skill owns: layer taxonomy, scan briefs, gap matrix, TDD fill order, default **headless** e2e policy, done receipt, and **artifact paths** under `docs/agent/test-gap/`.
+This skill owns: layer taxonomy, scan briefs, gap matrix, TDD fill order, default **headless** e2e policy, done receipt, and **artifact paths** under `docs/agent/find-missing-tests/`.
 
 ## Artifact paths (mandatory)
 
@@ -35,22 +35,21 @@ Never write campaign/report markdown at the **repository root**. Never use a fix
 
 | File | Path |
 |------|------|
-| Feature inventory | `docs/agent/test-gap/<run-id>/FEATURES.md` |
-| Gap report | `docs/agent/test-gap/<run-id>/REPORT.md` |
-| Active pointer | `docs/agent/test-gap/CURRENT` (one line: run-id) |
+| Feature inventory | `docs/agent/find-missing-tests/<run-id>/FEATURES.md` |
+| Gap report | `docs/agent/find-missing-tests/<run-id>/REPORT.md` |
+| Active pointer | `docs/agent/find-missing-tests/CURRENT` (one line: run-id) |
 
 1. **New run:** mint UTC run-id, then write only under that dir:
 
    ```bash
    RUN_ID=$(date -u +%Y-%m-%dT%H%M%SZ)
-   AGENT_DOCS="docs/agent/test-gap/$RUN_ID"
+   AGENT_DOCS="docs/agent/find-missing-tests/$RUN_ID"
    mkdir -p "$AGENT_DOCS"
-   printf '%s\n' "$RUN_ID" > docs/agent/test-gap/CURRENT
+   printf '%s\n' "$RUN_ID" > docs/agent/find-missing-tests/CURRENT
    ```
 
 2. **Resume:** resolve `CURRENT` / explicit run-id / newest run dir; do **not** mint a new run-id. Update files in place under that `AGENT_DOCS`.
-3. **Legacy migrate:** root `TEST-GAP-*.md` or flat `docs/agent/test-gap/*.md` → move into a run dir, set `CURRENT`, remove root copies.
-4. Full convention: [references/agent-artifacts.md](references/agent-artifacts.md).
+3. Full convention: [references/agent-artifacts.md](references/agent-artifacts.md).
 
 ## Layers (scan all that exist)
 
@@ -193,7 +192,7 @@ On failure: fix tests or product within scope; re-run failed command; do not hid
 - Default: leave topic branch + `$AGENT_DOCS/REPORT.md` + list of new tests; commit via **`organize-commits`** if user wants commits.
 - `open-pr` / `ship`: **`finish-and-push`** (PR, no merge unless they said merge).
 - Parallel worktrees + merge campaign: hand off to **`ship-missing-tests`** (do not half-implement lanes here).
-- Do not use `ship-one-feature` unless they want full merge+reinstall of a product feature (not a test-gap campaign).
+- Do not use `ship-one-feature` unless they want full merge+reinstall of a product feature (not a missing-tests campaign).
 
 ## Verification
 
@@ -215,8 +214,8 @@ headless: true | false (user override)
 surface: web | native | all
 features_scanned: N
 run_id: <YYYY-MM-DDTHHMMSSZ>
-report: docs/agent/test-gap/<run-id>/REPORT.md
-features: docs/agent/test-gap/<run-id>/FEATURES.md
+report: docs/agent/find-missing-tests/<run-id>/REPORT.md
+features: docs/agent/find-missing-tests/<run-id>/FEATURES.md
 gaps_filled: N
 unit: <cmd> → pass|fail
 e2e_web: <cmd> → pass|fail|skip

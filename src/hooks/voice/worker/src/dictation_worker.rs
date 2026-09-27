@@ -13,7 +13,7 @@ use crate::narration_mute::toggle_narration_muted;
 use crate::narration_worker;
 use crate::overlay;
 use crate::refine::refine_with_prefs;
-use crate::state_home::{atomic_json, ensure_state_home, now_secs, voice_state_home};
+use crate::state_home::{append_dictation_log, atomic_json, ensure_state_home, now_secs, voice_state_home};
 use crate::stt::SttEngine;
 use crate::tts;
 use crate::typing::{read_clipboard, write_clipboard};
@@ -197,6 +197,7 @@ fn run_capture_loop(hotkey: &Hotkey, running: &Arc<AtomicBool>, queue: &Dictatio
                 live_caption.clear();
             }
             hotkey.status.write("listening", "Recording");
+            append_dictation_log("hold start");
             announced_listening = true;
         }
         if hotkey.cancel.swap(false, Ordering::SeqCst) {
@@ -208,10 +209,21 @@ fn run_capture_loop(hotkey: &Hotkey, running: &Arc<AtomicBool>, queue: &Dictatio
                 announced_listening = false;
             }
         }
-        let stop_request = hotkey.timer.lock().stop_request.take();
+        let (stop_request, state) = {
+            let mut timer = hotkey.timer.lock();
+            (timer.stop_request.take(), timer.state)
+        };
         if let Some(generation) = stop_request {
             announced_listening = false;
+            append_dictation_log(&format!("hold stop gen={generation}"));
             finish_clip(hotkey, &capture, &live_caption, queue, generation);
+        } else if capture.is_recording() && matches!(state, HoldState::Idle | HoldState::Shortcut) {
+            // Safety net: recording with no Shift hold means a signal was lost; never leave the mic on.
+            append_dictation_log("recording stopped: no Shift hold");
+            capture.cancel_capture();
+            live_caption.clear();
+            hotkey.status.write("inactive", "");
+            announced_listening = false;
         }
         thread::sleep(Duration::from_millis(5));
     }

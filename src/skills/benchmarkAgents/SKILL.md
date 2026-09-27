@@ -62,9 +62,9 @@ Prefer repo-owned scripts under `scripts/dev/` or `scripts/bench/` (gitignored p
 
    ```bash
    RUN_ID=$(date -u +%Y-%m-%dT%H%M%SZ)
-   AGENT_DOCS="docs/agent/benchmark/$RUN_ID"
+   AGENT_DOCS="docs/agent/benchmark-agents/$RUN_ID"
    mkdir -p "$AGENT_DOCS"
-   printf '%s\n' "$RUN_ID" > docs/agent/benchmark/CURRENT
+   printf '%s\n' "$RUN_ID" > docs/agent/benchmark-agents/CURRENT
    ```
 
    Include methodology, versions, and raw data paths. Never write these at the repository root or a fixed flat path that a second bench overwrites.

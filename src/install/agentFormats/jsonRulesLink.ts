@@ -234,24 +234,3 @@ export const removeJsonRule = (input: {
     !input.ownership.filePreviouslyPresent && jsonObjectIsEmpty(source) ? new Uint8Array() : textEncoder.encode(source),
   );
 };
-
-export const jsonRulesWriteMatches = (write: {
-  bytes: Uint8Array;
-  configPath: string;
-  instructionPath: string | undefined;
-  ownership: JsonValuesOwnership;
-}): boolean => {
-  const configuration = decodeJsonConfiguration(write.bytes, write.configPath);
-  const [owned, ...extra] = write.ownership.values;
-
-  return (
-    Either.isRight(configuration) &&
-    configuration.right.rules !== undefined &&
-    write.instructionPath !== undefined &&
-    configuration.right.rules.includes(write.instructionPath) &&
-    extra.length === 0 &&
-    owned?.pointer === "/rules" &&
-    owned.installed._tag === "value" &&
-    owned.installed.hash === hashJsonValue(configuration.right.rules)
-  );
-};

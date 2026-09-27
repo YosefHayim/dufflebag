@@ -1,20 +1,11 @@
-# RULESET.md — emit the machine mirror of CODE-STYLE.md ("biome config, as a skill")
+# RULESET.md — give every CODE-STYLE.md rule a real verify command ("biome config, as a skill")
 
-`CODE-STYLE.md` is the human prose, and its cards already carry each rule's id, statement, and
-verify command. `code-style.rules.json` (beside it) is an **optional machine mirror**: every rule as an object declaring the exact command that proves it. This is what
-makes review deterministic across hundreds of changed files — the reviewer walks *every* rule
-by its command, not just the `## Never` list. Emit it in Step 8, right after the formatter/
-linter config, and generate the artifacts each rule points to.
+The cards in `CODE-STYLE.md` are the only rule index: each carries the rule's id, statement, and
+the exact command that proves it. This is what makes review deterministic across hundreds of
+changed files — the reviewer walks *every* rule by its command, not just the `## Never` list.
+In Step 8, right after the formatter/linter config, generate the artifacts each rule points to.
 
-Schema and slot rules: [CODE-STYLE-FORMAT.md](CODE-STYLE-FORMAT.md). Exemplar to
-copy: `src/templates/projectDocs/code-style.rules.json` in this package.
-
-```json
-{ "id": "function.arrow-only", "statement": "…one sentence…", "verify": "pnpm style" }
-```
-
-`statement` is byte-identical to the card's assertion; `verify` is byte-identical to the card's
-command, or `judgment`. A linter enforces both — see the format spec.
+Card format and slot rules: [CODE-STYLE-FORMAT.md](CODE-STYLE-FORMAT.md).
 
 ## Pick the cheapest real command
 
@@ -65,7 +56,7 @@ mechanism's command* as `verify`. Prefer left over right — deterministic Biome
 - GritQL → write `biome-rules/<id>.grit`, add its path to `plugins`.
 - Repo AST checker → add the detector and a script that runs it over the tree, so the `verify`
   command is real and runnable.
-- `judgment` → nothing; the review skill reads these from the ruleset.
+- `judgment` → nothing; the review skill reads these from the cards.
 
 **Then prove it, don't assume:** every new rule must **catch a planted violation** (drop a temp
 fixture in the right dir, run the command, delete it), and must not redden the gate unexpectedly
@@ -77,5 +68,4 @@ fixture in the right dir, run the command, delete it), and must not redden the g
 - In the planpage plan, show each rule's `verify` command beside its `PickBlock`, and the
   generated `overrides`/`plugins` diff for `biome.json` in the "review the exact writes" block.
 - The **`code-style-teach-me`** (build-time) and **`code-style-review`** (diff-time)
-  skills read `code-style.rules.json` when it exists, otherwise the `CODE-STYLE.md` cards — point
-  the AGENTS.md digest at whichever the repo keeps.
+  skills read the cards in `CODE-STYLE.md` — point the AGENTS.md digest there.

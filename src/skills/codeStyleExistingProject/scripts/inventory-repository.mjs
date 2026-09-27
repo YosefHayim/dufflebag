@@ -35,7 +35,6 @@ const DOC_NAMES = [
   "AGENTS.md",
   "CODE-STYLE.md",
   "CodeStyle.md",
-  "code-style.rules.json",
   "PROJECT.md",
   "CONTEXT.md",
   "LANGUAGE.md",

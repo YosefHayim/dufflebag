@@ -45,8 +45,8 @@ const waitForAuthorizationCode = (callbackUrl: URL) =>
       createServer((incomingRequest, callbackWriter) => {
         const requestUrl = new URL(incomingRequest.url || "/", callbackUrl);
         const code = requestUrl.searchParams.get("code");
-        const failure = requestUrl.searchParams.get("error");
-        const validCallback = requestUrl.pathname === callbackUrl.pathname && code !== null;
+        const stateMatches = requestUrl.pathname === callbackUrl.pathname;
+        const validCallback = stateMatches && code !== null;
         callbackWriter.writeHead(validCallback ? 200 : 400, { "content-type": "text/plain; charset=utf-8" });
         callbackWriter.end(
           validCallback ? "Dufflebag connected. You can close this tab." : "Dufflebag could not connect this account.",
@@ -56,7 +56,7 @@ const waitForAuthorizationCode = (callbackUrl: URL) =>
           resume(Effect.succeed(code));
           return;
         }
-        resume(Effect.fail(new OpenRouterOAuthError({ failureClass: failure === null ? "state" : "callback" })));
+        resume(Effect.fail(new OpenRouterOAuthError({ failureClass: stateMatches ? "callback" : "state" })));
       });
     // `localhost` can resolve to either loopback address, so listen on both.
     const callbackServers = ["127.0.0.1", "::1"].map((loopbackHost) => {
@@ -107,10 +107,12 @@ export const connectOpenRouter = (request: {
       ? exchangeAuthorizationCode
       : request.dependencies.exchangeAuthorizationCode;
   return Effect.gen(function* () {
-    const [authorizationCode] = yield* Effect.all(
-      [waitForAuthorizationCode(callbackUrl), request.dependencies.openBrowser(authorizationUrl)],
-      { concurrency: "unbounded" },
-    ).pipe(Effect.mapError(() => new OpenRouterOAuthError({ failureClass: "callback" })));
+    const openBrowser = request.dependencies
+      .openBrowser(authorizationUrl)
+      .pipe(Effect.mapError(() => new OpenRouterOAuthError({ failureClass: "callback" })));
+    const [authorizationCode] = yield* Effect.all([waitForAuthorizationCode(callbackUrl), openBrowser], {
+      concurrency: "unbounded",
+    });
     return yield* exchange({ code: authorizationCode, codeVerifier });
   });
 };

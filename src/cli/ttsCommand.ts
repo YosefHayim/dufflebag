@@ -3,7 +3,7 @@
 import { Command as CliCommand } from "@effect/cli";
 import { Effect } from "effect";
 
-import { saveVoiceSettings, stopNarration } from "../voiceControl/voiceWorker.js";
+import { narratingSpeechMode, saveVoiceSettings, stopNarration } from "../voiceControl/voiceWorker.js";
 import { type CliScope, scopeOption } from "./cliOptions.js";
 import * as TerminalUI from "./TerminalUI.js";
 import { holdToDictateHint, startVoice } from "./voiceCommand.js";
@@ -11,11 +11,14 @@ import { holdToDictateHint, startVoice } from "./voiceCommand.js";
 // speechMode goes in with the install, so the worker restart already prepares and starts narration.
 export const ttsOn = (scope: CliScope) =>
   Effect.gen(function* () {
-    const { previousConfig } = yield* startVoice({ scope, settings: { speechMode: "auto" } });
+    const { previousConfig, config } = yield* startVoice({
+      scope,
+      settings: (current) => ({ speechMode: narratingSpeechMode(current.speechMode) }),
+    });
     yield* TerminalUI.success(
-      previousConfig.speechMode === "auto"
-        ? `TTS is on (${scope}) — speech-mode already auto.`
-        : `TTS is on (${scope}) — speech-mode → auto.`,
+      previousConfig.speechMode === config.speechMode
+        ? `TTS is on (${scope}) — speech-mode already ${config.speechMode}.`
+        : `TTS is on (${scope}) — speech-mode → ${config.speechMode}.`,
     );
     yield* TerminalUI.detail("Agent responses are narrated when speech-mode is not off.");
     yield* TerminalUI.detail(`${holdToDictateHint} (STT is available while the worker runs.)`);
@@ -38,7 +41,7 @@ export const ttsOff = (scope: CliScope) =>
 
 const ttsOnCommand = CliCommand.make("on", { scope: scopeOption }, (args) =>
   Effect.all([TerminalUI.intro("tts on"), ttsOn(args.scope), TerminalUI.outro("Ready.")], { discard: true }),
-).pipe(CliCommand.withDescription("Enable agent response narration (speech-mode auto)"));
+).pipe(CliCommand.withDescription("Enable agent response narration (speech-mode off → auto)"));
 
 const ttsOffCommand = CliCommand.make("off", { scope: scopeOption }, (args) =>
   Effect.all([TerminalUI.intro("tts off"), ttsOff(args.scope), TerminalUI.outro("Done.")], { discard: true }),

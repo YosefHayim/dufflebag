@@ -2,21 +2,9 @@ import { expect, it } from "@effect/vitest";
 import { Effect, Either, Option, Schema, Stream } from "effect";
 import { afterEach, beforeEach, describe, vi } from "vitest";
 
-import {
-  acknowledgementVersion,
-  activeFreeProviderCount,
-  freePoolSnapshot,
-  freeProviderCatalog,
-  unavailableFreeProviderCount,
-} from "./freeProviderCatalog.js";
+import { acknowledgementVersion, freePoolSnapshot, freeProviderCatalog } from "./freeProviderCatalog.js";
 import { type HealthRecord, ProviderError, routingRequestSchema } from "./providerContract.js";
-import {
-  askFreeChat,
-  type HealthStore,
-  inspectProviderHealth,
-  listFreeModels,
-  listFreeProviders,
-} from "./providerRouting.js";
+import { askFreeChat, type HealthStore, listFreeModels, listFreeProviders } from "./providerRouting.js";
 
 const routingRequestFor = (request: { target: unknown; prompt: string }) =>
   Schema.decodeUnknownSync(routingRequestSchema)({
@@ -60,8 +48,6 @@ describe("provider routing", () => {
     Effect.gen(function* () {
       const providerManifests = yield* listFreeProviders();
       const freeModels = yield* listFreeModels();
-      expect(activeFreeProviderCount).toBe(30);
-      expect(unavailableFreeProviderCount).toBe(13);
       expect(freeProviderCatalog).toHaveLength(43);
       expect(providerManifests).toHaveLength(30);
       expect(freeModels).toHaveLength(30);
@@ -208,32 +194,14 @@ describe("provider routing", () => {
           ]),
       },
     }).pipe(
-      Effect.flatMap(() => {
+      Effect.tap(() => {
         const persistedHealth = [...storedHealth.values()].find(() => true);
-        if (persistedHealth === undefined) {
-          return Effect.die("A completed provider stream did not persist health.");
-        }
         const persistedText = JSON.stringify(persistedHealth);
-        const restartedHealth = new Map([
-          [`${persistedHealth.providerId}/${persistedHealth.modelId}`, persistedHealth],
-        ]);
-        return inspectProviderHealth({
-          providerId: persistedHealth.providerId,
-          modelId: persistedHealth.modelId,
-          healthStore: {
-            readHealth: ({ providerId, modelId }) =>
-              Effect.succeed(Option.fromNullable(restartedHealth.get(`${providerId}/${modelId}`))),
-            writeHealth: () => Effect.void,
-          },
-        }).pipe(
-          Effect.tap((healthOption) => {
-            expect(persistedText).not.toContain(privatePrompt);
-            expect(persistedText).not.toContain("reply-must-not-persist");
-            expect(persistedText).not.toContain(credential);
-            expect(Option.getOrUndefined(healthOption)?.quotaUsedTokens).toBe(18);
-            expect(Option.getOrUndefined(healthOption)?.successfulCalls).toBe(1);
-          }),
-        );
+        expect(persistedText).not.toContain(privatePrompt);
+        expect(persistedText).not.toContain("reply-must-not-persist");
+        expect(persistedText).not.toContain(credential);
+        expect(persistedHealth?.quotaUsedTokens).toBe(18);
+        expect(persistedHealth?.successfulCalls).toBe(1);
       }),
     );
   });

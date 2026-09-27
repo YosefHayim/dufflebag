@@ -188,6 +188,15 @@ const hasInvalidInputShape = (node: ExecutableFunction): boolean =>
 const hasExportModifier = (node: ts.TypeAliasDeclaration): boolean =>
   Boolean(node.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword));
 
+// Service shapes hold only functions, which no Schema can describe.
+const isFunctionOnlyType = (typeLiteral: ts.TypeLiteralNode): boolean =>
+  typeLiteral.members.length > 0 &&
+  typeLiteral.members.every(
+    (member) =>
+      ts.isMethodSignature(member) ||
+      (ts.isPropertySignature(member) && member.type !== undefined && ts.isFunctionTypeNode(member.type)),
+  );
+
 const MUTATING_METHODS = new Set(
   "add clear copyWithin delete fill pop push reverse set shift sort splice unshift".split(" "),
 );
@@ -427,7 +436,10 @@ const NODE_RULES: ReadonlyArray<NodeRule> = [
     kinds: ["application"],
     message: "Exported runtime object types must derive from an Effect Schema.",
     matches: ({ node }) =>
-      ts.isTypeAliasDeclaration(node) && hasExportModifier(node) && ts.isTypeLiteralNode(node.type),
+      ts.isTypeAliasDeclaration(node) &&
+      hasExportModifier(node) &&
+      ts.isTypeLiteralNode(node.type) &&
+      !isFunctionOnlyType(node.type),
   },
   {
     ruleId: "name.domain-specific",

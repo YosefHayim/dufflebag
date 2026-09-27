@@ -4,11 +4,11 @@
 
 | File | Path |
 |------|------|
-| Features | `docs/agent/test-gap/<run-id>/FEATURES.md` |
-| Report | `docs/agent/test-gap/<run-id>/REPORT.md` |
-| Active pointer | `docs/agent/test-gap/CURRENT` |
+| Features | `docs/agent/find-missing-tests/<run-id>/FEATURES.md` |
+| Report | `docs/agent/find-missing-tests/<run-id>/REPORT.md` |
+| Active pointer | `docs/agent/find-missing-tests/CURRENT` |
 
-Mint `RUN_ID=$(date -u +%Y-%m-%dT%H%M%SZ)` for new runs; resume via `CURRENT`. Migrate root `TEST-GAP-*.md` / flat campaign files into a run dir. Never leave campaign MD at repo root. See [references/agent-artifacts.md](references/agent-artifacts.md).
+Mint `RUN_ID=$(date -u +%Y-%m-%dT%H%M%SZ)` for new runs; resume via `CURRENT`. Never leave campaign MD at repo root. See [references/agent-artifacts.md](references/agent-artifacts.md).
 
 ## Headless policy
 

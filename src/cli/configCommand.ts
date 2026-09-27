@@ -66,12 +66,6 @@ export const showConfig = (request: {
     yield* TerminalUI.note(lines.join("\n"), "managed config");
   });
 
-// `config set refine-model menu` (or refine-provider / refine-mode) opens the provider picker instead of storing "menu".
-const refinePickerSettings = new Set(["refine-model", "refine-provider", "refine-mode"]);
-
-const describePickedRefine = (config: Config): string =>
-  `refine → ${config.refineProvider}/${config.refineModel === undefined ? "(default model)" : config.refineModel} effort=${config.refineEffort === undefined ? "(default)" : config.refineEffort}`;
-
 const showCommand = Command.make(
   "show",
   { setting: settingArgument.pipe(Args.optional), scope: scopeOption, format: formatOption },
@@ -89,27 +83,6 @@ const setCommand = Command.make(
   (args) =>
     Effect.gen(function* () {
       const { setting } = args;
-      if (refinePickerSettings.has(setting.name) && args.value.trim().toLowerCase() === "menu") {
-        yield* TerminalUI.intro("config pick-refine");
-        const { nextConfig, owner } = yield* pickRefineModel({ scope: args.scope, gui: true });
-        if (args.format === "text") {
-          yield* TerminalUI.success(describePickedRefine(nextConfig));
-          return;
-        }
-        yield* TerminalUI.json({
-          _tag: "configured",
-          scope: args.scope,
-          setting: "pick-refine",
-          value: {
-            provider: nextConfig.refineProvider,
-            model: nextConfig.refineModel,
-            effort: nextConfig.refineEffort,
-          },
-          owner,
-        });
-        return;
-      }
-
       const current = yield* readConfig(args.scope);
       const value = yield* settingValueFromText({ setting, text: args.value });
       const nextConfig = yield* withSettingValue({ config: current.config, key: setting.key, value });
@@ -126,7 +99,7 @@ const setCommand = Command.make(
         owner,
       });
     }),
-).pipe(Command.withDescription("Set one managed setting (use value `menu` for the refine model picker)"));
+).pipe(Command.withDescription("Set one managed setting"));
 
 const resetCommand = Command.make(
   "reset",
@@ -174,31 +147,39 @@ const guiOption = Options.boolean("gui").pipe(
   Options.withDescription("Force macOS GUI dialogs for pick-refine (default: TTY menu in terminal)"),
 );
 
+/** Pick the refine provider, model, and effort from the CLIs on this machine and save the choice. */
+export const pickRefine = (request: {
+  readonly scope: CliScope;
+  readonly format: OutputFormat;
+  readonly gui: boolean;
+}) =>
+  Effect.gen(function* () {
+    // Without a terminal (e.g. launched from a shortcut) only the GUI dialogs can ask.
+    const gui = request.gui || !(yield* TerminalUI.isInteractiveTerminal);
+    const { nextConfig, owner } = yield* pickRefineModel({ scope: request.scope, gui });
+    if (request.format === "json") {
+      yield* TerminalUI.json({
+        _tag: "configured",
+        scope: request.scope,
+        provider: nextConfig.refineProvider,
+        model: nextConfig.refineModel,
+        effort: nextConfig.refineEffort,
+        owner,
+      });
+      return;
+    }
+    const model = nextConfig.refineModel === undefined ? "(default model)" : nextConfig.refineModel;
+    const effort = nextConfig.refineEffort === undefined ? "(default)" : nextConfig.refineEffort;
+    yield* TerminalUI.success(`refine → ${nextConfig.refineProvider}/${model} effort=${effort}`);
+    yield* TerminalUI.detail(
+      "Restart voice if the worker is already running: dufflebag voice off && dufflebag voice on",
+    );
+  });
+
 const pickRefineCommand = Command.make(
   "pick-refine",
   { scope: scopeOption, format: formatOption, gui: guiOption },
-  (args) =>
-    Effect.gen(function* () {
-      yield* TerminalUI.intro("config pick-refine");
-      // Without a terminal (e.g. launched from a shortcut) only the GUI dialogs can ask.
-      const gui = args.gui || !(yield* TerminalUI.isInteractiveTerminal);
-      const { nextConfig, owner } = yield* pickRefineModel({ scope: args.scope, gui });
-      if (args.format === "json") {
-        yield* TerminalUI.json({
-          _tag: "configured",
-          scope: args.scope,
-          provider: nextConfig.refineProvider,
-          model: nextConfig.refineModel,
-          effort: nextConfig.refineEffort,
-          owner,
-        });
-        return;
-      }
-      yield* TerminalUI.success(describePickedRefine(nextConfig));
-      yield* TerminalUI.detail(
-        "Restart voice if the worker is already running: dufflebag voice off && dufflebag voice on",
-      );
-    }),
+  (args) => Effect.zipRight(TerminalUI.intro("config pick-refine"), pickRefine(args)),
 ).pipe(
   Command.withDescription(
     "Interactively pick refine provider + model + effort from providers on this machine (codex, claude, grok, ollama, …)",

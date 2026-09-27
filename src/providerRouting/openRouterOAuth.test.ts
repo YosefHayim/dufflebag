@@ -50,4 +50,20 @@ describe("OpenRouter OAuth", () => {
       );
     },
   );
+
+  it.effect("reports a callback with the wrong state as a state failure", () =>
+    connectOpenRouter({
+      openRouterOAuthRequest: Schema.decodeUnknownSync(openRouterOAuthRequestSchema)({ callbackPort: 49154 }),
+      dependencies: {
+        openBrowser: () =>
+          Effect.tryPromise(() => fetch("http://localhost:49154/openrouter/callback/forged-state?code=stolen")),
+        exchangeAuthorizationCode: () => Effect.die("A forged callback must not reach the key exchange."),
+      },
+    }).pipe(
+      Effect.flip,
+      Effect.tap((failure) => {
+        expect(failure.failureClass).toBe("state");
+      }),
+    ),
+  );
 });

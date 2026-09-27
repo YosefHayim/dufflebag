@@ -1,17 +1,12 @@
 import { createHash } from "node:crypto";
 
-import { Either, Option, Schema } from "effect";
+import { Either, Option } from "effect";
 import { describe, expect, it } from "vitest";
 
 import { findAgent } from "../../catalog/agentCatalog.js";
 import { featureCatalog, findFeature } from "../../catalog/featureCatalog.js";
 import type { PreviousFileValue } from "../ownership.js";
-import {
-  planSkillDirectory,
-  type SkillDirectoryPlan,
-  SkillDirectoryPlanError,
-  skillDirectoryPlanSchema,
-} from "./skillDirectory.js";
+import { planSkillDirectory, type SkillDirectoryPlan, SkillDirectoryPlanError } from "./skillDirectory.js";
 
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
@@ -231,36 +226,7 @@ describe("planSkillDirectory", () => {
     expect(Either.isLeft(planSkillDirectory({ ...request(), controlScript }))).toBe(true);
   });
 
-  it("strictly decodes catalog inputs and validates the generated result", () => {
-    const unknownRequestField = { ...request(), unexpected: true };
-    const alteredAgent = {
-      ...request(),
-      agent: { ...claudeAgent, target: { _tag: "skillDirectory", path: ".other/skills" } },
-    };
-    const alteredSkill = {
-      ...request(),
-      skills: [
-        {
-          installedSkill: { ...skillDefinition, shippedPaths: ["SKILL.md"] },
-          sourceFiles: sourceFiles(),
-        },
-      ],
-    };
-    const plan = unwrap(planSkillDirectory(request()));
-    const skillWrite = writeAt(plan, skillPath);
-
-    const tamperedPlan = {
-      writes: [
-        {
-          ...skillWrite,
-          bytes: textEncoder.encode("tampered\n"),
-        },
-      ],
-    };
-
-    expect(Either.isLeft(planSkillDirectory(unknownRequestField))).toBe(true);
-    expect(Either.isLeft(planSkillDirectory(alteredAgent))).toBe(true);
-    expect(Either.isLeft(planSkillDirectory(alteredSkill))).toBe(true);
-    expect(Schema.is(skillDirectoryPlanSchema)(tamperedPlan)).toBe(false);
+  it("strictly rejects unknown request properties", () => {
+    expect(Either.isLeft(planSkillDirectory({ ...request(), unexpected: true }))).toBe(true);
   });
 });

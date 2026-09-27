@@ -121,7 +121,7 @@ Turn on complete-response narration and play a first example:
 
 ```bash
 dufflebag voice on
-dufflebag voice speak "Read this number one. Now read this number two." --source manual
+dufflebag voice speak "Read this number one. Now read this number two."
 ```
 
 Claude Code, Codex, and Grok use native end-of-turn hooks. Run Devin through its
@@ -138,7 +138,8 @@ and read in full. Nothing is truncated.
 Inside Cmux, each response is bound to its originating workspace and surface. A
 background response remains silent until that surface is focused and Cmux is the
 frontmost app; older unread responses from the same surface coalesce into the
-latest one. Use `dufflebag config set speech-mode immediate` to speak every reply at once, or
+latest one. If Cmux does not answer, the response is spoken at once. Use
+`dufflebag config set speech-mode immediate` to speak every reply at once, or
 `dufflebag config set speech-mode off` to suppress narration without uninstalling voice.
 
 Tap Shift to stop narration. Hold Shift on its own for 300 ms to dictate
@@ -179,7 +180,7 @@ is unavailable. Disable the gesture with `dufflebag config set refine-mode off`.
 
 ```bash
 dufflebag voice status
-dufflebag voice speak "Release status: Devin is ready." --source devin
+dufflebag voice speak "Release status: Devin is ready."
 dufflebag voice off
 ```
 
@@ -360,7 +361,7 @@ dufflebag keeps one `config.json` in its install root: `~/.claude/dufflebag/conf
 | `idle-compact-after` | `idleCompactAfter` | `"off"` | How long an agent session sits idle before dufflebag submits a waiting draft or runs /compact: off, or a time like 30s, 2m, 1h. |
 | `speech-voice` | `speechVoice` | `"F4"` | Supertonic voice ID (F1-F5 or M1-M5); unsupported names fall back to F4. |
 | `speech-words-per-minute` | `speechWordsPerMinute` | `230` | Speech rate for read-aloud replies, in words per minute. |
-| `speech-mode` | `speechMode` | `"auto"` | When agent replies are read aloud: auto waits for the originating Cmux surface and speaks at once elsewhere; focused, immediate, or off. |
+| `speech-mode` | `speechMode` | `"auto"` | When agent replies are read aloud: auto holds a Cmux reply until its surface is focused and Cmux is in front, and speaks other replies at once; immediate speaks every reply at once; off reads nothing. |
 | `refine-mode` | `refineMode` | `"off"` | Prompt refine: off; clipboard = double-tap Shift refines the copied prompt; dictation = refine the final dictation before it is typed; both. |
 | `refine-provider` | `refineProvider` | `"codex"` | Refine provider: codex \| local \| auto \| grok \| ollama \| opencode \| claude \| gemini \| pi. `dufflebag config pick-refine` lists only providers found on PATH. |
 | `refine-model` | `refineModel` | absent | Model id for the refine provider (e.g. gpt-5.3-codex-spark, grok-4.5, llama3.2). When absent the voice worker uses gpt-5.3-codex-spark. |

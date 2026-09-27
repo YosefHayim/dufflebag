@@ -6,7 +6,7 @@ import { PNG } from "pngjs";
 import { argString, parseArgs } from "../lib/argv.js";
 
 const args = parseArgs(process.argv.slice(2));
-const input = argString(args, "input") || "robot.png";
+const input = argString(args, "input") || "design.png";
 const output = argString(args, "output") || "out/blob.svg";
 
 const src = PNG.sync.read(fs.readFileSync(input));

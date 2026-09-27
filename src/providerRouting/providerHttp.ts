@@ -17,7 +17,7 @@ type ChatInvocation = {
 };
 
 // Classifies by status alone; provider error prose is never read.
-export const classifyUpstreamFailure = (statusCode: number): "authentication" | "quota" | "upstream" => {
+const classifyUpstreamFailure = (statusCode: number): "authentication" | "quota" | "upstream" => {
   if (statusCode === 401 || statusCode === 403) return "authentication";
   return statusCode === 429 ? "quota" : "upstream";
 };

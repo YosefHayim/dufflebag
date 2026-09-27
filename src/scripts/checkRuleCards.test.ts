@@ -2,22 +2,9 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { checkRuleCards, type MirroredRule, ruleCardIds } from "./checkRuleCards.js";
+import { checkRuleCards, ruleCardIds } from "./checkRuleCards.js";
 
 const repositoryRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
-
-const SAMPLE_RULES: ReadonlyArray<MirroredRule> = [
-  {
-    id: "function.arrow-only",
-    statement: "Named functions are arrow constants declared before first use.",
-    verify: "pnpm style",
-  },
-  {
-    id: "function.one-job",
-    statement: "A function performs one job its name fully describes.",
-    verify: "judgment",
-  },
-];
 
 const card = (request: { id: string; verify: string; assertion: string }) =>
   [
@@ -68,8 +55,7 @@ const validCards = [
   }),
 ];
 
-const messagesFor = (guide: string) =>
-  checkRuleCards({ guide, rules: SAMPLE_RULES }).map((violation) => violation.message);
+const messagesFor = (guide: string) => checkRuleCards({ guide }).map((violation) => violation.message);
 
 describe("the repository style guide", () => {
   const guide = readFileSync(join(repositoryRoot, "CODE-STYLE.md"), "utf8");
@@ -102,32 +88,13 @@ describe("the repository style guide", () => {
   });
 });
 
-describe("a guide without a code-style.rules.json mirror", () => {
-  it("lists its rule IDs in document order", () => {
-    expect(ruleCardIds(guideWith(validCards))).toEqual(["function.arrow-only", "function.one-job"]);
-  });
-
-  it("checks only the card format", () => {
-    const guide = guideWith([
-      ...validCards,
-      card({ id: "function.invented", verify: "judgment", assertion: "A rule that only the guide declares." }),
-    ]);
-
-    expect(checkRuleCards({ guide })).toEqual([]);
-  });
-
-  it("still reports a repeated card", () => {
-    const guide = guideWith([...validCards, validCards.at(0) || ""]);
-
-    expect(checkRuleCards({ guide }).map((violation) => violation.message)).toContain(
-      "Rule function.arrow-only has more than one card in CODE-STYLE.md.",
-    );
-  });
-});
-
 describe("rule-card format", () => {
   it("accepts a conforming guide", () => {
-    expect(checkRuleCards({ guide: guideWith(validCards), rules: SAMPLE_RULES })).toEqual([]);
+    expect(checkRuleCards({ guide: guideWith(validCards) })).toEqual([]);
+  });
+
+  it("lists rule IDs in document order", () => {
+    expect(ruleCardIds(guideWith(validCards))).toEqual(["function.arrow-only", "function.one-job"]);
   });
 
   it("requires every listed section", () => {
@@ -168,32 +135,6 @@ describe("rule-card format", () => {
     expect(messagesFor(guide).join("\n")).toMatch(/exactly one sentence/u);
   });
 
-  it("rejects an assertion that drifts from the machine statement", () => {
-    const guide = guideWith([
-      card({
-        id: "function.arrow-only",
-        verify: "`pnpm style`",
-        assertion: "Named functions are arrow constants declared before use.",
-      }),
-      validCards.at(1) || "",
-    ]);
-
-    expect(messagesFor(guide)).toContain(
-      "Rule function.arrow-only assertion does not match its code-style.rules.json statement.",
-    );
-  });
-
-  it("rejects a verify command that drifts from the machine entry", () => {
-    const guide = guideWith(validCards).replace(
-      "[rule:function.arrow-only] · verify: `pnpm style`",
-      "[rule:function.arrow-only] · verify: `pnpm lint`",
-    );
-
-    expect(messagesFor(guide)).toContain(
-      'Rule function.arrow-only documents verify "pnpm lint" but code-style.rules.json records "pnpm style".',
-    );
-  });
-
   it.each([
     { name: "the chosen case", marker: "// ✓ good", expected: 'Rule function.arrow-only example needs a "// ✓" case.' },
     {
@@ -229,41 +170,21 @@ describe("rule-card format", () => {
     expect(messagesFor(guide)).toContain("Rule function.arrow-only needs a fenced example block.");
   });
 
-  it("reports a machine rule with no card", () => {
-    const guide = guideWith([validCards.at(0) || ""]);
-
-    expect(messagesFor(guide)).toContain(
-      "Rule function.one-job is in code-style.rules.json but has no card in CODE-STYLE.md.",
-    );
-  });
-
   it("reports a duplicated card", () => {
     const guide = guideWith([...validCards, validCards.at(0) || ""]);
 
     expect(messagesFor(guide)).toContain("Rule function.arrow-only has more than one card in CODE-STYLE.md.");
   });
 
-  it("reports a card whose ID has no machine entry", () => {
-    const guide = guideWith([
-      ...validCards,
-      card({ id: "function.invented", verify: "judgment", assertion: "Something asserted." }),
-    ]);
-
-    expect(messagesFor(guide)).toContain("Rule function.invented has no entry in code-style.rules.json.");
-  });
-
   it("accepts an existing snake_case ID rather than forcing a rename", () => {
-    const rules: ReadonlyArray<MirroredRule> = [
-      { id: "python.no_lambda", statement: "Something asserted.", verify: "judgment" },
-    ];
     const guide = guideWith([card({ id: "python.no_lambda", verify: "judgment", assertion: "Something asserted." })]);
 
-    expect(checkRuleCards({ guide, rules })).toEqual([]);
+    expect(checkRuleCards({ guide })).toEqual([]);
   });
 
   it("ignores headings that appear inside example code", () => {
     const guide = guideWith(validCards).replace("// ✓ good", "// ✓ good\n### not a card\n## not a section");
 
-    expect(checkRuleCards({ guide, rules: SAMPLE_RULES })).toEqual([]);
+    expect(checkRuleCards({ guide })).toEqual([]);
   });
 });

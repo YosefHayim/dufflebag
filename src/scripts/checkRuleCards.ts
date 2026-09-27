@@ -1,9 +1,3 @@
-export type MirroredRule = {
-  id: string;
-  statement: string;
-  verify: string;
-};
-
 type RuleCardViolation = {
   ruleId: string;
   line: number;
@@ -12,8 +6,6 @@ type RuleCardViolation = {
 
 type CheckRuleCardsRequest = {
   guide: string;
-  // Optional `code-style.rules.json` mirror; when a repository keeps one, every card must match it.
-  rules?: ReadonlyArray<MirroredRule>;
 };
 
 type SectionHeading = {
@@ -31,15 +23,13 @@ type CardRange = {
 type ValidateCardRequest = {
   lines: ReadonlyArray<string>;
   card: CardRange;
-  rulesById: ReadonlyMap<string, MirroredRule>;
-  mirrored: boolean;
 };
 
 const REQUIRED_SECTIONS = ["Rules", "Canonical example", "Golden path", "Exemplars", "Never"];
 
 // e.g. "[rule:function.arrow-only] · verify: `pnpm style`" or "… · verify: judgment". IDs may use "-" and "_"
 // so another repository can keep its existing IDs.
-const METADATA_PATTERN = /^\[rule:([a-z][a-z0-9]*(?:[._-][a-z0-9]+)*)\] · verify: (?:`([^`]+)`|judgment)$/u;
+const METADATA_PATTERN = /^\[rule:([a-z][a-z0-9]*(?:[._-][a-z0-9]+)*)\] · verify: (?:`[^`]+`|judgment)$/u;
 
 const FORMAT_RULE = "format.rule-card";
 
@@ -129,7 +119,7 @@ const isSingleSentence = (assertion: string): boolean =>
   assertion.endsWith(".") && !assertion.includes(". ") && !/^[-*#|>`]/u.test(assertion);
 
 const validateCard = (request: ValidateCardRequest): ReadonlyArray<RuleCardViolation> => {
-  const { lines, card, rulesById, mirrored } = request;
+  const { lines, card } = request;
   const metadataIndex = firstContentIndex({ lines, from: card.start + 1, to: card.end });
   const metadata = lines[metadataIndex]?.trim() || "";
   const match = METADATA_PATTERN.exec(metadata);
@@ -144,30 +134,10 @@ const validateCard = (request: ValidateCardRequest): ReadonlyArray<RuleCardViola
   }
 
   const id = match[1] || "";
-  const verify = match[2] || "judgment";
-  const rule = rulesById.get(id);
-  const violations: Array<RuleCardViolation> = [];
-  if (mirrored && !rule) {
-    violations.push({
-      ruleId: FORMAT_RULE,
-      line: metadataIndex + 1,
-      message: `Rule ${id} has no entry in code-style.rules.json.`,
-    });
-  }
-
-  if (rule && rule.verify !== verify) {
-    violations.push({
-      ruleId: id,
-      line: metadataIndex + 1,
-      message: `Rule ${id} documents verify "${verify}" but code-style.rules.json records "${rule.verify}".`,
-    });
-  }
-
   const assertionIndex = firstContentIndex({ lines, from: metadataIndex + 1, to: card.end });
   const assertion = lines[assertionIndex]?.trim() || "";
   if (assertionIndex < 0 || assertion.startsWith("```")) {
     return [
-      ...violations,
       {
         ruleId: id,
         line: card.headingLine,
@@ -176,19 +146,12 @@ const validateCard = (request: ValidateCardRequest): ReadonlyArray<RuleCardViola
     ];
   }
 
+  const violations: Array<RuleCardViolation> = [];
   if (!isSingleSentence(assertion)) {
     violations.push({
       ruleId: id,
       line: assertionIndex + 1,
       message: `Rule ${id} must state exactly one sentence ending in a period; split a second sentence into its own rule.`,
-    });
-  }
-
-  if (rule && rule.statement !== assertion) {
-    violations.push({
-      ruleId: id,
-      line: assertionIndex + 1,
-      message: `Rule ${id} assertion does not match its code-style.rules.json statement.`,
     });
   }
 
@@ -237,33 +200,19 @@ const missingSectionViolations = (headings: ReadonlyArray<SectionHeading>): Read
     }),
   );
 
-const parityViolations = (request: {
-  cards: ReadonlyArray<CardRange>;
-  documentedIds: ReadonlyArray<string>;
-  rules: ReadonlyArray<MirroredRule>;
-}): ReadonlyArray<RuleCardViolation> => {
+const duplicateCardViolations = (documentedIds: ReadonlyArray<string>): ReadonlyArray<RuleCardViolation> => {
   const counts = new Map<string, number>();
-  for (const id of request.documentedIds) {
+  for (const id of documentedIds) {
     counts.set(id, (counts.get(id) || 0) + 1);
   }
 
-  const duplicated = [...counts.entries()]
+  return [...counts.entries()]
     .filter(([, count]) => count > 1)
     .map(([id]) => ({
       ruleId: FORMAT_RULE,
       line: 1,
       message: `Rule ${id} has more than one card in CODE-STYLE.md.`,
     }));
-
-  const undocumented = request.rules
-    .filter((rule) => !counts.has(rule.id))
-    .map((rule) => ({
-      ruleId: FORMAT_RULE,
-      line: 1,
-      message: `Rule ${rule.id} is in code-style.rules.json but has no card in CODE-STYLE.md.`,
-    }));
-
-  return [...duplicated, ...undocumented];
 };
 
 export const ruleCardIds = (guide: string): ReadonlyArray<string> => {
@@ -288,15 +237,9 @@ export const checkRuleCards = (request: CheckRuleCardsRequest): ReadonlyArray<Ru
   }
 
   const cards = ruleCardRanges({ lines, fenced, section });
-  const mirroredRules = request.rules || [];
-  const rulesById = new Map(mirroredRules.map((rule) => [rule.id, rule]));
-  const mirrored = request.rules !== undefined;
-  const cardViolations = cards.flatMap((card) => validateCard({ lines, card, rulesById, mirrored }));
-  const documentedIds = cardRuleIds({ lines, cards });
+  const cardViolations = cards.flatMap((card) => validateCard({ lines, card }));
 
-  return [
-    ...sectionProblems,
-    ...cardViolations,
-    ...parityViolations({ cards, documentedIds, rules: mirroredRules }),
-  ].sort((left, right) => left.line - right.line || left.ruleId.localeCompare(right.ruleId));
+  return [...sectionProblems, ...cardViolations, ...duplicateCardViolations(cardRuleIds({ lines, cards }))].sort(
+    (left, right) => left.line - right.line || left.ruleId.localeCompare(right.ruleId),
+  );
 };

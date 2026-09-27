@@ -22,7 +22,7 @@ This skill **must not** reinvent sibling workflows. Before any step, **load the 
 | Atomic commits / history shape | `organize-commits` |
 | Verify, push, open/update PR, handoff hygiene (pre-merge) | `finish-and-push` |
 | Multi-feature parallel cleanup | **Stop** — hand off to `clean-repo-by-feature` (not this skill) |
-| Multi-feature **test-gap** campaign to main | **Stop** — hand off to `ship-missing-tests` |
+| Multi-feature **missing tests** campaign to main | **Stop** — hand off to `ship-missing-tests` |
 | Live production deploy URL | `deploy-and-check` after ship if user asks |
 | Browser-only local proof | `run-local-and-check` when the product is a web UI |
 | “Which skill?” mid-flight | `which-skill` |

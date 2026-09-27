@@ -80,6 +80,5 @@ If Node/Playwright is unavailable, use the manual overlay method in `reference/v
 - `scripts/src/bin/inspectPng.ts` — target dimensions + color sampling / palette
 - `scripts/src/bin/frames.ts` — contact sheet of animation frames by timeline-seeking (verify motion poses)
 - `scripts/svgo.config.mjs` — safe SVGO config (keeps viewBox + IDs)
-- `scripts/robot.svgo.config.mjs` — conservative SVGO for animated SVGs
 - `README.md` — setup, script catalog, and canonical iteration example
 - `CONTEXT.md` / `TECH-GLOSSARY.md` — domain vocabulary and technical glossary

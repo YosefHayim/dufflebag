@@ -10,7 +10,6 @@ import {
   wholeFileOwnershipSchema,
 } from "../ownership.js";
 import { writeOperationSchema } from "../plan.js";
-import { isCatalogAgent, isCatalogSkill } from "./catalogChecks.js";
 import { controlScriptSchema, controlToken, fillControlScript } from "./skillText.js";
 
 const textEncoder = new TextEncoder();
@@ -18,7 +17,7 @@ const textDecoder = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
 
 export class SkillDirectoryPlanError extends Schema.TaggedError<SkillDirectoryPlanError>()("SkillDirectoryPlanError", {
   issue: Schema.NonEmptyString.annotations({
-    description: "Actionable skill-directory request or generated-plan validation issue.",
+    description: "Actionable skill-directory request issue.",
   }),
 }) {
   get message(): string {
@@ -102,12 +101,6 @@ const preparedSkillSchema = preparedSkillFieldsSchema.pipe(
     const paths = skill.sourceFiles.map((file) => file.path);
 
     return [
-      isCatalogSkill(skill.installedSkill)
-        ? undefined
-        : {
-            path: ["installedSkill"],
-            message: "Installed skill definitions must exactly match the decoded feature catalog.",
-          },
       ...underPath("sourceFiles", duplicatePathIssues(paths)),
       ...underPath("sourceFiles", parentFileIssues(paths)),
       ...shippedPathShapeIssues(skill),
@@ -119,15 +112,9 @@ const skillDirectoryRequestFieldsSchema = Schema.Struct({
   agent: Schema.Struct({
     ...agentDefinitionSchema.fields,
     target: agentDefinitionSchema.fields.target.members[0],
-  })
-    .pipe(
-      Schema.filter(isCatalogAgent, {
-        message: () => "Agent definitions must exactly match the decoded agent catalog.",
-      }),
-    )
-    .annotations({
-      description: "Catalog agent whose skill-directory target receives the desired files.",
-    }),
+  }).annotations({
+    description: "Catalog agent whose skill-directory target receives the desired files.",
+  }),
   controlScript: controlScriptSchema.annotations({
     description: "Concrete control command substituted into UTF-8 prepared files.",
   }),
@@ -226,30 +213,23 @@ const skillDirectoryRequestSchema = skillDirectoryRequestFieldsSchema.pipe(
 
 type SkillDirectoryRequest = Schema.Schema.Type<typeof skillDirectoryRequestSchema>;
 
-export const skillDirectoryPlanSchema = Schema.Struct({
-  writes: Schema.Array(
-    Schema.TaggedStruct("write", {
-      file: Schema.Struct({
-        owner: fileOwnerSchema.members[1],
-        path: relativePathSchema,
-        kind: fileKindSchema.members[1],
-        ownership: wholeFileOwnershipSchema,
-      }),
-      bytes: writeOperationSchema.fields.bytes,
-    }).pipe(
-      Schema.filter((operation) =>
-        operation.file.ownership.installedHash === hashBytes(operation.bytes)
-          ? undefined
-          : {
-              path: ["file", "ownership", "installedHash"],
-              message: "Skill ownership hash must match the exact desired bytes.",
-            },
-      ),
-    ),
-  ).annotations({
+const skillWriteSchema = Schema.TaggedStruct("write", {
+  file: Schema.Struct({
+    owner: fileOwnerSchema.members[1],
+    path: relativePathSchema,
+    kind: fileKindSchema.members[1],
+    ownership: wholeFileOwnershipSchema,
+  }),
+  bytes: writeOperationSchema.fields.bytes,
+});
+
+type SkillWrite = Schema.Schema.Type<typeof skillWriteSchema>;
+
+const skillDirectoryPlanSchema = Schema.Struct({
+  writes: Schema.Array(skillWriteSchema).annotations({
     description: "Exact desired skill-file writes with matching whole-file ownership.",
   }),
-}).pipe(Schema.filter((plan) => underPath("writes", duplicatePathIssues(plan.writes.map((write) => write.file.path)))));
+});
 
 export type SkillDirectoryPlan = Schema.Schema.Type<typeof skillDirectoryPlanSchema>;
 
@@ -265,7 +245,7 @@ export const renderSkillBytes = (bytes: Uint8Array, controlScript: string): Uint
 const createSkillWrite = (
   request: SkillDirectoryRequest,
   file: { destination: string; source: { bytes: Uint8Array } },
-): Either.Either<unknown, SkillDirectoryPlanError> => {
+): Either.Either<SkillWrite, SkillDirectoryPlanError> => {
   const previous = request.previousFiles.find((candidate) => candidate.path === file.destination);
   if (previous === undefined) {
     return Either.left(
@@ -290,7 +270,7 @@ const createSkillWrite = (
 const toPlanError = (error: SchemaParseIssue.ParseError) =>
   new SkillDirectoryPlanError({ issue: SchemaParseIssue.TreeFormatter.formatErrorSync(error) });
 
-// Plan one skill-directory target without I/O: every shipped file becomes one validated whole-file write.
+// Plan one skill-directory target without I/O: every shipped file becomes one whole-file write.
 export const planSkillDirectory = (input: unknown): Either.Either<SkillDirectoryPlan, SkillDirectoryPlanError> =>
   Either.mapLeft(
     Schema.decodeUnknownEither(skillDirectoryRequestSchema, { onExcessProperty: "error" })(input),
@@ -299,10 +279,5 @@ export const planSkillDirectory = (input: unknown): Either.Either<SkillDirectory
     Either.flatMap((request) =>
       Either.all(selectedSourceFiles(request).map((file) => createSkillWrite(request, file))),
     ),
-    Either.flatMap((writes) =>
-      Either.mapLeft(
-        Schema.validateEither(skillDirectoryPlanSchema, { onExcessProperty: "error" })({ writes }),
-        toPlanError,
-      ),
-    ),
+    Either.map((writes) => ({ writes })),
   );

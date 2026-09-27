@@ -112,12 +112,14 @@ describe("agent run folder isolation", () => {
   });
 
   it.each([
-    ["runTasksInParallel", "sdlc-tasks"],
-    ["findMissingTests", "test-gap"],
-    ["shipMissingTests", "test-gap"],
+    ["runTasksInParallel", "run-tasks-in-parallel"],
+    ["findMissingTests", "find-missing-tests"],
+    ["shipMissingTests", "ship-missing-tests"],
     ["simplifyRepoWithTests", "simplify-repo-with-tests"],
-    ["cleanRepoByFeature", "messy-repo"],
-    ["improveUx", "ux-journey"],
+    ["cleanRepoByFeature", "clean-repo-by-feature"],
+    ["improveUx", "improve-ux"],
+    ["codeStyleExistingProject", "code-style-existing-project"],
+    ["benchmarkAgents", "benchmark-agents"],
   ] as const)("%s mints or resumes run-scoped docs/agent/%s paths", (sourceDirectory, campaign) => {
     const skillMd = path.join(skillRoot, sourceDirectory, "SKILL.md");
     const text = readFileSync(skillMd, "utf8");

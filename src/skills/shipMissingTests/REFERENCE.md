@@ -21,10 +21,9 @@ Typical MYPR-style handoff:
 
 ```text
 repo has:
-  docs/agent/test-gap/CURRENT              # run-id pointer
-  docs/agent/test-gap/<run-id>/REPORT.md
-  docs/agent/test-gap/<run-id>/FEATURES.md
-  (legacy flat docs/agent/test-gap/*.md or root TEST-GAP-*.md → migrate into a run dir on resume)
+  docs/agent/find-missing-tests/CURRENT    # run-id pointer
+  docs/agent/find-missing-tests/<run-id>/REPORT.md
+  docs/agent/find-missing-tests/<run-id>/FEATURES.md
   branch test/find-missing-tests-p0-units  (optional mono fill)
 ```
 
@@ -83,7 +82,7 @@ After each merge: update open PRs (rebase) before merging the next conflicting l
 Fixes #<n>
 
 ## Summary
-- Test-gap campaign lane: <feature_id>
+- Missing tests lane: <feature_id>
 - Gaps filled: <list>
 - Layers: backend-unit | client-unit | mocks | e2e-…
 

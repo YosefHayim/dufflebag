@@ -23,7 +23,6 @@ import {
   readReceipt,
   receiptJsonSchema,
   receiptSchema,
-  receiptSnapshotSchema,
 } from "./receipt.js";
 
 const installedHash = "a".repeat(64);
@@ -467,7 +466,6 @@ describe("readReceipt", () => {
 
       expect(missing).toEqual({ _tag: "missing" });
       expect(present).toEqual({ _tag: "present", bytes, receipt: completeReceipt });
-      expect(Schema.decodeUnknownSync(receiptSnapshotSchema)(present)).toEqual(present);
       if (present._tag === "present") {
         expect(present.bytes).toBe(bytes);
       }

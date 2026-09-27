@@ -3,7 +3,7 @@
 ## STATE.md (phase SSOT — write every phase change)
 
 ```markdown
-# Messy-repo STATE — <repo>
+# Clean repo by feature STATE — <repo>
 
 updated: <ISO date>
 campaign: single | full
@@ -14,9 +14,9 @@ host: A | B | C
 product_tip: <ref> @ <sha>
 backup: <ref> @ <sha>
 run_id: <YYYY-MM-DDTHHMMSSZ>
-matrix: docs/agent/messy-repo/<run-id>/MATRIX.md
-audit: docs/agent/messy-repo/<run-id>/AUDIT.md | none
-health: docs/agent/messy-repo/<run-id>/HEALTH.md | none
+matrix: docs/agent/clean-repo-by-feature/<run-id>/MATRIX.md
+audit: docs/agent/clean-repo-by-feature/<run-id>/AUDIT.md | none
+health: docs/agent/clean-repo-by-feature/<run-id>/HEALTH.md | none
 next_action: <one concrete verb — e.g. "run audit-wave on open MATRIX PRs">
 block_reason: none | <only if blocked>
 lanes_open: N
@@ -31,11 +31,11 @@ notes: <one line>
 ## AUDIT.md
 
 ```markdown
-# Messy-repo AUDIT — <repo>
+# Clean repo by feature AUDIT — <repo>
 
 Updated: <ISO date>
 Product tip (PR base): `<ref>` @ `<sha>`
-MATRIX: docs/agent/messy-repo/<run-id>/MATRIX.md
+MATRIX: docs/agent/clean-repo-by-feature/<run-id>/MATRIX.md
 Mode: audit-wave
 New feature PRs this run: **0**
 
@@ -187,7 +187,7 @@ Shape for `npx planpage render plan-brief --data …`:
 
 ```json
 {
-  "title": "Messy-repo audit — <repo>",
+  "title": "Clean repo by feature audit — <repo>",
   "summary": [
     { "label": "Lanes", "value": "18" },
     { "label": "MERGE", "value": "12" },

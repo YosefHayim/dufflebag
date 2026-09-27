@@ -10,9 +10,9 @@ out **understanding what changed**, not alienated from my own code. So collapse 
 short, teaching report: let the machine carry the mechanical load, and spend judgment (and my
 attention) only where a machine can't.
 
-**Read first:** the repo's rules — `code-style.rules.json` when it exists, otherwise the `[rule:<id>] · verify:` cards in `CODE-STYLE.md` (each rule's `verify` command + exemplars) — plus `CODE-STYLE.md`,
+**Read first:** the cards in `CODE-STYLE.md` (each rule's `verify` command + exemplars), plus
 `PROJECT.md`/`CONTEXT.md`, and **my original prompt/intent** (ask me for it if you don't have it —
-Tier 3 checks the diff *did what I asked* and flags scope creep). No ruleset? Offer
+Tier 3 checks the diff *did what I asked* and flags scope creep). No `CODE-STYLE.md`? Offer
 `code-style-new-project` or `code-style-existing-project` first.
 
 **Scope the diff** (ask if unclear): `git diff <base>...HEAD` (branch/PR), the uncommitted working
@@ -38,8 +38,8 @@ Walk **every** rule in the ruleset by its `verify` command. Most never reach me:
 ## Fan-out (Tier 3)
 
 Group the changed files into coherent slices (by layer/feature/directory). For each slice, launch a
-`subagent_explore` with: the slice's file list, the repo's rules (`code-style.rules.json` or the
-`CODE-STYLE.md` cards — the `judgment` rules + exemplars), the relevant `CONTEXT.md` terms, and **my original prompt**. Ask each to report, per
+`subagent_explore` with: the slice's file list, the cards in `CODE-STYLE.md`
+(the `judgment` rules + exemplars), the relevant `CONTEXT.md` terms, and **my original prompt**. Ask each to report, per
 finding: `file:line` · which rule/intent it breaks · the one-line fix · the exemplar it should
 mirror. Tell them explicitly: **report deviations only; stay silent on conforming code.** Aggregate,
 dedupe, and rank (intent-misses and architectural breaks first, nits last).

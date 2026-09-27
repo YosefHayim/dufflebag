@@ -4,7 +4,7 @@ import { afterEach, describe, vi } from "vitest";
 
 import { freeProviderCatalog } from "./freeProviderCatalog.js";
 import { chatRequestSchema, type ProviderManifest, providerManifestSchema } from "./providerContract.js";
-import { classifyUpstreamFailure, sendChat } from "./providerHttp.js";
+import { sendChat } from "./providerHttp.js";
 
 const chatRequest = Schema.decodeUnknownSync(chatRequestSchema)({
   turns: [{ role: "user", text: "Say hi" }],
@@ -36,15 +36,6 @@ afterEach(() => {
 });
 
 describe("provider HTTP", () => {
-  it.each([
-    [401, "authentication"],
-    [403, "authentication"],
-    [429, "quota"],
-    [503, "upstream"],
-  ])("classifies HTTP %i as %s", (statusCode, failureClass) => {
-    expect(classifyUpstreamFailure(statusCode)).toBe(failureClass);
-  });
-
   it.effect("uses the official AI Horde anonymous credential and GitHub API headers", () => {
     const observedHeaders: Array<Headers> = [];
     vi.stubGlobal("fetch", async (_endpoint: string, requestInit?: RequestInit) => {
@@ -179,7 +170,7 @@ describe("provider HTTP", () => {
       endpoint: "https://failure.example/chat/completions",
       modelId: "failure-model",
     });
-    return Effect.forEach([401, 429, 503], (statusCode) =>
+    return Effect.forEach([401, 403, 429, 503], (statusCode) =>
       Effect.sync(() => vi.stubGlobal("fetch", async () => new Response(null, { status: statusCode }))).pipe(
         Effect.flatMap(() => sendTo(providerManifest, Option.some("failure-key"))),
         Effect.either,
@@ -187,6 +178,7 @@ describe("provider HTTP", () => {
     ).pipe(
       Effect.tap((failures) => {
         expect(failures.map((failure) => (Either.isLeft(failure) ? failure.left.failureClass : "success"))).toEqual([
+          "authentication",
           "authentication",
           "quota",
           "upstream",

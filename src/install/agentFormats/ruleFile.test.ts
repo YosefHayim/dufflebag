@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 
 import { findAgent } from "../../catalog/agentCatalog.js";
 import { findFeature } from "../../catalog/featureCatalog.js";
-import { planRuleFiles, ruleFilePlanSchema, ruleFileRequestSchema } from "./ruleFile.js";
+import { planRuleFiles, ruleFileRequestSchema } from "./ruleFile.js";
 
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
@@ -173,37 +173,6 @@ describe("planRuleFiles", () => {
       issue: "ruleFile",
     },
     {
-      name: "an altered catalog rule target",
-      request: {
-        ...ruleFileRequest,
-        agent: { ...cursor, target: { _tag: "ruleFile", directory: ".other/rules", extension: ".mdc" } },
-        previousFiles: [
-          { path: ".other/rules/autorun.mdc", previous: missingPrevious },
-          { path: ".other/rules/image-to-code.mdc", previous: priorFile },
-        ],
-      },
-      issue: "catalog",
-    },
-    {
-      name: "an unknown installed skill definition",
-      request: {
-        ...ruleFileRequest,
-        skills: [
-          {
-            installedSkill: { _tag: "skill", id: "invented", shippedPaths: ["SKILL.md"] },
-            markdown: "Invented skill.\n",
-          },
-        ],
-        previousFiles: [{ path: ".cursor/rules/invented.mdc", previous: missingPrevious }],
-      },
-      issue: "catalog",
-    },
-    {
-      name: "an unknown agent owner",
-      request: { ...ruleFileRequest, agent: { ...cursor, id: "unknown-agent" } },
-      issue: "catalog",
-    },
-    {
       name: "an unknown request property",
       request: { ...ruleFileRequest, unexpected: true },
       issue: "unexpected",
@@ -233,28 +202,5 @@ describe("planRuleFiles", () => {
     "node @@AUTORUN_CONTROL@@ status",
   ])("rejects a non-concrete control command %j", (controlScript) => {
     expect(Either.isLeft(planRuleFiles({ ...ruleFileRequest, controlScript }))).toBe(true);
-  });
-
-  it("rejects a result whose ownership hash drifts from its bytes", () => {
-    const plan = unwrap(planRuleFiles(ruleFileRequest));
-    const firstWrite = writeAt(plan, 0);
-    const ruleMerge = Schema.validateEither(ruleFilePlanSchema, {
-      onExcessProperty: "error",
-    })({
-      ...plan,
-      writes: [
-        {
-          ...firstWrite,
-          file: {
-            ...firstWrite.file,
-            ownership: { ...firstWrite.file.ownership, installedHash: "0".repeat(64) },
-          },
-        },
-        ...plan.writes.slice(1),
-      ],
-    });
-
-    expect(Either.isLeft(ruleMerge)).toBe(true);
-    expect(String(Option.getOrThrow(Either.getLeft(ruleMerge)))).toContain("exact desired bytes");
   });
 });

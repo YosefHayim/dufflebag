@@ -588,22 +588,6 @@ def list_opencode_models() -> list[str]:
     return []
 
 
-def list_cursor_models() -> list[str]:
-    for binary in ("cursor-agent", "cursor"):
-        path = find_cli_or_none(binary)
-        if not path:
-            continue
-        help_text = "\n".join(_run_lines([path, "--help"], timeout=5))
-        found = re.findall(r"(?:gpt|claude|gemini|cursor)[\w.\-]*", help_text, re.I)
-        if found:
-            return dedupe(found)
-    return ["default"]
-
-
-def list_kimi_models() -> list[str]:
-    return ["kimi-latest", "moonshot-v1-auto", "moonshot-v1-128k"]
-
-
 def _pi_rank(token: str) -> tuple[int, str]:
     # OAuth providers (codex, copilot) usually work; OpenRouter often needs credits.
     lower = token.lower()
@@ -651,8 +635,6 @@ _PROVIDER_DISCOVERY: tuple[dict[str, Any], ...] = (
     {"id": "grok", "bins": ("grok", "agent"), "effort": True, "list": list_grok_models},
     {"id": "ollama", "bins": ("ollama",), "effort": False, "list": list_ollama_models},
     {"id": "opencode", "bins": ("opencode",), "effort": True, "list": list_opencode_models},
-    {"id": "cursor", "bins": ("cursor-agent", "cursor"), "effort": False, "list": list_cursor_models},
-    {"id": "kimi", "bins": ("kimi", "moonshot"), "effort": False, "list": list_kimi_models},
     {"id": "pi", "bins": ("pi", "pie"), "effort": True, "list": list_pi_models},
 )
 
@@ -668,11 +650,10 @@ def _describe_provider(spec: dict[str, Any], cli: tuple[str, str]) -> dict[str, 
         "path": cli[1],
         "effort": bool(spec["effort"]),
         "models": models or ["default"],
-        "runnable": spec["id"] in KNOWN_BACKENDS,
     }
 
 
-def discover_providers(*, runnable_only: bool = False, force_refresh: bool = False) -> list[dict[str, Any]]:
+def discover_providers(*, force_refresh: bool = False) -> list[dict[str, Any]]:
     """Providers with a binary on this machine and their model ids.
 
     Model listing runs in parallel and is memoized so `pick-refine` does not wait on slow CLIs twice.
@@ -686,7 +667,7 @@ def discover_providers(*, runnable_only: bool = False, force_refresh: bool = Fal
             with ThreadPoolExecutor(max_workers=min(8, len(present))) as pool:
                 _discovered = list(pool.map(lambda found: _describe_provider(*found), present))
         _discovered_at = now
-    return [provider for provider in _discovered if provider["runnable"] or not runnable_only]
+    return _discovered
 
 
 def normalize_backend(backend: str) -> str:
@@ -699,7 +680,7 @@ def backend_is_launchable(backend: str) -> bool:
     if be == "local":
         return sys.platform == "darwin"
     spec = next((spec for spec in _PROVIDER_DISCOVERY if spec["id"] == be), None)
-    return spec is not None and be in KNOWN_BACKENDS and _first_cli(spec["bins"]) is not None
+    return spec is not None and _first_cli(spec["bins"]) is not None
 
 
 def codex_model_candidates(preferred: str) -> list[str]:

@@ -89,9 +89,6 @@ python3 src/hooks/voice/refine_prompt.py --list-providers
 
 # Interactive TTY menu → writes config.json
 pnpm cli config pick-refine
-# aliases:
-pnpm cli config set refine-model menu
-pnpm cli config set refine-provider menu
 
 # Force macOS GUI dialogs
 pnpm cli config pick-refine --gui

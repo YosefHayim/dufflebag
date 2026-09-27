@@ -4,8 +4,8 @@ import fs from "node:fs";
 import { argString, parseArgs } from "../lib/argv.js";
 
 const args = parseArgs(process.argv.slice(2));
-const svgPath = argString(args, "svg") || "robot.min.svg";
-const outPath = argString(args, "out") || "robot.html";
+const svgPath = argString(args, "svg") || "out.min.svg";
+const outPath = argString(args, "out") || "out.html";
 const title = argString(args, "title") || "Animated SVG";
 
 const svg = fs.readFileSync(svgPath, "utf8");

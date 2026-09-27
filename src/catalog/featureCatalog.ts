@@ -390,7 +390,6 @@ export const featureCatalog = Schema.decodeUnknownSync(featureCatalogSchema, { o
       "reference",
       "scripts/package.json",
       "scripts/svgo.config.mjs",
-      "scripts/robot.svgo.config.mjs",
       "scripts/tsconfig.json",
       "scripts/src",
     ],

@@ -440,7 +440,7 @@ export type FeatureDefinition = { id: string; selectedByDefault: boolean };
 const FEATURE_DEFAULTS = { selectedByDefault: false };
 ```
 
-Why: one executable definition cannot drift from itself, and every derived concern — decoding, defaults, messages, docs — stays attached to the property it governs. Dependency-free hook code is the narrow exception, because Effect does not ship there.
+Why: one executable definition cannot drift from itself, and every derived concern — decoding, defaults, messages, docs — stays attached to the property it governs. Dependency-free hook code is the narrow exception, because Effect does not ship there, and so are function-only service types, which no Schema can describe.
 
 ### Model valid states directly
 [rule:type.valid-states] · verify: judgment

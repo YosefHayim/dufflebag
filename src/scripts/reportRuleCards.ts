@@ -4,24 +4,13 @@ import { checkRuleCards, ruleCardIds } from "./checkRuleCards.js";
 
 const repositoryRoot = resolve(process.argv[2] || process.cwd());
 const guidePath = join(repositoryRoot, "CODE-STYLE.md");
-// A repository may keep this optional mirror beside the guide; every card must then match it.
-const rulesPath = join(repositoryRoot, "code-style.rules.json");
-
-const readMirroredRules = () => {
-  if (!existsSync(rulesPath)) {
-    return undefined;
-  }
-
-  const parsed: unknown = JSON.parse(readFileSync(rulesPath, "utf8"));
-  return Reflect.get(Object(parsed), "rules");
-};
 
 if (!existsSync(guidePath)) {
   process.stdout.write(`${repositoryRoot}\n  missing: ${guidePath}\n`);
   process.exitCode = 1;
 } else {
   const guide = readFileSync(guidePath, "utf8");
-  const violations = checkRuleCards({ guide, rules: readMirroredRules() });
+  const violations = checkRuleCards({ guide });
 
   for (const violation of violations) {
     process.stdout.write(`  CODE-STYLE.md:${violation.line}  ${violation.message}\n`);

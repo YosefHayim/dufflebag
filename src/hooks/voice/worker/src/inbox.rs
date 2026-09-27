@@ -1,5 +1,6 @@
 //! Narration inbox: JSON replies queued by the Stop hook (and `watch-devin`), claimed one at a time.
 
+use crate::cmux_focus::{cmux_focus, CmuxFocus};
 use crate::config::VoicePreferences;
 use crate::narration_mute::narration_muted;
 use crate::state_home::{atomic_json, now_secs, voice_state_home};
@@ -138,6 +139,19 @@ fn remember_spoken(queued_reply: &QueuedReply) {
     let _ = atomic_json(&voice_state_home().join("seen.json"), &seen);
 }
 
+/// `immediate` speaks every reply at once. `auto` holds a Cmux reply until its surface is in
+/// front of the user, and speaks it when Cmux cannot be asked so it is not stuck until it expires.
+fn speaks_now(mode: &str, surface: &str, focus: impl FnOnce() -> CmuxFocus) -> bool {
+    if mode == "immediate" || surface.is_empty() {
+        return true;
+    }
+    match focus() {
+        CmuxFocus::Surface(focused) => focused == surface,
+        CmuxFocus::Away => false,
+        CmuxFocus::Unknown => true,
+    }
+}
+
 /// Readable, non-empty, unexpired queued replies (oldest first); anything else is deleted.
 fn pending_replies() -> Vec<(PathBuf, QueuedReply)> {
     let inbox = inbox_dir();
@@ -171,7 +185,8 @@ fn pending_replies() -> Vec<(PathBuf, QueuedReply)> {
 }
 
 /// Claim the next reply to speak by renaming it to `.speaking` so it cannot be picked twice.
-/// Older replies with the same identity or from the same Cmux surface are superseded.
+/// Older replies with the same identity or from the same Cmux surface are superseded, and a
+/// reply still waiting for its Cmux surface stays queued.
 pub fn next_queued_reply(preferences: &VoicePreferences) -> Option<(PathBuf, QueuedReply)> {
     let pending = pending_replies();
     if preferences.narration_mode == "off" {
@@ -196,7 +211,8 @@ pub fn next_queued_reply(preferences: &VoicePreferences) -> Option<(PathBuf, Que
             let _ = fs::remove_file(&path);
             continue;
         }
-        if narration_muted() {
+        let socket_path = reply.origin.get("socket_path").and_then(Value::as_str).unwrap_or("");
+        if narration_muted() || !speaks_now(&preferences.narration_mode, &surface, || cmux_focus(socket_path)) {
             continue;
         }
         // Claim before speaking so a crash mid-playback cannot re-queue forever.
@@ -246,6 +262,35 @@ mod tests {
     fn content_token_is_stable() {
         assert_eq!(stable_content_token("hello world"), stable_content_token("hello world"));
         assert_ne!(stable_content_token("hello world"), stable_content_token("hello world!"));
+    }
+
+    #[test]
+    fn auto_holds_a_cmux_reply_until_its_surface_is_in_front() {
+        let cases = [
+            (CmuxFocus::Surface("W1:S1".into()), true),
+            (CmuxFocus::Surface("W1:S2".into()), false),
+            (CmuxFocus::Away, false),
+            (CmuxFocus::Unknown, true),
+        ];
+        for (focus, speaks) in cases {
+            let label = format!("{focus:?}");
+            assert_eq!(speaks_now("auto", "W1:S1", || focus), speaks, "{label}");
+        }
+    }
+
+    #[test]
+    fn immediate_and_terminal_replies_speak_without_asking_cmux() {
+        let never_asked = || -> CmuxFocus { panic!("Cmux focus was asked") };
+        assert!(speaks_now("immediate", "W1:S1", never_asked));
+        assert!(speaks_now("auto", "", never_asked));
+    }
+
+    #[test]
+    fn cmux_replies_are_keyed_by_workspace_and_surface() {
+        let mut cmux = reply("");
+        cmux.origin = serde_json::json!({"kind": "cmux", "workspace_id": "W1", "surface_id": "S1"});
+        assert_eq!(surface_identity(&cmux), "W1:S1");
+        assert_eq!(surface_identity(&reply("")), "");
     }
 
     #[test]

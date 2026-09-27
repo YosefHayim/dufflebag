@@ -41,12 +41,12 @@ When I already have `CODE-STYLE.md` / structure docs and want confirmation that 
 
    ```bash
    RUN_ID=$(date -u +%Y-%m-%dT%H%M%SZ)
-   AGENT_DOCS="docs/agent/style-audit/$RUN_ID"
+   AGENT_DOCS="docs/agent/code-style-existing-project/$RUN_ID"
    mkdir -p "$AGENT_DOCS"
-   printf '%s\n' "$RUN_ID" > docs/agent/style-audit/CURRENT
+   printf '%s\n' "$RUN_ID" > docs/agent/code-style-existing-project/CURRENT
    ```
 
-   Resume → use `CURRENT` / explicit run-id. Never write `*AUDIT*.md` / compliance reports at the repository root or a fixed flat path. Migrate any legacy root/flat audit files into a run dir.
+   Resume → use `CURRENT` / explicit run-id. Never write `*AUDIT*.md` / compliance reports at the repository root or a fixed flat path.
 7. Do **not** rewrite CODE-STYLE or rename symbols in audit mode. Approved cleanup → `simplify-code`; structural prove-outs → `simplify-repo-with-tests`.
 
 Honest limit: mechanical scanners prove banned names, missing docs, and path patterns — not whether a name truly captures a business concept (`confidence: judgment` for those).

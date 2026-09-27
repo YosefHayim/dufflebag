@@ -34,6 +34,10 @@ export const normalizeVoiceId = (voice: string): string =>
 
 export const isTtsNarrationEnabled = (mode: Config["speechMode"]): boolean => mode !== "off";
 
+/** `tts on` wakes speech-mode from off to auto and keeps a mode that already narrates. */
+export const narratingSpeechMode = (mode: Config["speechMode"]): Config["speechMode"] =>
+  isTtsNarrationEnabled(mode) ? mode : "auto";
+
 // Effect Command inherits process.env only when extendEnv is set; voice needs PATH so Homebrew's `uv` resolves.
 export const withProcessEnv = (command: PlatformCommand.Command) => PlatformCommand.env(command, process.env);
 

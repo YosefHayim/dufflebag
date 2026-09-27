@@ -1,17 +1,12 @@
 import { createHash } from "node:crypto";
 
-import { Either, Option, Schema } from "effect";
+import { Either, Option } from "effect";
 import { describe, expect, expectTypeOf, it } from "vitest";
 
 import { agentCatalog } from "../../catalog/agentCatalog.js";
 import { findFeature } from "../../catalog/featureCatalog.js";
 import type { OwnedFile } from "../ownership.js";
-import {
-  type InstructionFilePlan,
-  InstructionFilePlanError,
-  instructionFilePlanSchema,
-  planInstructionFile,
-} from "./instructionFile.js";
+import { type InstructionFilePlan, InstructionFilePlanError, planInstructionFile } from "./instructionFile.js";
 
 const startMarker = "<!-- dufflebag:skills start -->";
 const endMarker = "<!-- dufflebag:skills end -->";
@@ -145,23 +140,6 @@ describe("planInstructionFile", () => {
     expect(aiderAgain.bytes).toEqual(aider.bytes);
   });
 
-  it("restores user AGENTS.md bytes from the legacy Codex instruction target", () => {
-    const original = encode("User instructions.\n");
-    const installed = write({ currentBytes: original });
-    const legacyCodexFile: OwnedFile = {
-      ...installed.file,
-      owner: { _tag: "agent", agentIds: ["codex"] },
-    };
-
-    const restored = restore({
-      desired: "absent",
-      currentBytes: installed.bytes,
-      previousFile: legacyCodexFile,
-    });
-
-    expect(restored.bytes).toEqual(original);
-  });
-
   it("restores exact surrounding bytes when the final shared owner leaves", () => {
     const original = encode("User bytes without a final newline");
     const installed = write({ currentBytes: original });
@@ -226,9 +204,8 @@ describe("planInstructionFile", () => {
 
       return agent.target._tag === "instructionLink" ? [{ agentId: agent.id, path: agent.target.instructionPath }] : [];
     }),
-  )("accepts catalog instruction consumer $agentId only at $path", ({ agentId, path }) => {
+  )("plans catalog instruction consumer $agentId at $path", ({ agentId, path }) => {
     expect(rejects(request({ agentIds: [agentId], path }))).toBe(false);
-    expect(rejects(request({ agentIds: [agentId], path: `${path}.forged` }))).toBe(true);
   });
 
   it.each([
@@ -260,16 +237,6 @@ describe("planInstructionFile", () => {
       "unresolved control token",
       { ...request(), desired: { ...request().desired, controlScript: "@@AUTORUN_CONTROL@@/control" } },
     ],
-    [
-      "invented skill",
-      {
-        ...request(),
-        desired: {
-          ...request().desired,
-          skills: [{ installedSkill: { _tag: "skill", id: "invented", shippedPaths: ["SKILL.md"] }, markdown: "Body" }],
-        },
-      },
-    ],
     ["unknown request property", { ...request(), unexpected: true }],
   ])("rejects %s at the strict request boundary", (_case, input) => {
     expect(rejects(input)).toBe(true);
@@ -282,27 +249,5 @@ describe("planInstructionFile", () => {
     expect(
       rejects({ ...request({ currentBytes: installed.bytes }), previousFile: { _tag: "owned", file: forged } }),
     ).toBe(true);
-  });
-
-  it("rejects a wrong file kind and managed-body hash drift", () => {
-    const operation = write();
-    const wrongKind = {
-      ...operation,
-      file: {
-        ...operation.file,
-        kind: { _tag: "rule" },
-        ownership: { _tag: "wholeFile", installedHash: "a".repeat(64), previous: { _tag: "missing" } },
-      },
-    };
-    const wrongHash = {
-      ...operation,
-      file: {
-        ...operation.file,
-        ownership: { ...operation.file.ownership, installedBodyHash: "0".repeat(64) },
-      },
-    };
-
-    expect(Schema.is(instructionFilePlanSchema)(wrongKind)).toBe(false);
-    expect(Schema.is(instructionFilePlanSchema)(wrongHash)).toBe(false);
   });
 });

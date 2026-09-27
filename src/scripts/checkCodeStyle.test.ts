@@ -178,6 +178,12 @@ const REJECTED: ReadonlyArray<SingleFileCase & { ruleId: string; line?: number }
     source: "export type RuntimeState = { sessionId: string };\n",
     ruleId: "type.schema-owned-runtime",
   },
+  {
+    name: "an exported object type mixing data and functions",
+    path: "src/providerRouting/healthStore.ts",
+    source: "export type HealthStore = { filePath: string; readHealth: () => Effect.Effect<void> };\n",
+    ruleId: "type.schema-owned-runtime",
+  },
   ...[
     'export { featureCatalog } from "./featureCatalog.js";\n',
     'export * as catalog from "./featureCatalog.js";\n',
@@ -281,6 +287,11 @@ const ACCEPTED: ReadonlyArray<SingleFileCase> = [
     source: 'export class InstallError extends Schema.TaggedError<InstallError>()("InstallError", {}) {}\n',
   },
   { name: "a type alias", source: "export type FeatureId = string;\n" },
+  {
+    name: "an exported object type holding only functions",
+    path: "src/providerRouting/healthStore.ts",
+    source: "export type HealthStore = { readHealth: () => Effect.Effect<void>; writeHealth(record: string): void };\n",
+  },
   { name: "assertion-looking string content", source: 'export const copy = "input as string";\n' },
   { name: "a satisfies expression", source: "export const values = { id: 1 } satisfies Record<string, unknown>;\n" },
   {

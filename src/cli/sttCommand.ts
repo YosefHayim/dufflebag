@@ -36,7 +36,7 @@ const dictationModel = (language: DictationLanguage) =>
 
 export const sttOn = (scope: CliScope) =>
   Effect.gen(function* () {
-    const { config } = yield* startVoice({ scope, settings: {} });
+    const { config } = yield* startVoice({ scope });
     yield* TerminalUI.success(`STT is on (${scope}).`);
     yield* TerminalUI.detail(holdToDictateHint);
     yield* TerminalUI.detail(

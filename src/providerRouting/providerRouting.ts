@@ -1,4 +1,4 @@
-import { Context, DateTime, Effect, Option, Stream } from "effect";
+import { DateTime, Effect, Option, Stream } from "effect";
 
 import { freeProviderCatalog } from "./freeProviderCatalog.js";
 import {
@@ -23,24 +23,10 @@ import {
 import { sendChat } from "./providerHttp.js";
 
 export {
-  decodeAnthropicStreamChunk,
-  decodeGoogleStreamChunk,
-  decodeOpenAiResponsesStreamChunk,
-  decodeOpenAiStreamChunk,
-  encodeAnthropicRequest,
-  encodeGoogleGenerativeRequest,
-  encodeOpenAiChatRequest,
-  encodeOpenAiResponsesRequest,
-} from "./chatFormats.js";
-export {
   acknowledgementVersion,
-  activeFreeProviderCount,
-  documentedFreePoolCount,
   documentedRecurringTokenEstimate,
   freePoolSnapshot,
-  freePoolSnapshotSource,
   freeProviderCatalog,
-  unavailableFreeProviderCount,
 } from "./freeProviderCatalog.js";
 export { connectOpenRouter } from "./openRouterOAuth.js";
 export {
@@ -76,21 +62,19 @@ export {
   streamEventSchema,
   termsStatusSchema,
 } from "./providerContract.js";
-export { classifyUpstreamFailure, sendChat } from "./providerHttp.js";
+export { sendChat } from "./providerHttp.js";
 
 // The caller owns credentials; routing never persists them.
 export type CredentialLookup = (credentialId: string) => Effect.Effect<Option.Option<string>>;
 
 // Caller-owned per-provider/model health; routing never stores conversation content in it.
-export const HealthStore = Context.GenericTag<{
+export type HealthStore = {
   readHealth: (identity: {
     providerId: ProviderId;
     modelId: ModelId;
   }) => Effect.Effect<Option.Option<HealthRecord>, HealthStoreError>;
   writeHealth: (healthRecord: HealthRecord) => Effect.Effect<void, HealthStoreError>;
-}>("ys-dufflebag/provider-routing/HealthStore");
-
-export type HealthStore = Context.Tag.Service<typeof HealthStore>;
+};
 
 export type SendChat = (invocation: {
   providerManifest: ProviderManifest;
@@ -343,12 +327,6 @@ export const listFreeModels = (request: { providerManifests?: ReadonlyArray<Prov
       ),
     ),
   );
-
-export const inspectProviderHealth = (request: {
-  providerId: ProviderId;
-  modelId: ModelId;
-  healthStore: HealthStore;
-}) => request.healthStore.readHealth({ providerId: request.providerId, modelId: request.modelId });
 
 // An explicit target never falls back; auto-free moves to the next ranked provider only before the first event streams.
 export const streamFreeChat = (request: FreeChatRequest): FreeChatStream =>

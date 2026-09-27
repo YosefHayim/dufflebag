@@ -177,7 +177,7 @@ def pick_refine_target(
     cancelled. The model is SKIP_REFINE_LABEL when the user skips (only offered with include_skip)."""
     gui = picker_enabled() if use_gui is None else use_gui
     print("Discovering refine providers on this machine…", file=sys.stderr, flush=True)
-    providers = discover_providers(runnable_only=True)
+    providers = discover_providers()
     if not providers:
         if gui:
             _macos_alert("No refine providers", _NO_PROVIDERS)

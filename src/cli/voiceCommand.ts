@@ -21,11 +21,14 @@ import * as TerminalUI from "./TerminalUI.js";
 
 export const holdToDictateHint = "Hold Shift to dictate; release to finish.";
 
-/** Turn voice on with `settings` merged into config.json; returns the config before and after. */
-export const startVoice = (request: { readonly scope: CliScope; readonly settings: Partial<Config> }) =>
+/** Turn voice on with `settings(current)` merged into config.json; returns the config before and after. */
+export const startVoice = (request: {
+  readonly scope: CliScope;
+  readonly settings?: (current: Config) => Partial<Config>;
+}) =>
   Effect.gen(function* () {
     const current = yield* readConfig(request.scope);
-    const config = { ...current.config, ...request.settings };
+    const config = { ...current.config, ...request.settings?.(current.config) };
     const models = isTtsNarrationEnabled(config.speechMode) ? "+ Supertonic" : "(STT only)";
     yield* TerminalUI.step(`installing voice and preparing the dictation model ${models}`);
     yield* turnVoiceOn({ ...current, config });
@@ -47,7 +50,7 @@ const describeDictationRefine = (config: Config) => {
 
 export const voiceOn = (scope: CliScope) =>
   Effect.gen(function* () {
-    const { config } = yield* startVoice({ scope, settings: {} });
+    const { config } = yield* startVoice({ scope });
     yield* TerminalUI.success(`Voice is on (${scope}).`);
     yield* TerminalUI.detail(holdToDictateHint);
     yield* TerminalUI.detail(
@@ -109,16 +112,10 @@ const statusCommand = CliCommand.make("status", { scope: scopeOption, format: fo
   }),
 ).pipe(CliCommand.withDescription("Show install, worker, STT, and TTS state"));
 
-const sourceOption = Options.choice("source", ["claude-code", "codex", "grok", "devin", "manual"]).pipe(
-  Options.withDefault("manual"),
-  Options.withDescription("Origin label for this spoken text"),
-);
-
 const speakCommand = CliCommand.make(
   "speak",
   {
     text: Args.text({ name: "text" }).pipe(Args.withDescription("Complete Markdown response to read aloud")),
-    source: sourceOption,
     scope: scopeOption,
   },
   (args) =>
@@ -126,7 +123,7 @@ const speakCommand = CliCommand.make(
       const target = yield* resolveConfigTarget(args.scope);
       yield* runCommand({
         executable: yield* requireInstalledVoice(target.destination.root),
-        args: ["speak", "--text", args.text, "--source", args.source],
+        args: ["speak", "--text", args.text],
         label: "Voice narration",
       });
     }),

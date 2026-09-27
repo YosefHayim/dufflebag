@@ -6,7 +6,7 @@ import { expect, layer } from "@effect/vitest";
 import { Effect, Schema } from "effect";
 
 import { defaultConfig } from "../config/configSchema.js";
-import { install, syncInstall } from "./install.js";
+import { install } from "./install.js";
 import { installRequestSchema } from "./installRequest.js";
 import { planRestores } from "./restore.js";
 
@@ -222,43 +222,6 @@ layer(NodeContext.layer)("install", (it) => {
 
       expect(exit._tag).toBe("Failure");
       expect(yield* readText(installedSkill)).toBe(handWritten);
-    }),
-  );
-
-  it.scoped("rejects receipt authority that does not match its source bytes", () =>
-    Effect.gen(function* () {
-      const { root, preparedRoot, writeFiles, readText, exists } = yield* workspace;
-      const victimBytes = textEncoder.encode("user-owned\n");
-      yield* writeFiles(preparedRoot, contextGuardRuntime);
-      yield* writeFiles(root, { "victim.txt": "user-owned\n" });
-
-      const harmlessReceipt = { version: "0.11.0", scope: "project", features: ["context-guard"], artifacts: [] };
-      const forgedReceipt = {
-        ...harmlessReceipt,
-        artifacts: [
-          {
-            owner: { _tag: "application" },
-            path: "victim.txt",
-            kind: { _tag: "runtime" },
-            ownership: { _tag: "wholeFile", installedHash: sha256(victimBytes), previous: { _tag: "missing" } },
-          },
-        ],
-      };
-
-      const exit = yield* Effect.exit(
-        syncInstall({
-          request: installRequest({ root, preparedRoot }),
-          receiptSnapshot: {
-            _tag: "present",
-            bytes: textEncoder.encode(`${JSON.stringify(harmlessReceipt)}\n`),
-            receipt: forgedReceipt,
-          },
-        }),
-      );
-
-      expect(exit._tag).toBe("Failure");
-      expect(yield* readText("victim.txt")).toBe("user-owned\n");
-      expect(yield* exists(".claude/dufflebag/config.json")).toBe(false);
     }),
   );
 

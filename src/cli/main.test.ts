@@ -58,11 +58,12 @@ describe("CLI help", () => {
     },
     {
       args: ["voice", "--help"],
-      shows: ["speak", "--source claude-code | codex | grok | devin | manual"],
+      shows: ["speak", "refine", "devin"],
       hides: ["--example"],
     },
     { args: ["stt", "--help"], shows: ["on", "off", "keep-listening", "lang", "hold Shift"], hides: [] },
     { args: ["tts", "--help"], shows: ["on", "off", "narration", "speech-mode"], hides: [] },
+    { args: ["config", "--help"], shows: ["pick-refine", "Set one managed setting"], hides: [] },
     { args: ["openrouter", "--help"], shows: ["connect", "smoke", "chat", "OAuth"], hides: [] },
     {
       args: ["free", "--help"],

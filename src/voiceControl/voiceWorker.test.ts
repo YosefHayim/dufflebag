@@ -7,6 +7,7 @@ import { defaultConfig } from "../config/configSchema.js";
 import { hooksPath } from "../install/installPaths.js";
 import {
   isTtsNarrationEnabled,
+  narratingSpeechMode,
   nextVoiceFeatures,
   normalizeVoiceId,
   reloadVoiceWorker,
@@ -88,10 +89,19 @@ describe("isTtsNarrationEnabled", () => {
   it.each([
     ["off", false],
     ["auto", true],
-    ["focused", true],
     ["immediate", true],
   ] as const)("speech-mode %s narrates: %s", (mode, enabled) => {
     expect(isTtsNarrationEnabled(mode)).toBe(enabled);
+  });
+});
+
+describe("narratingSpeechMode", () => {
+  it.each([
+    ["off", "auto"],
+    ["auto", "auto"],
+    ["immediate", "immediate"],
+  ] as const)("tts on turns speech-mode %s into %s", (mode, next) => {
+    expect(narratingSpeechMode(mode)).toBe(next);
   });
 });
 

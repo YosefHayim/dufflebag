@@ -2,6 +2,7 @@
 //! queue; the narration worker (a separate process) speaks queued agent replies.
 
 mod cmux_delivery;
+mod cmux_focus;
 mod config;
 mod devin_export_watcher;
 mod dictation_format;
@@ -47,8 +48,6 @@ enum Commands {
     Speak {
         #[arg(long)]
         text: String,
-        #[arg(long, default_value = "manual")]
-        source: String,
     },
     /// Download and verify Whisper turbo + warm Supertonic
     Prepare,
@@ -129,7 +128,7 @@ fn main() {
             println!("{}", markdown_to_speech::markdown_to_speech(&text));
             0
         }
-        Commands::Speak { text, source: _ } => match tts::speak_markdown(&text) {
+        Commands::Speak { text } => match tts::speak_markdown(&text) {
             Ok(status) => {
                 if status != "completed" {
                     eprintln!("{status}");

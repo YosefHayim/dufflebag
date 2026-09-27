@@ -10,9 +10,9 @@ at each **real decision**, stop and coach me: explain the concept simply, show m
 variants, and make me **confirm the direction before you write**. Then teach me *why* and show me
 the file to imitate. I get better; the code stays on-style.
 
-**Read first (never coach from memory):** the repo's rules — `code-style.rules.json` when it exists,
-otherwise the `[rule:<id>] · verify:` cards in `CODE-STYLE.md` (each rule's `verify` command + exemplars), `CODE-STYLE.md` (the prose), and `PROJECT.md` / `CONTEXT.md` (so "where does
-this go" comes from *my* docs, not generic advice). No ruleset in the repo? Say so and offer to run
+**Read first (never coach from memory):** the cards in `CODE-STYLE.md` (each rule's `verify`
+command + exemplars), the rest of `CODE-STYLE.md`, and `PROJECT.md` / `CONTEXT.md` (so "where does
+this go" comes from *my* docs, not generic advice). No `CODE-STYLE.md` in the repo? Say so and offer to run
 `code-style-new-project` / `code-style-existing-project` first.
 
 **Only grill me on what matters.** Each rule's `verify` field tells you what to skip and what to teach:
@@ -66,7 +66,7 @@ the rule.
 
 ## Never
 
-- Never coach from memory — re-read the rules (`code-style.rules.json` or the `CODE-STYLE.md` cards) + `CONTEXT.md` for this change.
+- Never coach from memory — re-read the cards in `CODE-STYLE.md` + `CONTEXT.md` for this change.
 - Never grill me on a rule a tool already enforces (any rule with a real `verify` command) — just follow it.
 - Never write the code before I've confirmed the direction on a judgment decision.
 - Never invent a pattern when a `CODE-STYLE.md` recipe/exemplar fits — mirror it and tell me which.

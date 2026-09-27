@@ -38,7 +38,7 @@ import type { PreviousFileValue } from "./ownership.js";
 import { createHookWrites, readPreparedSkills } from "./packageFiles.js";
 import type { FileChange, ReceiptTarget } from "./plan.js";
 import { planInstall } from "./planChanges.js";
-import { type Receipt, readReceipt, receiptJsonSchema, receiptSnapshotSchema } from "./receipt.js";
+import { type Receipt, type ReceiptSnapshot, readReceipt, receiptJsonSchema } from "./receipt.js";
 import { createStaleRestorations } from "./restore.js";
 
 const receiptEqual = (left: Receipt, right: Receipt): boolean =>
@@ -207,18 +207,6 @@ const installSummary = (input: {
   interaction: input.request.interaction,
 });
 
-// The receipt snapshot is decoded with the request so its bytes and decoded receipt must agree.
-const installSyncSchema = Schema.Struct({
-  request: Schema.typeSchema(installRequestSchema).annotations({
-    description: "Decoded install request being synced.",
-  }),
-  receiptSnapshot: receiptSnapshotSchema.annotations({
-    description: "Exact receipt state inspected once before the sync.",
-  }),
-}).annotations({
-  description: "Decoded install request paired with its single ownership-receipt snapshot.",
-});
-
 // Claude's settings are always planned, so deselecting Claude restores the hooks it received earlier.
 const planHookSettings = (input: {
   request: InstallRequest;
@@ -266,9 +254,9 @@ const planHookSettings = (input: {
     return plans.filter((plan): plan is FileChange => plan !== undefined);
   });
 
-export const syncInstall = (input: unknown) =>
+export const syncInstall = (input: { request: InstallRequest; receiptSnapshot: ReceiptSnapshot }) =>
   Effect.gen(function* () {
-    const { request: requested, receiptSnapshot } = yield* decodeStrictly(installSyncSchema)(input);
+    const { request: requested, receiptSnapshot } = input;
     const fileSystem = yield* FileSystem.FileSystem;
     const path = yield* Path.Path;
     const request = yield* decodeStrictly(installRequestSchema)({

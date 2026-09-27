@@ -65,7 +65,7 @@ def _model_candidates_for_backend(backend: str, preferred: str = "") -> list[str
     """Model ids for one backend: preferred, then the sticky pick, then discovery."""
     be = normalize_backend(backend)
     preferred_name = (preferred or "").strip()
-    head = [preferred_name] if preferred_name not in ("default", "auto", "menu") else []
+    head = [preferred_name] if preferred_name not in ("default", "auto") else []
     sticky = read_user_choice()
     if sticky.get("backend") == be and sticky.get("model"):
         head.append(sticky["model"])

@@ -83,9 +83,6 @@ export const decodeReceiptJson = Schema.decodeUnknown(receiptJsonSchema, {
   onExcessProperty: "error",
 });
 
-const receiptsEqual = (left: Receipt, right: Receipt): boolean =>
-  Schema.encodeSync(receiptJsonSchema)(left) === Schema.encodeSync(receiptJsonSchema)(right);
-
 const decodeReceiptBytes = (bytes: Uint8Array): Either.Either<Receipt, string> =>
   Either.flatMap(decodeStrictText(bytes, "receipt.json"), (json) => {
     const duplicateProperty = findDuplicateJsonKey(json);
@@ -99,7 +96,7 @@ const decodeReceiptBytes = (bytes: Uint8Array): Either.Either<Receipt, string> =
     );
   });
 
-export const receiptSnapshotSchema = Schema.Union(
+const receiptSnapshotSchema = Schema.Union(
   Schema.TaggedStruct("missing", {}),
   Schema.TaggedStruct("present", {
     bytes: Schema.Uint8ArrayFromSelf.annotations({
@@ -108,20 +105,12 @@ export const receiptSnapshotSchema = Schema.Union(
     receipt: Schema.typeSchema(receiptSchema).annotations({
       description: "Strict receipt decoded from the same file bytes.",
     }),
-  }).pipe(
-    Schema.filter((snapshot) => {
-      const decodedReceipt = decodeReceiptBytes(snapshot.bytes);
-
-      return Either.isRight(decodedReceipt) && receiptsEqual(decodedReceipt.right, snapshot.receipt)
-        ? undefined
-        : { path: ["receipt"], message: "Decoded receipt authority must exactly match its source bytes." };
-    }),
-  ),
+  }),
 ).annotations({
   description: "Missing or strictly decoded receipt with its exact source bytes.",
 });
 
-type ReceiptSnapshot = Schema.Schema.Type<typeof receiptSnapshotSchema>;
+export type ReceiptSnapshot = Schema.Schema.Type<typeof receiptSnapshotSchema>;
 
 export class ReceiptParseError extends Schema.TaggedError<ReceiptParseError>()("ReceiptParseError", {
   receiptPath: Schema.NonEmptyString.annotations({
@@ -154,9 +143,5 @@ export const readReceipt = (receiptPath: string) =>
       return yield* new ReceiptParseError({ receiptPath, issue: receipt.left });
     }
 
-    return Schema.validateSync(receiptSnapshotSchema, { onExcessProperty: "error" })({
-      _tag: "present",
-      bytes: contents.value,
-      receipt: receipt.right,
-    });
+    return { _tag: "present", bytes: contents.value, receipt: receipt.right } satisfies ReceiptSnapshot;
   });

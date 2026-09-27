@@ -5,7 +5,7 @@ import { Effect } from "effect";
 import { configSettings, defaultSettingValue, settingValueFromText, withSettingValue } from "../config/configSchema.js";
 import { readConfig, resolveConfigTarget, saveConfig } from "../config/configSettings.js";
 import { type CliScope, CliUsageError } from "./cliOptions.js";
-import { formatSettingValue, showConfig } from "./configCommand.js";
+import { formatSettingValue, pickRefine, showConfig } from "./configCommand.js";
 import { setDictationLanguage, setKeepListening, sttOff, sttOn } from "./sttCommand.js";
 import * as TerminalUI from "./TerminalUI.js";
 import { ttsOff, ttsOn } from "./ttsCommand.js";
@@ -175,13 +175,24 @@ const runConfigReset = Effect.gen(function* () {
   });
 });
 
+const runPickRefine = Effect.gen(function* () {
+  const scope = yield* pickScope("Config pick-refine");
+  yield* applyCommand({
+    command: "config pick-refine",
+    scope,
+    action: "pick refine provider, model, and effort",
+    apply: pickRefine({ scope, format: "text", gui: false }),
+  });
+});
+
 export const runConfig = Effect.gen(function* () {
-  const action = yield* TerminalUI.selectOne<"show" | "set" | "reset" | "back">({
+  const action = yield* TerminalUI.selectOne<"show" | "set" | "reset" | "pick-refine" | "back">({
     message: "Config",
     choices: [
       { title: "Show", value: "show", description: "inspect managed settings" },
       { title: "Set", value: "set", description: "change one setting" },
       { title: "Reset", value: "reset", description: "restore Schema defaults" },
+      { title: "Pick refine", value: "pick-refine", description: "refine provider, model, and effort" },
       { title: "Back", value: "back" },
     ],
     initial: "show",
@@ -193,6 +204,8 @@ export const runConfig = Effect.gen(function* () {
       return yield* runConfigSet;
     case "reset":
       return yield* runConfigReset;
+    case "pick-refine":
+      return yield* runPickRefine;
     case "back":
       return;
   }
@@ -311,7 +324,7 @@ export const runTts = Effect.gen(function* () {
       return yield* applyCommand({
         command: "tts on",
         scope,
-        action: "enable response narration (speech-mode → auto)",
+        action: "enable response narration (speech-mode off → auto)",
         apply: ttsOn(scope),
       });
     case "off":

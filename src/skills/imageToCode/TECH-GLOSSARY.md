@@ -25,7 +25,7 @@ Node library for reading/writing PNG pixel buffers synchronously (`PNG.sync.read
 
 ## SVGO
 
-SVG optimizer. Default presets strip `viewBox` and IDs that animations depend on — use `scripts/svgo.config.mjs` (general) or `scripts/robot.svgo.config.mjs` (animated figures with opacity-0 rest frames).
+SVG optimizer. Default presets strip `viewBox` and IDs that animations depend on — use `scripts/svgo.config.mjs`. Animated figures with opacity-0 rest frames need more plugins off — see the minify guard in `reference/animation.md`.
 
 ## potrace / trace
 
@@ -53,7 +53,7 @@ Contour tracing/simplification algorithms used by `extract-blob` and `hand-clip`
 
 ## chroma key (green screen)
 
-Painting non-subject pixels bright green (#00FF00) so a trace can strip the background to transparency. Used in the robot arm rig pipeline.
+Painting non-subject pixels bright green (#00FF00) so a trace can strip the background to transparency. Used to cut a white part off a white body before tracing (`reference/rigging.md`).
 
 ## flood fill / exterior flood
 

@@ -32,7 +32,7 @@ One **task** = one **agent** = one **worktree** = one **branch** = one **issue**
 | Local browser / manual UI QA | **`run-local-and-check`** |
 | Single feature with merge+reinstall polish | **`ship-one-feature`** (one task only — or run this skill with one line) |
 | Multi-feature cleanup campaign | **`clean-repo-by-feature`** (calls this skill’s setup/land) |
-| Test-gap multi-lane campaign | **`ship-missing-tests`** |
+| Missing tests multi-lane campaign | **`ship-missing-tests`** |
 | Production live prove | **`deploy-and-check`** only if user asks |
 
 This skill owns: task parsing, lane isolation, SDLC mandate, matrix board, merge sequencing when authorized. Details: [REFERENCE.md](REFERENCE.md).
@@ -74,9 +74,9 @@ This skill owns: task parsing, lane isolation, SDLC mandate, matrix board, merge
 
    ```bash
    RUN_ID=$(date -u +%Y-%m-%dT%H%M%SZ)
-   AGENT_DOCS="docs/agent/sdlc-tasks/$RUN_ID"
+   AGENT_DOCS="docs/agent/run-tasks-in-parallel/$RUN_ID"
    mkdir -p "$AGENT_DOCS"
-   printf '%s\n' "$RUN_ID" > docs/agent/sdlc-tasks/CURRENT
+   printf '%s\n' "$RUN_ID" > docs/agent/run-tasks-in-parallel/CURRENT
    ```
 
    Write `BOARD.md` (and optional `STATE.md`) only under `$AGENT_DOCS`. Put `AGENT_DOCS` in every `LANE-BRIEF.md` so all lanes share this run. Resume → use `CURRENT` / explicit run-id (do not mint a new one). Never put campaign MD at repo root or under product `docs/agents/`.
@@ -125,7 +125,7 @@ Flags: `no-merge` (default without merge language), `merge` / `to-main`, `no-cmu
 
 ### Mode: setup-lanes
 
-Same fan-out as execute steps 2–3 **without** forcing full SDLC gates unless the calling skill’s brief requires them. Each lane: implement → narrow/full verify as brief says → **`organize-commits`** + **`finish-and-push`** push/PR. **Do not merge** unless asked. Report matrix. Used by messy-repo / ship-missing-tests / simplify-repo-with-tests / ux-journey.
+Same fan-out as execute steps 2–3 **without** forcing full SDLC gates unless the calling skill’s brief requires them. Each lane: implement → narrow/full verify as brief says → **`organize-commits`** + **`finish-and-push`** push/PR. **Do not merge** unless asked. Report matrix. Used by clean-repo-by-feature / ship-missing-tests / simplify-repo-with-tests / improve-ux.
 
 ### Mode: land-lanes
 
@@ -147,7 +147,7 @@ Same fan-out as execute steps 2–3 **without** forcing full SDLC gates unless t
 mode: execute
 repo: <path>
 default: <branch> @ <sha>
-board: docs/agent/sdlc-tasks/<run-id>/BOARD.md
+board: docs/agent/run-tasks-in-parallel/<run-id>/BOARD.md
 run_id: <YYYY-MM-DDTHHMMSSZ>
 
 host: A|B|C

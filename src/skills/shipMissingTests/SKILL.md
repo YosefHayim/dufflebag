@@ -33,13 +33,13 @@ Never write campaign markdown at the **repository root**. Never overwrite anothe
 
 | File | Path |
 |------|------|
-| Features (from find-missing-tests) | `docs/agent/test-gap/<run-id>/FEATURES.md` |
-| Gap report | `docs/agent/test-gap/<run-id>/REPORT.md` |
-| Campaign board | `docs/agent/test-gap/<run-id>/SHIP.md` |
-| Active pointer | `docs/agent/test-gap/CURRENT` |
+| Features (from find-missing-tests) | `docs/agent/find-missing-tests/<report-run-id>/FEATURES.md` |
+| Gap report (from find-missing-tests) | `docs/agent/find-missing-tests/<report-run-id>/REPORT.md` |
+| Campaign board | `docs/agent/ship-missing-tests/<run-id>/SHIP.md` |
+| Active pointer | `docs/agent/ship-missing-tests/CURRENT` |
 
-1. **New campaign:** `RUN_ID=$(date -u +%Y-%m-%dT%H%M%SZ)`; `AGENT_DOCS=docs/agent/test-gap/$RUN_ID`; `mkdir -p "$AGENT_DOCS"`; write `CURRENT`.
-2. **Resume / from-report:** resolve `CURRENT` or explicit run path; do not mint a new run-id. Migrate legacy root `TEST-GAP-*.md` or flat campaign files into a run dir.
+1. **New campaign:** `RUN_ID=$(date -u +%Y-%m-%dT%H%M%SZ)`; `AGENT_DOCS=docs/agent/ship-missing-tests/$RUN_ID`; `mkdir -p "$AGENT_DOCS"`; write `CURRENT`. Write the report path you use at the top of `SHIP.md`.
+2. **Resume:** resolve `docs/agent/ship-missing-tests/CURRENT` or an explicit run path; do not mint a new run-id. `SHIP.md` names its report.
 3. `LANE-BRIEF.md` stays **inside each worktree**, not under `docs/agent/`. Include `AGENT_DOCS` in every brief.
 4. Shared rules: [references/agent-artifacts.md](references/agent-artifacts.md).
 
@@ -62,7 +62,7 @@ Never write campaign markdown at the **repository root**. Never overwrite anothe
 | Flag / phrase | Meaning |
 |---------------|---------|
 | **(default)** | Scan if no fresh report → backup main → parallel lanes for P0 gaps → fill → prove → PR → **merge** each green lane |
-| `resume` / `from-report` | Skip scan; use existing `$AGENT_DOCS/REPORT.md` (+ FEATURES.md via CURRENT/run-id; migrate legacy if needed) |
+| `resume` / `from-report` | Skip scan; use the find-missing-tests `REPORT.md` + `FEATURES.md` (its `CURRENT` or a run-id). `resume` also continues the last `SHIP.md` |
 | `residual-only` | Only features listed under residual / still-missing in the report |
 | `scan-only` | Only run `find-missing-tests` scan; stop (no lanes) |
 | `no-merge` | Open PRs only; human merges |
@@ -94,7 +94,7 @@ If the user does **not** say headed/visible/ui → **headless**.
 1. Repo root (cwd or path). Default branch from `origin/HEAD`. Dirty unrelated main → stop or isolate.
 2. Read `AGENTS.md`, `PROJECT.md`/`CONTEXT.md`, `CODE-STYLE.md`, package scripts, e2e setup docs.
 3. Detect unit / e2e commands via **`find-missing-tests`** discovery rules.
-4. Detect existing run via `docs/agent/test-gap/CURRENT` → `$AGENT_DOCS/REPORT.md` / `FEATURES.md` (or legacy flat/root `TEST-GAP-*.md` to migrate) / open branch from a prior `find-missing-tests` run.
+4. Detect earlier runs: `docs/agent/ship-missing-tests/CURRENT` → `SHIP.md`; `docs/agent/find-missing-tests/CURRENT` → `REPORT.md` / `FEATURES.md`; or an open branch from a prior `find-missing-tests` run.
 
 ### 1. Gap matrix (scan or resume)
 
@@ -128,22 +128,22 @@ For each selected feature, **`run-tasks-in-parallel` setup-lanes** (via `clean-r
 
 | Item | Value |
 |------|--------|
-| Worktree | `REPO/.worktrees/test-gap-<slug>/` |
+| Worktree | `REPO/.worktrees/missing-tests-<slug>/` |
 | Branch | `test/<issue>-gap-<slug>` |
-| Issue | Title: `test-gap: <feature id>`; body = missing list from report + acceptance “tests would fail if behavior deleted”; label if useful |
+| Issue | Title: `missing tests: <feature id>`; body = missing list from report + acceptance “tests would fail if behavior deleted”; label if useful |
 | Brief | `LANE-BRIEF.md` with mandate below |
 | Host | A / B / C from step 2 |
 
 #### Per-lane mandate (every LANE-BRIEF.md)
 
 ```markdown
-# Lane: test-gap <feature_id>
+# Lane: missing tests <feature_id>
 You own ONLY these path globs: <globs>
 Issue: #<n>
 Base backup: <backup branch> @ <sha>
 Default branch: <main>
-Report source: $AGENT_DOCS/REPORT.md section for this feature
-AGENT_DOCS: docs/agent/test-gap/<run-id>/
+Report source: docs/agent/find-missing-tests/<report-run-id>/REPORT.md section for this feature
+AGENT_DOCS: docs/agent/ship-missing-tests/<run-id>/
 
 ## Job
 1. Load skill **find-missing-tests** fill rules for YOUR feature only (TDD red→green).
@@ -203,8 +203,8 @@ mode: full | resume | residual-only | scan-only | no-merge
 headless: true | false
 backup: <branch> @ <sha>
 run_id: <YYYY-MM-DDTHHMMSSZ>
-report: docs/agent/test-gap/<run-id>/REPORT.md
-campaign: docs/agent/test-gap/<run-id>/SHIP.md
+report: docs/agent/find-missing-tests/<report-run-id>/REPORT.md
+campaign: docs/agent/ship-missing-tests/<run-id>/SHIP.md
 waves: N
 lanes:
   - feature | issue | worktree | branch | pr | unit | e2e | confidence | merge

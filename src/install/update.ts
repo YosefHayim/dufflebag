@@ -6,7 +6,7 @@ import {
   agentChoiceSchema,
   configurationChoiceSchema,
   errorMessage,
-  installRequestSchema,
+  type InstallRequest,
   interactionSchema,
   platformRequirementSchema,
   preparedPackageSchema,
@@ -79,10 +79,7 @@ export const update = (input: unknown) =>
 
     // A preserved selection reuses the receipt's features only; agents always come from the request.
     const featureIds = request.features._tag === "preserve" ? receiptSnapshot.receipt.features : request.features.ids;
-    const installRequest = yield* decodeStrictly(installRequestSchema)({
-      ...request,
-      features: { _tag: "selected", ids: featureIds },
-    });
+    const installRequest: InstallRequest = { ...request, features: { _tag: "selected", ids: featureIds } };
     const installSummary = yield* syncInstall({ request: installRequest, receiptSnapshot });
     const updateSummary: UpdateSummary = {
       ...installSummary,

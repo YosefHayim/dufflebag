@@ -12,8 +12,8 @@
 # exclude-newer = "2026-07-30T00:00:00Z"
 # ///
 
-"""Warm Supertonic TTS for the Rust voice worker: `prepare` loads the models once and exits;
-`serve` is a long-lived JSON-lines server that streams speech chunk by chunk."""
+"""Warm Supertonic TTS for the Rust voice worker: `serve` loads the models once, then answers
+JSON lines and streams speech chunk by chunk."""
 
 from __future__ import annotations
 
@@ -137,14 +137,9 @@ def speak(text: str, voice: str, speed: float) -> str:
     return _done("completed")
 
 
-def prepare(voice: str) -> dict[str, str]:
-    tts_runtime(voice)
-    return {"narration": "ready", "voice": _voice_name(voice)}
-
-
 def serve(default_voice: str) -> int:
     try:
-        prepare(default_voice)
+        tts_runtime(default_voice)
     except Exception as error:
         emit({"event": "error", "message": str(error)})
         return 1
@@ -175,11 +170,6 @@ def serve(default_voice: str) -> int:
             _done("stopped")
         elif cmd == "ping":
             emit({"event": "pong"})
-        elif cmd == "prepare":
-            try:
-                emit({"event": "ready", **prepare(voice)})
-            except Exception as error:
-                emit({"event": "error", "message": str(error)})
         elif cmd == "speak":
             text = str(message.get("text", ""))
             speed = float(message.get("speed", 1.15))
@@ -195,14 +185,8 @@ def serve(default_voice: str) -> int:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Dufflebag Supertonic TTS server")
-    commands = parser.add_subparsers(dest="command", required=True)
-    for name in ("prepare", "serve"):
-        commands.add_parser(name).add_argument("--voice", default="F4")
-    args = parser.parse_args()
-    if args.command == "prepare":
-        print(json.dumps(prepare(args.voice)), flush=True)
-        return 0
-    return serve(args.voice)
+    parser.add_subparsers(dest="command", required=True).add_parser("serve").add_argument("--voice", default="F4")
+    return serve(parser.parse_args().voice)
 
 
 if __name__ == "__main__":

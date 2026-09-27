@@ -37,7 +37,7 @@ Use this as a quick lookup. Prefer **one primary** skill.
 | launch local, playwright, e2e, don’t deploy | `run-local-and-check` |
 | scan/fill missing unit mocks e2e per feature (TDD) | `find-missing-tests` |
 | over-engineering kill list + TDD parity + headless e2e | `simplify-repo-with-tests` |
-| test-gap campaign worktrees PRs merge | `ship-missing-tests` |
+| missing tests campaign worktrees PRs merge | `ship-missing-tests` |
 | redeploy, is live, production smoke | `deploy-and-check` |
 | /fix-bug, reproduce then fix, fix these bugs | `fix-bug` |
 
@@ -67,19 +67,20 @@ Use this as a quick lookup. Prefer **one primary** skill.
 
 Campaign / audit MD is **not** product SSOT. Skills must write under **`docs/agent/<campaign>/<run-id>/`** (UTC `date -u +%Y-%m-%dT%H%M%SZ`; create if missing; set `CURRENT` pointer), never:
 
-- root `TEST-GAP-*.md`, `LEAN-PROVE-*.md`, `*AUDIT*.md`, campaign boards
+- the repository root (reports, audits, campaign boards)
 - fixed flat paths like `docs/agent/<campaign>/BOARD.md` that parallel agents overwrite
 - product **`docs/agents/`** (plural — issue-tracker / triage / domain)
 
 | Campaign | Dir |
 |----------|-----|
-| sdlc-tasks | `docs/agent/sdlc-tasks/<run-id>/` |
-| test-gap / ship-missing-tests | `docs/agent/test-gap/<run-id>/` |
+| run-tasks-in-parallel | `docs/agent/run-tasks-in-parallel/<run-id>/` |
+| find-missing-tests | `docs/agent/find-missing-tests/<run-id>/` |
+| ship-missing-tests | `docs/agent/ship-missing-tests/<run-id>/` |
 | simplify-repo-with-tests | `docs/agent/simplify-repo-with-tests/<run-id>/` |
-| style audit | `docs/agent/style-audit/<run-id>/` |
-| messy-repo matrix | `docs/agent/messy-repo/<run-id>/` |
-| ux-journey | `docs/agent/ux-journey/<run-id>/` |
-| benchmark | `docs/agent/benchmark/<run-id>/` |
+| code-style-existing-project | `docs/agent/code-style-existing-project/<run-id>/` |
+| clean-repo-by-feature | `docs/agent/clean-repo-by-feature/<run-id>/` |
+| improve-ux | `docs/agent/improve-ux/<run-id>/` |
+| benchmark-agents | `docs/agent/benchmark-agents/<run-id>/` |
 | TEACH (stack grill) | `docs/learning/TEACH.md` |
 
 Root stays for: README, AGENTS, CODE-STYLE, PROJECT, CONTEXT, LANGUAGE.

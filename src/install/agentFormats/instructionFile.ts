@@ -5,7 +5,6 @@ import { type AgentDefinition, agentCatalog, agentIdSchema } from "../../catalog
 import { installedSkillSchema } from "../../catalog/featureCatalog.js";
 import { bytesEqual, hashBytes } from "../fileBytes.js";
 import { fileKindSchema, fileOwnerSchema, managedBlockOwnershipSchema, relativePathSchema } from "../ownership.js";
-import { isCatalogSkill } from "./catalogChecks.js";
 import { controlScriptSchema, fillControlScript, stripFrontmatter, withCompleteFrontmatter } from "./skillText.js";
 
 const startMarker = "<!-- dufflebag:skills start -->";
@@ -46,10 +45,6 @@ const agentIdsMatchPath = (agentIds: ReadonlyArray<string>, path: string): boole
 
     return agent !== undefined && instructionPath(agent) === path;
   });
-
-// Codex once owned AGENTS.md directly, so its receipts must still be restorable.
-const previousAgentIdsMatchPath = (agentIds: ReadonlyArray<string>, path: string): boolean =>
-  agentIds.every((agentId) => agentIdsMatchPath([agentId], path) || (agentId === "codex" && path === "AGENTS.md"));
 
 const concatenateBytes = (parts: ReadonlyArray<Uint8Array>): Uint8Array => {
   const bytes = new Uint8Array(parts.reduce((total, part) => total + part.byteLength, 0));
@@ -111,14 +106,9 @@ const inspectManagedBlock = (bytes: Uint8Array): Either.Either<CurrentBlock, Ins
 };
 
 const instructionSkillSchema = Schema.Struct({
-  installedSkill: installedSkillSchema.pipe(
-    Schema.filter(isCatalogSkill, {
-      message: () => "Instruction-file installed skills must exactly match the decoded feature catalog.",
-    }),
-    Schema.annotations({
-      description: "Catalog-owned installed skill rendered into the managed instruction block.",
-    }),
-  ),
+  installedSkill: installedSkillSchema.annotations({
+    description: "Catalog-owned installed skill rendered into the managed instruction block.",
+  }),
   markdown: withCompleteFrontmatter(Schema.NonEmptyString).annotations({
     description: "Complete installed SKILL.md text before frontmatter removal and control-path substitution.",
   }),
@@ -207,7 +197,8 @@ const ownedInstructionFileSchema = Schema.Struct({
 
 type OwnedInstructionFile = Schema.Schema.Type<typeof ownedInstructionFileSchema>;
 
-const instructionOperationSchema = Schema.Union(
+const instructionFilePlanSchema = Schema.Union(
+  Schema.TaggedStruct("none", {}),
   Schema.TaggedStruct("write", {
     file: ownedInstructionFileSchema,
     bytes: Schema.Uint8ArrayFromSelf.annotations({
@@ -222,73 +213,18 @@ const instructionOperationSchema = Schema.Union(
   }),
   Schema.TaggedStruct("remove", {
     file: ownedInstructionFileSchema,
-    unownedBytes: Schema.Uint8ArrayFromSelf.pipe(
-      Schema.filter((bytes) => bytes.byteLength === 0, {
-        message: () => "Instruction-file removal requires no remaining unowned bytes.",
-      }),
-    ),
-  }).pipe(
-    Schema.filter((operation) =>
-      operation.file.ownership.filePreviouslyPresent
-        ? {
-            path: ["file", "ownership", "filePreviouslyPresent"],
-            message: "A pre-existing instruction file must be restored instead of removed.",
-          }
-        : undefined,
-    ),
-  ),
-).pipe(
-  Schema.filter((operation) => {
-    const ownership = operation.file.ownership;
-    const ownerMatchesPath = operation._tag === "write" ? agentIdsMatchPath : previousAgentIdsMatchPath;
-    const identityIssues = [
-      ownerMatchesPath(operation.file.owner.agentIds, operation.file.path)
-        ? undefined
-        : { path: ["file", "owner"], message: "Instruction plan owners must consume the file path from the catalog." },
-      ownership.startMarker === startMarker && ownership.endMarker === endMarker
-        ? undefined
-        : {
-            path: ["file", "ownership"],
-            message: "Instruction ownership must use the canonical managed-block markers.",
-          },
-    ];
-    if (operation._tag !== "write") {
-      return identityIssues;
-    }
-
-    const block = inspectManagedBlock(operation.bytes);
-    if (Either.isLeft(block) || block.right._tag === "missing") {
-      return [
-        ...identityIssues,
-        { path: ["bytes"], message: "Instruction writes must contain exactly one valid managed block." },
-      ];
-    }
-
-    return [
-      ...identityIssues,
-      hashBytes(operation.bytes.slice(block.right.bodyStart, block.right.bodyEnd)) === ownership.installedBodyHash
-        ? undefined
-        : {
-            path: ["file", "ownership", "installedBodyHash"],
-            message: "Instruction ownership hash must match the exact managed body bytes.",
-          },
-    ];
+    unownedBytes: Schema.Uint8ArrayFromSelf.annotations({
+      description: "Empty bytes proving the file held nothing but the managed block.",
+    }),
   }),
 );
-
-export const instructionFilePlanSchema = Schema.Union(Schema.TaggedStruct("none", {}), instructionOperationSchema);
 
 export type InstructionFilePlan = Schema.Schema.Type<typeof instructionFilePlanSchema>;
 
 const presentInstructionSchema = Schema.TaggedStruct("present", {
-  agentIds: Schema.NonEmptyArray(agentIdSchema).pipe(
-    Schema.filter((agentIds) => Schema.is(fileOwnerSchema)({ _tag: "agent", agentIds }), {
-      message: () => "Instruction agents must be unique and use exact catalog order.",
-    }),
-    Schema.annotations({
-      description: "Catalog-ordered agents that share the desired instruction path.",
-    }),
-  ),
+  agentIds: Schema.NonEmptyArray(agentIdSchema).annotations({
+    description: "Catalog-ordered agents that share the desired instruction path.",
+  }),
   skills: Schema.NonEmptyArray(instructionSkillSchema).pipe(
     Schema.filter((skills) => skills.length === new Set(skills.map((skill) => skill.installedSkill.id)).size, {
       message: () => "Instruction-file installed skills must be unique.",
@@ -332,21 +268,13 @@ const instructionFileRequestFieldsSchema = Schema.Struct({
 type InstructionFileRequestFields = Schema.Schema.Type<typeof instructionFileRequestFieldsSchema>;
 
 const requestIssues = (request: InstructionFileRequestFields) => {
-  const desiredIssue =
-    request.desired._tag === "absent" || agentIdsMatchPath(request.desired.agentIds, request.path)
-      ? undefined
-      : {
-          path: ["desired", "agentIds"],
-          message: "Every desired agent must consume the exact shared instruction path from the catalog.",
-        };
   if (request.previousFile._tag === "missing") {
-    return [desiredIssue];
+    return [];
   }
 
   const previousFile = request.previousFile.file;
 
   return [
-    desiredIssue,
     previousFile.path === request.path
       ? undefined
       : {
@@ -359,7 +287,7 @@ const requestIssues = (request: InstructionFileRequestFields) => {
           path: ["previousFile", "file", "ownership"],
           message: "Prior instruction ownership must use the canonical managed-block markers.",
         },
-    previousAgentIdsMatchPath(previousFile.owner.agentIds, request.path)
+    agentIdsMatchPath(previousFile.owner.agentIds, request.path)
       ? undefined
       : {
           path: ["previousFile", "file", "owner"],
@@ -374,11 +302,6 @@ const requestIssues = (request: InstructionFileRequestFields) => {
 const instructionFileRequestSchema = instructionFileRequestFieldsSchema.pipe(Schema.filter(requestIssues));
 
 type InstructionFileRequest = Schema.Schema.Type<typeof instructionFileRequestSchema>;
-
-const validateInstructionPlan = (input: unknown): Either.Either<InstructionFilePlan, InstructionFilePlanError> =>
-  Either.mapLeft(Schema.decodeUnknownEither(instructionFilePlanSchema, { onExcessProperty: "error" })(input), (error) =>
-    planError(`generated operation is invalid: ${SchemaParseIssue.TreeFormatter.formatErrorSync(error)}`),
-  );
 
 // A block dufflebag wrote earlier may be replaced or removed only while its body still hashes to the receipt.
 const receiptedOwnership = (request: InstructionFileRequest, block: ManagedBlock) => {
@@ -455,7 +378,7 @@ const planInstructionWrite = (input: {
           },
         };
 
-        return validateInstructionPlan({ _tag: "write", file, bytes });
+        return Either.right({ _tag: "write", file, bytes });
       },
     ),
   );
@@ -465,7 +388,7 @@ const planInstructionRemoval = (
   currentBlock: CurrentBlock,
 ): Either.Either<InstructionFilePlan, InstructionFilePlanError> => {
   if (request.previousFile._tag === "missing") {
-    return validateInstructionPlan({ _tag: "none" });
+    return Either.right({ _tag: "none" });
   }
 
   if (request.currentFile._tag === "missing" || currentBlock._tag === "missing") {
@@ -476,17 +399,17 @@ const planInstructionRemoval = (
   const currentBytes = request.currentFile.bytes;
 
   return Either.flatMap(receiptedOwnership(request, currentBlock), ({ filePreviouslyPresent }) =>
-    Either.flatMap(stripReceiptedBlock({ currentBytes, block: currentBlock, filePreviouslyPresent }), (unownedBytes) =>
-      validateInstructionPlan(
+    Either.map(
+      stripReceiptedBlock({ currentBytes, block: currentBlock, filePreviouslyPresent }),
+      (unownedBytes): InstructionFilePlan =>
         !filePreviouslyPresent && unownedBytes.byteLength === 0
           ? { _tag: "remove", file, unownedBytes }
           : { _tag: "restore", file, bytes: unownedBytes },
-      ),
     ),
   );
 };
 
-// Plan one shared instruction path: a write, restoration, removal, or no-op, validated before it is returned.
+// Plan one shared instruction path: a write, restoration, removal, or no-op.
 export const planInstructionFile = (input: unknown): Either.Either<InstructionFilePlan, InstructionFilePlanError> =>
   Either.mapLeft(
     Schema.decodeUnknownEither(instructionFileRequestSchema, { onExcessProperty: "error" })(input),
@@ -494,7 +417,7 @@ export const planInstructionFile = (input: unknown): Either.Either<InstructionFi
   ).pipe(
     Either.flatMap((request) => {
       if (request.desired._tag === "absent" && request.previousFile._tag === "missing") {
-        return validateInstructionPlan({ _tag: "none" });
+        return Either.right({ _tag: "none" });
       }
 
       const currentBytes = request.currentFile._tag === "missing" ? new Uint8Array() : request.currentFile.bytes;

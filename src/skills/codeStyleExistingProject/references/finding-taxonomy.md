@@ -26,7 +26,6 @@ Use these IDs and severities so mechanical reports stay comparable across repos.
 
 - `docs.missing` — expected instruction file not found
 - `docs.contradiction` — parent vs nested instruction conflict
-- `docs.orphan-rule` — rule in JSON with no CODE-STYLE card (or reverse)
 - `docs.stale-path` — doc names paths that do not exist
 
 ### `naming.*`

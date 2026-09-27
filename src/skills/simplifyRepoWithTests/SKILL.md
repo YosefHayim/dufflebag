@@ -24,8 +24,7 @@ Never write lean/campaign markdown at the **repository root**. Never use a fixed
 
 1. **New run:** `RUN_ID=$(date -u +%Y-%m-%dT%H%M%SZ)`; `AGENT_DOCS=docs/agent/simplify-repo-with-tests/$RUN_ID`; `mkdir -p "$AGENT_DOCS"`; write `CURRENT`.
 2. **Resume:** resolve `CURRENT` / explicit run-id; update in place (do not mint a new run-id).
-3. Migrate legacy root `LEAN-PROVE-*.md` or flat campaign files into a run dir; remove root copies.
-4. Shared rules: [references/agent-artifacts.md](references/agent-artifacts.md).
+3. Shared rules: [references/agent-artifacts.md](references/agent-artifacts.md).
 
 ## Skill map (do not invent siblings)
 

@@ -2,8 +2,7 @@
 
 import { Either, Schema, ParseResult as SchemaParseIssue } from "effect";
 
-import { agentCatalog, agentDefinitionSchema } from "../../catalog/agentCatalog.js";
-import { decodeStrictText } from "../fileBytes.js";
+import { agentDefinitionSchema } from "../../catalog/agentCatalog.js";
 import {
   fileKindSchema,
   fileOwnerSchema,
@@ -13,13 +12,12 @@ import {
   type YamlSequenceValueOwnership,
   yamlSequenceValueOwnershipSchema,
 } from "../ownership.js";
-import { isCatalogAgent } from "./catalogChecks.js";
-import { addJsonRule, jsonRulesOwnershipIsValid, jsonRulesWriteMatches, removeJsonRule } from "./jsonRulesLink.js";
-import { addYamlRead, removeYamlRead, yamlReadHasReference } from "./yamlReadLink.js";
+import { addJsonRule, jsonRulesOwnershipIsValid, removeJsonRule } from "./jsonRulesLink.js";
+import { addYamlRead, removeYamlRead } from "./yamlReadLink.js";
 
 class InstructionLinkPlanError extends Schema.TaggedError<InstructionLinkPlanError>()("InstructionLinkPlanError", {
   issue: Schema.NonEmptyString.annotations({
-    description: "Actionable request, native configuration, or correlated-plan validation issue.",
+    description: "Actionable request or native configuration issue.",
   }),
 }) {
   get message(): string {
@@ -62,15 +60,9 @@ const instructionLinkRequestFieldsSchema = Schema.Struct({
   agent: Schema.Struct({
     ...agentDefinitionSchema.fields,
     target: agentDefinitionSchema.fields.target.members[3],
-  })
-    .pipe(
-      Schema.filter(isCatalogAgent, {
-        message: () => "Instruction-link agents must exactly match the decoded agent catalog.",
-      }),
-    )
-    .annotations({
-      description: "Exact catalog agent whose target defines the native config path, reference, and format.",
-    }),
+  }).annotations({
+    description: "Exact catalog agent whose target defines the native config path, reference, and format.",
+  }),
   desired: Schema.Union(Schema.TaggedStruct("present", {}), Schema.TaggedStruct("absent", {})).annotations({
     description: "Whether this exact native reference must be present or restored away.",
   }),
@@ -145,7 +137,8 @@ const instructionLinkRequestSchema = instructionLinkRequestFieldsSchema.pipe(Sch
 
 type InstructionLinkRequest = Schema.Schema.Type<typeof instructionLinkRequestSchema>;
 
-const instructionLinkOperationSchema = Schema.Union(
+const instructionLinkPlanSchema = Schema.Union(
+  Schema.TaggedStruct("none", {}),
   instructionLinkWriteSchema,
   Schema.TaggedStruct("restore", {
     file: ownedInstructionLinkSchema,
@@ -155,94 +148,11 @@ const instructionLinkOperationSchema = Schema.Union(
   }),
   Schema.TaggedStruct("remove", {
     file: ownedInstructionLinkSchema,
-    unownedBytes: Schema.Uint8ArrayFromSelf.pipe(
-      Schema.filter((bytes) => bytes.byteLength === 0, {
-        message: () => "Native config removal requires no remaining unowned bytes.",
-      }),
-    ),
-  }).pipe(
-    Schema.filter((operation) => {
-      const ownership = operation.file.ownership;
-      const ownedWholeCreatedFile =
-        !ownership.filePreviouslyPresent &&
-        (ownership._tag === "jsonValues"
-          ? ownership.values.every((value) => value.previous._tag === "missing")
-          : !ownership.previouslyPresent);
-
-      return ownedWholeCreatedFile
-        ? undefined
-        : {
-            path: ["file", "ownership"],
-            message: "Native config removal requires proof that no prior file or owned member must be restored.",
-          };
+    unownedBytes: Schema.Uint8ArrayFromSelf.annotations({
+      description: "Empty bytes proving the file held nothing but the native reference.",
     }),
-  ),
-).pipe(
-  Schema.filter((operation) => {
-    const target = agentCatalog.find((candidate) => candidate.id === operation.file.owner.agentIds[0])?.target;
-    const ownership = operation.file.ownership;
-
-    return [
-      operation.file.owner.agentIds.length === 1
-        ? undefined
-        : { path: ["file", "owner"], message: "Native references require exactly one catalog agent owner." },
-      target?._tag === "instructionLink" && target.configPath === operation.file.path
-        ? undefined
-        : { path: ["file", "path"], message: "Native-reference owner and path must match the decoded agent catalog." },
-      target?._tag !== "instructionLink" ||
-      (target.referenceFormat === "yamlReadArray" && ownership._tag === "yamlSequenceValue") ||
-      (target.referenceFormat === "jsonRulesArray" && ownership._tag === "jsonValues")
-        ? undefined
-        : { path: ["file", "ownership"], message: "Native-reference ownership must match the catalog format." },
-      target?._tag !== "instructionLink" ||
-      ownership._tag !== "yamlSequenceValue" ||
-      (ownership.key === "read" && ownership.reference === target.instructionPath)
-        ? undefined
-        : {
-            path: ["file", "ownership"],
-            message: "Aider ownership must match the catalog read key and instruction path.",
-          },
-      ownership._tag !== "jsonValues" || jsonRulesOwnershipIsValid(ownership)
-        ? undefined
-        : {
-            path: ["file", "ownership"],
-            message: "Continue ownership must contain one /rules pointer with missing or string-array history.",
-          },
-    ];
-  }),
-  // A write must contain exactly the reference its ownership records.
-  Schema.filter((operation) => {
-    if (operation._tag !== "write") {
-      return undefined;
-    }
-
-    const ownership = operation.file.ownership;
-    if (ownership._tag === "jsonValues") {
-      const owner = agentCatalog.find((candidate) => candidate.id === operation.file.owner.agentIds[0]);
-      const matches = jsonRulesWriteMatches({
-        bytes: operation.bytes,
-        configPath: operation.file.path,
-        instructionPath: owner?.target._tag === "instructionLink" ? owner.target.instructionPath : undefined,
-        ownership,
-      });
-
-      return matches
-        ? undefined
-        : { path: ["file", "ownership"], message: "Continue ownership must hash the exact desired /rules value." };
-    }
-
-    const source = decodeStrictText(operation.bytes, operation.file.path);
-    if (Either.isLeft(source)) {
-      return { path: ["bytes"], message: "Aider write bytes must be strict UTF-8." };
-    }
-
-    return yamlReadHasReference({ source: source.right, ownership })
-      ? undefined
-      : { path: ["file", "ownership"], message: "Aider ownership must match the exact desired read reference." };
   }),
 );
-
-export const instructionLinkPlanSchema = Schema.Union(Schema.TaggedStruct("none", {}), instructionLinkOperationSchema);
 
 export type InstructionLinkPlan = Schema.Schema.Type<typeof instructionLinkPlanSchema>;
 
@@ -301,7 +211,9 @@ const unownedBytes = (request: InstructionLinkRequest, ownership: LinkOwnership)
   }
 };
 
-const planReferenceChange = (request: InstructionLinkRequest): Either.Either<unknown, InstructionLinkPlanError> => {
+const planReferenceChange = (
+  request: InstructionLinkRequest,
+): Either.Either<InstructionLinkPlan, InstructionLinkPlanError> => {
   if (request.desired._tag === "present") {
     return addReference(request);
   }
@@ -314,7 +226,7 @@ const planReferenceChange = (request: InstructionLinkRequest): Either.Either<unk
 
   return Either.mapBoth(unownedBytes(request, file.ownership), {
     onLeft: linkIssue,
-    onRight: (bytes) =>
+    onRight: (bytes): InstructionLinkPlan =>
       bytes.byteLength === 0 && !file.ownership.filePreviouslyPresent
         ? { _tag: "remove", file, unownedBytes: bytes }
         : { _tag: "restore", file, bytes },
@@ -325,12 +237,4 @@ export const planInstructionLink = (input: unknown): Either.Either<InstructionLi
   Either.mapLeft(
     Schema.decodeUnknownEither(instructionLinkRequestSchema, { onExcessProperty: "error" })(input),
     toLinkError,
-  ).pipe(
-    Either.flatMap(planReferenceChange),
-    Either.flatMap((plan) =>
-      Either.mapLeft(
-        Schema.decodeUnknownEither(instructionLinkPlanSchema, { onExcessProperty: "error" })(plan),
-        toLinkError,
-      ),
-    ),
-  );
+  ).pipe(Either.flatMap(planReferenceChange));

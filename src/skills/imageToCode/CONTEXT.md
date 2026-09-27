@@ -42,15 +42,6 @@ Use these terms consistently in issues, refactors, test names, and agent output:
 | **fidelity bar** | Strict 1:1 (diff is hard gate) vs inspired-by (diff is loose guide) |
 | **crux test** | Seek each moving part to rotation extremes; joint must not gap or ghost |
 
-## Robot case study — worked decisions
-
-These decisions are reference examples, not universal rules:
-
-- **Wrist rock, not elbow sweep** — for a hand already raised palm-forward, the natural "hello" is the hand rocking at the wrist while the forearm stays planted in the base layer.
-- **Blob layer behind trace** — pale lavender cloud (#f4edfd) vs page white falls under pixelmatch threshold; rebuild from source PNG with `extract-blob` and draw behind the figure.
-- **Hand clip-path** — mask-traced hand carries a pale margin that swings as a ghost when rotated; clip the wave group to a flood-filled hand silhouette instead of dropping paths by color.
-- **Aurora at opacity 0** — drifting glows rest invisible so frozen/reduced-motion views match the still PNG exactly.
-
 ## ADRs
 
 Architectural decisions for this skill live in `docs/adr/` when recorded. Read relevant ADRs before contradicting past choices.

@@ -81,10 +81,10 @@ export const configSchema = Schema.Struct({
     title: "speech rate (words per minute)",
     description: "Speech rate for read-aloud replies, in words per minute.",
   }),
-  speechMode: withDefault(trimmed(Schema.Literal("auto", "focused", "immediate", "off")), "auto").annotations({
+  speechMode: withDefault(trimmed(Schema.Literal("auto", "immediate", "off")), "auto").annotations({
     title: "speech mode",
     description:
-      "When agent replies are read aloud: auto waits for the originating Cmux surface and speaks at once elsewhere; focused, immediate, or off.",
+      "When agent replies are read aloud: auto holds a Cmux reply until its surface is focused and Cmux is in front, and speaks other replies at once; immediate speaks every reply at once; off reads nothing.",
   }),
   refineMode: withDefault(trimmed(Schema.Literal("off", "clipboard", "dictation", "both")), "off").annotations({
     title: "refine mode",
