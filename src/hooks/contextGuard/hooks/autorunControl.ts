@@ -14,7 +14,7 @@ import { resolveSessionId, sumTokens } from "../lib/sessionTranscript.js";
 import { autorunFile, KILL_SWITCH, readInt, readText, remove, writeText } from "../lib/stateFiles.js";
 
 const DEFAULT_BUDGET = readConfig().autorunDefaultCycles;
-const RATE_LIMITS_FILE = path.join(homedir(), ".claude", ".last-rate-limits.json");
+const RATE_LIMITS_FILE = path.join(homedir(), ".claude", "dufflebag", "state", "rate-limits.json");
 
 const HALT_REASONS: Record<string, string> = {
   "budget-reached": "cycle budget reached",

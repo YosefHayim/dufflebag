@@ -5,7 +5,7 @@ import { spawnSync } from "node:child_process";
 
 import { FileSystem, Path } from "@effect/platform";
 import type { PlatformError } from "@effect/platform/Error";
-import { Effect, Schema } from "effect";
+import { Effect, Option, Schema } from "effect";
 
 import { featureCatalog } from "../catalog/featureCatalog.js";
 import { errorMessage, type preparedPackageSchema } from "./installRequest.js";
@@ -130,6 +130,29 @@ const buildVoiceWorker = (packageRoot: string) =>
     });
   });
 
+// A worker binary older than any file in its crate would ship old code, so it is rebuilt.
+// A published package has no crate beside the binary and keeps its prebuilt worker.
+const voiceWorkerIsStale = (binary: string) =>
+  Effect.gen(function* () {
+    const fileSystem = yield* FileSystem.FileSystem;
+    const path = yield* Path.Path;
+    const crate = path.join(path.dirname(binary), "worker");
+    if (!(yield* fileSystem.exists(crate))) {
+      return false;
+    }
+    const builtAt = Option.getOrElse((yield* fileSystem.stat(binary)).mtime, () => new Date(0));
+    const sources = (yield* fileSystem.readDirectory(crate, { recursive: true })).filter(
+      (file) => !file.startsWith("target"),
+    );
+    for (const file of sources) {
+      const sourceFile = yield* fileSystem.stat(path.join(crate, file));
+      if (sourceFile.type === "File" && Option.getOrElse(sourceFile.mtime, () => new Date(0)) > builtAt) {
+        return true;
+      }
+    }
+    return false;
+  });
+
 const ensureShippedRuntimeSource = (input: {
   source: string;
   shippedPath: string;
@@ -138,10 +161,11 @@ const ensureShippedRuntimeSource = (input: {
 }) =>
   Effect.gen(function* () {
     const fileSystem = yield* FileSystem.FileSystem;
-    if (yield* fileSystem.exists(input.source)) {
+    const isVoiceWorker = input.shippedPath === "dufflebag-voice";
+    if ((yield* fileSystem.exists(input.source)) && !(isVoiceWorker && (yield* voiceWorkerIsStale(input.source)))) {
       return;
     }
-    if (input.shippedPath === "dufflebag-voice") {
+    if (isVoiceWorker) {
       yield* buildVoiceWorker(input.packageRoot);
     }
     if (yield* fileSystem.exists(input.source)) {

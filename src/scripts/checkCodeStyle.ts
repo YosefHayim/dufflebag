@@ -11,14 +11,15 @@ type CodeStyleViolation = {
   message: string;
 };
 
-// Skill payload is written for other repositories, so only the naming and `??` rules reach it;
-// root config files answer only to the `??` rule, as they did under Biome.
-type FileKind = "application" | "hook" | "tooling" | "skill" | "root";
+// Copied files (skill payload, status-line presets) run outside this app, so only the naming and `??`
+// rules reach them; root config files answer only to the `??` rule, as they did under Biome.
+type FileKind = "application" | "hook" | "tooling" | "copied" | "root";
 
 const KIND_BY_PREFIX: ReadonlyArray<readonly [string, FileKind]> = [
   ["src/scripts/", "tooling"],
   ["src/hooks/", "hook"],
-  ["src/skills/", "skill"],
+  ["src/skills/", "copied"],
+  ["src/statuslines/", "copied"],
   ["src/", "application"],
 ];
 
@@ -443,7 +444,7 @@ const NODE_RULES: ReadonlyArray<NodeRule> = [
   },
   {
     ruleId: "name.domain-specific",
-    kinds: [...MAINTAINED, "skill"],
+    kinds: [...MAINTAINED, "copied"],
     message: (node) => `Rename "${node.getText()}" for the domain value or job it represents.`,
     matches: ({ node }) => ts.isIdentifier(node) && isBindingName(node) && hasForbiddenNameToken(node.text),
   },
@@ -473,7 +474,7 @@ const NODE_RULES: ReadonlyArray<NodeRule> = [
   },
   {
     ruleId: "syntax.no-nullish",
-    kinds: [...MAINTAINED, "skill", "root"],
+    kinds: [...MAINTAINED, "copied", "root"],
     message: "Decode absence and defaults at the owning boundary instead of using `??`.",
     matches: ({ node, file }) =>
       ts.isBinaryExpression(node) &&
