@@ -16,6 +16,7 @@ const expectedFeatureIds = [
   "autorun",
   "voice",
   "duplicate-code-guard",
+  "scratch-folder-guard",
   "image-to-code",
   "github-repo-about",
   "write-blog-post",
@@ -69,6 +70,7 @@ const expectedSourceDirectories = [
   "autorun",
   "voice",
   "duplicateCodeGuard",
+  "scratchFolderGuard",
   "imageToCode",
   "githubRepoAbout",
   "writeBlogPost",
@@ -178,7 +180,7 @@ describe("featureCatalog", () => {
   });
 
   it("derives defaults, installed skills, and exact shipped allowlists", () => {
-    expect(defaultFeatureIds).toEqual(["context-guard"]);
+    expect(defaultFeatureIds).toEqual(["context-guard", "scratch-folder-guard"]);
     expect(skillsForFeatures(["context-guard", "voice", "duplicate-code-guard"])).toEqual([]);
     expect(
       skillsForFeatures(featureCatalog.map((feature) => feature.id)).map((skill) => [skill.id, skill.shippedPaths]),
@@ -365,6 +367,26 @@ describe("featureCatalog", () => {
             event: "PreToolUse",
             matcher: { _tag: "pattern", value: "Write|Edit|MultiEdit" },
             entrypoint: { _tag: "featureDefault" },
+            readsAgentId: false,
+          },
+        ],
+      },
+      {
+        id: "scratch-folder-guard",
+        platform: "any",
+        sourceEntrypoint: "hooks/scratchFolderGuard.ts",
+        shippedPaths: [],
+        registrations: [
+          {
+            event: "PreToolUse",
+            matcher: { _tag: "none" },
+            entrypoint: { _tag: "featureDefault" },
+            readsAgentId: false,
+          },
+          {
+            event: "SessionEnd",
+            matcher: { _tag: "none" },
+            entrypoint: { _tag: "path", value: "hooks/clearSessionScratch.ts" },
             readsAgentId: false,
           },
         ],
