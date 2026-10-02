@@ -9,7 +9,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { readConfig } from "../../lib/hookConfig.js";
-import { isProcessAlive } from "../lib/processAlive.js";
+import { isProcessAlive } from "../../lib/processAlive.js";
 import { resolveSessionId, sumTokens } from "../lib/sessionTranscript.js";
 import { autorunFile, KILL_SWITCH, readInt, readText, remove, writeText } from "../lib/stateFiles.js";
 

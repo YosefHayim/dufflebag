@@ -29,7 +29,7 @@ export const environmentVariables = Schema.decodeUnknownSync(Schema.Array(enviro
     name: "DUFFLEBAG_AGENT_ID",
     defaultValue: "set by dufflebag in hook commands",
     purpose:
-      "Which agent ran a hook (claude-code, codex, grok). Install writes DUFFLEBAG_AGENT_ID=<agent> in front of the hook commands that read it: idle compact and voice.",
+      "Which agent ran a hook (claude-code, codex, grok). Install writes DUFFLEBAG_AGENT_ID=<agent> in front of the hook commands that read it: idle compact, voice, and session rehome.",
     readBy: ["TypeScript"],
   },
   {
@@ -79,6 +79,13 @@ export const environmentVariables = Schema.decodeUnknownSync(Schema.Array(enviro
     purpose:
       "Set to off (or 0, false, no) so a failed refine never opens the macOS model picker (CI, headless machines).",
     readBy: ["Python"],
+  },
+  {
+    name: "DUFFLEBAG_REHOME_STATE_DIR",
+    defaultValue: "~/.claude/dufflebag/state/session-rehome",
+    purpose:
+      "Folder for session-rehome's ledger of moved, kept, and deleted sessions, its watcher lock, and its sweep stamp. Tests point it at a temporary folder.",
+    readBy: ["TypeScript"],
   },
   {
     name: "DUFFLEBAG_PROVIDER_HEALTH_FILE",

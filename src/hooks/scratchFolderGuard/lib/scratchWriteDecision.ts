@@ -1,3 +1,4 @@
+import os from "node:os";
 import path from "node:path";
 
 // e.g. "/tmp/a.log", "> /private/tmp/x", "/var/folders/1b/x/T/a", "$TMPDIR/out" — not "/Users/me/tmpfiles" or "./tmp/a"
@@ -15,9 +16,9 @@ const SCRATCH_VARIABLE_ASSIGNMENT =
 // e.g. "> /tmp/a.log", "2>> /private/tmp/b", "&> $TMPDIR/c" — not "> ./logs/a.log"
 const REDIRECT_INTO_SCRATCH =
   /(?:^|[\s;|])(?:\d+|\{[A-Za-z_][A-Za-z0-9_]*\})?(?:&>>|&>|>>|>\||<>|>)\s*['"]?(?:(?:\/private)?\/(?:tmp|var\/tmp|dev\/shm|run\/user\/\d+)|(?:\/private)?\/var\/folders\/[^\s'"]+\/T|\$\{?(?:TMPDIR|TMP|TEMP|XDG_RUNTIME_DIR)\}?)(?:\/|['"]|$)/i;
-// e.g. "cp a.txt /tmp/a.txt", "mv build /private/tmp" — not "cp /tmp/a.txt ./a.txt"
+// e.g. "cp a.txt /tmp/a.txt", "mv build /private/tmp" — not "cp /tmp/a.txt ./a.txt" or "rm -rf /tmp/tend-install-proof"
 const COPY_INTO_SCRATCH =
-  /\b(?:cp|mv|install|rsync|scp|sftp|ln)\b[^\n;|&]*\s+['"]?(?:(?:\/private)?\/(?:tmp|var\/tmp|dev\/shm|run\/user\/\d+)|(?:\/private)?\/var\/folders\/[^\s'"]+\/T|\$\{?(?:TMPDIR|TMP|TEMP|XDG_RUNTIME_DIR)\}?)[^\s'"]*['"]?\s*(?:$|[;&|])/i;
+  /(?:^|[\s;&|(])(?:cp|mv|install|rsync|scp|sftp|ln)(?=\s)[^\n;|&]*\s+['"]?(?:(?:\/private)?\/(?:tmp|var\/tmp|dev\/shm|run\/user\/\d+)|(?:\/private)?\/var\/folders\/[^\s'"]+\/T|\$\{?(?:TMPDIR|TMP|TEMP|XDG_RUNTIME_DIR)\}?)[^\s'"]*['"]?\s*(?:$|[;&|])/i;
 // e.g. "touch", "tee", "sed -i", "curl -o", "git clone", "writeFileSync(" — commands and calls that create or change files
 const FILE_MUTATION_COMMAND =
   /(?:^|[;&|]\s*|\b)(?:touch|mkdir|mkfifo|mknod|truncate|fallocate|tee|split|csplit)\b|\bdd\b[^\n]*\bof\s*=|\bsort\b[^\n]*(?:\s-o\s|\s--output(?:=|\s))|\b(?:sed|perl|ruby)\b[^\n]*\s-i(?:\s|['".]|$)|\b(?:tar|zip|unzip|gzip|bzip2|xz)\b[^\n]*(?:\s-f\s|\s--file(?:=|\s)|\s-d\s|\s--directory(?:=|\s))|\b(?:curl|wget)\b[^\n]*(?:\s-o\s|\s--output(?:=|\s)|\s-O(?:\s|$)|\s--remote-name(?:\s|$)|\s--output-dir(?:=|\s)|\s--output-document(?:=|\s)|\s--directory-prefix(?:=|\s)|\s--cookie-jar(?:=|\s)|\s--dump-header(?:=|\s)|\s--hsts(?:=|\s)|\s--alt-svc(?:=|\s)|\s--libcurl(?:=|\s))|\bgit\s+(?:clone|worktree\s+add)\b|\bgit\s+(?:archive|format-patch)\b[^\n]*(?:\s-o\s|\s--output(?:=|\s))|\b(?:write|writeFile|writeFileSync|WriteAllText|WriteAllBytes|appendFile|appendFileSync|copyFile|copyFileSync|cp|cpSync|createWriteStream|write_text|write_bytes|copyfile|copy2|copytree|file_put_contents|create_dir|createDirectory|CreateDirectory|createDirectories|createFile|newOutputStream|newBufferedWriter|mkdir|mkdirs|mkdirSync|rename|renameSync|move|symlink|truncate|truncateSync|OpenFile)\s*\(|\b(?:File|Files|Path|FileManager|Directory|fs(?:\.promises)?|os|shutil|std::fs|Deno|Bun)[:.]+(?:write|WriteAllText|WriteAllBytes|append|create|copy|cp|move|rename|mkdir|mkdirs|symlink|truncate|writeFile|appendFile|copyFile|createWriteStream|writeTextFile|writeFileSync|appendFileSync|copyFileSync|cpSync|mkdirSync|renameSync|truncateSync|write_text|write_bytes)\b|\bopen\s*\([^\n]*['"](?:w|a|x)[+b]?['"]/i;
@@ -36,6 +37,8 @@ const PATH_FIELD_NAME =
   /(?:^|_)(?:file_?path|path|notebook_?path|target(?:_path)?|destination(?:_path)?|dest(?:_path)?|output(?:_path)?|save(?:_path)?|directory|dir)$/i;
 // e.g. "*** Add File: /tmp/a.txt" in a Codex apply_patch body
 const PATCH_TARGET_HEADER = /^\*{3}\s+(?:Add|Update|Move to) File:\s*(.+)$/gim;
+// e.g. "cd ~ && git status", "cd /Users/me/app" — a command that starts by changing folder runs there
+const LEADING_FOLDER_CHANGE = /^\s*cd\s+(['"]?)([^'"\s;&|]+)\1\s*(?:&&|;|$)/;
 const COMMAND_FIELDS = ["command", "cmd", "script", "code", "input", "patch", "chars", "stdin"];
 const BLOCK_REASON =
   "Writes to system temporary folders (/tmp, /private/tmp, /var/tmp, /dev/shm, $TMPDIR) are blocked. Write logs and scratch files to a gitignored folder inside the current repository (its AGENTS.md may name one) and delete them before handoff.";
@@ -106,6 +109,17 @@ const commandTextOf = (toolInput: unknown): string => {
     .join("\n");
 };
 
+// A shell left inside a scratch folder must still be able to leave it.
+const commandFolderOf = (commandText: string, workingDirectory: string | undefined): string | undefined => {
+  const folderChange = LEADING_FOLDER_CHANGE.exec(commandText);
+  if (folderChange === null) {
+    return workingDirectory;
+  }
+
+  const target = (folderChange[2] || "").replace(/^(?:~|\$\{?HOME\}?)(?=\/|$)/, os.homedir());
+  return path.resolve(workingDirectory || os.homedir(), target);
+};
+
 const patchTargetsOf = (commandText: string): ReadonlyArray<string> =>
   [...commandText.matchAll(PATCH_TARGET_HEADER)].flatMap((header) =>
     header[1] === undefined ? [] : [header[1].trim()],
@@ -117,7 +131,10 @@ const shellCommandWritesScratch = (request: ScratchWriteRequest & { commandText:
     return true;
   }
 
-  const runsInScratchFolder = isScratchPath({ ...request, candidate: request.workingDirectory });
+  const runsInScratchFolder = isScratchPath({
+    ...request,
+    candidate: commandFolderOf(commandText, request.workingDirectory),
+  });
   const mentionsScratchFolder = SCRATCH_FOLDER_REFERENCE.test(commandText) || RUNTIME_SCRATCH_LOOKUP.test(commandText);
   if (!mentionsScratchFolder && !runsInScratchFolder) {
     return false;

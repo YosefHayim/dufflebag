@@ -406,6 +406,36 @@ export const featureCatalog = Schema.decodeUnknownSync(featureCatalogSchema, { o
       ],
     },
   },
+  {
+    id: "session-rehome",
+    sourceDirectory: "sessionRehome",
+    installedSkill: { _tag: "none" },
+    title: "Session rehome",
+    summary:
+      "Move each ended Claude Code session and Codex thread into the repo it was about, so `/resume` and `codex resume` in that repo list it. Sessions started in ~/Desktop/Code, ~, /tmp, or a deleted worktree move when one repo clearly dominates their work; resuming a moved session from its old folder says where it went.",
+    selectedByDefault: false,
+    dependencies: [],
+    platform: "any",
+    runtime: {
+      _tag: "hook",
+      sourceEntrypoint: "hooks/rehomeEndedSession.ts",
+      shippedPaths: [],
+      registrations: [
+        {
+          event: "SessionEnd",
+          matcher: { _tag: "none" },
+          entrypoint: { _tag: "featureDefault" },
+          readsAgentId: true,
+        },
+        {
+          event: "SessionStart",
+          matcher: { _tag: "none" },
+          entrypoint: { _tag: "path", value: "hooks/announceMovedSession.ts" },
+          readsAgentId: true,
+        },
+      ],
+    },
+  },
   skillFeature({
     id: "image-to-code",
     sourceDirectory: "imageToCode",

@@ -287,6 +287,7 @@ Every copied skill also has a new plain name; [What it installs](#what-it-instal
 | **voice** | Read complete agent responses with local speech, hold-Shift dictation via whisper.cpp large-v3-turbo (Metal), Cmux focus gating, and optional on-device prompt refinement on macOS. | 🟢 any OS |
 | **duplicate-code-guard** | Block a Write/Edit that pastes a function body or interface/type shape already defined elsewhere in the repo — DRY enforced at the moment of the write. Uses the repo's own TypeScript; blocks by default (tune with `dufflebag config set duplicate-code-mode warn`). Agents without edit hooks can run `dufflebag duplicates` as a pre-commit or CI check. | 🟢 any OS |
 | **scratch-folder-guard** | Block every agent write into system temporary folders (/tmp, /private/tmp, /var/tmp, /dev/shm, $TMPDIR) — files, edits, shell redirects, copies, and mktemp — so logs and scratch files stay in a gitignored repo folder. Also deletes each ended Claude Code session's own scratch folder. | 🟢 any OS |
+| **session-rehome** | Move each ended Claude Code session and Codex thread into the repo it was about, so `/resume` and `codex resume` in that repo list it. Sessions started in ~/Desktop/Code, ~, /tmp, or a deleted worktree move when one repo clearly dominates their work; resuming a moved session from its old folder says where it went. | 🟢 any OS |
 | **image-to-code** | Turn an image (PNG, screenshot, design) into code that looks the same — SVG, HTML/CSS, or animation — checked with pixel diffs. | 🟢 any OS |
 | **github-repo-about** | Write the GitHub "About" box — a one-line description, a website link, and topics. | 🟢 any OS |
 | **write-blog-post** | Write a new portfolio blog post in the owner's voice, add it to the blog data file, and make a matching cover image in ChatGPT. | 🟢 any OS |
@@ -376,6 +377,7 @@ dufflebag keeps one `config.json` in its install root: `~/.claude/dufflebag/conf
 | `dictation-language` | `dictationLanguage` | `"en"` | Dictation speech language: en (default whisper.cpp) or he (ivrit.ai Hebrew whisper-large-v3-turbo ggml). |
 | `duplicate-code-mode` | `duplicateCodeMode` | `"block"` | What the duplicate-code guard does with a copied function or type shape: block the edit, warn, or off. |
 | `duplicate-code-skip-folders` | `duplicateCodeSkipFolders` | `[]` | Folder names the duplicate-code guard skips, on top of its built-in skips such as node_modules. |
+| `session-rehome-roots` | `sessionRehomeRoots` | `["Desktop/Code","Code","Projects","dev","src","repos"]` | Folders (home-relative or absolute) whose git repos session-rehome may move Claude Code and Codex sessions into. Repos are found one and two levels deep. |
 | `debug-logs` | `debugLogs` | `false` | Print dufflebag hook errors to stderr. |
 
 Lists (`duplicate-code-skip-folders`) take comma-separated values on the command line. An empty value clears a setting whose default is absent.
@@ -386,7 +388,7 @@ Provider API keys (`GROQ_API_KEY`, `GEMINI_API_KEY`, …) keep their vendor name
 
 | Variable | Default | What it does | Read by |
 | --- | --- | --- | --- |
-| `DUFFLEBAG_AGENT_ID` | set by dufflebag in hook commands | Which agent ran a hook (claude-code, codex, grok). Install writes DUFFLEBAG_AGENT_ID=<agent> in front of the hook commands that read it: idle compact and voice. | TypeScript |
+| `DUFFLEBAG_AGENT_ID` | set by dufflebag in hook commands | Which agent ran a hook (claude-code, codex, grok). Install writes DUFFLEBAG_AGENT_ID=<agent> in front of the hook commands that read it: idle compact, voice, and session rehome. | TypeScript |
 | `DUFFLEBAG_IDLE_COMPACT_AFTER` | unset (idleCompactAfter in config.json applies) | Overrides idleCompactAfter for one agent session: off, or a time like 30s. Set it when starting the agent, e.g. `DUFFLEBAG_IDLE_COMPACT_AFTER=30s codex`. | TypeScript |
 | `DUFFLEBAG_AUTORUN_DRY_RUN` | off | When 1, true, or yes, the autorun watcher logs the keystrokes it would type instead of typing them (safe manual testing). | TypeScript |
 | `DUFFLEBAG_VOICE_DIR` | ~/Library/Application Support/dufflebag/voice on macOS | Folder for voice state: Whisper models, the narration inbox, worker status, and saved refine choices. The Stop hook, the voice worker, and the refiner all use it. | TypeScript, Rust, Python |
@@ -394,6 +396,7 @@ Provider API keys (`GROQ_API_KEY`, `GEMINI_API_KEY`, …) keep their vendor name
 | `DUFFLEBAG_DICTATION_MODEL` | unset (dictationLanguage picks turbo-q5 or the ivrit.ai Hebrew model) | Forces the Whisper model the dictation worker loads: turbo-q5, turbo-q8, turbo, small, base, tiny, or ivrit. | Rust |
 | `DUFFLEBAG_DICTATION_LIVE_PREVIEW` | on | Set to off (or 0, false, no) to stop the live caption preview while Shift is held. | Rust |
 | `DUFFLEBAG_REFINE_PICKER` | on | Set to off (or 0, false, no) so a failed refine never opens the macOS model picker (CI, headless machines). | Python |
+| `DUFFLEBAG_REHOME_STATE_DIR` | ~/.claude/dufflebag/state/session-rehome | Folder for session-rehome's ledger of moved, kept, and deleted sessions, its watcher lock, and its sweep stamp. Tests point it at a temporary folder. | TypeScript |
 | `DUFFLEBAG_PROVIDER_HEALTH_FILE` | ~/.claude/dufflebag/state/provider-health.json | File where `dufflebag free` keeps provider health records and the accepted terms version. | TypeScript |
 <!-- AUTO:SETTINGS:END -->
 

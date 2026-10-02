@@ -57,10 +57,19 @@ const uniqueSorted = (values: ReadonlyArray<string>): ReadonlyArray<string> => [
 
 const absoluteRoot = (value: string, path: Path.Path): string => path.resolve(value).replaceAll("\\", "/");
 
+// cmux puts a wrapper for every agent it integrates with (grok, opencode, …) on each terminal's PATH whether or not
+// the agent is installed — its grok wrapper only prints "grok not found" — so a wrapper alone is not evidence.
+// e.g. "/Applications/cmux.app/Contents/Resources/bin/grok"
+const TERMINAL_WRAPPER_PATTERN = /\/cmux\.app\/Contents\/Resources\/bin\//u;
+
+// Effect Command passes no environment unless given one, and `which` needs PATH to find anything.
 const commandAvailable = (commandName: string) =>
-  Command.make("which", commandName).pipe(
-    Command.exitCode,
-    Effect.map((code) => code === 0),
+  Command.make("which", "-a", commandName).pipe(
+    Command.env(process.env),
+    Command.lines,
+    Effect.map((commandPaths) =>
+      commandPaths.some((commandPath) => commandPath.trim() !== "" && !TERMINAL_WRAPPER_PATTERN.test(commandPath)),
+    ),
     Effect.catchAll(() => Effect.succeed(false)),
   );
 

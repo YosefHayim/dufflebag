@@ -50,4 +50,20 @@ describe("decideScratchWrite", () => {
 
     expect(decision).toMatchObject({ _tag: "block", reason: expect.stringContaining("gitignored folder") });
   });
+
+  it("lets a shell inside a system temporary folder leave it with a leading cd", () => {
+    const decision = decideScratchWrite({
+      toolName: "Bash",
+      toolInput: { command: "cd ~/repo && pnpm install" },
+      workingDirectory: "/private/tmp/project",
+      systemScratchFolder,
+    });
+
+    expect(decision).toEqual({ _tag: "allow" });
+  });
+
+  it("treats a copy command only as a whole word, not inside a longer name", () => {
+    expect(decisionTagFor("Bash", { command: "./re-install /tmp/report.txt" })).toBe("allow");
+    expect(decisionTagFor("Bash", { command: "pnpm build && install dist/cli /tmp/cli" })).toBe("block");
+  });
 });

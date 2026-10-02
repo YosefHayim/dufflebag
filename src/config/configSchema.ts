@@ -151,6 +151,18 @@ export const configSchema = Schema.Struct({
     title: "duplicate code skip folders",
     description: "Folder names the duplicate-code guard skips, on top of its built-in skips such as node_modules.",
   }),
+  sessionRehomeRoots: withDefault(Schema.Array(Schema.NonEmptyTrimmedString), [
+    "Desktop/Code",
+    "Code",
+    "Projects",
+    "dev",
+    "src",
+    "repos",
+  ]).annotations({
+    title: "session rehome roots",
+    description:
+      "Folders (home-relative or absolute) whose git repos session-rehome may move Claude Code and Codex sessions into. Repos are found one and two levels deep.",
+  }),
   debugLogs: withDefault(Schema.Boolean, false).annotations({
     title: "debug logs",
     description: "Print dufflebag hook errors to stderr.",

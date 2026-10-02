@@ -15,6 +15,7 @@ type HookConfig = {
   readonly idleCompactAfter: string;
   readonly duplicateCodeMode: "block" | "warn" | "off";
   readonly duplicateCodeSkipFolders: ReadonlyArray<string>;
+  readonly sessionRehomeRoots: ReadonlyArray<string>;
   readonly debugLogs: boolean;
 };
 
@@ -36,6 +37,7 @@ const DEFAULTS: HookConfig = {
   idleCompactAfter: "off",
   duplicateCodeMode: "block",
   duplicateCodeSkipFolders: [],
+  sessionRehomeRoots: ["Desktop/Code", "Code", "Projects", "dev", "src", "repos"],
   debugLogs: false,
 };
 
@@ -61,6 +63,7 @@ export const decodeHookConfig = (candidate: unknown): HookConfig => {
   const idleCompactAfter = propertyOf(candidate, "idleCompactAfter");
   const duplicateCodeMode = propertyOf(candidate, "duplicateCodeMode");
   const skipFolders = propertyOf(candidate, "duplicateCodeSkipFolders");
+  const rehomeRoots = propertyOf(candidate, "sessionRehomeRoots");
   const debugLogs = propertyOf(candidate, "debugLogs");
   return {
     contextWarnPercent: numberSetting(candidate, "contextWarnPercent"),
@@ -77,6 +80,10 @@ export const decodeHookConfig = (candidate: unknown): HookConfig => {
     duplicateCodeSkipFolders: Array.isArray(skipFolders)
       ? skipFolders.filter((folder): folder is string => typeof folder === "string")
       : DEFAULTS.duplicateCodeSkipFolders,
+    sessionRehomeRoots: Array.isArray(rehomeRoots)
+      ? // A blank root would resolve to the home folder itself and scan every folder in it.
+        rehomeRoots.filter((folder): folder is string => typeof folder === "string" && folder.trim() !== "")
+      : DEFAULTS.sessionRehomeRoots,
     debugLogs: typeof debugLogs === "boolean" ? debugLogs : DEFAULTS.debugLogs,
   };
 };
