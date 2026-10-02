@@ -14,8 +14,11 @@ export type RehomeDecision =
 const PROMPT_WEIGHT = 3;
 // A session started in a folder named after a repo (a /tmp eval copy, a generated kit) leans toward that repo.
 const FOLDER_NAME_WEIGHT = 10;
-// Below this many weighted signals a session is too thin to move automatically.
+// Below this many weighted signals a session is too thin to move out of a repo, or to delete.
 const MIN_SCORE = 10;
+// A session started outside every repo is listed nowhere useful, so a short one moves once a prompt and a file (or
+// two prompts, or four files) point at one repo; a single passing mention of a word like "extensions" is not enough.
+const MIN_SCORE_FROM_GENERIC = 4;
 // A session started outside every repo moves when one repo owns this share of its signals.
 const MOVE_FROM_GENERIC_SHARE = 0.6;
 // A session already inside a repo moves only when another repo clearly dominates and its own barely appears.
@@ -72,7 +75,7 @@ export const decideRehome = (request: {
   }
 
   if (request.homeRepoName === undefined) {
-    return total >= MIN_SCORE && top.share >= MOVE_FROM_GENERIC_SHARE
+    return total >= MIN_SCORE_FROM_GENERIC && top.share >= MOVE_FROM_GENERIC_SHARE
       ? { _tag: "move", repoName: top.repoName, share: top.share }
       : { _tag: "uncertain", candidates: request.scores.slice(0, 3) };
   }
