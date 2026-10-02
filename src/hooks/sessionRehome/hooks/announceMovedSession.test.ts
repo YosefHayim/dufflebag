@@ -87,6 +87,19 @@ describe("announceMovedSession process boundary", () => {
     expect(freshStart.stdout).toBe("");
   });
 
+  it("still names the move after the session was later kept in its new home", () => {
+    const keptLater = {
+      ...movedEntry("claude-code"),
+      decision: "stayed",
+      fromFolder: "/Users/me/Desktop/Code/vybekiit",
+    };
+    const stateFolder = createStateFolder([movedEntry("claude-code"), keptLater]);
+
+    const execution = runHook({ stateFolder, agent: "claude-code", cwd: "/Users/me/Desktop/Code", source: "resume" });
+
+    expect(JSON.parse(execution.stdout).systemMessage).toContain("(from ~/Desktop/Code)");
+  });
+
   it("tells Codex about each move once", () => {
     const stateFolder = createStateFolder([movedEntry("codex")]);
 

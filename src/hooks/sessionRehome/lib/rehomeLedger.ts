@@ -79,16 +79,23 @@ const decodeLedgerEntry = (record: Record<string, unknown>): LedgerEntry | undef
   };
 };
 
-export const readLedger = (): ReadonlyMap<string, LedgerEntry> => {
+const newestPerSession = (request: { readonly keep: (entry: LedgerEntry) => boolean }) => {
   const entries = new Map<string, LedgerEntry>();
   const lines = existsSync(ledgerFile()) ? readFileSync(ledgerFile(), "utf8").split("\n") : [];
   for (const entry of lines.map(decodeJsonLine).map(decodeLedgerEntry)) {
-    if (entry) {
+    if (entry && request.keep(entry)) {
       entries.set(ledgerKey(entry), entry);
     }
   }
   return entries;
 };
+
+export const readLedger = (): ReadonlyMap<string, LedgerEntry> => newestPerSession({ keep: () => true });
+
+// A moved session that later ends in its new home is recorded as kept there; where it moved from still matters
+// when it is resumed from the old folder.
+export const readLastMoves = (): ReadonlyMap<string, LedgerEntry> =>
+  newestPerSession({ keep: (entry) => entry.decision === "moved" });
 
 export const ledgerEntryFor = (request: {
   readonly ledger: ReadonlyMap<string, LedgerEntry>;

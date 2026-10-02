@@ -14,7 +14,7 @@ import {
   claimSweepSlot,
   ledgerEntryFor,
   type RehomeAgent,
-  readLedger,
+  readLastMoves,
   recordLedgerEntry,
 } from "../lib/rehomeLedger.js";
 
@@ -61,7 +61,7 @@ const announceMovedSession = (): never => {
   }
 
   startSweepIfDue();
-  const entry = ledgerEntryFor({ ledger: readLedger(), agent, sessionId: sessionStart.sessionId });
+  const entry = ledgerEntryFor({ ledger: readLastMoves(), agent, sessionId: sessionStart.sessionId });
   const homeRoot = process.env.HOME || os.homedir();
   const notice =
     sessionStart.source === "resume" && entry
