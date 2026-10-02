@@ -2,7 +2,13 @@
 
 import type { SessionEvidence } from "./sessionEvidence.js";
 
-export type RepoScore = { readonly repoName: string; readonly score: number; readonly share: number };
+export type RepoScore = {
+  readonly repoName: string;
+  readonly score: number;
+  readonly share: number;
+  /** Lines whose working folder, file, or command touched the repo, as opposed to prompts that only name it. */
+  readonly pathHits: number;
+};
 
 export type RehomeDecision =
   | { readonly _tag: "move"; readonly repoName: string; readonly share: number }
@@ -16,8 +22,9 @@ const PROMPT_WEIGHT = 3;
 const FOLDER_NAME_WEIGHT = 10;
 // Below this many weighted signals a session is too thin to move out of a repo, or to delete.
 const MIN_SCORE = 10;
-// A session started outside every repo is listed nowhere useful, so a short one moves once a prompt and a file (or
-// two prompts, or four files) point at one repo; a single passing mention of a word like "extensions" is not enough.
+// A session started outside every repo is listed nowhere useful, so a short one moves once it touched the repo and a
+// prompt or more files back that up. Prompts alone still need MIN_SCORE: some repo keywords, like "extensions", are
+// ordinary words.
 const MIN_SCORE_FROM_GENERIC = 4;
 // A session started outside every repo moves when one repo owns this share of its signals.
 const MOVE_FROM_GENERIC_SHARE = 0.6;
@@ -42,7 +49,12 @@ export const scoreSession = (request: {
 
   const total = [...weighted.values()].reduce((sum, score) => sum + score, 0);
   return [...weighted]
-    .map(([repoName, score]) => ({ repoName, score, share: total === 0 ? 0 : score / total }))
+    .map(([repoName, score]) => ({
+      repoName,
+      score,
+      share: total === 0 ? 0 : score / total,
+      pathHits: request.evidence.pathHits.get(repoName) || 0,
+    }))
     .sort((left, right) => right.score - left.score);
 };
 
@@ -75,7 +87,8 @@ export const decideRehome = (request: {
   }
 
   if (request.homeRepoName === undefined) {
-    return total >= MIN_SCORE_FROM_GENERIC && top.share >= MOVE_FROM_GENERIC_SHARE
+    const enoughSignal = total >= MIN_SCORE || (total >= MIN_SCORE_FROM_GENERIC && top.pathHits > 0);
+    return enoughSignal && top.share >= MOVE_FROM_GENERIC_SHARE
       ? { _tag: "move", repoName: top.repoName, share: top.share }
       : { _tag: "uncertain", candidates: request.scores.slice(0, 3) };
   }
