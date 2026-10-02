@@ -167,7 +167,11 @@ const planClaudeSession = (request: { readonly sweep: SweepContext; readonly ses
     return livePlan({ agent: "claude-code", sessionId: session.sessionId, homeFolder: session.homeFolder });
   }
 
-  const evidence = readClaudeEvidence({ transcriptFile: session.transcriptFile, matchers: sweep.matchers });
+  const evidence = readClaudeEvidence({
+    transcriptFile: session.transcriptFile,
+    matchers: sweep.matchers,
+    homeRoot: sweep.homeRoot,
+  });
   return {
     agent: "claude-code" as const,
     sessionId: session.sessionId,
@@ -184,7 +188,11 @@ const planCodexThread = async (request: { readonly sweep: SweepContext; readonly
     return livePlan({ agent: "codex", sessionId: thread.threadId, homeFolder: thread.homeFolder });
   }
 
-  const evidence = readCodexEvidence({ transcriptFile: thread.rolloutFile, matchers: sweep.matchers });
+  const evidence = readCodexEvidence({
+    transcriptFile: thread.rolloutFile,
+    matchers: sweep.matchers,
+    homeRoot: sweep.homeRoot,
+  });
   return {
     agent: "codex" as const,
     sessionId: thread.threadId,

@@ -49,6 +49,12 @@ describe("rehome decision", () => {
     expect(decideRehome({ scores, homeRepoName: undefined })).toMatchObject({ _tag: "move", repoName: "vybekiit" });
   });
 
+  it("does not move a short session that only names a repo in prompts and never touches it", () => {
+    const scores = scoreSession({ evidence: evidenceWith({ prompts: { extensions: 2 } }), folderRepoName: undefined });
+
+    expect(decideRehome({ scores, homeRepoName: undefined })._tag).toBe("uncertain");
+  });
+
   it("keeps the same short session in the repo it started in", () => {
     const scores = scoreSession({
       evidence: evidenceWith({ prompts: { vybekiit: 1 }, paths: { vybekiit: 2 } }),
