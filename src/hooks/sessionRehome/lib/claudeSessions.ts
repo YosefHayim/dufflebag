@@ -83,9 +83,15 @@ export const listClaudeSessions = (homeRoot: string): ReadonlyArray<ClaudeSessio
     return [];
   }
 
-  return readdirSync(root, { withFileTypes: true })
+  const sessions = readdirSync(root, { withFileTypes: true })
     .filter((entry) => entry.isDirectory())
     .flatMap((entry) => sessionsInFolder(path.join(root, entry.name)));
+  const copies = new Map<string, number>();
+  for (const session of sessions) {
+    copies.set(session.sessionId, (copies.get(session.sessionId) || 0) + 1);
+  }
+  // `claude --resume` already refuses an id stored in two project folders; moving either copy could lose work.
+  return sessions.filter((session) => copies.get(session.sessionId) === 1);
 };
 
 // Finds one session by file name alone, without reading every transcript the way a full listing does.
@@ -94,10 +100,11 @@ export const findClaudeSession = (request: {
   readonly sessionId: string;
 }): ClaudeSession | undefined => {
   const root = projectsRoot(request.homeRoot);
-  const projectFolder = (existsSync(root) ? readdirSync(root) : [])
+  const projectFolders = (existsSync(root) ? readdirSync(root) : [])
     .map((name) => path.join(root, name))
-    .find((folder) => existsSync(path.join(folder, `${request.sessionId}.jsonl`)));
-  if (!projectFolder) {
+    .filter((folder) => existsSync(path.join(folder, `${request.sessionId}.jsonl`)));
+  const [projectFolder] = projectFolders;
+  if (!projectFolder || projectFolders.length > 1) {
     return undefined;
   }
 
@@ -164,11 +171,20 @@ export const moveClaudeSession = (request: {
 
   mkdirSync(targetProjectFolder, { recursive: true });
   renameSync(request.session.transcriptFile, targetTranscript);
-  if (existsSync(sourceSessionFolder)) {
-    renameSync(sourceSessionFolder, targetSessionFolder);
-  }
   const relocated = { type: "relocated", sessionId: request.session.sessionId, relocatedCwd: request.targetFolder };
-  appendJsonLine({ file: targetTranscript, line: relocated });
+  try {
+    if (existsSync(sourceSessionFolder)) {
+      renameSync(sourceSessionFolder, targetSessionFolder);
+    }
+    appendJsonLine({ file: targetTranscript, line: relocated });
+  } catch (moveError) {
+    // A half-done move would split the transcript from its subagents; put everything back in the old folder.
+    if (existsSync(targetSessionFolder) && !existsSync(sourceSessionFolder)) {
+      renameSync(targetSessionFolder, sourceSessionFolder);
+    }
+    renameSync(targetTranscript, request.session.transcriptFile);
+    throw moveError;
+  }
   return { _tag: "moved", transcriptFile: targetTranscript };
 };
 

@@ -60,8 +60,11 @@ export type SessionPlan = {
   readonly repoName: string;
   readonly share: number;
   readonly candidates: ReadonlyArray<RepoScore>;
-  /** What applying the plan recorded; "planned" in a dry run, "skipped" for a live session. */
-  readonly status: LedgerDecision | "planned" | "skipped";
+  /**
+   * What applying the plan recorded; "planned" in a dry run, "skipped" for a live session, "failed" when a move or
+   * delete threw or Codex refused a delete (left unrecorded, so the next sweep retries it).
+   */
+  readonly status: LedgerDecision | "planned" | "skipped" | "failed";
 };
 
 // The ledger and matchers are built once per sweep and shared by every session.
@@ -251,13 +254,32 @@ const applyCodexPlan = async (request: {
       return plan;
     case "delete": {
       const deletions = await deleteCodexThread({ homeRoot: request.sweep.homeRoot, thread: request.thread });
-      return deletions.every((deletion) => deletion.deleted) ? recordPlan({ plan, decision: "deleted" }) : plan;
+      return deletions.every((deletion) => deletion.deleted)
+        ? recordPlan({ plan, decision: "deleted" })
+        : { ...plan, status: "failed" };
     }
     case "move":
       await moveCodexThread({ homeRoot: request.sweep.homeRoot, thread: request.thread, targetFolder: plan.toFolder });
       return recordPlan({ plan, decision: "moved" });
     default:
       return recordPlan({ plan, decision: KEPT_DECISIONS[plan.action] });
+  }
+};
+
+// One session that cannot be moved or deleted must not stop the rest of the sweep; the next sweep retries it.
+const applyClaudePlanSafely = (request: Parameters<typeof applyClaudePlan>[0]): SessionPlan => {
+  try {
+    return applyClaudePlan(request);
+  } catch {
+    return { ...request.plan, status: "failed" };
+  }
+};
+
+const applyCodexPlanSafely = async (request: Parameters<typeof applyCodexPlan>[0]): Promise<SessionPlan> => {
+  try {
+    return await applyCodexPlan(request);
+  } catch {
+    return { ...request.plan, status: "failed" };
   }
 };
 
@@ -275,7 +297,7 @@ const sweepClaude = (sweep: SweepContext): ReadonlyArray<SessionPlan> =>
     .filter((session) => !isSettled({ sweep, agent: "claude-code", sessionId: session.sessionId }))
     .map((session) => {
       const plan = planClaudeSession({ sweep, session });
-      return sweep.dryRun ? plan : applyClaudePlan({ sweep, session, plan });
+      return sweep.dryRun ? plan : applyClaudePlanSafely({ sweep, session, plan });
     });
 
 // A thread the ledger moved can drift back when Codex rebuilds its row from an older rollout; put it back.
@@ -317,7 +339,7 @@ const sweepCodex = async (sweep: SweepContext): Promise<ReadonlyArray<SessionPla
   for (const thread of threads) {
     const plan = await planCodexSweepEntry({ sweep, thread });
     if (plan) {
-      plans.push(sweep.dryRun ? plan : await applyCodexPlan({ sweep, thread, plan }));
+      plans.push(sweep.dryRun ? plan : await applyCodexPlanSafely({ sweep, thread, plan }));
     }
   }
   return plans;

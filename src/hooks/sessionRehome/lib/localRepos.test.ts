@@ -61,6 +61,17 @@ describe("local repos", () => {
     expect(repos.find((repo) => repo.name === "cli")?.keywords).toEqual([]);
   });
 
+  it("tells apart checkouts that share a folder name by their path under home", () => {
+    const homeRoot = createCodeFolder();
+    createRepo({ folder: path.join(homeRoot, "Code", "genshot-org", "cli") });
+    createRepo({ folder: path.join(homeRoot, "Code", "other-org", "cli") });
+    createRepo({ folder: path.join(homeRoot, "Code", "vybekiit") });
+
+    const repos = discoverRepos({ homeRoot, rootFolders: ["Code"], deletedRepoNames: [] });
+
+    expect(repos.map((repo) => repo.name).sort()).toEqual(["Code/genshot-org/cli", "Code/other-org/cli", "vybekiit"]);
+  });
+
   it("matches a repo root only at a path boundary and prefers the longest root", () => {
     const repos = [
       { name: "agent-runner", root: "/code/agent-runner", keywords: [], checkedOut: true },

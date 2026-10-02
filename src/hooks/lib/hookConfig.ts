@@ -81,7 +81,8 @@ export const decodeHookConfig = (candidate: unknown): HookConfig => {
       ? skipFolders.filter((folder): folder is string => typeof folder === "string")
       : DEFAULTS.duplicateCodeSkipFolders,
     sessionRehomeRoots: Array.isArray(rehomeRoots)
-      ? rehomeRoots.filter((folder): folder is string => typeof folder === "string")
+      ? // A blank root would resolve to the home folder itself and scan every folder in it.
+        rehomeRoots.filter((folder): folder is string => typeof folder === "string" && folder.trim() !== "")
       : DEFAULTS.sessionRehomeRoots,
     debugLogs: typeof debugLogs === "boolean" ? debugLogs : DEFAULTS.debugLogs,
   };

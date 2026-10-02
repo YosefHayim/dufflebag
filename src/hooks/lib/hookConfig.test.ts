@@ -68,6 +68,12 @@ describe("hook config resolution", () => {
     expect(config.debugLogs).toBe(defaultConfig.debugLogs);
   });
 
+  it("drops blank session-rehome roots, which would scan the whole home folder", () => {
+    expect(decodeHookConfig({ sessionRehomeRoots: ["", "  ", "Desktop/Code", 7] }).sessionRehomeRoots).toEqual([
+      "Desktop/Code",
+    ]);
+  });
+
   it.each([
     [{ DUFFLEBAG_IDLE_COMPACT_AFTER: "45s" }, 45],
     [{ DUFFLEBAG_IDLE_COMPACT_AFTER: "1h" }, 3_600],

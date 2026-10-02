@@ -74,6 +74,15 @@ const reposUnder = (root: string): ReadonlyArray<string> =>
     isGitCheckout(child) ? [child] : visibleChildFolders(child).filter(isGitCheckout),
   );
 
+// Two checkouts named "cli" become "Desktop/Code/genshot-org/cli" and "Desktop/Code/other-org/cli", so a match
+// never lands on the wrong one.
+const withUniqueNames = (request: { readonly homeRoot: string; readonly repos: ReadonlyArray<Repo> }) =>
+  request.repos.map((repo) =>
+    request.repos.some((other) => other !== repo && other.name === repo.name)
+      ? { ...repo, name: path.relative(request.homeRoot, repo.root) }
+      : repo,
+  );
+
 // A keyword several repos share (genshot, genshot-org/cli as @genshot/cli, …) points at the repo named exactly
 // that, or at none of them.
 const withoutSharedKeywords = (repos: ReadonlyArray<Repo>): ReadonlyArray<Repo> =>
@@ -93,7 +102,7 @@ export const discoverRepos = (request: {
 }): ReadonlyArray<Repo> => {
   const roots = [...new Set(request.rootFolders.map((folder) => path.resolve(request.homeRoot, folder)))];
   const repoRoots = [...new Set(roots.flatMap(reposUnder))];
-  const checkedOut = repoRoots.map(checkedOutRepo);
+  const checkedOut = withUniqueNames({ homeRoot: request.homeRoot, repos: repoRoots.map(checkedOutRepo) });
   const firstRoot = roots.find(existsSync) || request.homeRoot;
   const deleted = request.deletedRepoNames
     .filter((name) => !checkedOut.some((repo) => repo.name === name))

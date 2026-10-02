@@ -1,5 +1,14 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from "node:fs";
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  utimesSync,
+  writeFileSync,
+} from "node:fs";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { fileURLToPath } from "node:url";
@@ -116,6 +125,23 @@ describe("rehome watcher with Claude Code sessions", () => {
     expect(ledgerLines(workspace)).toEqual([
       expect.objectContaining({ agent: "claude-code", sessionId, decision: "moved", toFolder: vybekiitRoot }),
     ]);
+  });
+
+  it("leaves a session id stored in two project folders untouched", () => {
+    const workspace = createWorkspace();
+    const transcript = createClaudeSession({ workspace, startFolder: workspace.codeRoot, editedRepo: "vybekiit" });
+    const strayCopy = path.join(projectFolder({ workspace, folder: workspace.homeRoot }), `${sessionId}.jsonl`);
+    mkdirSync(path.dirname(strayCopy), { recursive: true });
+    copyFileSync(transcript, strayCopy);
+    ageFile(strayCopy);
+
+    const sweep = runWatcher({ workspace, args: ["--sweep", "--json"] });
+    const ended = runWatcher({ workspace, args: ["--agent", "claude-code", "--session", sessionId, "--json"] });
+
+    expect(JSON.parse(sweep.stdout)).toEqual([]);
+    expect(JSON.parse(ended.stdout)).toEqual([]);
+    expect(existsSync(transcript)).toBe(true);
+    expect(existsSync(strayCopy)).toBe(true);
   });
 
   it("only reports the move in a dry run", () => {
