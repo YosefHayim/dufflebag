@@ -40,6 +40,24 @@ describe("rehome decision", () => {
     expect(decideRehome({ scores, homeRepoName: undefined })._tag).toBe("uncertain");
   });
 
+  it("moves a short session from a generic folder once a prompt and a file both name one repo", () => {
+    const scores = scoreSession({
+      evidence: evidenceWith({ prompts: { vybekiit: 1 }, paths: { vybekiit: 2 } }),
+      folderRepoName: undefined,
+    });
+
+    expect(decideRehome({ scores, homeRepoName: undefined })).toMatchObject({ _tag: "move", repoName: "vybekiit" });
+  });
+
+  it("keeps the same short session in the repo it started in", () => {
+    const scores = scoreSession({
+      evidence: evidenceWith({ prompts: { vybekiit: 1 }, paths: { vybekiit: 2 } }),
+      folderRepoName: undefined,
+    });
+
+    expect(decideRehome({ scores, homeRepoName: "replybase" })).toEqual({ _tag: "stay", repoName: "replybase" });
+  });
+
   it("reports no signal when nothing in the session names a repo", () => {
     const scores = scoreSession({ evidence: evidenceWith({}), folderRepoName: undefined });
 
