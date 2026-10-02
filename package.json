@@ -20,6 +20,8 @@
     "!src/skills/**/node_modules/**",
     "!src/skills/**/*.test.ts",
     "!src/hooks/**/*.test.ts",
+    "!src/hooks/voice/worker",
+    "!src/hooks/voice/worker/**",
     "!dist/src/scripts"
   ],
   "scripts": {

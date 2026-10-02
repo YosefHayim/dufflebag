@@ -376,6 +376,36 @@ export const featureCatalog = Schema.decodeUnknownSync(featureCatalogSchema, { o
       ],
     },
   },
+  {
+    id: "scratch-folder-guard",
+    sourceDirectory: "scratchFolderGuard",
+    installedSkill: { _tag: "none" },
+    title: "Scratch folder guard",
+    summary:
+      "Block every agent write into system temporary folders (/tmp, /private/tmp, /var/tmp, /dev/shm, $TMPDIR) — files, edits, shell redirects, copies, and mktemp — so logs and scratch files stay in a gitignored repo folder. Also deletes each ended Claude Code session's own scratch folder.",
+    selectedByDefault: true,
+    dependencies: [],
+    platform: "any",
+    runtime: {
+      _tag: "hook",
+      sourceEntrypoint: "hooks/scratchFolderGuard.ts",
+      shippedPaths: [],
+      registrations: [
+        {
+          event: "PreToolUse",
+          matcher: { _tag: "none" },
+          entrypoint: { _tag: "featureDefault" },
+          readsAgentId: false,
+        },
+        {
+          event: "SessionEnd",
+          matcher: { _tag: "none" },
+          entrypoint: { _tag: "path", value: "hooks/clearSessionScratch.ts" },
+          readsAgentId: false,
+        },
+      ],
+    },
+  },
   skillFeature({
     id: "image-to-code",
     sourceDirectory: "imageToCode",

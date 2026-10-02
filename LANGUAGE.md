@@ -96,6 +96,10 @@ _Avoid_: "focused pane", "front window".
 Guard that blocks a copied function body or type shape at write time. `dufflebag duplicates` runs the same check from the CLI or CI.
 _Avoid_: "duplicate checker".
 
+**scratch-folder-guard**
+Guard that denies agent writes into system temporary folders and deletes an ended Claude Code session's own scratch folder. Code names say "scratch" because `temp`/`tmp` are forbidden name tokens.
+_Avoid_: "temp guard", "tmp hook".
+
 **autorun**
 Feature and skill that arms the context-guard autorun watcher for hands-free compact/resume (`stop`/`exit` verbs). Its hook code is owned by **context-guard**.
 _Avoid_: "auto-compact", "autopilot".
