@@ -1,29 +1,25 @@
-/**
- * `dufflebag doctor` — read-only health check for global and project scopes.
- */
+/** `dufflebag doctor` — read-only health check for global and project scopes. */
 
 import { Command } from "@effect/cli";
 import { Effect } from "effect";
 
-import { type DoctorReport, doctor } from "../doctor.js";
-import { captureHostEvidence, destinationForScope } from "./hostEvidence.js";
-import { formatOption } from "./scopeOptions.js";
-import { stagePackage } from "./stagePackage.js";
+import { destinationForScope, scanHost } from "../config/hostScan.js";
+import { checkHealth, type HealthReport } from "../doctor/doctor.js";
+import { preparePackage } from "../install/preparePackage.js";
+import { formatOption } from "./cliOptions.js";
 import * as TerminalUI from "./TerminalUI.js";
 
-type DoctorScope = DoctorReport["scope"];
-type ObservedDaemon = DoctorReport["daemons"][number];
-type ObservedDiscrepancy = DoctorReport["discrepancies"][number];
+type ScopeHealth = { readonly scope: HealthReport["scope"]; readonly report: HealthReport };
 
 const abbreviatedSessionId = (sessionId: string): string =>
   sessionId.length > 12 ? `${sessionId.slice(0, 8)}…` : sessionId;
 
-const renderInstallationLine = (installation: DoctorReport["installation"]): string =>
+const installationLine = (installation: HealthReport["installation"]): string =>
   installation._tag === "present"
     ? `installation v${installation.version}: ${installation.features.join(", ") || "(no features)"}`
     : "installation: missing";
 
-const renderAgentsLine = (agents: DoctorReport["agents"]): string =>
+const agentsLine = (agents: HealthReport["agents"]): string =>
   `agents: ${
     agents
       .filter((agent) => agent.detected || agent.managed)
@@ -31,87 +27,49 @@ const renderAgentsLine = (agents: DoctorReport["agents"]): string =>
       .join(", ") || "none detected"
   }`;
 
-const reportDaemon = (daemon: ObservedDaemon) => {
-  const sessionLabel = abbreviatedSessionId(daemon.sessionId);
-  if (daemon.snapshot._tag === "missing") {
-    return TerminalUI.warn(`daemon ${sessionLabel}: live, no config snapshot — restart the session`);
-  }
-
-  return TerminalUI.detail(
-    `daemon ${sessionLabel}: frozen warn ${daemon.snapshot.config.contextWarnFraction} · budget ${daemon.snapshot.config.autorunDefaultCycleCount} · cap ${daemon.snapshot.config.autorunMaxCycleCount}`,
+export const checkBothScopes = Effect.gen(function* () {
+  const host = yield* scanHost;
+  const preparedPackage = yield* preparePackage;
+  return yield* Effect.forEach(["global", "project"] as const, (scope) =>
+    checkHealth({
+      destination: destinationForScope({ scope, homeRoot: host.homeRoot, projectRoot: host.projectRoot }),
+      preparedPackage,
+      platform: host.platform,
+      agentEvidence: host.agentEvidence,
+    }).pipe(Effect.map((report): ScopeHealth => ({ scope, report }))),
   );
-};
+});
 
-const reportDaemons = (observation: { scope: DoctorScope; daemons: DoctorReport["daemons"] }) =>
+// Reports every discrepancy without offering a repair.
+export const showScopeHealth = ({ scope, report }: ScopeHealth) =>
   Effect.gen(function* () {
-    if (observation.daemons.length > 0) {
-      // Summarize each live daemon's spawn-time config vs managed config.
-      yield* Effect.forEach(observation.daemons, reportDaemon);
-      return;
+    yield* TerminalUI.step(`${scope} scope`);
+    yield* TerminalUI.detail(installationLine(report.installation));
+    yield* TerminalUI.detail(report.config._tag === "present" ? "config: present" : "config: missing");
+    yield* TerminalUI.detail(agentsLine(report.agents));
+    if (report.watchers.length === 0) {
+      yield* TerminalUI.detail("watcher: none running");
     }
-
-    if (observation.scope === "global") {
-      yield* TerminalUI.detail("daemon: none running (config freezes at next SessionStart)");
+    for (const watcher of report.watchers) {
+      yield* TerminalUI.detail(`watcher ${abbreviatedSessionId(watcher.sessionId)}: live (pid ${String(watcher.pid)})`);
     }
-  });
-
-const reportDiscrepancy = (discrepancy: ObservedDiscrepancy) => {
-  if (discrepancy._tag === "daemonConfigMismatch") {
-    return TerminalUI.warn(
-      `daemonConfigMismatch ${discrepancy.sessionId}: ${discrepancy.key} managed=${discrepancy.managedValue} daemon=${discrepancy.daemonValue}`,
-    );
-  }
-
-  if (discrepancy._tag === "daemonConfigSnapshotMissing") {
-    return TerminalUI.warn(`daemonConfigSnapshotMissing ${discrepancy.sessionId}`);
-  }
-
-  return TerminalUI.warn(discrepancy._tag);
-};
-
-const reportScopeHealth = (inspection: { scope: DoctorScope; report: DoctorReport }) =>
-  Effect.gen(function* () {
-    yield* TerminalUI.step(`${inspection.scope} scope`);
-    yield* TerminalUI.detail(renderInstallationLine(inspection.report.installation));
-    yield* TerminalUI.detail(inspection.report.config._tag === "present" ? "config: present" : "config: missing");
-    yield* TerminalUI.detail(renderAgentsLine(inspection.report.agents));
-    yield* reportDaemons({ scope: inspection.scope, daemons: inspection.report.daemons });
-
-    // Surface every deterministic discrepancy without authorizing repair.
-    yield* Effect.forEach(inspection.report.discrepancies, reportDiscrepancy);
+    for (const discrepancy of report.discrepancies) {
+      yield* TerminalUI.warn(discrepancy._tag);
+    }
   });
 
 export const doctorCommand = Command.make("doctor", { format: formatOption }, (args) =>
   Effect.gen(function* () {
     if (args.format === "text") yield* TerminalUI.intro("doctor");
-    const host = yield* captureHostEvidence;
-    const stagedPackage = yield* stagePackage;
-
-    const scopes: ReadonlyArray<DoctorScope> = ["global", "project"];
-    const inspections: Array<{ scope: DoctorScope; report: DoctorReport }> = [];
-
-    for (const scope of scopes) {
-      const report = yield* doctor({
-        destination: destinationForScope({
-          scope,
-          homeRoot: host.homeRoot,
-          projectRoot: host.projectRoot,
-        }),
-        stagedPackage,
-        platform: host.platform,
-        agentEvidence: host.agentEvidence,
-      });
-      inspections.push({ scope, report });
-    }
-
-    const unhealthy = inspections.some((inspection) => inspection.report.discrepancies.length > 0);
+    const scopes = yield* checkBothScopes;
+    const unhealthy = scopes.some((scopeHealth) => scopeHealth.report.discrepancies.length > 0);
     if (unhealthy) process.exitCode = 1;
     if (args.format === "json") {
-      yield* TerminalUI.json({ _tag: unhealthy ? "unhealthy" : "healthy", scopes: inspections });
+      yield* TerminalUI.json({ _tag: unhealthy ? "unhealthy" : "healthy", scopes });
       return;
     }
 
-    yield* Effect.forEach(inspections, reportScopeHealth);
+    yield* Effect.forEach(scopes, showScopeHealth);
     yield* TerminalUI.outro("Read-only check complete.");
   }),
 ).pipe(Command.withDescription("Read-only health check across global + project scopes"));

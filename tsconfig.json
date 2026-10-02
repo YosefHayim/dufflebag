@@ -16,13 +16,14 @@
     "esModuleInterop": true,
     "verbatimModuleSyntax": true
   },
-  "include": ["src/**/*.ts", "scripts/**/*.ts"],
+  "include": ["src/**/*.ts"],
   "exclude": [
     "node_modules",
     "dist",
-    "src/skills/pngToCode",
+    "src/skills/imageToCode",
+    "src/scripts/dev",
     "src/**/*.test.ts",
-    "src/hookIsland/speakResponse/voice/target",
-    "src/hookIsland/speakResponse/voice/**/target"
+    "src/hooks/voice/worker/target",
+    "src/hooks/voice/worker/**/target"
   ]
 }

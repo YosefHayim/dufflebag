@@ -1,8 +1,9 @@
 name: Sync README
 
-# Auto-regenerate README.md feature table and skills section on every push to
-# main. If the generated output differs from what's committed, push an auto-commit
-# so the README never drifts from the source of truth (feature catalog + SKILL.md).
+# Auto-regenerate README.md (feature table, skills and settings sections)
+# on every push to main. If the generated output differs from what's committed, push an
+# auto-commit so the documents never drift from their source of truth (feature catalog,
+# SKILL.md files, config schema, environment variable list).
 
 on:
   push:
@@ -11,7 +12,9 @@ on:
       - ".github/workflows/readme-sync.yml"
       - "src/catalog/featureCatalog.ts"
       - "src/skills/**/SKILL.md"
-      - "scripts/generateReadme.mjs"
+      - "src/config/configSchema.ts"
+      - "src/config/environmentVariables.ts"
+      - "src/scripts/generateReadme.ts"
 
 permissions:
   contents: write
@@ -37,8 +40,11 @@ jobs:
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
 
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
       - name: Generate README
-        run: node scripts/generateReadme.mjs
+        run: pnpm generate-readme
 
       - name: Check for changes
         id: diff
@@ -51,5 +57,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add README.md
-          git commit -m "docs: auto-sync README from feature catalog and skills"
+          git commit -m "docs: sync README from its sources"
           git push

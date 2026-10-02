@@ -1,3 +1,4 @@
+import { execFile } from "node:child_process";
 import { createHash, randomBytes } from "node:crypto";
 import { createServer } from "node:http";
 
@@ -5,7 +6,7 @@ import { Effect, Schema } from "effect";
 
 import {
   type OpenRouterCredential,
-  OpenRouterOAuthFailure,
+  OpenRouterOAuthError,
   type OpenRouterOAuthRequest,
   openRouterCredentialSchema,
   openRouterKeyExchangeSchema,
@@ -13,22 +14,17 @@ import {
 
 const openRouterAuthorizationEndpoint = "https://openrouter.ai/auth";
 const openRouterKeyExchangeEndpoint = "https://openrouter.ai/api/v1/auth/keys";
+const openRouterChatEndpoint = "https://openrouter.ai/api/v1/chat/completions";
 
 type OpenRouterOAuthDependencies = {
   openBrowser: (authorizationUrl: URL) => Effect.Effect<void, Error>;
   exchangeAuthorizationCode?: (request: { code: string; codeVerifier: string }) => Effect.Effect<OpenRouterCredential>;
 };
 
-const base64Url = (value: Buffer): string => value.toString("base64url");
-
 const createPkceChallenge = (codeVerifier: string): string =>
   createHash("sha256").update(codeVerifier).digest("base64url");
 
-const callbackUrlFor = (request: { callbackPort: number; state: string }): URL => {
-  return new URL(`http://localhost:${String(request.callbackPort)}/openrouter/callback/${request.state}`);
-};
-
-const authorizationUrlFor = (request: { callbackUrl: URL; state: string; codeChallenge: string }): URL => {
+const authorizationUrlFor = (request: { callbackUrl: URL; codeChallenge: string }): URL => {
   const authorizationUrl = new URL(openRouterAuthorizationEndpoint);
   authorizationUrl.searchParams.set("callback_url", request.callbackUrl.toString());
   authorizationUrl.searchParams.set("code_challenge", request.codeChallenge);
@@ -36,9 +32,9 @@ const authorizationUrlFor = (request: { callbackUrl: URL; state: string; codeCha
   return authorizationUrl;
 };
 
-const waitForAuthorizationCode = (request: { callbackUrl: URL; state: string }) =>
-  Effect.async<string, OpenRouterOAuthFailure>((resume) => {
-    const callbackServers: Array<ReturnType<typeof createServer>> = [];
+// The callback path carries the state, so a request on any other path is rejected.
+const waitForAuthorizationCode = (callbackUrl: URL) =>
+  Effect.async<string, OpenRouterOAuthError>((resume) => {
     const closeCallbackServers = () => {
       callbackServers.forEach((callbackServer) => {
         callbackServer.close();
@@ -47,10 +43,10 @@ const waitForAuthorizationCode = (request: { callbackUrl: URL; state: string }) 
 
     const createCallbackServer = () =>
       createServer((incomingRequest, callbackWriter) => {
-        const requestUrl = new URL(incomingRequest.url || "/", request.callbackUrl);
+        const requestUrl = new URL(incomingRequest.url || "/", callbackUrl);
         const code = requestUrl.searchParams.get("code");
-        const failure = requestUrl.searchParams.get("error");
-        const validCallback = requestUrl.pathname === request.callbackUrl.pathname && code !== null;
+        const stateMatches = requestUrl.pathname === callbackUrl.pathname;
+        const validCallback = stateMatches && code !== null;
         callbackWriter.writeHead(validCallback ? 200 : 400, { "content-type": "text/plain; charset=utf-8" });
         callbackWriter.end(
           validCallback ? "Dufflebag connected. You can close this tab." : "Dufflebag could not connect this account.",
@@ -60,20 +56,16 @@ const waitForAuthorizationCode = (request: { callbackUrl: URL; state: string }) 
           resume(Effect.succeed(code));
           return;
         }
-        resume(Effect.fail(new OpenRouterOAuthFailure({ failureClass: failure === null ? "state" : "callback" })));
+        resume(Effect.fail(new OpenRouterOAuthError({ failureClass: stateMatches ? "callback" : "state" })));
       });
-    const loopbackHosts = ["127.0.0.1", "::1"];
-    callbackServers.push(...loopbackHosts.map(createCallbackServer));
-    callbackServers.forEach((callbackServer, index) => {
-      const loopbackHost = loopbackHosts[index];
-      if (loopbackHost === undefined) {
-        return;
-      }
+    // `localhost` can resolve to either loopback address, so listen on both.
+    const callbackServers = ["127.0.0.1", "::1"].map((loopbackHost) => {
+      const callbackServer = createCallbackServer();
       callbackServer.once("error", () => {
         closeCallbackServers();
-        resume(Effect.fail(new OpenRouterOAuthFailure({ failureClass: "callback" })));
+        resume(Effect.fail(new OpenRouterOAuthError({ failureClass: "callback" })));
       });
-      callbackServer.listen(Number(request.callbackUrl.port), loopbackHost);
+      return callbackServer.listen(Number(callbackUrl.port), loopbackHost);
     });
     return Effect.sync(closeCallbackServers);
   });
@@ -96,35 +88,61 @@ const exchangeAuthorizationCode = (request: { code: string; codeVerifier: string
       const openRouterKeyExchange = Schema.decodeUnknownSync(openRouterKeyExchangeSchema)(await upstreamReply.json());
       return Schema.decodeUnknownSync(openRouterCredentialSchema)({ credential: openRouterKeyExchange.key });
     },
-    catch: () => new OpenRouterOAuthFailure({ failureClass: "exchange" }),
+    catch: () => new OpenRouterOAuthError({ failureClass: "exchange" }),
   });
 
-/**
- * Runs OpenRouter PKCE browser consent and returns the exchanged credential to the caller.
- * @param request - Validated callback settings and optional browser/exchange mechanisms.
- * @returns An Effect containing the OpenRouter credential without persisting it.
- */
+// Runs PKCE browser consent and returns the credential without persisting it.
 export const connectOpenRouter = (request: {
   openRouterOAuthRequest: OpenRouterOAuthRequest;
   dependencies: OpenRouterOAuthDependencies;
-}): Effect.Effect<OpenRouterCredential, OpenRouterOAuthFailure> => {
-  const codeVerifier = base64Url(randomBytes(32));
-  const state = base64Url(randomBytes(24));
-  const callbackUrl = callbackUrlFor({ callbackPort: request.openRouterOAuthRequest.callbackPort, state });
-  const authorizationUrl = authorizationUrlFor({
-    callbackUrl,
-    state,
-    codeChallenge: createPkceChallenge(codeVerifier),
-  });
+}): Effect.Effect<OpenRouterCredential, OpenRouterOAuthError> => {
+  const codeVerifier = randomBytes(32).toString("base64url");
+  const state = randomBytes(24).toString("base64url");
+  const callbackUrl = new URL(
+    `http://localhost:${String(request.openRouterOAuthRequest.callbackPort)}/openrouter/callback/${state}`,
+  );
+  const authorizationUrl = authorizationUrlFor({ callbackUrl, codeChallenge: createPkceChallenge(codeVerifier) });
   const exchange =
     request.dependencies.exchangeAuthorizationCode === undefined
       ? exchangeAuthorizationCode
       : request.dependencies.exchangeAuthorizationCode;
   return Effect.gen(function* () {
-    const [authorizationCode] = yield* Effect.all(
-      [waitForAuthorizationCode({ callbackUrl, state }), request.dependencies.openBrowser(authorizationUrl)],
-      { concurrency: "unbounded" },
-    ).pipe(Effect.mapError(() => new OpenRouterOAuthFailure({ failureClass: "callback" })));
+    const openBrowser = request.dependencies
+      .openBrowser(authorizationUrl)
+      .pipe(Effect.mapError(() => new OpenRouterOAuthError({ failureClass: "callback" })));
+    const [authorizationCode] = yield* Effect.all([waitForAuthorizationCode(callbackUrl), openBrowser], {
+      concurrency: "unbounded",
+    });
     return yield* exchange({ code: authorizationCode, codeVerifier });
   });
+};
+
+export const openConsentScreen = (authorizationUrl: URL) =>
+  Effect.async<void, Error>((resume) => {
+    execFile("open", [authorizationUrl.toString()], (failure) => {
+      resume(
+        failure === null ? Effect.void : Effect.fail(new Error("macOS could not open the OpenRouter consent screen.")),
+      );
+    });
+  });
+
+// One tiny chat on the free-model route proves OpenRouter accepts the credential.
+export const checkOpenRouterCredential = (credential: string) => {
+  const declined = () => new Error("OpenRouter free-model smoke check was declined.");
+  return Effect.tryPromise({
+    try: () =>
+      fetch(openRouterChatEndpoint, {
+        method: "POST",
+        headers: { authorization: `Bearer ${credential}`, "content-type": "application/json" },
+        body: JSON.stringify({
+          model: "openrouter/free",
+          messages: [{ role: "user", content: "Reply exactly: OK" }],
+          max_tokens: 4,
+        }),
+      }),
+    catch: declined,
+  }).pipe(
+    Effect.filterOrFail((upstreamReply) => upstreamReply.ok, declined),
+    Effect.asVoid,
+  );
 };

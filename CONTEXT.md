@@ -6,43 +6,49 @@ Orientation: what this is, its moving parts, and how they fit. For the words, se
 
 ## What this is
 
-`dufflebag` is a personal toolbelt, not a platform: a TypeScript/Node CLI that installs, updates, and surgically uninstalls a curated bag of coding-agent guardrails, skills, and copyable CI/publish workflow templates. Installed TypeScript hooks form a separate dependency-free Node runtime. Local voice is a native Rust worker (`dufflebag-voice`, whisper.cpp large-v3-turbo) with thin Python bridges only for Supertonic TTS and Apple prompt refinement.
+`dufflebag` is a personal toolbelt, not a platform: a TypeScript/Node CLI that installs, updates, and surgically uninstalls a curated set of coding-agent guardrails, skills, and copyable CI/publish workflow templates. Installed TypeScript hooks are separate dependency-free Node code. Local voice is a native Rust worker (`dufflebag-voice`, whisper.cpp large-v3-turbo) with thin Python scripts only for Supertonic text to speech (`text_to_speech.py`) and prompt refinement (`refine_prompt.py`).
 
 ## Actors
 
 - **The owner / user** — runs `npx ys-dufflebag install` to wire guardrails into `~/.claude` (global) or `./.claude` (project).
 - **Claude Code, Codex, and Grok** — verified native lifecycle-hook targets.
 - **Other agents** — detected and wired only through verified catalog-driven formats; unsupported hook adapters are reported, not guessed.
-- **CI / `workflow scaffold` consumers** — repositories that copy the single-gate CI/publish set from `templates/workflows/`.
+- **CI / `workflow scaffold` consumers** — repositories that copy the single-gate CI/publish set from `src/templates/workflows/`.
 
 ## Shape (capability layout)
 
 Application code is grouped by capability, not by technical layer:
 
-- `src/cli/` — Effect CLI edge (`main`, commands, `TerminalUI`, package staging)
+- `src/cli/` — Effect CLI edge (`main`, one file per command, `TerminalUI`)
 - `src/catalog/` — feature and agent catalogs (decoded data is the SSOT)
-- `src/config/` — managed configuration schema, file IO, and planning
-- `src/install/` — artifact plans, receipts, transactional apply, lifecycle
-- `src/runtime/` — dependency-free hook kernel (`config` + `io`)
+- `src/config/` — managed configuration schema, config file read and save, and the list of every environment variable
+- `src/install/` — install plans, package preparation, receipts, transactional apply, lifecycle
+- `src/hooks/lib/` — dependency-free code shared by every hook feature (`hookConfig` + `hookOutput`)
 - `src/skills/<sourceDirectory>/` — authored skill payload only (camelCase directories), shipped verbatim
-- `src/hookIsland/<sourceDirectory>/` — feature-local executable hook runtime (`hooks/`, `lib/`, `command/`)
-- `src/doctor.ts` / `src/scaffoldWorkflows.ts` — doctor and workflow scaffolding capabilities
-- `scripts/` — outer-ring maintainer tooling (build, README generation, style contract); never imported by product code
-- `templates/` — copyable workflows and markdown guides
-- `dist/hooks/` — flat, compiled, zero-dep hook payload assembled at build time
-- `dist/staged/` — catalog-closed staged package for install/update/doctor
+- `src/hooks/<sourceDirectory>/` — feature-local executable hook code (`hooks/`, `lib/`, `command/`); `src/hooks/voice/worker/` is the Rust voice worker
+- `src/doctor/` — installation health checks behind `dufflebag doctor`
+- `src/workflows/` — workflow template copying behind `dufflebag workflow scaffold`
+- `src/voiceControl/` — voice worker on/off and the refine model picker, shared by the `voice` and `config` commands
+- `src/providerRouting/` — free provider routing: provider catalog, chat formats, HTTP, health file, and credentials
+- `src/scripts/` — outer-ring maintainer tooling (build, README generation, style contract); never imported by product code
+- `src/templates/` — copyable workflows and project docs
+- `src/statuslines/` — agent status-line presets with their own install script
+- `dist/prepared/` — catalog-closed prepared package for install/update/doctor
 
-`src/core/`, `src/commands/`, `src/payload/`, and `src/scripts/` are **not** part of the current tree (see ADR 0016; tooling lives under root `scripts/`).
+The repository root holds only configuration and top-level docs; everything authored lives under `src/`.
 
-A feature is either payload or runtime, never both: `src/skills/` holds only what is copied verbatim into an installed skill directory, and `src/hookIsland/` holds only code this repository compiles and installs elsewhere. The split is what lets the style contract apply one rule set per kind of code.
+A feature is either payload or hook code, never both: `src/skills/` holds only what is copied verbatim into an installed skill directory, and `src/hooks/` holds only code this repository compiles and installs elsewhere. The split is what lets the style contract apply one rule set per kind of code.
 
 ## Key constraints
 
 - Hooks must be **fail-open** — any internal error allows the tool through.
-- Ownership is receipt-based: install/update/uninstall apply only receipt-authorized artifacts.
-- Managed config lives at `.claude/dufflebag/config.json` and is schema-owned.
-- Idle compaction is off by default, requires macOS + Ghostty 1.3+, and targets a stable terminal ID claimed by the session itself.
-- A provider-specific `DUFFLEBAG_<AGENT_ID>_AUTO_COMPACT` process override wins over persistent `idleAutoCompact` config.
+- Ownership is receipt-based: install/update/uninstall change only files the receipt owns.
+- Managed config lives at `.claude/dufflebag/config.json` and is schema-owned. Installed hooks read that same file.
+- Hook state lives under `.claude/dufflebag/state/` (`autorun/`, `context-guard/`, `context-guard-off`, `idle-compact/`). `dufflebag free` keeps provider health in `~/.claude/dufflebag/state/provider-health.json`.
+- Hook background processes are **watchers** (the autorun watcher, the idle compact watcher). Voice background processes are **workers** (the dictation worker, the narration worker).
+- Idle compact is off by default, requires macOS + Ghostty 1.3+, and targets a stable terminal ID claimed by the session itself.
+- A `DUFFLEBAG_IDLE_COMPACT_AFTER` value set when starting an agent wins over the persistent `idleCompactAfter` config for that session.
+- Every setting and environment variable is listed in the Settings section of `README.md`, generated from `src/config/configSchema.ts` and `src/config/environmentVariables.ts`. Environment variables are named `DUFFLEBAG_<AREA>_<SETTING>`, config keys start with their area word (`context`, `autorun`, `idleCompact`, `speech`, `dictation`, `refine`, `duplicateCode`, `debug`), and a test fails when a `DUFFLEBAG_*` name in `src/` is missing from the list.
 - Authored skill directories use **camelCase**; public feature IDs and installed skill IDs remain **kebab-case** data.
-- One strict style bar across maintained TypeScript, documented in root `CODE-STYLE.md`. Biome and `scripts/checkCodeStyle.ts` both gate through `pnpm verify`, including `src/hookIsland/`; portable skill scripts additionally answer to their shipped harnesses.
+- One strict style bar across maintained TypeScript, documented in root `CODE-STYLE.md`. Biome and `src/scripts/checkCodeStyle.ts` both gate through `pnpm verify`, including `src/hooks/`; portable skill scripts additionally answer to their shipped harnesses.
 - Root `AGENTS.md` is the authoritative contract for coding agents and routes each subject to its delegated SSOT.

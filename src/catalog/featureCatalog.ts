@@ -1,12 +1,12 @@
 import { Either, Option, Schema } from "effect";
 
-// e.g. "context-guard", "png-to-code" — not "ContextGuard" or "png_to_code"
+// e.g. "context-guard", "image-to-code" — not "ContextGuard" or "png_to_code"
 const FEATURE_ID_PATTERN = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
-// e.g. "contextGuard", "pngToCode" — not "context-guard" or "Context_Guard"
+// e.g. "contextGuard", "imageToCode" — not "context-guard" or "Context_Guard"
 const SOURCE_DIRECTORY_PATTERN = /^[a-z][a-zA-Z0-9]*$/;
-// e.g. "SKILL.md", "hooks/ctxWatch.ts" — not "/abs/path" or "a/../b"
+// e.g. "SKILL.md", "hooks/autorunWatcher.ts" — not "/abs/path" or "a/../b"
 const FEATURE_RELATIVE_PATH_PATTERN = /^(?!\/)(?!.*(?:^|\/)\.\.(?:\/|$))[^\\]+$/;
-// e.g. "hooks/dedupGuard.ts" — feature-relative hook entrypoint only
+// e.g. "hooks/duplicateCodeGuard.ts" — feature-relative hook entrypoint only
 const HOOK_SOURCE_ENTRYPOINT_PATTERN = /^(?!\/)(?!.*(?:^|\/)\.\.(?:\/|$))[^\\]+\.ts$/;
 
 export const featureIdSchema = Schema.NonEmptyTrimmedString.pipe(
@@ -33,6 +33,12 @@ const shippedPathSchema = Schema.NonEmptyTrimmedString.pipe(
   }),
 );
 
+const shippedPathsSchema = (request: { readonly duplicateMessage: string; readonly description: string }) =>
+  Schema.Array(shippedPathSchema).pipe(
+    Schema.filter((paths) => paths.length === new Set(paths).size, { message: () => request.duplicateMessage }),
+    Schema.annotations({ description: request.description }),
+  );
+
 export const featurePlatformSchema = Schema.Literal("any", "macos", "macos+ghostty").annotations({
   description: "Host capability required by one selected feature.",
 });
@@ -46,14 +52,10 @@ export const installedSkillSchema = Schema.TaggedStruct("skill", {
       description: "Public directory name installed for this skill.",
     }),
   ),
-  shippedPaths: Schema.Array(shippedPathSchema).pipe(
-    Schema.filter((paths) => paths.length === new Set(paths).size, {
-      message: () => "Shipped paths must be unique within one skill.",
-    }),
-    Schema.annotations({
-      description: "Exact feature-relative allowlist copied into dist/skills.",
-    }),
-  ),
+  shippedPaths: shippedPathsSchema({
+    duplicateMessage: "Shipped paths must be unique within one skill.",
+    description: "Exact feature-relative allowlist copied into dist/skills.",
+  }),
 });
 
 export const installedSkillDefinitionSchema = Schema.Union(Schema.TaggedStruct("none", {}), installedSkillSchema);
@@ -102,9 +104,12 @@ const hookRegistrationSchema = Schema.Struct({
   }),
   matcher: hookMatcherSchema,
   entrypoint: registrationEntrypointSchema,
+  readsAgentId: Schema.Boolean.annotations({
+    description: "Whether the hook reads DUFFLEBAG_AGENT_ID, so its command starts with DUFFLEBAG_AGENT_ID=<agent>.",
+  }),
 });
 
-export const featureRuntimeSchema = Schema.Union(
+const featureRuntimeSchema = Schema.Union(
   Schema.TaggedStruct("none", {}),
   Schema.TaggedStruct("hook", {
     sourceEntrypoint: Schema.NonEmptyTrimmedString.pipe(
@@ -112,17 +117,13 @@ export const featureRuntimeSchema = Schema.Union(
         message: () => "Hook source entrypoints must end in .ts and stay feature-relative.",
       }),
       Schema.annotations({
-        description: "Feature-relative TypeScript entrypoint compiled into dist/runtime.",
+        description: "Feature-relative TypeScript entrypoint compiled into dist/src/hooks.",
       }),
     ),
-    shippedPaths: Schema.Array(shippedPathSchema).pipe(
-      Schema.filter((paths) => paths.length === new Set(paths).size, {
-        message: () => "Runtime shipped paths must be unique within one feature.",
-      }),
-      Schema.annotations({
-        description: "Exact authored runtime assets copied beside the compiled hook.",
-      }),
-    ),
+    shippedPaths: shippedPathsSchema({
+      duplicateMessage: "Runtime shipped paths must be unique within one feature.",
+      description: "Exact authored runtime assets copied beside the compiled hook.",
+    }),
     registrations: Schema.Array(hookRegistrationSchema).annotations({
       description: "Hook registrations derived into supported agent settings.",
     }),
@@ -161,36 +162,16 @@ export const featureDefinitionSchema = Schema.Struct({
 
 export type FeatureDefinition = Schema.Schema.Type<typeof featureDefinitionSchema>;
 
-const duplicateIndexes = (values: ReadonlyArray<string>): ReadonlyArray<number> =>
-  values.flatMap((value, index) => (values.indexOf(value) === index ? [] : [index]));
-
-const duplicateFeatureIdIssues = (features: ReadonlyArray<FeatureDefinition>) =>
-  duplicateIndexes(features.map((feature) => feature.id)).map((index) => ({
-    path: [index, "id"],
-    message: "Feature IDs must be unique.",
-  }));
-
-const duplicateSourceDirectoryIssues = (features: ReadonlyArray<FeatureDefinition>) =>
-  duplicateIndexes(features.map((feature) => feature.sourceDirectory)).map((index) => ({
-    path: [index, "sourceDirectory"],
-    message: "Source directories must be unique.",
-  }));
-
-const duplicateInstalledSkillIssues = (features: ReadonlyArray<FeatureDefinition>) =>
-  features.flatMap((feature, index) => {
-    if (feature.installedSkill._tag === "none") {
-      return [];
-    }
-
-    const installedSkillId = feature.installedSkill.id;
-    const firstIndex = features.findIndex(
-      (candidate) => candidate.installedSkill._tag === "skill" && candidate.installedSkill.id === installedSkillId,
-    );
-
-    return firstIndex === index
+const duplicateIssues = (request: {
+  readonly values: ReadonlyArray<string | undefined>;
+  readonly field: ReadonlyArray<string>;
+  readonly message: string;
+}) =>
+  request.values.flatMap((value, index) =>
+    value === undefined || request.values.indexOf(value) === index
       ? []
-      : [{ path: [index, "installedSkill", "id"], message: "Installed skill IDs must be unique." }];
-  });
+      : [{ path: [index, ...request.field], message: request.message }],
+  );
 
 const missingDependencyIssues = (features: ReadonlyArray<FeatureDefinition>) => {
   const featureIds = new Set(features.map((feature) => feature.id));
@@ -230,21 +211,56 @@ const dependencyCycleIssues = (features: ReadonlyArray<FeatureDefinition>) => {
   );
 };
 
-const validateFeatureCatalog = (features: ReadonlyArray<FeatureDefinition>) => {
-  return [
-    ...duplicateFeatureIdIssues(features),
-    ...duplicateSourceDirectoryIssues(features),
-    ...duplicateInstalledSkillIssues(features),
-    ...missingDependencyIssues(features),
-    ...dependencyCycleIssues(features),
-  ];
-};
+const validateFeatureCatalog = (features: ReadonlyArray<FeatureDefinition>) => [
+  ...duplicateIssues({
+    values: features.map((feature) => feature.id),
+    field: ["id"],
+    message: "Feature IDs must be unique.",
+  }),
+  ...duplicateIssues({
+    values: features.map((feature) => feature.sourceDirectory),
+    field: ["sourceDirectory"],
+    message: "Source directories must be unique.",
+  }),
+  ...duplicateIssues({
+    values: features.map((feature) =>
+      feature.installedSkill._tag === "skill" ? feature.installedSkill.id : undefined,
+    ),
+    field: ["installedSkill", "id"],
+    message: "Installed skill IDs must be unique.",
+  }),
+  ...missingDependencyIssues(features),
+  ...dependencyCycleIssues(features),
+];
 
 export const featureCatalogSchema = Schema.Array(featureDefinitionSchema).pipe(Schema.filter(validateFeatureCatalog));
 
-export const featureCatalog = Schema.decodeUnknownSync(featureCatalogSchema, {
-  onExcessProperty: "error",
-})([
+// A copied skill: installed under its feature ID, never preselected, and without hook code.
+const skillFeature = ({
+  shippedPaths,
+  dependencies = [],
+  platform = "any",
+  ...skill
+}: {
+  readonly id: string;
+  readonly sourceDirectory: string;
+  readonly title: string;
+  readonly summary: string;
+  readonly shippedPaths: ReadonlyArray<string>;
+  readonly dependencies?: ReadonlyArray<string>;
+  readonly platform?: Schema.Schema.Type<typeof featurePlatformSchema>;
+}) => ({
+  ...skill,
+  installedSkill: { _tag: "skill", id: skill.id, shippedPaths },
+  selectedByDefault: false,
+  dependencies,
+  platform,
+  runtime: { _tag: "none" },
+});
+
+const idleCompactEvents = ["SessionStart", "UserPromptSubmit", "Stop", "PreCompact", "PostCompact", "SessionEnd"];
+
+export const featureCatalog = Schema.decodeUnknownSync(featureCatalogSchema, { onExcessProperty: "error" })([
   {
     id: "context-guard",
     sourceDirectory: "contextGuard",
@@ -264,869 +280,482 @@ export const featureCatalog = Schema.decodeUnknownSync(featureCatalogSchema, {
           event: "PreToolUse",
           matcher: { _tag: "pattern", value: "Write|Edit|MultiEdit|NotebookEdit" },
           entrypoint: { _tag: "featureDefault" },
+          readsAgentId: false,
         },
         {
           event: "PostToolUse",
           matcher: { _tag: "pattern", value: "Write|Edit|MultiEdit|NotebookEdit" },
           entrypoint: { _tag: "featureDefault" },
+          readsAgentId: false,
         },
         {
           event: "UserPromptSubmit",
           matcher: { _tag: "none" },
           entrypoint: { _tag: "featureDefault" },
+          readsAgentId: false,
         },
         {
           event: "SessionStart",
           matcher: { _tag: "none" },
-          entrypoint: { _tag: "path", value: "hooks/ctxWatchSpawn.ts" },
+          entrypoint: { _tag: "path", value: "hooks/startAutorunWatcher.ts" },
+          readsAgentId: false,
         },
-        {
-          event: "SessionStart",
+        ...idleCompactEvents.map((event) => ({
+          event,
           matcher: { _tag: "none" },
-          entrypoint: { _tag: "path", value: "hooks/idleCompactHook.ts" },
-        },
-        {
-          event: "UserPromptSubmit",
-          matcher: { _tag: "none" },
-          entrypoint: { _tag: "path", value: "hooks/idleCompactHook.ts" },
-        },
-        {
-          event: "Stop",
-          matcher: { _tag: "none" },
-          entrypoint: { _tag: "path", value: "hooks/idleCompactHook.ts" },
-        },
-        {
-          event: "PreCompact",
-          matcher: { _tag: "none" },
-          entrypoint: { _tag: "path", value: "hooks/idleCompactHook.ts" },
-        },
-        {
-          event: "PostCompact",
-          matcher: { _tag: "none" },
-          entrypoint: { _tag: "path", value: "hooks/idleCompactHook.ts" },
-        },
-        {
-          event: "SessionEnd",
-          matcher: { _tag: "none" },
-          entrypoint: { _tag: "path", value: "hooks/idleCompactHook.ts" },
-        },
+          entrypoint: { _tag: "path", value: "hooks/recordIdleCompactEvent.ts" },
+          readsAgentId: true,
+        })),
       ],
     },
   },
-  {
-    id: "autonomous-loop",
+  skillFeature({
+    id: "autorun",
     sourceDirectory: "autorun",
-    installedSkill: {
-      _tag: "skill",
-      id: "autorun",
-      shippedPaths: ["SKILL.md"],
-    },
-    title: "Autonomous loop (autorun)",
+    title: "Autorun",
     summary:
-      "A skill that arms the context-guard SessionStart daemon to auto-/compact and resume hands-free once context nears the guardrail and a fresh handoff exists. macOS + Ghostty only (it types into your terminal window). Hook runtime lives under context-guard.",
-    selectedByDefault: false,
+      "Let the agent keep working alone. When the context is almost full and a fresh handoff note exists, it runs /compact and continues the task. macOS + Ghostty only (it types into your terminal). The hook code lives in context-guard.",
+    shippedPaths: ["SKILL.md"],
     dependencies: ["context-guard"],
     platform: "macos+ghostty",
-    runtime: { _tag: "none" },
-  },
+  }),
   {
-    id: "speak-response",
-    sourceDirectory: "speakResponse",
+    id: "voice",
+    sourceDirectory: "voice",
     installedSkill: { _tag: "none" },
-    title: "Speak responses (TTS)",
+    title: "Voice",
     summary:
-      "Read complete agent responses with local speech, hold-§ dictation via whisper.cpp large-v3-turbo (Metal), Cmux focus gating, and optional on-device prompt refinement on macOS.",
+      "Read complete agent responses with local speech, hold-Shift dictation via whisper.cpp large-v3-turbo (Metal), Cmux focus gating, and optional on-device prompt refinement on macOS.",
     selectedByDefault: false,
     dependencies: [],
     platform: "any",
     runtime: {
       _tag: "hook",
-      sourceEntrypoint: "hooks/speakResponse.ts",
-      // Native STT worker (built by scripts/buildVoice.sh) plus optional Python helpers.
-      shippedPaths: ["dufflebag-voice", "cmux_focus.py", "prompt_refinement.py", "tts_bridge.py", "tts_bridge.py.lock"],
+      sourceEntrypoint: "hooks/speakReply.ts",
+      // Native voice worker (built by src/scripts/buildVoiceWorker.sh) plus optional Python helpers.
+      shippedPaths: [
+        "dufflebag-voice",
+        "refine_prompt.py",
+        "refine_providers.py",
+        "refine_choices.py",
+        "mac_picker.py",
+        "text_to_speech.py",
+        "text_to_speech.py.lock",
+      ],
       registrations: [
         {
           event: "Stop",
           matcher: { _tag: "none" },
           entrypoint: { _tag: "featureDefault" },
+          readsAgentId: true,
         },
       ],
     },
   },
   {
-    id: "dedup-guard",
-    sourceDirectory: "dedupGuard",
+    id: "duplicate-code-guard",
+    sourceDirectory: "duplicateCodeGuard",
     installedSkill: { _tag: "none" },
-    title: "Dedup guard",
+    title: "Duplicate code guard",
     summary:
-      "Block a Write/Edit that pastes a function body or interface/type shape already defined elsewhere in the repo — DRY enforced at the moment of the write. Uses the repo's own TypeScript; deny by default (tune with dufflebagDedupEnforcement). Also wires Cursor (warn) + an AGENTS.md rule for Codex.",
+      "Block a Write/Edit that pastes a function body or interface/type shape already defined elsewhere in the repo — DRY enforced at the moment of the write. Uses the repo's own TypeScript; blocks by default (tune with `dufflebag config set duplicate-code-mode warn`). Agents without edit hooks can run `dufflebag duplicates` as a pre-commit or CI check.",
     selectedByDefault: false,
     dependencies: [],
     platform: "any",
     runtime: {
       _tag: "hook",
-      sourceEntrypoint: "hooks/dedupGuard.ts",
+      sourceEntrypoint: "hooks/duplicateCodeGuard.ts",
       shippedPaths: [],
       registrations: [
         {
           event: "PreToolUse",
           matcher: { _tag: "pattern", value: "Write|Edit|MultiEdit" },
           entrypoint: { _tag: "featureDefault" },
+          readsAgentId: false,
         },
       ],
     },
   },
-  {
-    id: "png-to-code",
-    sourceDirectory: "pngToCode",
-    installedSkill: {
-      _tag: "skill",
-      id: "png-to-code",
-      shippedPaths: [
-        "SKILL.md",
-        "README.md",
-        "CONTEXT.md",
-        "TECH-GLOSSARY.md",
-        "reference",
-        "demo",
-        "scripts/package.json",
-        "scripts/svgo.config.mjs",
-        "scripts/robot.svgo.config.mjs",
-        "scripts/tsconfig.json",
-        "scripts/src",
-      ],
-    },
-    title: "PNG → pixel-perfect code",
+  skillFeature({
+    id: "image-to-code",
+    sourceDirectory: "imageToCode",
+    title: "Image to code",
     summary:
-      "A skill that turns a PNG design (illustration, logo, UI mockup) into SVG/HTML/CSS that measurably converges to a 1:1 match — a decompose → reuse-or-build → render → screenshot-diff → refine loop, plus a rig-first doctrine for animation. Pure skill (no hooks); its diff harness needs Node + Playwright.",
-    selectedByDefault: false,
-    dependencies: [],
-    platform: "any",
-    runtime: { _tag: "none" },
-  },
-  {
-    id: "github-repo-metadata",
-    sourceDirectory: "githubRepoMetadata",
-    installedSkill: {
-      _tag: "skill",
-      id: "github-repo-metadata",
-      shippedPaths: ["SKILL.md"],
-    },
-    title: "GitHub repo metadata",
+      "Turn an image (PNG, screenshot, design) into code that looks the same — SVG, HTML/CSS, or animation — checked with pixel diffs.",
+    shippedPaths: [
+      "SKILL.md",
+      "README.md",
+      "CONTEXT.md",
+      "TECH-GLOSSARY.md",
+      "reference",
+      "scripts/package.json",
+      "scripts/svgo.config.mjs",
+      "scripts/tsconfig.json",
+      "scripts/src",
+    ],
+  }),
+  skillFeature({
+    id: "github-repo-about",
+    sourceDirectory: "githubRepoAbout",
+    title: "GitHub repo About",
+    summary: 'Write the GitHub "About" box — a one-line description, a website link, and topics.',
+    shippedPaths: ["SKILL.md"],
+  }),
+  skillFeature({
+    id: "write-blog-post",
+    sourceDirectory: "writeBlogPost",
+    title: "Write blog post (voice + cover)",
     summary:
-      "A skill that writes and audits GitHub repository About metadata: concise descriptions, homepage/demo links, and topics/tags grounded in official GitHub guidance. Pure skill (no hooks).",
-    selectedByDefault: false,
-    dependencies: [],
-    platform: "any",
-    runtime: { _tag: "none" },
-  },
-  {
-    id: "write-a-post",
-    sourceDirectory: "writeAPost",
-    installedSkill: {
-      _tag: "skill",
-      id: "write-a-post",
-      shippedPaths: ["SKILL.md"],
-    },
-    title: "Write a blog post (voice + cover)",
+      "Write a new portfolio blog post in the owner's voice, add it to the blog data file, and make a matching cover image in ChatGPT.",
+    shippedPaths: ["SKILL.md"],
+  }),
+  skillFeature({
+    id: "write-readme",
+    sourceDirectory: "writeReadme",
+    title: "Write README",
     summary:
-      "A skill that writes a portfolio blog post in the owner's exact voice, scaffolds it into the blog data file via a one-command dev script, and generates a matching cover image by driving a real ChatGPT browser conversation through ai-browser-bridge (attaching the likeness photo + an existing cover so the character and flat-2D style stay consistent). Pure skill (no hooks).",
-    selectedByDefault: false,
-    dependencies: [],
-    platform: "any",
-    runtime: { _tag: "none" },
-  },
-  {
-    id: "readme-editor",
-    sourceDirectory: "readmeEditor",
-    installedSkill: {
-      _tag: "skill",
-      id: "readme-editor",
-      shippedPaths: ["SKILL.md", "references"],
-    },
-    title: "README editor",
+      "Write or fix the README and other start-here docs. Reads the repo first, then asks you questions one by one.",
+    shippedPaths: ["SKILL.md", "references"],
+  }),
+  skillFeature({
+    id: "update-agent-docs",
+    sourceDirectory: "updateAgentDocs",
+    title: "Update agent docs",
     summary:
-      "A skill that audits and rewrites README.md, AGENTS.md, CLAUDE.md, Copilot instructions, and llms.txt from repo evidence, with official links for named tools and technologies. Pure skill (no hooks).",
-    selectedByDefault: false,
-    dependencies: [],
-    platform: "any",
-    runtime: { _tag: "none" },
-  },
-  {
-    id: "refresh-agent-docs",
-    sourceDirectory: "refreshAgentDocs",
-    installedSkill: {
-      _tag: "skill",
-      id: "refresh-agent-docs",
-      shippedPaths: ["SKILL.md", "sources.json", "scripts"],
-    },
-    title: "Refresh agent docs",
+      "Create or update agent instruction files (AGENTS.md, CLAUDE.md, GEMINI.md, Cursor rules, and more) based on each agent's official docs.",
+    shippedPaths: ["SKILL.md", "sources.json", "scripts"],
+  }),
+  skillFeature({
+    id: "make-code-readable",
+    sourceDirectory: "makeCodeReadable",
+    title: "Make code readable",
     summary:
-      "A skill that refetches current official guidance for AGENTS.md, CLAUDE.md, GEMINI.md, Cursor rules, Kiro steering, Roo rules, and Codex instructions before rewriting repo agent docs. Pure skill (no hooks).",
-    selectedByDefault: false,
-    dependencies: [],
-    platform: "any",
-    runtime: { _tag: "none" },
-  },
-  {
-    id: "deslop",
-    sourceDirectory: "deslop",
-    installedSkill: {
-      _tag: "skill",
-      id: "deslop",
-      shippedPaths: ["SKILL.md", "references"],
-    },
-    title: "Deslop",
+      "Make code easier to read — clearer names, files, and functions. Reviews first and shows before and after.",
+    shippedPaths: ["SKILL.md", "references"],
+  }),
+  skillFeature({
+    id: "simplify-code",
+    sourceDirectory: "simplifyCode",
+    title: "Simplify code",
+    summary: "Remove extra code — wrappers, layers, folders, generic names, and scripts the job does not need.",
+    shippedPaths: ["SKILL.md", "references"],
+  }),
+  skillFeature({
+    id: "question-my-plan",
+    sourceDirectory: "questionMyPlan",
+    title: "Question my plan",
+    summary: "Ask hard questions about your plan or design until you both understand it the same way.",
+    shippedPaths: ["SKILL.md"],
+  }),
+  skillFeature({
+    id: "code-style-new-project",
+    sourceDirectory: "codeStyleNewProject",
+    title: "Code style — new project",
     summary:
-      "A skill that reviews code readability first, then applies approved cleanup to make the full pipeline understandable in seconds. Use when the user asks to clean up, rename, or make code less AI-generated.",
-    selectedByDefault: false,
-    dependencies: [],
-    platform: "any",
-    runtime: { _tag: "none" },
-  },
-  {
-    id: "deslop-v2",
-    sourceDirectory: "deslopV2",
-    installedSkill: {
-      _tag: "skill",
-      id: "deslop-v2",
-      shippedPaths: ["SKILL.md", "references"],
-    },
-    title: "Deslop v2 — kill over-engineering",
+      "For a new project — ask you questions about code style, folder structure, and CLI, then write CODE-STYLE.md, a formatter config, and the project docs.",
+    shippedPaths: ["SKILL.md", "_shared"],
+  }),
+  skillFeature({
+    id: "code-style-teach-me",
+    sourceDirectory: "codeStyleTeachMe",
+    title: "Code style — teach me",
     summary:
-      "The over-engineering companion to deslop: reviews code, repo structure, and tool-ceremony for excess — pass-through wrappers, `??` fallback chains, nested ternaries, grab-bag returns, over-nested folders/packages, house typegen, and scripts that only shell wrangler/biome/drizzle — then removes it so the code does exactly what it needs and no more. Use when the user says code is over-engineered, over-abstracted, or too complicated, or asks to kill ceremony, simplify, flatten, or cut needless indirection and layers. Pure skill (no hooks).",
-    selectedByDefault: false,
-    dependencies: [],
-    platform: "any",
-    runtime: { _tag: "none" },
-  },
-  {
-    id: "grill-me",
-    sourceDirectory: "grillMe",
-    installedSkill: {
-      _tag: "skill",
-      id: "grill-me",
-      shippedPaths: ["SKILL.md"],
-    },
-    title: "Grill me",
+      "While you build, stop at each real choice, show two options, and explain the rule so you learn your own architecture.",
+    shippedPaths: ["SKILL.md"],
+  }),
+  skillFeature({
+    id: "code-style-review",
+    sourceDirectory: "codeStyleReview",
+    title: "Code style review",
     summary:
-      "A skill that interviews the user relentlessly about a plan or design until reaching shared understanding, firing every ready question in one TUI question card.",
-    selectedByDefault: false,
-    dependencies: [],
-    platform: "any",
-    runtime: { _tag: "none" },
-  },
-  {
-    id: "grill-me-code-style",
-    sourceDirectory: "grillMeCodeStyle",
-    installedSkill: {
-      _tag: "skill",
-      id: "grill-me-code-style",
-      shippedPaths: ["SKILL.md", "_shared"],
-    },
-    title: "Grill me — code style (greenfield)",
+      "Check a big change (branch or PR) against the style rules and get a short report, so you do not need to read every file.",
+    shippedPaths: ["SKILL.md"],
+  }),
+  skillFeature({
+    id: "code-style-existing-project",
+    sourceDirectory: "codeStyleExistingProject",
+    title: "Code style — existing project",
     summary:
-      "A greenfield code-style grilling skill. Interviews the user about how a new project is built, then renders an interactive HTML plan and writes CODE-STYLE.md, formatter config, and AGENTS.md digest on approval.",
-    selectedByDefault: false,
-    dependencies: [],
-    platform: "any",
-    runtime: { _tag: "none" },
-  },
-  {
-    id: "grill-me-code-style-coach",
-    sourceDirectory: "grillMeCodeStyleCoach",
-    installedSkill: {
-      _tag: "skill",
-      id: "grill-me-code-style-coach",
-      shippedPaths: ["SKILL.md"],
-    },
-    title: "Grill me — code style coach",
-    summary: "Coach real style and structure decisions while code is being built or fixed.",
-    selectedByDefault: false,
-    dependencies: [],
-    platform: "any",
-    runtime: { _tag: "none" },
-  },
-  {
-    id: "grill-me-code-style-review",
-    sourceDirectory: "grillMeCodeStyleReview",
-    installedSkill: {
-      _tag: "skill",
-      id: "grill-me-code-style-review",
-      shippedPaths: ["SKILL.md"],
-    },
-    title: "Grill me — code style review",
-    summary: "Review a large changeset against its code-style contract and explain only real deviations.",
-    selectedByDefault: false,
-    dependencies: [],
-    platform: "any",
-    runtime: { _tag: "none" },
-  },
-  {
-    id: "grill-me-code-style-with-docs",
-    sourceDirectory: "grillMeCodeStyleWithDocs",
-    installedSkill: {
-      _tag: "skill",
-      id: "grill-me-code-style-with-docs",
-      shippedPaths: ["SKILL.md", "SCAN.md", "references", "scripts"],
-    },
-    title: "Grill me — code style (existing codebase)",
+      "For a project that already has code — read the real code, ask you questions, then write or update CODE-STYLE.md and the formatter config. Can also only check code against the rules.",
+    shippedPaths: ["SKILL.md", "SCAN.md", "references", "scripts"],
+    dependencies: ["code-style-new-project"],
+  }),
+  skillFeature({
+    id: "explain-my-stack",
+    sourceDirectory: "explainMyStack",
+    title: "Explain my stack",
     summary:
-      "An existing-codebase code-style grilling skill. Uses real code as evidence, fans out sub-agents for repeated patterns, then writes/updates CODE-STYLE.md and the AGENTS.md digest on approval.",
-    selectedByDefault: false,
-    dependencies: ["grill-me-code-style"],
-    platform: "any",
-    runtime: { _tag: "none" },
-  },
-  {
-    id: "grill-me-stack",
-    sourceDirectory: "grillMeStack",
-    installedSkill: {
-      _tag: "skill",
-      id: "grill-me-stack",
-      shippedPaths: ["SKILL.md", "TEACH-FORMAT.md"],
-    },
-    title: "Grill me — technology stack",
-    summary: "Teach and challenge a project's technology choices until their tradeoffs are explainable.",
-    selectedByDefault: false,
-    dependencies: [],
-    platform: "any",
-    runtime: { _tag: "none" },
-  },
-  {
-    id: "grill-with-docs",
-    sourceDirectory: "grillWithDocs",
-    installedSkill: {
-      _tag: "skill",
-      id: "grill-with-docs",
-      shippedPaths: ["SKILL.md", "CONTEXT-FORMAT.md", "ADR-FORMAT.md", "LANGUAGE-FORMAT.md"],
-    },
-    title: "Grill with docs",
+      "Understand why the project uses each technology (language, framework, services) and save the answers in TEACH.md.",
+    shippedPaths: ["SKILL.md", "TEACH-FORMAT.md"],
+  }),
+  skillFeature({
+    id: "question-plan-with-docs",
+    sourceDirectory: "questionPlanWithDocs",
+    title: "Question plan with docs",
+    summary: "Check your plan against the project docs and decisions, and update the docs as you decide.",
+    shippedPaths: ["SKILL.md", "CONTEXT-FORMAT.md", "ADR-FORMAT.md", "LANGUAGE-FORMAT.md"],
+    dependencies: ["code-style-new-project"],
+  }),
+  skillFeature({
+    id: "plan-page",
+    sourceDirectory: "planPage",
+    title: "Plan page",
     summary:
-      "A grilling session that challenges a plan against the existing domain model, sharpens terminology, and updates LANGUAGE.md, CONTEXT.md, PROJECT.md, and ADRs inline as decisions crystallise.",
-    selectedByDefault: false,
-    dependencies: ["grill-me-code-style"],
-    platform: "any",
-    runtime: { _tag: "none" },
-  },
-  {
-    id: "planpage",
-    sourceDirectory: "planpage",
-    installedSkill: {
-      _tag: "skill",
-      id: "planpage",
-      shippedPaths: ["SKILL.md", "COMPONENTS.md"],
-    },
-    title: "planpage",
+      "Show a plan, approval step, or report as an interactive HTML page (open-source planpage package) where you can approve or change choices.",
+    shippedPaths: ["SKILL.md", "COMPONENTS.md"],
+  }),
+  skillFeature({
+    id: "website-speed-ci",
+    sourceDirectory: "websiteSpeedCi",
+    title: "Website speed CI",
+    summary: "Add website speed checks (Lighthouse CI, Core Web Vitals, CrUX) to CI so a slow change fails the PR.",
+    shippedPaths: ["SKILL.md", "README.md", "CONTEXT.md", "TECH-GLOSSARY.md", "reference", "scripts", "templates"],
+  }),
+  skillFeature({
+    id: "chrome-store-seo",
+    sourceDirectory: "chromeStoreSeo",
+    title: "Chrome Store SEO",
     summary:
-      "A skill for rendering agent plans, review gates, and reports as beautiful interactive HTML pages using the open-source planpage package.",
-    selectedByDefault: false,
-    dependencies: [],
-    platform: "any",
-    runtime: { _tag: "none" },
-  },
-  {
-    id: "web-perf-ci",
-    sourceDirectory: "webPerfCi",
-    installedSkill: {
-      _tag: "skill",
-      id: "web-perf-ci",
-      shippedPaths: ["SKILL.md", "README.md", "CONTEXT.md", "TECH-GLOSSARY.md", "reference", "scripts", "templates"],
-    },
-    title: "Website performance CI (Core Web Vitals)",
+      "Improve your Chrome Web Store text (name, summary, description) and landing page so more people find the extension.",
+    shippedPaths: ["SKILL.md", "REFERENCE.md", "scripts", "templates"],
+  }),
+  skillFeature({
+    id: "make-promo-video",
+    sourceDirectory: "makePromoVideo",
+    title: "Make promo video",
     summary:
-      "A skill that wires automated performance gates into a website's CI/CD: a Lighthouse CI budget check on every PR (lab), a Chrome UX Report (CrUX) real-user field check after deploy, and an optional web-vitals RUM snippet — all enforcing Core Web Vitals budgets (LCP, INP, CLS). It interviews the repo to detect the stack and run mode, then writes lighthouserc, the GitHub Actions workflows, and zero-dep CrUX + PSI checkers. Pure skill (no hooks); the checks need Node 18+ and a free Google API key (Chrome UX Report + PageSpeed Insights APIs).",
-    selectedByDefault: false,
-    dependencies: [],
-    platform: "any",
-    runtime: { _tag: "none" },
-  },
-  {
-    id: "cws-listing-seo",
-    sourceDirectory: "cwsListingSeo",
-    installedSkill: {
-      _tag: "skill",
-      id: "cws-listing-seo",
-      shippedPaths: ["SKILL.md", "REFERENCE.md", "scripts", "templates"],
-    },
-    title: "Chrome Web Store listing SEO (+ GEO)",
-    summary:
-      "A skill that optimizes Chrome Web Store listing copy (name, summary, Overview) and marketing-site GEO using official Chrome/Google guidance. Ships a zero-dep validator for limits + Keyword Spam heuristics; CWS keyword volume stays manual/browser research (no official free API). Pure skill (no hooks).",
-    selectedByDefault: false,
-    dependencies: [],
-    platform: "any",
-    runtime: { _tag: "none" },
-  },
-  {
-    id: "make-a-trailer",
-    sourceDirectory: "makeATrailer",
-    installedSkill: {
-      _tag: "skill",
-      id: "make-a-trailer",
-      shippedPaths: ["SKILL.md", "reference", "scripts"],
-    },
-    title: "Make a trailer (cinematic project video)",
-    summary:
-      "A skill that directs a cinematic, viral-ready vertical trailer for any project: it reads the repo's own docs to derive the story, consults ChatGPT (GPT-5.5 Thinking) over ai-browser-bridge to write the transcript + storyboard, batch-generates the keyframes as ChatGPT images, animates them with Higgsfield or Flow/Veo, produces voiceover + music (ElevenLabs → Higgsfield → local synth), and assembles a 9:16 master + 16:9/1:1/4:5 cuts with ffmpeg — behind two planpage approval gates and a resumable generation manifest. macOS + Chrome (ai-browser-bridge), the Higgsfield MCP, and ffmpeg required. Pure skill (no hooks).",
-    selectedByDefault: false,
-    dependencies: ["planpage"],
+      "Make a short promo video for a project — story, images, animation, voice, music, and a cut for each social app.",
+    shippedPaths: ["SKILL.md", "reference", "scripts"],
+    dependencies: ["plan-page"],
     platform: "macos",
-    runtime: { _tag: "none" },
-  },
-  {
-    id: "web-best-practices",
-    sourceDirectory: "webBestPractices",
-    installedSkill: {
-      _tag: "skill",
-      id: "web-best-practices",
-      shippedPaths: ["SKILL.md", "reference", "scripts", "templates"],
-    },
-    title: "Web best practices",
-    summary: "Audit and fix semantics, accessibility, assets, security, SEO, and machine readability.",
-    selectedByDefault: false,
-    dependencies: [],
-    platform: "any",
-    runtime: { _tag: "none" },
-  },
-  {
-    id: "organized-commits",
-    sourceDirectory: "organizedCommits",
-    installedSkill: {
-      _tag: "skill",
-      id: "organized-commits",
-      shippedPaths: ["SKILL.md", "REFERENCE.md"],
-    },
-    title: "Organized commits",
+  }),
+  skillFeature({
+    id: "check-website-quality",
+    sourceDirectory: "checkWebsiteQuality",
+    title: "Check website quality",
     summary:
-      "Organize Git changes into atomic, evidence-backed commits and safely push or consolidate work when requested.",
-    selectedByDefault: false,
-    dependencies: [],
-    platform: "any",
-    runtime: { _tag: "none" },
-  },
-  {
-    id: "finish-and-ship",
-    sourceDirectory: "finishAndShip",
-    installedSkill: {
-      _tag: "skill",
-      id: "finish-and-ship",
-      shippedPaths: ["SKILL.md"],
-    },
-    title: "Finish and ship",
+      "Scan a website for HTML structure, accessibility, images, speed, security headers, SEO, and AI-readiness, then fix what is wrong.",
+    shippedPaths: ["SKILL.md", "reference", "scripts", "templates"],
+  }),
+  skillFeature({
+    id: "organize-commits",
+    sourceDirectory: "organizeCommits",
+    title: "Organize commits",
+    summary: "Split your changes into small, clear commits with good messages, and clean up history and branches.",
+    shippedPaths: ["SKILL.md", "REFERENCE.md"],
+  }),
+  skillFeature({
+    id: "finish-and-push",
+    sourceDirectory: "finishAndPush",
+    title: "Finish and push",
+    summary: "Finish the work — run checks, commit, push to a feature branch, and clean up leftovers.",
+    shippedPaths: ["SKILL.md"],
+    dependencies: ["organize-commits"],
+  }),
+  skillFeature({
+    id: "run-local-and-check",
+    sourceDirectory: "runLocalAndCheck",
+    title: "Run local and check",
+    summary: "Run the app on your computer and prove it works in a real browser or app. No deploy.",
+    shippedPaths: ["SKILL.md"],
+  }),
+  skillFeature({
+    id: "reuse-before-build",
+    sourceDirectory: "reuseBeforeBuild",
+    title: "Reuse before build",
     summary:
-      "Close implementation, verification, Git history, push, hosted checks, and handoff without hidden leftovers.",
-    selectedByDefault: false,
-    dependencies: ["organized-commits"],
-    platform: "any",
-    runtime: { _tag: "none" },
-  },
-  {
-    id: "preview-and-prove",
-    sourceDirectory: "previewAndProve",
-    installedSkill: {
-      _tag: "skill",
-      id: "preview-and-prove",
-      shippedPaths: ["SKILL.md"],
-    },
-    title: "Preview and prove",
+      "Before building a feature, find code, packages, or platform features you already have that can do the job.",
+    shippedPaths: ["SKILL.md"],
+  }),
+  skillFeature({
+    id: "find-repeated-prompts",
+    sourceDirectory: "findRepeatedPrompts",
+    title: "Find repeated prompts",
+    summary: "Read your past agent sessions and find prompts and work patterns you repeat, as ideas for new skills.",
+    shippedPaths: ["SKILL.md", "scripts"],
+  }),
+  skillFeature({
+    id: "install-skills",
+    sourceDirectory: "installSkills",
+    title: "Install skills",
+    summary: "Install or update skills in all your coding agents and check that each agent can really find them.",
+    shippedPaths: ["SKILL.md"],
+  }),
+  skillFeature({
+    id: "fix-env-config",
+    sourceDirectory: "fixEnvConfig",
+    title: "Fix env config",
     summary:
-      "Launch the real product surface and prove a user-visible flow through browser, network, and persisted-state evidence.",
-    selectedByDefault: false,
-    dependencies: [],
-    platform: "any",
-    runtime: { _tag: "none" },
-  },
-  {
-    id: "reuse-first-audit",
-    sourceDirectory: "reuseFirstAudit",
-    installedSkill: {
-      _tag: "skill",
-      id: "reuse-first-audit",
-      shippedPaths: ["SKILL.md"],
-    },
-    title: "Reuse-first audit",
+      "Put env variables and config in one place with types and checks, and find duplicates, silent defaults, and secrets leaking to the client.",
+    shippedPaths: ["SKILL.md"],
+  }),
+  skillFeature({
+    id: "add-mcp-server",
+    sourceDirectory: "addMcpServer",
+    title: "Add MCP server",
+    summary: "Add an MCP server to your agents, log in with OAuth, and check that its tools really work.",
+    shippedPaths: ["SKILL.md"],
+  }),
+  skillFeature({
+    id: "check-rtl-ui",
+    sourceDirectory: "checkRtlUi",
+    title: "Check RTL UI",
     summary:
-      "Search internal code, platform primitives, and primary ecosystem sources before deciding to build new surface.",
-    selectedByDefault: false,
-    dependencies: [],
-    platform: "any",
-    runtime: { _tag: "none" },
-  },
-  {
-    id: "agent-session-auditor",
-    sourceDirectory: "agentSessionAuditor",
-    installedSkill: {
-      _tag: "skill",
-      id: "agent-session-auditor",
-      shippedPaths: ["SKILL.md", "scripts"],
-    },
-    title: "Agent session auditor",
-    summary:
-      "Privacy-safe local session coverage, prompt extraction, fuzzy clustering, and evidence-backed skill prioritization — one-command script plus optional multi-agent review.",
-    selectedByDefault: false,
-    dependencies: [],
-    platform: "any",
-    runtime: { _tag: "none" },
-  },
-  {
-    id: "sync-agent-skills",
-    sourceDirectory: "syncAgentSkills",
-    installedSkill: {
-      _tag: "skill",
-      id: "sync-agent-skills",
-      shippedPaths: ["SKILL.md"],
-    },
-    title: "Sync agent skills",
-    summary:
-      "Synchronize canonical skills through receipt-backed native formats and prove parity across detected supported agents.",
-    selectedByDefault: false,
-    dependencies: [],
-    platform: "any",
-    runtime: { _tag: "none" },
-  },
-  {
-    id: "env-config-contract",
-    sourceDirectory: "envConfigContract",
-    installedSkill: {
-      _tag: "skill",
-      id: "env-config-contract",
-      shippedPaths: ["SKILL.md"],
-    },
-    title: "Environment config contract",
-    summary:
-      "Consolidate environment reads into fail-loud schema boundaries without leaking secrets across trust zones.",
-    selectedByDefault: false,
-    dependencies: [],
-    platform: "any",
-    runtime: { _tag: "none" },
-  },
-  {
-    id: "mcp-oauth-onboarding",
-    sourceDirectory: "mcpOauthOnboarding",
-    installedSkill: {
-      _tag: "skill",
-      id: "mcp-oauth-onboarding",
-      shippedPaths: ["SKILL.md"],
-    },
-    title: "MCP OAuth onboarding",
-    summary:
-      "Install an MCP at the intended scope, complete OAuth, reload the agent, and prove it with a harmless tool call.",
-    selectedByDefault: false,
-    dependencies: [],
-    platform: "any",
-    runtime: { _tag: "none" },
-  },
-  {
-    id: "rtl-ui-audit",
-    sourceDirectory: "rtlUiAudit",
-    installedSkill: {
-      _tag: "skill",
-      id: "rtl-ui-audit",
-      shippedPaths: ["SKILL.md"],
-    },
-    title: "RTL UI audit",
-    summary:
-      "Audit and verify real right-to-left layout, bidi content, directional assets, interaction, and accessibility.",
-    selectedByDefault: false,
-    dependencies: [],
-    platform: "any",
-    runtime: { _tag: "none" },
-  },
-  {
-    id: "deploy-and-prove",
-    sourceDirectory: "deployAndProve",
-    installedSkill: {
-      _tag: "skill",
-      id: "deploy-and-prove",
-      shippedPaths: ["SKILL.md"],
-    },
-    title: "Deploy and prove",
-    summary:
-      "Deploy or publish an immutable source identity and prove the provider, live runtime, and changed behavior serve it.",
-    selectedByDefault: false,
-    dependencies: [],
-    platform: "any",
-    runtime: { _tag: "none" },
-  },
-  {
+      "Check and fix right-to-left screens (Hebrew, Arabic, Persian, Urdu) — layout, mixed-direction text, icons, forms, and accessibility.",
+    shippedPaths: ["SKILL.md"],
+  }),
+  skillFeature({
+    id: "deploy-and-check",
+    sourceDirectory: "deployAndCheck",
+    title: "Deploy and check",
+    summary: "Deploy to production and prove it is really live with checks against the real URL.",
+    shippedPaths: ["SKILL.md"],
+  }),
+  skillFeature({
     id: "fix-bug",
     sourceDirectory: "fixBug",
-    installedSkill: {
-      _tag: "skill",
-      id: "fix-bug",
-      shippedPaths: ["SKILL.md"],
-    },
     title: "Fix bug",
-    summary:
-      "Reproduce one or many reported bugs (env, logs, edge cases), root-cause, fix, and verify — never patch from the report alone.",
-    selectedByDefault: false,
-    dependencies: [],
-    platform: "any",
-    runtime: { _tag: "none" },
-  },
-  {
-    id: "sdlc-tasks-executions",
-    sourceDirectory: "sdlcTasksExecutions",
-    installedSkill: {
-      _tag: "skill",
-      id: "sdlc-tasks-executions",
-      shippedPaths: ["SKILL.md", "REFERENCE.md"],
-    },
-    title: "SDLC tasks executions",
-    summary:
-      "Numbered task list → one agent per task → full SDLC (issue, implement, unit+e2e, UI QA, PR, optional merge). Also setup-lanes / land-lanes for multi-agent worktrees (replaces coordinate-worktrees). Campaign boards use run-scoped docs/agent/sdlc-tasks/<run-id>/.",
-    selectedByDefault: false,
-    dependencies: ["organized-commits", "finish-and-ship", "preview-and-prove"],
-    platform: "any",
-    runtime: { _tag: "none" },
-  },
-  {
-    id: "ship-feature-e2e",
-    sourceDirectory: "shipFeatureE2e",
-    installedSkill: {
-      _tag: "skill",
-      id: "ship-feature-e2e",
-      shippedPaths: ["SKILL.md", "REFERENCE.md"],
-    },
-    title: "Ship feature end-to-end",
-    summary:
-      "One feature from ask/issue through worktree, unit+e2e happy paths, PR with confidence score, local act CI, merge to main, and global reinstall proof.",
-    selectedByDefault: false,
-    dependencies: ["sdlc-tasks-executions", "finish-and-ship", "organized-commits"],
-    platform: "any",
-    runtime: { _tag: "none" },
-  },
-  {
-    id: "test-gap-tdd",
-    sourceDirectory: "testGapTdd",
-    installedSkill: {
-      _tag: "skill",
-      id: "test-gap-tdd",
-      shippedPaths: ["SKILL.md", "REFERENCE.md", "references"],
-    },
-    title: "Test gap TDD",
-    summary:
-      "Sub-agent scan of unit, mocks/MSW, integration, and e2e layers per feature; report missing cases; TDD-fill; run e2e headless by default. Reports under docs/agent/test-gap/<run-id>/.",
-    selectedByDefault: false,
-    dependencies: ["sdlc-tasks-executions", "organized-commits", "finish-and-ship"],
-    platform: "any",
-    runtime: { _tag: "none" },
-  },
-  {
-    id: "test-gap-ship",
-    sourceDirectory: "testGapShip",
-    installedSkill: {
-      _tag: "skill",
-      id: "test-gap-ship",
-      shippedPaths: ["SKILL.md", "REFERENCE.md", "references"],
-    },
-    title: "Test gap ship — campaign to main",
-    summary:
-      "One init: scan or resume test gaps, backup main, parallel worktree+issue lanes per feature, TDD-fill, headless e2e, PR, merge after gates. Composes test-gap-tdd + messy-repo + sdlc-tasks-executions + finish-and-ship.",
-    selectedByDefault: false,
+    summary: "Reproduce the bug first, find the real cause, fix it, and prove the fix works.",
+    shippedPaths: ["SKILL.md"],
+  }),
+  skillFeature({
+    id: "run-tasks-in-parallel",
+    sourceDirectory: "runTasksInParallel",
+    title: "Run tasks in parallel",
+    summary: "Give a numbered task list, and each task gets its own agent, branch, tests, and PR.",
+    shippedPaths: ["SKILL.md", "REFERENCE.md"],
+    dependencies: ["organize-commits", "finish-and-push", "run-local-and-check"],
+  }),
+  skillFeature({
+    id: "ship-one-feature",
+    sourceDirectory: "shipOneFeature",
+    title: "Ship one feature",
+    summary: "Take one feature or one GitHub issue all the way — branch, code, tests, PR, merge, and reinstall.",
+    shippedPaths: ["SKILL.md", "REFERENCE.md"],
+    dependencies: ["run-tasks-in-parallel", "finish-and-push", "organize-commits"],
+  }),
+  skillFeature({
+    id: "find-missing-tests",
+    sourceDirectory: "findMissingTests",
+    title: "Find missing tests",
+    summary: "Find the tests each feature is missing (unit, mocks, integration, e2e), then write them test-first.",
+    shippedPaths: ["SKILL.md", "REFERENCE.md", "references"],
+    dependencies: ["run-tasks-in-parallel", "organize-commits", "finish-and-push"],
+  }),
+  skillFeature({
+    id: "ship-missing-tests",
+    sourceDirectory: "shipMissingTests",
+    title: "Ship missing tests",
+    summary: "Find missing tests in many features, fill them in parallel branches, and merge to main after checks.",
+    shippedPaths: ["SKILL.md", "REFERENCE.md", "references"],
     dependencies: [
-      "test-gap-tdd",
-      "messy-repo-orchestrator",
-      "sdlc-tasks-executions",
-      "organized-commits",
-      "finish-and-ship",
-      "ship-feature-e2e",
+      "find-missing-tests",
+      "clean-repo-by-feature",
+      "run-tasks-in-parallel",
+      "organize-commits",
+      "finish-and-push",
+      "ship-one-feature",
     ],
-    platform: "any",
-    runtime: { _tag: "none" },
-  },
-  {
-    id: "lean-prove",
-    sourceDirectory: "leanProve",
-    installedSkill: {
-      _tag: "skill",
-      id: "lean-prove",
-      shippedPaths: ["SKILL.md", "REFERENCE.md", "references"],
-    },
-    title: "Lean prove — over-engineering with proof",
+  }),
+  skillFeature({
+    id: "simplify-repo-with-tests",
+    sourceDirectory: "simplifyRepoWithTests",
+    title: "Simplify repo with tests",
+    summary: "Find over-engineering across the repo, simplify it, and use tests to prove the behavior did not change.",
+    shippedPaths: ["SKILL.md", "REFERENCE.md", "references"],
+    dependencies: [
+      "simplify-code",
+      "run-tasks-in-parallel",
+      "organize-commits",
+      "finish-and-push",
+      "find-missing-tests",
+    ],
+  }),
+  skillFeature({
+    id: "improve-ux",
+    sourceDirectory: "improveUx",
+    title: "Improve UX",
     summary:
-      "Sub-agent scan for over-engineering (files, folders, line/ceremony smells, test-slop) with proofs and before/after; TDD parity first; apply lean via deslop-v2 rules; prove with unit + headless e2e.",
-    selectedByDefault: false,
-    dependencies: ["deslop-v2", "sdlc-tasks-executions", "organized-commits", "finish-and-ship", "test-gap-tdd"],
-    platform: "any",
-    runtime: { _tag: "none" },
-  },
-  {
-    id: "ux-journey-improve",
-    sourceDirectory: "uxJourneyImprove",
-    installedSkill: {
-      _tag: "skill",
-      id: "ux-journey-improve",
-      shippedPaths: ["SKILL.md", "REFERENCE.md"],
-    },
-    title: "UX journey improve",
+      "Make user flows easier (fewer clicks, better layout, forms, mobile). Shows before/after designs first, then builds the one you pick.",
+    shippedPaths: ["SKILL.md", "REFERENCE.md"],
+    dependencies: ["plan-page", "run-tasks-in-parallel", "finish-and-push", "organize-commits", "run-local-and-check"],
+  }),
+  skillFeature({
+    id: "free-ports",
+    sourceDirectory: "freePorts",
+    title: "Free ports",
+    summary: "Stop local servers that block ports (keeps Metro on 8081) so you can start dev again.",
+    shippedPaths: ["SKILL.md"],
+  }),
+  skillFeature({
+    id: "clone-all-repos",
+    sourceDirectory: "cloneAllRepos",
+    title: "Clone all repos",
+    summary: "Clone or update all your GitHub repos into your Code folder and report what changed.",
+    shippedPaths: ["SKILL.md"],
+  }),
+  skillFeature({
+    id: "manage-cloudflare",
+    sourceDirectory: "manageCloudflare",
+    title: "Manage Cloudflare",
+    summary: "Set up and fix Cloudflare — wrangler config, D1, KV, R2, Workers and Pages projects, and secrets.",
+    shippedPaths: ["SKILL.md"],
+  }),
+  skillFeature({
+    id: "clean-repo-by-feature",
+    sourceDirectory: "cleanRepoByFeature",
+    title: "Clean repo by feature",
     summary:
-      "Expert UX/UI journey improvement: audit flows, high-fi taste mocks on planpage, implement after direction pick via issues/worktrees/PRs. Campaign artifacts under docs/agent/ux-journey/<run-id>/.",
-    selectedByDefault: false,
-    dependencies: ["planpage", "sdlc-tasks-executions", "finish-and-ship", "organized-commits", "preview-and-prove"],
-    platform: "any",
-    runtime: { _tag: "none" },
-  },
-  {
-    id: "kill-ports-local-dev",
-    sourceDirectory: "killPortsLocalDev",
-    installedSkill: {
-      _tag: "skill",
-      id: "kill-ports-local-dev",
-      shippedPaths: ["SKILL.md"],
-    },
-    title: "Kill ports (local dev)",
+      "Back up main, then clean a messy project with one agent and one branch per feature, and open one PR per feature for you to review.",
+    shippedPaths: ["SKILL.md"],
+    dependencies: ["run-tasks-in-parallel", "finish-and-push", "organize-commits"],
+  }),
+  skillFeature({
+    id: "improve-skill",
+    sourceDirectory: "improveSkill",
+    title: "Improve skill",
+    summary: "Change an existing skill based on feedback or on what went wrong in a real session.",
+    shippedPaths: ["SKILL.md"],
+  }),
+  skillFeature({
+    id: "which-skill",
+    sourceDirectory: "whichSkill",
+    title: "Which skill",
     summary:
-      "List and free local TCP listeners (default keep Metro 8081) so the next dev launch is not blocked by stale processes.",
-    selectedByDefault: false,
-    dependencies: [],
-    platform: "any",
-    runtime: { _tag: "none" },
-  },
-  {
-    id: "workspace-bootstrap",
-    sourceDirectory: "workspaceBootstrap",
-    installedSkill: {
-      _tag: "skill",
-      id: "workspace-bootstrap",
-      shippedPaths: ["SKILL.md"],
-    },
-    title: "Workspace bootstrap",
+      "Not sure which skill to use? It turns your request into a short plan with the right skills and a ready prompt.",
+    shippedPaths: ["SKILL.md", "REFERENCE.md"],
+  }),
+  skillFeature({
+    id: "benchmark-agents",
+    sourceDirectory: "benchmarkAgents",
+    title: "Benchmark agents",
+    summary: "Run the same tasks with different agents, skills, or tools and compare tokens, time, cost, and success.",
+    shippedPaths: ["SKILL.md", "REFERENCE.md"],
+  }),
+  skillFeature({
+    id: "release-mobile-app",
+    sourceDirectory: "releaseMobileApp",
+    title: "Release mobile app",
     summary:
-      "Clone or sync GitHub user/org repos into a Code folder, optional bulk package installs, and pull-all delta reports.",
-    selectedByDefault: false,
-    dependencies: [],
-    platform: "any",
-    runtime: { _tag: "none" },
-  },
-  {
-    id: "cloudflare-ops",
-    sourceDirectory: "cloudflareOps",
-    installedSkill: {
-      _tag: "skill",
-      id: "cloudflare-ops",
-      shippedPaths: ["SKILL.md"],
-    },
-    title: "Cloudflare ops",
+      "Build and upload the app to App Store, TestFlight, or Google Play, and prove which commit, version, and build was sent.",
+    shippedPaths: ["SKILL.md"],
+  }),
+  skillFeature({
+    id: "save-as-skill",
+    sourceDirectory: "saveAsSkill",
+    title: "Save as skill",
+    summary: "Turn what we just did into something you can reuse — a skill, script, template, test, or runbook.",
+    shippedPaths: ["SKILL.md"],
+  }),
+  skillFeature({
+    id: "finish-old-sessions",
+    sourceDirectory: "finishOldSessions",
+    title: "Finish old sessions",
     summary:
-      "Wrangler/D1/KV/R2 operational wiring and safe migrations — distinct from deploy-and-prove live production proof.",
-    selectedByDefault: false,
-    dependencies: [],
-    platform: "any",
-    runtime: { _tag: "none" },
-  },
-  {
-    id: "messy-repo-orchestrator",
-    sourceDirectory: "messyRepoOrchestrator",
-    installedSkill: {
-      _tag: "skill",
-      id: "messy-repo-orchestrator",
-      shippedPaths: ["SKILL.md"],
-    },
-    title: "Messy repo orchestrator",
-    summary:
-      "Backup main, then fan out one sub-agent per feature for safe refactors/deslop/fixes with issue + PR to main for human review. Ask host mode: background subagents, cmux terminal per lane (watch/join/continue), or briefs only. Campaign files under docs/agent/messy-repo/<run-id>/.",
-    selectedByDefault: false,
-    dependencies: ["sdlc-tasks-executions", "finish-and-ship", "organized-commits"],
-    platform: "any",
-    runtime: { _tag: "none" },
-  },
-  {
-    id: "skill-from-feedback",
-    sourceDirectory: "skillFromFeedback",
-    installedSkill: {
-      _tag: "skill",
-      id: "skill-from-feedback",
-      shippedPaths: ["SKILL.md"],
-    },
-    title: "Skill from feedback",
-    summary:
-      "Patch an existing skill from concrete user or session feedback: triggers, routing, safety, verification — then validate and re-sync.",
-    selectedByDefault: false,
-    dependencies: [],
-    platform: "any",
-    runtime: { _tag: "none" },
-  },
-  {
-    id: "route-request",
-    sourceDirectory: "routeRequest",
-    installedSkill: {
-      _tag: "skill",
-      id: "route-request",
-      shippedPaths: ["SKILL.md", "REFERENCE.md"],
-    },
-    title: "Route request (mid-orchestrator)",
-    summary:
-      "Refine messy freeform into a plan that picks and chains existing skills — a dispatcher, not a second copy of every workflow.",
-    selectedByDefault: false,
-    dependencies: [],
-    platform: "any",
-    runtime: { _tag: "none" },
-  },
-  {
-    id: "agent-benchmark",
-    sourceDirectory: "agentBenchmark",
-    installedSkill: {
-      _tag: "skill",
-      id: "agent-benchmark",
-      shippedPaths: ["SKILL.md", "REFERENCE.md"],
-    },
-    title: "Agent benchmark",
-    summary:
-      "Design and run dynamic same-task agent/skill/tool benchmarks with tokens, turns, latency, cost, and success — evidence over stars.",
-    selectedByDefault: false,
-    dependencies: [],
-    platform: "any",
-    runtime: { _tag: "none" },
-  },
-  {
-    id: "mobile-release",
-    sourceDirectory: "mobileRelease",
-    installedSkill: {
-      _tag: "skill",
-      id: "mobile-release",
-      shippedPaths: ["SKILL.md"],
-    },
-    title: "Mobile release",
-    summary:
-      "Ship Expo/React Native store releases with Launch-first build/upload, provenance (git SHA, version, build numbers), and optional EAS fallback.",
-    selectedByDefault: false,
-    dependencies: [],
-    platform: "any",
-    runtime: { _tag: "none" },
-  },
-  {
-    id: "capture-workflow",
-    sourceDirectory: "captureWorkflow",
-    installedSkill: {
-      _tag: "skill",
-      id: "capture-workflow",
-      shippedPaths: ["SKILL.md"],
-    },
-    title: "Capture workflow",
-    summary:
-      "Turn a proven task into the smallest reusable skill, script, template, test, or runbook and replay it cleanly.",
-    selectedByDefault: false,
-    dependencies: [],
-    platform: "any",
-    runtime: { _tag: "none" },
-  },
-  {
-    id: "finish-agent-sessions",
-    sourceDirectory: "finishAgentSessions",
-    installedSkill: {
-      _tag: "skill",
-      id: "finish-agent-sessions",
-      shippedPaths: ["SKILL.md"],
-    },
-    title: "Finish agent sessions",
-    summary:
-      "Reconcile interrupted work across agent histories with current repositories, then finish or honestly classify every task.",
-    selectedByDefault: false,
-    dependencies: ["finish-and-ship", "agent-session-auditor"],
-    platform: "any",
-    runtime: { _tag: "none" },
-  },
+      "Find unfinished work in past agent sessions, compare it with the repos, and finish each task or mark it honestly.",
+    shippedPaths: ["SKILL.md"],
+    dependencies: ["finish-and-push", "find-repeated-prompts"],
+  }),
 ]);
 
 export class UnknownFeatureError extends Schema.TaggedError<UnknownFeatureError>()("UnknownFeatureError", {
@@ -1142,56 +771,34 @@ export class UnknownFeatureError extends Schema.TaggedError<UnknownFeatureError>
 export const findFeature = (id: string): Option.Option<FeatureDefinition> =>
   Option.fromNullable(featureCatalog.find((feature) => feature.id === id));
 
-export const selectedFeatureIds = featureCatalog
+export const defaultFeatureIds = featureCatalog
   .filter((feature) => feature.selectedByDefault)
   .map((feature) => feature.id);
 
-export const resolveFeatureSelection = (
+export const addDependencies = (
   requestedIds: ReadonlyArray<string>,
 ): Either.Either<ReadonlyArray<FeatureId>, UnknownFeatureError> => {
-  const resolvedIds = new Set<FeatureId>();
-  const visitFeature = (id: string): Either.Either<void, UnknownFeatureError> => {
-    const feature = Option.getOrNull(findFeature(id));
-    if (feature === null) {
-      return Either.left(new UnknownFeatureError({ featureId: id }));
-    }
+  const unknownId = requestedIds.find((id) => Option.isNone(findFeature(id)));
+  if (unknownId !== undefined) {
+    return Either.left(new UnknownFeatureError({ featureId: unknownId }));
+  }
 
+  const resolvedIds = new Set<string>();
+  // The catalog schema already proves every dependency exists and the graph is acyclic.
+  const visitFeature = (feature: FeatureDefinition): void => {
     if (resolvedIds.has(feature.id)) {
-      return Either.right(undefined);
+      return;
     }
 
     resolvedIds.add(feature.id);
-
-    // Resolve every declared dependency before returning this feature.
-    for (const dependency of feature.dependencies) {
-      const featureCatalogCheck = visitFeature(dependency);
-      if (Either.isLeft(featureCatalogCheck)) {
-        return featureCatalogCheck;
-      }
-    }
-
-    return Either.right(undefined);
+    featureCatalog.filter((candidate) => feature.dependencies.includes(candidate.id)).forEach(visitFeature);
   };
-
-  // Validate and expand every caller selection into the owned set.
-  for (const requestedId of requestedIds) {
-    const featureCatalogCheck = visitFeature(requestedId);
-    if (Either.isLeft(featureCatalogCheck)) {
-      return Either.left(featureCatalogCheck.left);
-    }
-  }
+  featureCatalog.filter((feature) => requestedIds.includes(feature.id)).forEach(visitFeature);
 
   return Either.right(featureCatalog.filter((feature) => resolvedIds.has(feature.id)).map((feature) => feature.id));
 };
 
-export const installedSkillsFor = (featureIds: ReadonlyArray<FeatureId>) => {
-  const requestedIds = new Set(featureIds);
-
-  return featureCatalog.flatMap((feature) => {
-    if (!requestedIds.has(feature.id) || feature.installedSkill._tag === "none") {
-      return [];
-    }
-
-    return [feature.installedSkill];
-  });
-};
+export const skillsForFeatures = (featureIds: ReadonlyArray<FeatureId>) =>
+  featureCatalog.flatMap((feature) =>
+    featureIds.includes(feature.id) && feature.installedSkill._tag === "skill" ? [feature.installedSkill] : [],
+  );

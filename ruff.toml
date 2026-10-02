@@ -1,3 +1,5 @@
+cache-dir = "node_modules/.cache/ruff"
+
 target-version = "py310"
 line-length = 120
 

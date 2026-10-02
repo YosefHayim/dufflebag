@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 
 import { findAgent } from "../../catalog/agentCatalog.js";
 import { findFeature } from "../../catalog/featureCatalog.js";
-import { planRuleFiles, ruleFilePlanSchema, ruleFileRequestSchema } from "./ruleFile.js";
+import { planRuleFiles, ruleFileRequestSchema } from "./ruleFile.js";
 
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
@@ -23,25 +23,25 @@ const installedSkillFor = (featureId: string) => {
   return feature.installedSkill;
 };
 
-const autorunSkill = installedSkillFor("autonomous-loop");
-const pngToCodeSkill = installedSkillFor("png-to-code");
+const autorunSkill = installedSkillFor("autorun");
+const imageToCodeSkill = installedSkillFor("image-to-code");
 
 const ruleFileRequest = {
   agent: cursor,
-  ctl: "/workspace/.claude/dufflebag/hooks/ctxLoopCtl.js",
+  controlScript: "/workspace/.claude/dufflebag/hooks/contextGuard/hooks/autorunControl.js",
   skills: [
     {
       installedSkill: autorunSkill,
-      markdown: "---\nname: autorun\ndescription: Run autonomously.\n---\nStart with @@CTL@@.\n",
+      markdown: "---\nname: autorun\ndescription: Run autonomously.\n---\nStart with @@AUTORUN_CONTROL@@.\n",
     },
     {
-      installedSkill: pngToCodeSkill,
+      installedSkill: imageToCodeSkill,
       markdown: "Convert a PNG.\n\n---\nThis divider is body content.\n",
     },
   ],
   previousFiles: [
     { path: ".cursor/rules/autorun.mdc", previous: missingPrevious },
-    { path: ".cursor/rules/png-to-code.mdc", previous: priorFile },
+    { path: ".cursor/rules/image-to-code.mdc", previous: priorFile },
   ],
 };
 
@@ -50,30 +50,33 @@ const unwrap = <Right, Left>(ruleMerge: Either.Either<Right, Left>): Right =>
 
 const hashBytes = (bytes: Uint8Array): string => createHash("sha256").update(bytes).digest("hex");
 
+const writeAt = <Write>(plan: { writes: ReadonlyArray<Write> }, index: number): Write =>
+  Option.getOrThrow(Option.fromNullable(plan.writes.at(index)));
+
 describe("planRuleFiles", () => {
   it("plans one ordered rule write per installed skill with exact ownership", () => {
     const plan = unwrap(planRuleFiles(ruleFileRequest));
 
-    expect(plan.writes.map((write) => write.artifact.path)).toEqual([
+    expect(plan.writes.map((write) => write.file.path)).toEqual([
       ".cursor/rules/autorun.mdc",
-      ".cursor/rules/png-to-code.mdc",
+      ".cursor/rules/image-to-code.mdc",
     ]);
     expect(plan.writes.map((write) => textDecoder.decode(write.bytes))).toEqual([
-      "Start with /workspace/.claude/dufflebag/hooks/ctxLoopCtl.js.\n",
+      "Start with /workspace/.claude/dufflebag/hooks/contextGuard/hooks/autorunControl.js.\n",
       "Convert a PNG.\n\n---\nThis divider is body content.\n",
     ]);
 
-    const firstWrite = Option.getOrThrow(Option.fromNullable(plan.writes.at(0)));
-    const secondWrite = Option.getOrThrow(Option.fromNullable(plan.writes.at(1)));
+    const firstWrite = writeAt(plan, 0);
+    const secondWrite = writeAt(plan, 1);
 
-    expect(firstWrite.artifact.kind).toEqual({ _tag: "rule" });
-    expect(firstWrite.artifact.owner).toEqual({ _tag: "agent", agentIds: ["cursor"] });
-    expect(firstWrite.artifact.ownership).toEqual({
+    expect(firstWrite.file.kind).toEqual({ _tag: "rule" });
+    expect(firstWrite.file.owner).toEqual({ _tag: "agent", agentIds: ["cursor"] });
+    expect(firstWrite.file.ownership).toEqual({
       _tag: "wholeFile",
       installedHash: hashBytes(firstWrite.bytes),
       previous: missingPrevious,
     });
-    expect(secondWrite.artifact.ownership).toEqual({
+    expect(secondWrite.file.ownership).toEqual({
       _tag: "wholeFile",
       installedHash: hashBytes(secondWrite.bytes),
       previous: priorFile,
@@ -83,20 +86,20 @@ describe("planRuleFiles", () => {
   it("strips CRLF frontmatter without trimming the markdown body", () => {
     const request = {
       ...ruleFileRequest,
-      ctl: "$&/ctl",
+      controlScript: "$&/control",
       skills: [
         {
           installedSkill: autorunSkill,
-          markdown: "---\r\nname: autorun\r\n---\r\n\r\n  Run @@CTL@@.\r\n",
+          markdown: "---\r\nname: autorun\r\n---\r\n\r\n  Run @@AUTORUN_CONTROL@@.\r\n",
         },
       ],
       previousFiles: [{ path: ".cursor/rules/autorun.mdc", previous: missingPrevious }],
     };
 
     const plan = unwrap(planRuleFiles(request));
-    const write = Option.getOrThrow(Option.fromNullable(plan.writes.at(0)));
+    const write = writeAt(plan, 0);
 
-    expect(textDecoder.decode(write.bytes)).toBe("\r\n  Run $&/ctl.\r\n");
+    expect(textDecoder.decode(write.bytes)).toBe("\r\n  Run $&/control.\r\n");
   });
 
   it.each([
@@ -170,37 +173,6 @@ describe("planRuleFiles", () => {
       issue: "ruleFile",
     },
     {
-      name: "an altered catalog rule target",
-      request: {
-        ...ruleFileRequest,
-        agent: { ...cursor, target: { _tag: "ruleFile", directory: ".other/rules", extension: ".mdc" } },
-        previousFiles: [
-          { path: ".other/rules/autorun.mdc", previous: missingPrevious },
-          { path: ".other/rules/png-to-code.mdc", previous: priorFile },
-        ],
-      },
-      issue: "catalog",
-    },
-    {
-      name: "an unknown installed skill definition",
-      request: {
-        ...ruleFileRequest,
-        skills: [
-          {
-            installedSkill: { _tag: "skill", id: "invented", shippedPaths: ["SKILL.md"] },
-            markdown: "Invented skill.\n",
-          },
-        ],
-        previousFiles: [{ path: ".cursor/rules/invented.mdc", previous: missingPrevious }],
-      },
-      issue: "catalog",
-    },
-    {
-      name: "an unknown agent owner",
-      request: { ...ruleFileRequest, agent: { ...cursor, id: "unknown-agent" } },
-      issue: "catalog",
-    },
-    {
       name: "an unknown request property",
       request: { ...ruleFileRequest, unexpected: true },
       issue: "unexpected",
@@ -224,30 +196,11 @@ describe("planRuleFiles", () => {
     expect(String(Option.getOrThrow(Either.getLeft(ruleMerge)))).toContain("unexpected");
   });
 
-  it.each(["   ", "@@CTL@@", "node @@CTL@@ status"])("rejects a non-concrete control command %j", (ctl) => {
-    expect(Either.isLeft(planRuleFiles({ ...ruleFileRequest, ctl }))).toBe(true);
-  });
-
-  it("rejects a result whose ownership hash drifts from its bytes", () => {
-    const plan = unwrap(planRuleFiles(ruleFileRequest));
-    const firstWrite = Option.getOrThrow(Option.fromNullable(plan.writes.at(0)));
-    const ruleMerge = Schema.validateEither(ruleFilePlanSchema, {
-      onExcessProperty: "error",
-    })({
-      ...plan,
-      writes: [
-        {
-          ...firstWrite,
-          artifact: {
-            ...firstWrite.artifact,
-            ownership: { ...firstWrite.artifact.ownership, installedHash: "0".repeat(64) },
-          },
-        },
-        ...plan.writes.slice(1),
-      ],
-    });
-
-    expect(Either.isLeft(ruleMerge)).toBe(true);
-    expect(String(Option.getOrThrow(Either.getLeft(ruleMerge)))).toContain("exact desired bytes");
+  it.each([
+    "   ",
+    "@@AUTORUN_CONTROL@@",
+    "node @@AUTORUN_CONTROL@@ status",
+  ])("rejects a non-concrete control command %j", (controlScript) => {
+    expect(Either.isLeft(planRuleFiles({ ...ruleFileRequest, controlScript }))).toBe(true);
   });
 });

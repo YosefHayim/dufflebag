@@ -2,119 +2,119 @@ import { Either, Option, Schema } from "effect";
 import { describe, expect, it } from "vitest";
 
 import {
+  addDependencies,
+  defaultFeatureIds,
   featureCatalog,
   featureCatalogSchema,
   findFeature,
-  installedSkillsFor,
-  resolveFeatureSelection,
-  selectedFeatureIds,
+  skillsForFeatures,
   UnknownFeatureError,
 } from "./featureCatalog.js";
 
 const expectedFeatureIds = [
   "context-guard",
-  "autonomous-loop",
-  "speak-response",
-  "dedup-guard",
-  "png-to-code",
-  "github-repo-metadata",
-  "write-a-post",
-  "readme-editor",
-  "refresh-agent-docs",
-  "deslop",
-  "deslop-v2",
-  "grill-me",
-  "grill-me-code-style",
-  "grill-me-code-style-coach",
-  "grill-me-code-style-review",
-  "grill-me-code-style-with-docs",
-  "grill-me-stack",
-  "grill-with-docs",
-  "planpage",
-  "web-perf-ci",
-  "cws-listing-seo",
-  "make-a-trailer",
-  "web-best-practices",
-  "organized-commits",
-  "finish-and-ship",
-  "preview-and-prove",
-  "reuse-first-audit",
-  "agent-session-auditor",
-  "sync-agent-skills",
-  "env-config-contract",
-  "mcp-oauth-onboarding",
-  "rtl-ui-audit",
-  "deploy-and-prove",
+  "autorun",
+  "voice",
+  "duplicate-code-guard",
+  "image-to-code",
+  "github-repo-about",
+  "write-blog-post",
+  "write-readme",
+  "update-agent-docs",
+  "make-code-readable",
+  "simplify-code",
+  "question-my-plan",
+  "code-style-new-project",
+  "code-style-teach-me",
+  "code-style-review",
+  "code-style-existing-project",
+  "explain-my-stack",
+  "question-plan-with-docs",
+  "plan-page",
+  "website-speed-ci",
+  "chrome-store-seo",
+  "make-promo-video",
+  "check-website-quality",
+  "organize-commits",
+  "finish-and-push",
+  "run-local-and-check",
+  "reuse-before-build",
+  "find-repeated-prompts",
+  "install-skills",
+  "fix-env-config",
+  "add-mcp-server",
+  "check-rtl-ui",
+  "deploy-and-check",
   "fix-bug",
-  "sdlc-tasks-executions",
-  "ship-feature-e2e",
-  "test-gap-tdd",
-  "test-gap-ship",
-  "lean-prove",
-  "ux-journey-improve",
-  "kill-ports-local-dev",
-  "workspace-bootstrap",
-  "cloudflare-ops",
-  "messy-repo-orchestrator",
-  "skill-from-feedback",
-  "route-request",
-  "agent-benchmark",
-  "mobile-release",
-  "capture-workflow",
-  "finish-agent-sessions",
+  "run-tasks-in-parallel",
+  "ship-one-feature",
+  "find-missing-tests",
+  "ship-missing-tests",
+  "simplify-repo-with-tests",
+  "improve-ux",
+  "free-ports",
+  "clone-all-repos",
+  "manage-cloudflare",
+  "clean-repo-by-feature",
+  "improve-skill",
+  "which-skill",
+  "benchmark-agents",
+  "release-mobile-app",
+  "save-as-skill",
+  "finish-old-sessions",
 ];
 
 const expectedSourceDirectories = [
   "contextGuard",
   "autorun",
-  "speakResponse",
-  "dedupGuard",
-  "pngToCode",
-  "githubRepoMetadata",
-  "writeAPost",
-  "readmeEditor",
-  "refreshAgentDocs",
-  "deslop",
-  "deslopV2",
-  "grillMe",
-  "grillMeCodeStyle",
-  "grillMeCodeStyleCoach",
-  "grillMeCodeStyleReview",
-  "grillMeCodeStyleWithDocs",
-  "grillMeStack",
-  "grillWithDocs",
-  "planpage",
-  "webPerfCi",
-  "cwsListingSeo",
-  "makeATrailer",
-  "webBestPractices",
-  "organizedCommits",
-  "finishAndShip",
-  "previewAndProve",
-  "reuseFirstAudit",
-  "agentSessionAuditor",
-  "syncAgentSkills",
-  "envConfigContract",
-  "mcpOauthOnboarding",
-  "rtlUiAudit",
-  "deployAndProve",
+  "voice",
+  "duplicateCodeGuard",
+  "imageToCode",
+  "githubRepoAbout",
+  "writeBlogPost",
+  "writeReadme",
+  "updateAgentDocs",
+  "makeCodeReadable",
+  "simplifyCode",
+  "questionMyPlan",
+  "codeStyleNewProject",
+  "codeStyleTeachMe",
+  "codeStyleReview",
+  "codeStyleExistingProject",
+  "explainMyStack",
+  "questionPlanWithDocs",
+  "planPage",
+  "websiteSpeedCi",
+  "chromeStoreSeo",
+  "makePromoVideo",
+  "checkWebsiteQuality",
+  "organizeCommits",
+  "finishAndPush",
+  "runLocalAndCheck",
+  "reuseBeforeBuild",
+  "findRepeatedPrompts",
+  "installSkills",
+  "fixEnvConfig",
+  "addMcpServer",
+  "checkRtlUi",
+  "deployAndCheck",
   "fixBug",
-  "sdlcTasksExecutions",
-  "shipFeatureE2e",
-  "testGapTdd",
-  "testGapShip",
-  "leanProve",
-  "uxJourneyImprove",
-  "killPortsLocalDev",
-  "workspaceBootstrap",
-  "cloudflareOps",
-  "messyRepoOrchestrator",
-  "skillFromFeedback",
-  "routeRequest",
-  "agentBenchmark",
-  "mobileRelease",
-  "captureWorkflow",
-  "finishAgentSessions",
+  "runTasksInParallel",
+  "shipOneFeature",
+  "findMissingTests",
+  "shipMissingTests",
+  "simplifyRepoWithTests",
+  "improveUx",
+  "freePorts",
+  "cloneAllRepos",
+  "manageCloudflare",
+  "cleanRepoByFeature",
+  "improveSkill",
+  "whichSkill",
+  "benchmarkAgents",
+  "releaseMobileApp",
+  "saveAsSkill",
+  "finishOldSessions",
 ];
 
 const validFixture = [
@@ -155,16 +155,14 @@ const validFixture = [
           event: "Stop",
           matcher: { _tag: "none" },
           entrypoint: { _tag: "featureDefault" },
+          readsAgentId: false,
         },
       ],
     },
   },
 ];
 
-const decodeFixture = (input: unknown) =>
-  Schema.decodeUnknownEither(featureCatalogSchema, {
-    onExcessProperty: "error",
-  })(input);
+const decodeFixture = Schema.decodeUnknownEither(featureCatalogSchema, { onExcessProperty: "error" });
 
 describe("featureCatalog", () => {
   it("decodes all approved features in display order", () => {
@@ -173,85 +171,81 @@ describe("featureCatalog", () => {
 
   it("keeps public IDs, authored directories, and installed IDs distinct", () => {
     expect(featureCatalog.map((feature) => feature.sourceDirectory)).toEqual(expectedSourceDirectories);
-    expect(featureCatalog.find((feature) => feature.id === "autonomous-loop")).toMatchObject({
+    expect(featureCatalog.find((feature) => feature.id === "autorun")).toMatchObject({
       sourceDirectory: "autorun",
       installedSkill: { _tag: "skill", id: "autorun" },
     });
-    expect(new Set(featureCatalog.map((feature) => feature.id)).size).toBe(featureCatalog.length);
-    expect(new Set(featureCatalog.map((feature) => feature.sourceDirectory)).size).toBe(featureCatalog.length);
-
-    const installedIds = installedSkillsFor(featureCatalog.map((feature) => feature.id)).map((skill) => skill.id);
-    expect(new Set(installedIds).size).toBe(installedIds.length);
   });
 
   it("derives defaults, installed skills, and exact shipped allowlists", () => {
-    expect(selectedFeatureIds).toEqual(["context-guard"]);
-    expect(installedSkillsFor(["context-guard", "speak-response", "dedup-guard"])).toEqual([]);
+    expect(defaultFeatureIds).toEqual(["context-guard"]);
+    expect(skillsForFeatures(["context-guard", "voice", "duplicate-code-guard"])).toEqual([]);
     expect(
-      installedSkillsFor(featureCatalog.map((feature) => feature.id)).map((skill) => [skill.id, skill.shippedPaths]),
+      skillsForFeatures(featureCatalog.map((feature) => feature.id)).map((skill) => [skill.id, skill.shippedPaths]),
     ).toEqual([
       ["autorun", ["SKILL.md"]],
       [
-        "png-to-code",
+        "image-to-code",
         [
           "SKILL.md",
           "README.md",
           "CONTEXT.md",
           "TECH-GLOSSARY.md",
           "reference",
-          "demo",
           "scripts/package.json",
           "scripts/svgo.config.mjs",
-          "scripts/robot.svgo.config.mjs",
           "scripts/tsconfig.json",
           "scripts/src",
         ],
       ],
-      ["github-repo-metadata", ["SKILL.md"]],
-      ["write-a-post", ["SKILL.md"]],
-      ["readme-editor", ["SKILL.md", "references"]],
-      ["refresh-agent-docs", ["SKILL.md", "sources.json", "scripts"]],
-      ["deslop", ["SKILL.md", "references"]],
-      ["deslop-v2", ["SKILL.md", "references"]],
-      ["grill-me", ["SKILL.md"]],
-      ["grill-me-code-style", ["SKILL.md", "_shared"]],
-      ["grill-me-code-style-coach", ["SKILL.md"]],
-      ["grill-me-code-style-review", ["SKILL.md"]],
-      ["grill-me-code-style-with-docs", ["SKILL.md", "SCAN.md", "references", "scripts"]],
-      ["grill-me-stack", ["SKILL.md", "TEACH-FORMAT.md"]],
-      ["grill-with-docs", ["SKILL.md", "CONTEXT-FORMAT.md", "ADR-FORMAT.md", "LANGUAGE-FORMAT.md"]],
-      ["planpage", ["SKILL.md", "COMPONENTS.md"]],
-      ["web-perf-ci", ["SKILL.md", "README.md", "CONTEXT.md", "TECH-GLOSSARY.md", "reference", "scripts", "templates"]],
-      ["cws-listing-seo", ["SKILL.md", "REFERENCE.md", "scripts", "templates"]],
-      ["make-a-trailer", ["SKILL.md", "reference", "scripts"]],
-      ["web-best-practices", ["SKILL.md", "reference", "scripts", "templates"]],
-      ["organized-commits", ["SKILL.md", "REFERENCE.md"]],
-      ["finish-and-ship", ["SKILL.md"]],
-      ["preview-and-prove", ["SKILL.md"]],
-      ["reuse-first-audit", ["SKILL.md"]],
-      ["agent-session-auditor", ["SKILL.md", "scripts"]],
-      ["sync-agent-skills", ["SKILL.md"]],
-      ["env-config-contract", ["SKILL.md"]],
-      ["mcp-oauth-onboarding", ["SKILL.md"]],
-      ["rtl-ui-audit", ["SKILL.md"]],
-      ["deploy-and-prove", ["SKILL.md"]],
+      ["github-repo-about", ["SKILL.md"]],
+      ["write-blog-post", ["SKILL.md"]],
+      ["write-readme", ["SKILL.md", "references"]],
+      ["update-agent-docs", ["SKILL.md", "sources.json", "scripts"]],
+      ["make-code-readable", ["SKILL.md", "references"]],
+      ["simplify-code", ["SKILL.md", "references"]],
+      ["question-my-plan", ["SKILL.md"]],
+      ["code-style-new-project", ["SKILL.md", "_shared"]],
+      ["code-style-teach-me", ["SKILL.md"]],
+      ["code-style-review", ["SKILL.md"]],
+      ["code-style-existing-project", ["SKILL.md", "SCAN.md", "references", "scripts"]],
+      ["explain-my-stack", ["SKILL.md", "TEACH-FORMAT.md"]],
+      ["question-plan-with-docs", ["SKILL.md", "CONTEXT-FORMAT.md", "ADR-FORMAT.md", "LANGUAGE-FORMAT.md"]],
+      ["plan-page", ["SKILL.md", "COMPONENTS.md"]],
+      [
+        "website-speed-ci",
+        ["SKILL.md", "README.md", "CONTEXT.md", "TECH-GLOSSARY.md", "reference", "scripts", "templates"],
+      ],
+      ["chrome-store-seo", ["SKILL.md", "REFERENCE.md", "scripts", "templates"]],
+      ["make-promo-video", ["SKILL.md", "reference", "scripts"]],
+      ["check-website-quality", ["SKILL.md", "reference", "scripts", "templates"]],
+      ["organize-commits", ["SKILL.md", "REFERENCE.md"]],
+      ["finish-and-push", ["SKILL.md"]],
+      ["run-local-and-check", ["SKILL.md"]],
+      ["reuse-before-build", ["SKILL.md"]],
+      ["find-repeated-prompts", ["SKILL.md", "scripts"]],
+      ["install-skills", ["SKILL.md"]],
+      ["fix-env-config", ["SKILL.md"]],
+      ["add-mcp-server", ["SKILL.md"]],
+      ["check-rtl-ui", ["SKILL.md"]],
+      ["deploy-and-check", ["SKILL.md"]],
       ["fix-bug", ["SKILL.md"]],
-      ["sdlc-tasks-executions", ["SKILL.md", "REFERENCE.md"]],
-      ["ship-feature-e2e", ["SKILL.md", "REFERENCE.md"]],
-      ["test-gap-tdd", ["SKILL.md", "REFERENCE.md", "references"]],
-      ["test-gap-ship", ["SKILL.md", "REFERENCE.md", "references"]],
-      ["lean-prove", ["SKILL.md", "REFERENCE.md", "references"]],
-      ["ux-journey-improve", ["SKILL.md", "REFERENCE.md"]],
-      ["kill-ports-local-dev", ["SKILL.md"]],
-      ["workspace-bootstrap", ["SKILL.md"]],
-      ["cloudflare-ops", ["SKILL.md"]],
-      ["messy-repo-orchestrator", ["SKILL.md"]],
-      ["skill-from-feedback", ["SKILL.md"]],
-      ["route-request", ["SKILL.md", "REFERENCE.md"]],
-      ["agent-benchmark", ["SKILL.md", "REFERENCE.md"]],
-      ["mobile-release", ["SKILL.md"]],
-      ["capture-workflow", ["SKILL.md"]],
-      ["finish-agent-sessions", ["SKILL.md"]],
+      ["run-tasks-in-parallel", ["SKILL.md", "REFERENCE.md"]],
+      ["ship-one-feature", ["SKILL.md", "REFERENCE.md"]],
+      ["find-missing-tests", ["SKILL.md", "REFERENCE.md", "references"]],
+      ["ship-missing-tests", ["SKILL.md", "REFERENCE.md", "references"]],
+      ["simplify-repo-with-tests", ["SKILL.md", "REFERENCE.md", "references"]],
+      ["improve-ux", ["SKILL.md", "REFERENCE.md"]],
+      ["free-ports", ["SKILL.md"]],
+      ["clone-all-repos", ["SKILL.md"]],
+      ["manage-cloudflare", ["SKILL.md"]],
+      ["clean-repo-by-feature", ["SKILL.md"]],
+      ["improve-skill", ["SKILL.md"]],
+      ["which-skill", ["SKILL.md", "REFERENCE.md"]],
+      ["benchmark-agents", ["SKILL.md", "REFERENCE.md"]],
+      ["release-mobile-app", ["SKILL.md"]],
+      ["save-as-skill", ["SKILL.md"]],
+      ["finish-old-sessions", ["SKILL.md"]],
     ]);
   });
 
@@ -269,9 +263,7 @@ describe("featureCatalog", () => {
           ]
         : [],
     );
-    const runtimeEntrypoints = runtimeFeatures.map((feature) => feature.sourceEntrypoint);
 
-    expect(runtimeEntrypoints).toEqual(["hooks/contextGuard.ts", "hooks/speakResponse.ts", "hooks/dedupGuard.ts"]);
     expect(runtimeFeatures).toEqual([
       {
         id: "context-guard",
@@ -283,83 +275,97 @@ describe("featureCatalog", () => {
             event: "PreToolUse",
             matcher: { _tag: "pattern", value: "Write|Edit|MultiEdit|NotebookEdit" },
             entrypoint: { _tag: "featureDefault" },
+            readsAgentId: false,
           },
           {
             event: "PostToolUse",
             matcher: { _tag: "pattern", value: "Write|Edit|MultiEdit|NotebookEdit" },
             entrypoint: { _tag: "featureDefault" },
+            readsAgentId: false,
           },
           {
             event: "UserPromptSubmit",
             matcher: { _tag: "none" },
             entrypoint: { _tag: "featureDefault" },
+            readsAgentId: false,
           },
           {
             event: "SessionStart",
             matcher: { _tag: "none" },
-            entrypoint: { _tag: "path", value: "hooks/ctxWatchSpawn.ts" },
+            entrypoint: { _tag: "path", value: "hooks/startAutorunWatcher.ts" },
+            readsAgentId: false,
           },
           {
             event: "SessionStart",
             matcher: { _tag: "none" },
-            entrypoint: { _tag: "path", value: "hooks/idleCompactHook.ts" },
+            entrypoint: { _tag: "path", value: "hooks/recordIdleCompactEvent.ts" },
+            readsAgentId: true,
           },
           {
             event: "UserPromptSubmit",
             matcher: { _tag: "none" },
-            entrypoint: { _tag: "path", value: "hooks/idleCompactHook.ts" },
+            entrypoint: { _tag: "path", value: "hooks/recordIdleCompactEvent.ts" },
+            readsAgentId: true,
           },
           {
             event: "Stop",
             matcher: { _tag: "none" },
-            entrypoint: { _tag: "path", value: "hooks/idleCompactHook.ts" },
+            entrypoint: { _tag: "path", value: "hooks/recordIdleCompactEvent.ts" },
+            readsAgentId: true,
           },
           {
             event: "PreCompact",
             matcher: { _tag: "none" },
-            entrypoint: { _tag: "path", value: "hooks/idleCompactHook.ts" },
+            entrypoint: { _tag: "path", value: "hooks/recordIdleCompactEvent.ts" },
+            readsAgentId: true,
           },
           {
             event: "PostCompact",
             matcher: { _tag: "none" },
-            entrypoint: { _tag: "path", value: "hooks/idleCompactHook.ts" },
+            entrypoint: { _tag: "path", value: "hooks/recordIdleCompactEvent.ts" },
+            readsAgentId: true,
           },
           {
             event: "SessionEnd",
             matcher: { _tag: "none" },
-            entrypoint: { _tag: "path", value: "hooks/idleCompactHook.ts" },
+            entrypoint: { _tag: "path", value: "hooks/recordIdleCompactEvent.ts" },
+            readsAgentId: true,
           },
         ],
       },
       {
-        id: "speak-response",
+        id: "voice",
         platform: "any",
-        sourceEntrypoint: "hooks/speakResponse.ts",
+        sourceEntrypoint: "hooks/speakReply.ts",
         shippedPaths: [
           "dufflebag-voice",
-          "cmux_focus.py",
-          "prompt_refinement.py",
-          "tts_bridge.py",
-          "tts_bridge.py.lock",
+          "refine_prompt.py",
+          "refine_providers.py",
+          "refine_choices.py",
+          "mac_picker.py",
+          "text_to_speech.py",
+          "text_to_speech.py.lock",
         ],
         registrations: [
           {
             event: "Stop",
             matcher: { _tag: "none" },
             entrypoint: { _tag: "featureDefault" },
+            readsAgentId: true,
           },
         ],
       },
       {
-        id: "dedup-guard",
+        id: "duplicate-code-guard",
         platform: "any",
-        sourceEntrypoint: "hooks/dedupGuard.ts",
+        sourceEntrypoint: "hooks/duplicateCodeGuard.ts",
         shippedPaths: [],
         registrations: [
           {
             event: "PreToolUse",
             matcher: { _tag: "pattern", value: "Write|Edit|MultiEdit" },
             entrypoint: { _tag: "featureDefault" },
+            readsAgentId: false,
           },
         ],
       },
@@ -367,30 +373,13 @@ describe("featureCatalog", () => {
     expect(
       featureCatalog.filter((feature) => feature.platform !== "any").map((feature) => [feature.id, feature.platform]),
     ).toEqual([
-      ["autonomous-loop", "macos+ghostty"],
-      ["make-a-trailer", "macos"],
+      ["autorun", "macos+ghostty"],
+      ["make-promo-video", "macos"],
     ]);
-    expect(runtimeEntrypoints.every((entrypoint) => entrypoint.endsWith(".ts"))).toBe(true);
-    expect(runtimeEntrypoints.some((entrypoint) => entrypoint.endsWith(".js"))).toBe(false);
-  });
-
-  it("registers the normalized idle hook for complete session lifecycle evidence", () => {
-    const contextGuard = Option.getOrThrow(findFeature("context-guard"));
-    expect(contextGuard.runtime._tag).toBe("hook");
-    if (contextGuard.runtime._tag !== "hook") return;
-
-    const idleEvents = contextGuard.runtime.registrations
-      .filter(
-        (registration) =>
-          registration.entrypoint._tag === "path" && registration.entrypoint.value === "hooks/idleCompactHook.ts",
-      )
-      .map((registration) => registration.event);
-
-    expect(idleEvents).toEqual(["SessionStart", "UserPromptSubmit", "Stop", "PreCompact", "PostCompact", "SessionEnd"]);
   });
 
   it("finds features with Option", () => {
-    expect(Option.map(findFeature("planpage"), (feature) => feature.title)).toEqual(Option.some("planpage"));
+    expect(Option.map(findFeature("plan-page"), (feature) => feature.title)).toEqual(Option.some("Plan page"));
     expect(findFeature("missing-feature")).toEqual(Option.none());
   });
 
@@ -400,40 +389,46 @@ describe("featureCatalog", () => {
         .filter((feature) => feature.dependencies.length > 0)
         .map((feature) => [feature.id, feature.dependencies]),
     ).toEqual([
-      ["autonomous-loop", ["context-guard"]],
-      ["grill-me-code-style-with-docs", ["grill-me-code-style"]],
-      ["grill-with-docs", ["grill-me-code-style"]],
-      ["make-a-trailer", ["planpage"]],
-      ["finish-and-ship", ["organized-commits"]],
-      ["sdlc-tasks-executions", ["organized-commits", "finish-and-ship", "preview-and-prove"]],
-      ["ship-feature-e2e", ["sdlc-tasks-executions", "finish-and-ship", "organized-commits"]],
-      ["test-gap-tdd", ["sdlc-tasks-executions", "organized-commits", "finish-and-ship"]],
+      ["autorun", ["context-guard"]],
+      ["code-style-existing-project", ["code-style-new-project"]],
+      ["question-plan-with-docs", ["code-style-new-project"]],
+      ["make-promo-video", ["plan-page"]],
+      ["finish-and-push", ["organize-commits"]],
+      ["run-tasks-in-parallel", ["organize-commits", "finish-and-push", "run-local-and-check"]],
+      ["ship-one-feature", ["run-tasks-in-parallel", "finish-and-push", "organize-commits"]],
+      ["find-missing-tests", ["run-tasks-in-parallel", "organize-commits", "finish-and-push"]],
       [
-        "test-gap-ship",
+        "ship-missing-tests",
         [
-          "test-gap-tdd",
-          "messy-repo-orchestrator",
-          "sdlc-tasks-executions",
-          "organized-commits",
-          "finish-and-ship",
-          "ship-feature-e2e",
+          "find-missing-tests",
+          "clean-repo-by-feature",
+          "run-tasks-in-parallel",
+          "organize-commits",
+          "finish-and-push",
+          "ship-one-feature",
         ],
       ],
-      ["lean-prove", ["deslop-v2", "sdlc-tasks-executions", "organized-commits", "finish-and-ship", "test-gap-tdd"]],
       [
-        "ux-journey-improve",
-        ["planpage", "sdlc-tasks-executions", "finish-and-ship", "organized-commits", "preview-and-prove"],
+        "simplify-repo-with-tests",
+        ["simplify-code", "run-tasks-in-parallel", "organize-commits", "finish-and-push", "find-missing-tests"],
       ],
-      ["messy-repo-orchestrator", ["sdlc-tasks-executions", "finish-and-ship", "organized-commits"]],
-      ["finish-agent-sessions", ["finish-and-ship", "agent-session-auditor"]],
+      [
+        "improve-ux",
+        ["plan-page", "run-tasks-in-parallel", "finish-and-push", "organize-commits", "run-local-and-check"],
+      ],
+      ["clean-repo-by-feature", ["run-tasks-in-parallel", "finish-and-push", "organize-commits"]],
+      ["finish-old-sessions", ["finish-and-push", "find-repeated-prompts"]],
     ]);
-    expect(
-      Either.getOrThrowWith(resolveFeatureSelection(["make-a-trailer", "autonomous-loop", "context-guard"]), String),
-    ).toEqual(["context-guard", "autonomous-loop", "planpage", "make-a-trailer"]);
+    expect(Either.getOrThrowWith(addDependencies(["make-promo-video", "autorun", "context-guard"]), String)).toEqual([
+      "context-guard",
+      "autorun",
+      "plan-page",
+      "make-promo-video",
+    ]);
   });
 
   it("returns a tagged unknown-feature error", () => {
-    const featureCatalogCheck = resolveFeatureSelection(["not-installed"]);
+    const featureCatalogCheck = addDependencies(["not-installed"]);
 
     expect(Either.isLeft(featureCatalogCheck)).toBe(true);
     expect(Option.getOrThrow(Either.getLeft(featureCatalogCheck))).toBeInstanceOf(UnknownFeatureError);

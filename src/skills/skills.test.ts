@@ -13,7 +13,7 @@ import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
-import { featureCatalog, installedSkillsFor } from "../catalog/featureCatalog.js";
+import { featureCatalog, skillsForFeatures } from "../catalog/featureCatalog.js";
 
 type Frontmatter = {
   name?: string;
@@ -46,7 +46,7 @@ const parseFrontmatter = (file: string): { frontmatter: Frontmatter | null; body
 
 const skillRoot = path.dirname(fileURLToPath(import.meta.url));
 
-const installedSkills = installedSkillsFor(featureCatalog.map((feature) => feature.id)).map((skill) => {
+const installedSkills = skillsForFeatures(featureCatalog.map((feature) => feature.id)).map((skill) => {
   const feature = featureCatalog.find(
     (candidate) => candidate.installedSkill._tag === "skill" && candidate.installedSkill.id === skill.id,
   );
@@ -78,7 +78,7 @@ const expectValidSkillFrontmatter = (skillMd: string, expectedName: string): voi
   const { frontmatter } = parseFrontmatter(skillMd);
   expect(frontmatter).not.toBeNull();
   expect(frontmatter?.name).toBe(expectedName);
-  // e.g. "png-to-code", "autorun" — not "PngToCode"
+  // e.g. "image-to-code", "autorun" — not "ImageToCode"
   expect(frontmatter?.name).toMatch(/^[a-z0-9-]+$/);
   expect((frontmatter?.name || "").length).toBeLessThanOrEqual(64);
   expect(frontmatter?.description).toBeTruthy();
@@ -98,11 +98,11 @@ describe("shipped skills", () => {
   });
 });
 
-describe("agent artifact run isolation", () => {
-  const sharedArtifacts = path.join(skillRoot, "_shared", "agent-artifacts.md");
+describe("agent run folder isolation", () => {
+  const sharedGuidePath = path.join(skillRoot, "_shared", "agent-artifacts.md");
 
   it("requires time-stamped run dirs under docs/agent (not fixed flat BOARD/REPORT paths)", () => {
-    const text = readFileSync(sharedArtifacts, "utf8");
+    const text = readFileSync(sharedGuidePath, "utf8");
     expect(text).toMatch(/date -u \+%Y-%m-%dT%H%M%SZ/);
     expect(text).toMatch(/CURRENT/);
     expect(text).toMatch(/run-id/);
@@ -112,12 +112,14 @@ describe("agent artifact run isolation", () => {
   });
 
   it.each([
-    ["sdlcTasksExecutions", "sdlc-tasks"],
-    ["testGapTdd", "test-gap"],
-    ["testGapShip", "test-gap"],
-    ["leanProve", "lean-prove"],
-    ["messyRepoOrchestrator", "messy-repo"],
-    ["uxJourneyImprove", "ux-journey"],
+    ["runTasksInParallel", "run-tasks-in-parallel"],
+    ["findMissingTests", "find-missing-tests"],
+    ["shipMissingTests", "ship-missing-tests"],
+    ["simplifyRepoWithTests", "simplify-repo-with-tests"],
+    ["cleanRepoByFeature", "clean-repo-by-feature"],
+    ["improveUx", "improve-ux"],
+    ["codeStyleExistingProject", "code-style-existing-project"],
+    ["benchmarkAgents", "benchmark-agents"],
   ] as const)("%s mints or resumes run-scoped docs/agent/%s paths", (sourceDirectory, campaign) => {
     const skillMd = path.join(skillRoot, sourceDirectory, "SKILL.md");
     const text = readFileSync(skillMd, "utf8");
@@ -129,11 +131,11 @@ describe("agent artifact run isolation", () => {
 
 describe("local skill sources", () => {
   it.each(sourceSkillDirectories)("%s is camelCase and has valid skill frontmatter", (sourceDirectory) => {
-    // e.g. "pngToCode" — not "png-to-code"
+    // e.g. "imageToCode" — not "image-to-code"
     expect(sourceDirectory).toMatch(/^[a-z][a-zA-Z0-9]*$/);
 
     const feature = featureCatalog.find((candidate) => candidate.sourceDirectory === sourceDirectory);
-    // e.g. "pngToCode" → "png-to-code" when catalog has no installed skill id
+    // e.g. "imageToCode" → "image-to-code" when catalog has no installed skill id
     const expectedName =
       feature?.installedSkill._tag === "skill"
         ? feature.installedSkill.id

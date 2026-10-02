@@ -21,8 +21,6 @@ export const agentIdSchema = Schema.NonEmptyTrimmedString.pipe(
   }),
 );
 
-export type AgentId = Schema.Schema.Type<typeof agentIdSchema>;
-
 const homePathSchema = Schema.NonEmptyTrimmedString.pipe(
   Schema.pattern(HOME_RELATIVE_PATH_PATTERN, {
     message: () => "Home paths must be relative and stay inside the home directory.",
@@ -50,38 +48,35 @@ const commandSchema = Schema.NonEmptyTrimmedString.pipe(
   }),
 );
 
-const uniqueEvidenceArray = <Value>(values: ReadonlyArray<Value>) => values.length === new Set(values).size;
+const uniqueList = <Value, Encoded>(request: {
+  readonly item: Schema.Schema<Value, Encoded>;
+  readonly duplicateMessage: string;
+  readonly description: string;
+}) =>
+  Schema.Array(request.item).pipe(
+    Schema.filter((values) => values.length === new Set(values).size, { message: () => request.duplicateMessage }),
+    Schema.annotations({ description: request.description }),
+  );
 
-export const agentDetectionSchema = Schema.Struct({
-  homePaths: Schema.Array(homePathSchema).pipe(
-    Schema.filter(uniqueEvidenceArray, {
-      message: () => "Home detection paths must be unique for one agent.",
-    }),
-    Schema.annotations({
-      description: "Explicit home-relative detection paths, matched with OR semantics.",
-    }),
-  ),
-  absolutePaths: Schema.Array(absolutePathSchema).pipe(
-    Schema.filter(uniqueEvidenceArray, {
-      message: () => "Absolute detection paths must be unique for one agent.",
-    }),
-    Schema.annotations({
-      description: "Explicit absolute detection paths, matched with OR semantics.",
-    }),
-  ),
-  commands: Schema.Array(commandSchema).pipe(
-    Schema.filter(uniqueEvidenceArray, {
-      message: () => "Detection commands must be unique for one agent.",
-    }),
-    Schema.annotations({
-      description: "Explicit command names, matched with OR semantics.",
-    }),
-  ),
+const agentDetectionSchema = Schema.Struct({
+  homePaths: uniqueList({
+    item: homePathSchema,
+    duplicateMessage: "Home detection paths must be unique for one agent.",
+    description: "Explicit home-relative detection paths, matched with OR semantics.",
+  }),
+  absolutePaths: uniqueList({
+    item: absolutePathSchema,
+    duplicateMessage: "Absolute detection paths must be unique for one agent.",
+    description: "Explicit absolute detection paths, matched with OR semantics.",
+  }),
+  commands: uniqueList({
+    item: commandSchema,
+    duplicateMessage: "Detection commands must be unique for one agent.",
+    description: "Explicit command names, matched with OR semantics.",
+  }),
 }).annotations({
   description: "Observable evidence that can detect an installed agent.",
 });
-
-export type AgentDetection = Schema.Schema.Type<typeof agentDetectionSchema>;
 
 const targetPathSchema = Schema.NonEmptyTrimmedString.pipe(
   Schema.pattern(HOME_RELATIVE_PATH_PATTERN, {
@@ -120,7 +115,7 @@ export const agentTargetSchema = Schema.Union(
       description: "Instruction file that receives one managed block.",
     }),
   }),
-  Schema.TaggedStruct("configReference", {
+  Schema.TaggedStruct("instructionLink", {
     instructionPath: targetPathSchema.annotations({
       description: "Managed instruction file referenced from native agent configuration.",
     }),
@@ -135,27 +130,14 @@ export const agentTargetSchema = Schema.Union(
   description: "Exactly one native output format and destination for an agent.",
 });
 
-export type AgentTarget = Schema.Schema.Type<typeof agentTargetSchema>;
-
-export const nativeHookAdapterSchema = Schema.Union(
+const nativeHookAdapterSchema = Schema.Union(
   Schema.TaggedStruct("unsupported", {}),
-  Schema.TaggedStruct("claudeJson", {
-    configPath: targetPathSchema,
-    compactCommand: Schema.Literal("/compact"),
-  }),
-  Schema.TaggedStruct("codexJson", {
-    configPath: targetPathSchema,
-    compactCommand: Schema.Literal("/compact"),
-  }),
-  Schema.TaggedStruct("grokJson", {
-    configPath: targetPathSchema,
-    compactCommand: Schema.Literal("/compact"),
-  }),
+  Schema.TaggedStruct("claudeJson", { configPath: targetPathSchema }),
+  Schema.TaggedStruct("codexJson", { configPath: targetPathSchema }),
+  Schema.TaggedStruct("grokJson", { configPath: targetPathSchema }),
 ).annotations({
   description: "Verified native lifecycle-hook format or an explicit unsupported result.",
 });
-
-export type NativeHookAdapter = Schema.Schema.Type<typeof nativeHookAdapterSchema>;
 
 export const agentDefinitionSchema = Schema.Struct({
   id: agentIdSchema.annotations({
@@ -175,26 +157,22 @@ export const agentDefinitionSchema = Schema.Struct({
 
 export type AgentDefinition = Schema.Schema.Type<typeof agentDefinitionSchema>;
 
-const duplicateIndexes = (values: ReadonlyArray<string>): ReadonlyArray<number> =>
-  values.flatMap((value, index) => (values.indexOf(value) === index ? [] : [index]));
-
 const duplicateAgentIdIssues = (agents: ReadonlyArray<AgentDefinition>) =>
-  duplicateIndexes(agents.map((agent) => agent.id)).map((index) => ({
-    path: [index, "id"],
-    message: "Agent IDs must be unique.",
-  }));
+  agents.flatMap((agent, index) =>
+    agents.findIndex((candidate) => candidate.id === agent.id) === index
+      ? []
+      : [{ path: [index, "id"], message: "Agent IDs must be unique." }],
+  );
 
 export const agentCatalogSchema = Schema.Array(agentDefinitionSchema).pipe(Schema.filter(duplicateAgentIdIssues));
 
-export const agentCatalog = Schema.decodeUnknownSync(agentCatalogSchema, {
-  onExcessProperty: "error",
-})([
+export const agentCatalog = Schema.decodeUnknownSync(agentCatalogSchema, { onExcessProperty: "error" })([
   {
     id: "claude-code",
     displayName: "Claude Code",
     detection: { homePaths: [".claude"], absolutePaths: [], commands: ["claude"] },
     target: { _tag: "skillDirectory", path: ".claude/skills" },
-    nativeHooks: { _tag: "claudeJson", configPath: ".claude/settings.json", compactCommand: "/compact" },
+    nativeHooks: { _tag: "claudeJson", configPath: ".claude/settings.json" },
   },
   {
     id: "kiro",
@@ -243,14 +221,14 @@ export const agentCatalog = Schema.decodeUnknownSync(agentCatalogSchema, {
     displayName: "Codex",
     detection: { homePaths: [".codex"], absolutePaths: [], commands: ["codex"] },
     target: { _tag: "skillDirectory", path: ".agents/skills" },
-    nativeHooks: { _tag: "codexJson", configPath: ".codex/hooks.json", compactCommand: "/compact" },
+    nativeHooks: { _tag: "codexJson", configPath: ".codex/hooks.json" },
   },
   {
     id: "grok",
     displayName: "Grok",
     detection: { homePaths: [".grok"], absolutePaths: [], commands: ["grok"] },
     target: { _tag: "skillDirectory", path: ".grok/skills" },
-    nativeHooks: { _tag: "grokJson", configPath: ".grok/hooks/dufflebag.json", compactCommand: "/compact" },
+    nativeHooks: { _tag: "grokJson", configPath: ".grok/hooks/dufflebag.json" },
   },
   {
     id: "gemini",
@@ -264,7 +242,7 @@ export const agentCatalog = Schema.decodeUnknownSync(agentCatalogSchema, {
     displayName: "Aider",
     detection: { homePaths: [], absolutePaths: [], commands: ["aider"] },
     target: {
-      _tag: "configReference",
+      _tag: "instructionLink",
       instructionPath: "AGENTS.md",
       configPath: ".aider.conf.yml",
       referenceFormat: "yamlReadArray",
@@ -276,7 +254,7 @@ export const agentCatalog = Schema.decodeUnknownSync(agentCatalogSchema, {
     displayName: "Continue",
     detection: { homePaths: [".continue"], absolutePaths: [], commands: [] },
     target: {
-      _tag: "configReference",
+      _tag: "instructionLink",
       instructionPath: "AGENTS.md",
       configPath: ".continue/config.json",
       referenceFormat: "jsonRulesArray",
@@ -300,53 +278,26 @@ export const agentCatalog = Schema.decodeUnknownSync(agentCatalogSchema, {
 ]);
 
 export const agentEvidenceSchema = Schema.Struct({
-  homePaths: Schema.Array(homePathSchema).pipe(
-    Schema.filter(uniqueEvidenceArray, {
-      message: () => "Observed home paths must be unique.",
-    }),
-    Schema.annotations({
-      description: "Observed home-relative paths.",
-    }),
-  ),
-  absolutePaths: Schema.Array(absolutePathSchema).pipe(
-    Schema.filter(uniqueEvidenceArray, {
-      message: () => "Observed absolute paths must be unique.",
-    }),
-    Schema.annotations({
-      description: "Observed absolute paths.",
-    }),
-  ),
-  commands: Schema.Array(commandSchema).pipe(
-    Schema.filter(uniqueEvidenceArray, {
-      message: () => "Observed commands must be unique.",
-    }),
-    Schema.annotations({
-      description: "Observed executable names.",
-    }),
-  ),
+  homePaths: uniqueList({
+    item: homePathSchema,
+    duplicateMessage: "Observed home paths must be unique.",
+    description: "Observed home-relative paths.",
+  }),
+  absolutePaths: uniqueList({
+    item: absolutePathSchema,
+    duplicateMessage: "Observed absolute paths must be unique.",
+    description: "Observed absolute paths.",
+  }),
+  commands: uniqueList({
+    item: commandSchema,
+    duplicateMessage: "Observed commands must be unique.",
+    description: "Observed executable names.",
+  }),
 }).annotations({
   description: "Filesystem and command evidence already observed by an external detector.",
 });
 
 export type AgentEvidence = Schema.Schema.Type<typeof agentEvidenceSchema>;
-
-export const classifiedAgentSchema = Schema.Struct({
-  id: agentIdSchema.annotations({
-    description: "Stable public agent ID.",
-  }),
-  displayName: Schema.NonEmptyTrimmedString.annotations({
-    description: "Human-facing agent name derived from the catalog.",
-  }),
-  installed: Schema.Boolean.annotations({
-    description: "Whether any declared detection evidence was observed.",
-  }),
-});
-
-export type ClassifiedAgent = Schema.Schema.Type<typeof classifiedAgentSchema>;
-
-const classifiedAgentListSchema = Schema.Array(classifiedAgentSchema);
-
-type ClassifiedAgentList = Schema.Schema.Type<typeof classifiedAgentListSchema>;
 
 const hasObservedEvidence = (declared: ReadonlyArray<string>, observed: ReadonlyArray<string>): boolean =>
   declared.some((value) => observed.includes(value));
@@ -358,7 +309,7 @@ const isAgentInstalled = (agent: AgentDefinition, evidence: AgentEvidence): bool
 
 export const findAgent = (id: string) => Option.fromNullable(agentCatalog.find((agent) => agent.id === id));
 
-export const classifyAgents = (evidence: AgentEvidence): ClassifiedAgentList =>
+export const detectAgents = (evidence: AgentEvidence) =>
   agentCatalog.map((agent) => ({
     id: agent.id,
     displayName: agent.displayName,

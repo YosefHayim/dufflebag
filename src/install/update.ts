@@ -1,19 +1,18 @@
 import { Path } from "@effect/platform";
 import { Effect, Schema, ParseResult as SchemaParseIssue } from "effect";
-import { readArtifactReceiptSnapshot } from "./artifactReceipt.js";
+import { syncInstall } from "./install.js";
+import { installationLocationSchema, receiptPath } from "./installPaths.js";
 import {
   agentChoiceSchema,
   configurationChoiceSchema,
-  type InstallSummary,
-  installationLocationSchema,
-  installRequestSchema,
+  errorMessage,
+  type InstallRequest,
   interactionSchema,
   platformRequirementSchema,
-  receiptPath,
-  reconcileInstallation,
+  preparedPackageSchema,
   selectedFeatureChoiceSchema,
-  stagedPackageSchema,
-} from "./install.js";
+} from "./installRequest.js";
+import { readReceipt } from "./receipt.js";
 
 const updateFeatureChoiceSchema = Schema.Union(
   Schema.TaggedStruct("preserve", {}).annotations({
@@ -24,10 +23,10 @@ const updateFeatureChoiceSchema = Schema.Union(
   description: "Preserved or explicit feature selection for an existing installation.",
 });
 
-export const updateRequestSchema = Schema.extend(
+const updateRequestSchema = Schema.extend(
   installationLocationSchema,
   Schema.Struct({
-    stagedPackage: stagedPackageSchema,
+    preparedPackage: preparedPackageSchema,
     features: updateFeatureChoiceSchema,
     agents: agentChoiceSchema,
     interaction: interactionSchema,
@@ -37,8 +36,6 @@ export const updateRequestSchema = Schema.extend(
   description: "Complete update capability request decoded before receipt inspection.",
 });
 
-export type UpdateRequest = Schema.Schema.Type<typeof updateRequestSchema>;
-
 const updateSummaryFieldsSchema = {
   scope: Schema.Literal("global", "project"),
   features: selectedFeatureChoiceSchema.fields.ids,
@@ -47,18 +44,16 @@ const updateSummaryFieldsSchema = {
   interaction: interactionSchema,
 };
 
-export const updateSummarySchema = Schema.Union(
+const updateSummarySchema = Schema.Union(
   Schema.TaggedStruct("updated", updateSummaryFieldsSchema),
   Schema.TaggedStruct("unchanged", updateSummaryFieldsSchema),
-).annotations({
-  description: "Applied or already-current update result.",
-});
+);
 
-export type UpdateSummary = Schema.Schema.Type<typeof updateSummarySchema>;
+type UpdateSummary = Schema.Schema.Type<typeof updateSummarySchema>;
 
-export class UpdateError extends Schema.TaggedError<UpdateError>()("UpdateError", {
+class UpdateError extends Schema.TaggedError<UpdateError>()("UpdateError", {
   issue: Schema.NonEmptyString.annotations({
-    description: "Actionable update decode, receipt, reconciliation, or application failure.",
+    description: "Actionable update decode, receipt, sync, or application failure.",
   }),
 }) {
   get message(): string {
@@ -66,61 +61,34 @@ export class UpdateError extends Schema.TaggedError<UpdateError>()("UpdateError"
   }
 }
 
-const formatParseError = (error: SchemaParseIssue.ParseError): string =>
-  SchemaParseIssue.TreeFormatter.formatErrorSync(error);
+const decodeStrictly =
+  <Decoded, Encoded>(schema: Schema.Schema<Decoded, Encoded>) =>
+  (input: unknown) =>
+    Schema.decodeUnknown(schema, { onExcessProperty: "error" })(input).pipe(
+      Effect.mapError((error) => new UpdateError({ issue: SchemaParseIssue.TreeFormatter.formatErrorSync(error) })),
+    );
 
-const formatUnknownError = (error: unknown): string => (error instanceof Error ? error.message : String(error));
-
-const toUpdateError = (error: unknown): UpdateError =>
-  error instanceof UpdateError ? error : new UpdateError({ issue: formatUnknownError(error) });
-
-const decodeUpdateRequest = (input: unknown) =>
-  Schema.decodeUnknown(updateRequestSchema, {
-    onExcessProperty: "error",
-  })(input).pipe(Effect.mapError((error) => new UpdateError({ issue: formatParseError(error) })));
-
-const decodeInstallRequest = (input: unknown) =>
-  Schema.decodeUnknown(installRequestSchema, {
-    onExcessProperty: "error",
-  })(input).pipe(Effect.mapError((error) => new UpdateError({ issue: formatParseError(error) })));
-
-const createUpdateSummary = (updateExecution: InstallSummary): UpdateSummary =>
-  Schema.validateSync(updateSummarySchema, {
-    onExcessProperty: "error",
-  })({
-    _tag: updateExecution._tag === "installed" ? "updated" : "unchanged",
-    scope: updateExecution.scope,
-    features: updateExecution.features,
-    agents: updateExecution.agents,
-    platformRequirements: updateExecution.platformRequirements,
-    interaction: updateExecution.interaction,
-  });
-
-// Update one existing receipt through a visible decode, inspect, resolve, reconcile, and result pipeline.
 export const update = (input: unknown) =>
   Effect.gen(function* () {
-    // 1. Decode the complete update request before reading installation state.
-    const request = yield* decodeUpdateRequest(input);
+    const request = yield* decodeStrictly(updateRequestSchema)(input);
     const path = yield* Path.Path;
-
-    // 2. Inspect and strictly decode the sole receipt that authorizes reconciliation.
-    const receiptSnapshot = yield* readArtifactReceiptSnapshot(path.join(request.destination.root, receiptPath));
+    const receiptSnapshot = yield* readReceipt(path.join(request.destination.root, receiptPath));
     if (receiptSnapshot._tag === "missing") {
       return yield* new UpdateError({ issue: "No ownership receipt exists at the requested scope." });
     }
 
-    // 3. Resolve preserved feature choice from the receipt without inferring agent deletion authority.
+    // A preserved selection reuses the receipt's features only; agents always come from the request.
     const featureIds = request.features._tag === "preserve" ? receiptSnapshot.receipt.features : request.features.ids;
+    const installRequest: InstallRequest = { ...request, features: { _tag: "selected", ids: featureIds } };
+    const installSummary = yield* syncInstall({ request: installRequest, receiptSnapshot });
+    const updateSummary: UpdateSummary = {
+      ...installSummary,
+      _tag: installSummary._tag === "installed" ? "updated" : "unchanged",
+    };
 
-    // 4. Validate one install-shaped reconciliation request from the resolved update policy.
-    const installRequest = yield* decodeInstallRequest({
-      ...request,
-      features: { _tag: "selected", ids: featureIds },
-    });
-
-    // 5. Reconcile through the shared planner with the already-inspected receipt snapshot.
-    const updateExecution = yield* reconcileInstallation({ request: installRequest, receiptSnapshot });
-
-    // 6. Return one schema-validated update presentation value.
-    return createUpdateSummary(updateExecution);
-  }).pipe(Effect.mapError(toUpdateError));
+    return updateSummary;
+  }).pipe(
+    Effect.mapError((error) =>
+      error instanceof UpdateError ? error : new UpdateError({ issue: errorMessage(error) }),
+    ),
+  );

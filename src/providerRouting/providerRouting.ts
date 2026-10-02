@@ -1,36 +1,32 @@
-import { Context, DateTime, Effect, Option, Stream } from "effect";
+import { DateTime, Effect, Option, Stream } from "effect";
 
 import { freeProviderCatalog } from "./freeProviderCatalog.js";
 import {
   type ChatRequest,
   type HealthRecord,
+  type HealthStoreError,
   type ModelId,
-  NoEligibleProvider,
-  type ProviderFailure,
+  NoProviderError,
+  type ProviderError,
   type ProviderId,
   type ProviderManifest,
   type RoutingRequest,
-  type RoutingStateFailure,
   type StreamEvent,
 } from "./providerContract.js";
 import {
   estimatedRemainingQuota,
-  providerCircuitIsOpen,
   providerIsCoolingDown,
+  providerIsPaused,
   providerRank,
   quotaWindowIsExpired,
 } from "./providerHealth.js";
-import { exchangeProviderChat } from "./providerHttp.js";
+import { sendChat } from "./providerHttp.js";
 
 export {
   acknowledgementVersion,
-  activeFreeProviderCount,
-  documentedFreePoolCount,
   documentedRecurringTokenEstimate,
   freePoolSnapshot,
-  freePoolSnapshotSource,
   freeProviderCatalog,
-  unavailableFreeProviderCount,
 } from "./freeProviderCatalog.js";
 export { connectOpenRouter } from "./openRouterOAuth.js";
 export {
@@ -42,81 +38,61 @@ export {
   documentedFreePoolSchema,
   freeTierWindowSchema,
   type HealthRecord,
+  HealthStoreError,
   healthRecordSchema,
   type ModelId,
   modelCapabilitySchema,
   modelIdSchema,
-  NoEligibleProvider,
+  NoProviderError,
   type OpenRouterCredential,
-  OpenRouterOAuthFailure,
+  OpenRouterOAuthError,
   type OpenRouterOAuthRequest,
   openRouterCredentialSchema,
   openRouterOAuthRequestSchema,
-  ProviderFailure,
+  ProviderError,
   type ProviderId,
   type ProviderManifest,
   providerIdSchema,
   providerManifestSchema,
   providerUnavailabilitySchema,
   type RoutingRequest,
-  RoutingStateFailure,
   routingRequestSchema,
   routingTargetSchema,
   type StreamEvent,
   streamEventSchema,
   termsStatusSchema,
 } from "./providerContract.js";
-export {
-  classifyUpstreamFailure,
-  decodeAnthropicStreamChunk,
-  decodeGoogleStreamChunk,
-  decodeOpenAiResponsesStreamChunk,
-  decodeOpenAiStreamChunk,
-  encodeAnthropicRequest,
-  encodeGoogleGenerativeRequest,
-  encodeOpenAiChatRequest,
-  encodeOpenAiResponsesRequest,
-  exchangeOpenRouterChat,
-  exchangeProviderChat,
-} from "./providerHttp.js";
+export { sendChat } from "./providerHttp.js";
 
-/**
- * Resolves a caller-owned credential without allowing Dufflebag to persist it.
- * @param credentialId - Credential identity declared by the provider manifest.
- * @returns An Effect containing an optional secret supplied by the caller.
- */
+// The caller owns credentials; routing never persists them.
 export type CredentialLookup = (credentialId: string) => Effect.Effect<Option.Option<string>>;
-export const RoutingState = Context.GenericTag<{
+
+// Caller-owned per-provider/model health; routing never stores conversation content in it.
+export type HealthStore = {
   readHealth: (identity: {
     providerId: ProviderId;
     modelId: ModelId;
-  }) => Effect.Effect<Option.Option<HealthRecord>, RoutingStateFailure>;
-  writeHealth: (healthRecord: HealthRecord) => Effect.Effect<void, RoutingStateFailure>;
-}>("ys-dufflebag/provider-routing/RoutingState");
+  }) => Effect.Effect<Option.Option<HealthRecord>, HealthStoreError>;
+  writeHealth: (healthRecord: HealthRecord) => Effect.Effect<void, HealthStoreError>;
+};
 
-type RoutingStateService = Context.Tag.Service<typeof RoutingState>;
-/**
- * Executes one selected provider/model invocation as a lazy Effect Stream.
- * @param invocation - Selected manifest, model, credential option, and chat request.
- * @returns A lazy Effect Stream of provider-neutral events.
- */
-export type ProviderExchange = (invocation: {
-  /** Selected provider declaration. */
+export type SendChat = (invocation: {
   providerManifest: ProviderManifest;
-  /** Selected upstream model identity. */
   modelId: ModelId;
-  /** Caller-owned credential when required. */
   credential: Option.Option<string>;
-  /** Provider-neutral conversation and capability requirements. */
   chatRequest: ChatRequest;
-}) => Stream.Stream<StreamEvent, ProviderFailure>;
+}) => Stream.Stream<StreamEvent, ProviderError>;
 
 type ProviderRoutingDependencies = {
   providerManifests?: ReadonlyArray<ProviderManifest>;
   credentialLookup: CredentialLookup;
-  routingState: RoutingStateService;
-  providerExchange?: ProviderExchange;
+  healthStore: HealthStore;
+  sendChat?: SendChat;
 };
+
+type FreeChatRequest = { routingRequest: RoutingRequest; dependencies: ProviderRoutingDependencies };
+
+type FreeChatStream = Stream.Stream<StreamEvent, ProviderError | NoProviderError | HealthStoreError>;
 
 type EligibleProvider = {
   providerManifest: ProviderManifest;
@@ -125,13 +101,11 @@ type EligibleProvider = {
   credential: Option.Option<string>;
 };
 
-const manifestsFor = (dependencies: ProviderRoutingDependencies): ReadonlyArray<ProviderManifest> =>
-  dependencies.providerManifests === undefined ? freeProviderCatalog : dependencies.providerManifests;
+const quotaCooldown = { minutes: 1 };
+const repeatedFailurePause = { minutes: 5 };
 
-const providerExchangeFor = (dependencies: ProviderRoutingDependencies): ProviderExchange =>
-  dependencies.providerExchange === undefined ? exchangeProviderChat : dependencies.providerExchange;
-
-const requiresAcknowledgement = (providerManifest: ProviderManifest): boolean => providerManifest.termsStatus !== "ok";
+const manifestsOrCatalog = (providerManifests: ReadonlyArray<ProviderManifest> | undefined) =>
+  providerManifests === undefined ? freeProviderCatalog : providerManifests;
 
 const hasRequiredCapabilities = (request: {
   providerManifest: ProviderManifest;
@@ -139,30 +113,20 @@ const hasRequiredCapabilities = (request: {
   chatRequest: ChatRequest;
 }): boolean => {
   const modelCapability = request.providerManifest.models.find((candidate) => candidate.modelId === request.modelId);
-  if (modelCapability === undefined) {
-    return false;
-  }
-  return request.chatRequest.requiredCapabilities.every((requiredCapability) =>
-    modelCapability.capabilities.includes(requiredCapability),
+  return (
+    modelCapability !== undefined &&
+    request.chatRequest.requiredCapabilities.every((capability) => modelCapability.capabilities.includes(capability))
   );
 };
 
-const acknowledgedTerms = (routingRequest: RoutingRequest, providerManifest: ProviderManifest): boolean => {
-  if (!requiresAcknowledgement(providerManifest)) {
-    return true;
-  }
-  return routingRequest.acknowledgementVersion === providerManifest.acknowledgementVersion;
-};
+const acknowledgedTerms = (routingRequest: RoutingRequest, providerManifest: ProviderManifest): boolean =>
+  providerManifest.termsStatus === "ok" ||
+  routingRequest.acknowledgementVersion === providerManifest.acknowledgementVersion;
 
-const credentialFor = (providerManifest: ProviderManifest, credentialLookup: CredentialLookup) => {
-  if (providerManifest.authentication === "keyless") {
-    return Effect.succeed(Option.none<string>());
-  }
-  if (providerManifest.credentialId === undefined) {
-    return Effect.succeed(Option.none<string>());
-  }
-  return credentialLookup(providerManifest.credentialId);
-};
+const credentialFor = (providerManifest: ProviderManifest, credentialLookup: CredentialLookup) =>
+  providerManifest.authentication === "keyless" || providerManifest.credentialId === undefined
+    ? Effect.succeed(Option.none<string>())
+    : credentialLookup(providerManifest.credentialId);
 
 const modelChoices = (routingRequest: RoutingRequest, providerManifest: ProviderManifest): ReadonlyArray<ModelId> => {
   if (routingRequest.target === "auto-free") {
@@ -171,123 +135,120 @@ const modelChoices = (routingRequest: RoutingRequest, providerManifest: Provider
   return routingRequest.target.providerId === providerManifest.providerId ? [routingRequest.target.modelId] : [];
 };
 
-const selectEligibleProviders = (routingRequest: RoutingRequest, dependencies: ProviderRoutingDependencies) =>
-  Effect.gen(function* () {
-    const eligibleProviders = yield* Effect.forEach(
-      manifestsFor(dependencies).flatMap((providerManifest) =>
-        modelChoices(routingRequest, providerManifest).map((modelId) => ({ providerManifest, modelId })),
-      ),
-      ({ providerManifest, modelId }) =>
-        Effect.gen(function* () {
-          const credential = yield* credentialFor(providerManifest, dependencies.credentialLookup);
-          const healthOption = yield* dependencies.routingState.readHealth({
-            providerId: providerManifest.providerId,
-            modelId,
-          });
-          const healthRecord = Option.getOrUndefined(healthOption);
-          const eligible =
-            providerManifest.activation === "active" &&
-            acknowledgedTerms(routingRequest, providerManifest) &&
-            hasRequiredCapabilities({ providerManifest, modelId, chatRequest: routingRequest.chatRequest }) &&
-            !providerIsCoolingDown(healthRecord, routingRequest.observedAt) &&
-            !providerCircuitIsOpen(healthRecord, routingRequest.observedAt) &&
-            estimatedRemainingQuota({ providerManifest, healthRecord, observedAt: routingRequest.observedAt }) > 0 &&
-            (providerManifest.authentication === "keyless" || Option.isSome(credential));
-          return eligible
-            ? Option.some({ providerManifest, modelId, healthRecord, credential })
-            : Option.none<EligibleProvider>();
-        }),
-      { concurrency: 8 },
-    );
-    return eligibleProviders
-      .filter(Option.isSome)
-      .map((eligibleProvider) => eligibleProvider.value)
-      .map((eligibleProvider) => ({
-        eligibleProvider,
-        providerRank: providerRank({
-          providerManifest: eligibleProvider.providerManifest,
-          healthRecord: eligibleProvider.healthRecord,
-          observedAt: routingRequest.observedAt,
-        }),
-      }))
-      .sort((left, right) => right.providerRank - left.providerRank)
-      .map((rankedProvider) => rankedProvider.eligibleProvider);
-  });
+const isEligible = (routingRequest: RoutingRequest, candidate: EligibleProvider): boolean => {
+  const { providerManifest, modelId, healthRecord } = candidate;
+  const observedAt = routingRequest.observedAt;
+  return (
+    providerManifest.activation === "active" &&
+    acknowledgedTerms(routingRequest, providerManifest) &&
+    hasRequiredCapabilities({ providerManifest, modelId, chatRequest: routingRequest.chatRequest }) &&
+    !providerIsCoolingDown(healthRecord, observedAt) &&
+    !providerIsPaused(healthRecord, observedAt) &&
+    estimatedRemainingQuota({ providerManifest, healthRecord, observedAt }) > 0 &&
+    (providerManifest.authentication === "keyless" || Option.isSome(candidate.credential))
+  );
+};
+
+const selectEligibleProviders = ({ routingRequest, dependencies }: FreeChatRequest) =>
+  Effect.forEach(
+    manifestsOrCatalog(dependencies.providerManifests).flatMap((providerManifest) =>
+      modelChoices(routingRequest, providerManifest).map((modelId) => ({ providerManifest, modelId })),
+    ),
+    ({ providerManifest, modelId }) =>
+      Effect.gen(function* () {
+        const credential = yield* credentialFor(providerManifest, dependencies.credentialLookup);
+        const healthOption = yield* dependencies.healthStore.readHealth({
+          providerId: providerManifest.providerId,
+          modelId,
+        });
+        const candidate = { providerManifest, modelId, healthRecord: Option.getOrUndefined(healthOption), credential };
+        return isEligible(routingRequest, candidate) ? Option.some(candidate) : Option.none<EligibleProvider>();
+      }),
+    { concurrency: 8 },
+  ).pipe(
+    Effect.map((candidates) =>
+      candidates
+        .flatMap(Option.toArray)
+        .map((eligibleProvider) => ({
+          eligibleProvider,
+          rank: providerRank({ ...eligibleProvider, observedAt: routingRequest.observedAt }),
+        }))
+        .sort((left, right) => right.rank - left.rank)
+        .map((rankedProvider) => rankedProvider.eligibleProvider),
+    ),
+  );
+
+const freshCounters = (observedAt: HealthRecord["observedAt"]) => ({
+  quotaUsedTokens: 0,
+  quotaWindowStartedAt: observedAt,
+  successfulCalls: 0,
+  failedCalls: 0,
+  latencyMilliseconds: 0,
+});
 
 const recordFailure = (request: {
   eligibleProvider: EligibleProvider;
-  routingRequest: RoutingRequest;
-  failure: ProviderFailure;
-  routingState: RoutingStateService;
+  observedAt: HealthRecord["observedAt"];
+  failure: ProviderError;
+  healthStore: HealthStore;
 }) => {
-  const prior = request.eligibleProvider.healthRecord;
-  const priorFailedCalls = prior === undefined ? 0 : prior.failedCalls;
-  const cooldownUntil =
-    request.failure.failureClass === "quota"
-      ? DateTime.unsafeMake(DateTime.toEpochMillis(request.routingRequest.observedAt) + 60_000)
-      : undefined;
-  const circuitUntil =
-    request.failure.failureClass === "upstream" && priorFailedCalls >= 2
-      ? DateTime.unsafeMake(DateTime.toEpochMillis(request.routingRequest.observedAt) + 300_000)
-      : undefined;
-  return request.routingState.writeHealth({
-    providerId: request.eligibleProvider.providerManifest.providerId,
-    modelId: request.eligibleProvider.modelId,
-    observedAt: request.routingRequest.observedAt,
-    cooldownUntil,
-    circuitUntil,
-    quotaUsedTokens: prior === undefined ? 0 : prior.quotaUsedTokens,
-    quotaWindowStartedAt: prior === undefined ? request.routingRequest.observedAt : prior.quotaWindowStartedAt,
-    successfulCalls: prior === undefined ? 0 : prior.successfulCalls,
-    failedCalls: priorFailedCalls + 1,
-    latencyMilliseconds: prior === undefined ? 0 : prior.latencyMilliseconds,
-    failureClass: request.failure.failureClass === "configuration" ? "upstream" : request.failure.failureClass,
+  const { providerManifest, modelId, healthRecord } = request.eligibleProvider;
+  const { observedAt, failure } = request;
+  const prior = healthRecord === undefined ? freshCounters(observedAt) : healthRecord;
+  return request.healthStore.writeHealth({
+    providerId: providerManifest.providerId,
+    modelId,
+    observedAt,
+    cooldownUntil: failure.failureClass === "quota" ? DateTime.add(observedAt, quotaCooldown) : undefined,
+    circuitUntil:
+      failure.failureClass === "upstream" && prior.failedCalls >= 2
+        ? DateTime.add(observedAt, repeatedFailurePause)
+        : undefined,
+    quotaUsedTokens: prior.quotaUsedTokens,
+    quotaWindowStartedAt: prior.quotaWindowStartedAt,
+    successfulCalls: prior.successfulCalls,
+    failedCalls: prior.failedCalls + 1,
+    latencyMilliseconds: prior.latencyMilliseconds,
+    failureClass: failure.failureClass === "configuration" ? "upstream" : failure.failureClass,
   });
 };
 
 const recordSuccess = (request: {
   eligibleProvider: EligibleProvider;
-  routingRequest: RoutingRequest;
+  observedAt: HealthRecord["observedAt"];
   usageTokens: number;
   latencyMilliseconds: number;
-  routingState: RoutingStateService;
+  healthStore: HealthStore;
 }) => {
-  const prior = request.eligibleProvider.healthRecord;
-  const quotaExpired =
-    prior === undefined
-      ? false
-      : quotaWindowIsExpired({
-          providerManifest: request.eligibleProvider.providerManifest,
-          healthRecord: prior,
-          observedAt: request.routingRequest.observedAt,
-        });
-  const quotaUsedTokens = prior === undefined || quotaExpired ? 0 : prior.quotaUsedTokens;
-  const quotaWindowStartedAt =
-    prior === undefined || quotaExpired ? request.routingRequest.observedAt : prior.quotaWindowStartedAt;
-  return request.routingState.writeHealth({
-    providerId: request.eligibleProvider.providerManifest.providerId,
-    modelId: request.eligibleProvider.modelId,
-    observedAt: request.routingRequest.observedAt,
-    quotaUsedTokens: quotaUsedTokens + request.usageTokens,
-    quotaWindowStartedAt,
-    successfulCalls: (prior === undefined ? 0 : prior.successfulCalls) + 1,
-    failedCalls: prior === undefined ? 0 : prior.failedCalls,
+  const { providerManifest, modelId, healthRecord } = request.eligibleProvider;
+  const observedAt = request.observedAt;
+  const prior = healthRecord === undefined ? freshCounters(observedAt) : healthRecord;
+  const quotaWindow =
+    healthRecord === undefined || quotaWindowIsExpired({ providerManifest, healthRecord, observedAt })
+      ? freshCounters(observedAt)
+      : healthRecord;
+  return request.healthStore.writeHealth({
+    providerId: providerManifest.providerId,
+    modelId,
+    observedAt,
+    quotaUsedTokens: quotaWindow.quotaUsedTokens + request.usageTokens,
+    quotaWindowStartedAt: quotaWindow.quotaWindowStartedAt,
+    successfulCalls: prior.successfulCalls + 1,
+    failedCalls: prior.failedCalls,
     latencyMilliseconds: request.latencyMilliseconds,
   });
 };
 
-const streamFromEligibleProviders = (request: {
-  eligibleProviders: ReadonlyArray<EligibleProvider>;
-  routingRequest: RoutingRequest;
-  dependencies: ProviderRoutingDependencies;
-}): Stream.Stream<StreamEvent, ProviderFailure | NoEligibleProvider | RoutingStateFailure> => {
-  const tryProvider = (
-    providerIndex: number,
-  ): Stream.Stream<StreamEvent, ProviderFailure | NoEligibleProvider | RoutingStateFailure> => {
+const streamFromEligibleProviders = (
+  request: FreeChatRequest & { eligibleProviders: ReadonlyArray<EligibleProvider> },
+): FreeChatStream => {
+  const { routingRequest, dependencies } = request;
+  const send = dependencies.sendChat === undefined ? sendChat : dependencies.sendChat;
+  const tryProvider = (providerIndex: number): FreeChatStream => {
     const eligibleProvider = request.eligibleProviders[providerIndex];
     if (eligibleProvider === undefined) {
       return Stream.fail(
-        new NoEligibleProvider({ requiredCapabilities: request.routingRequest.chatRequest.requiredCapabilities }),
+        new NoProviderError({ requiredCapabilities: routingRequest.chatRequest.requiredCapabilities }),
       );
     }
     let emittedOutput = false;
@@ -295,11 +256,11 @@ const streamFromEligibleProviders = (request: {
     let inputTokens = 0;
     let outputTokens = 0;
     const startedAt = Date.now();
-    return providerExchangeFor(request.dependencies)({
+    return send({
       providerManifest: eligibleProvider.providerManifest,
       modelId: eligibleProvider.modelId,
       credential: eligibleProvider.credential,
-      chatRequest: request.routingRequest.chatRequest,
+      chatRequest: routingRequest.chatRequest,
     }).pipe(
       Stream.map((streamEvent) => {
         emittedOutput = true;
@@ -307,23 +268,24 @@ const streamFromEligibleProviders = (request: {
           inputTokens = Math.max(inputTokens, streamEvent.inputTokens);
           outputTokens = Math.max(outputTokens, streamEvent.outputTokens);
         }
-        if (streamEvent._tag === "completed") {
-          completed = true;
-        }
+        if (streamEvent._tag === "completed") completed = true;
         return streamEvent;
       }),
       Stream.catchAll((failure) =>
         Stream.unwrap(
-          Effect.gen(function* () {
-            yield* recordFailure({
-              eligibleProvider,
-              routingRequest: request.routingRequest,
-              failure,
-              routingState: request.dependencies.routingState,
-            });
-            if (emittedOutput || request.routingRequest.target !== "auto-free") return Stream.fail(failure);
-            return tryProvider(providerIndex + 1);
-          }),
+          recordFailure({
+            eligibleProvider,
+            observedAt: routingRequest.observedAt,
+            failure,
+            healthStore: dependencies.healthStore,
+          }).pipe(
+            // Lazy on purpose: the next provider's chat is built only after this failure is recorded.
+            Effect.map(() =>
+              emittedOutput || routingRequest.target !== "auto-free"
+                ? Stream.fail(failure)
+                : tryProvider(providerIndex + 1),
+            ),
+          ),
         ),
       ),
       Stream.concat(
@@ -332,10 +294,10 @@ const streamFromEligibleProviders = (request: {
             if (!completed) return Effect.succeed(Stream.empty);
             return recordSuccess({
               eligibleProvider,
-              routingRequest: request.routingRequest,
+              observedAt: routingRequest.observedAt,
               usageTokens: inputTokens + outputTokens,
               latencyMilliseconds: Date.now() - startedAt,
-              routingState: request.dependencies.routingState,
+              healthStore: dependencies.healthStore,
             }).pipe(Effect.as(Stream.empty));
           }),
         ),
@@ -345,25 +307,15 @@ const streamFromEligibleProviders = (request: {
   return tryProvider(0);
 };
 
-/**
- * Lists active free-provider declarations.
- * @param request - Optional caller-supplied declarations replacing the built-in catalog.
- * @returns Active validated provider manifests.
- */
 export const listFreeProviders = (
   request: { providerManifests?: ReadonlyArray<ProviderManifest> } = {},
 ): Effect.Effect<ReadonlyArray<ProviderManifest>> =>
   Effect.succeed(
-    (request.providerManifests === undefined ? freeProviderCatalog : request.providerManifests).filter(
+    manifestsOrCatalog(request.providerManifests).filter(
       (providerManifest) => providerManifest.activation === "active",
     ),
   );
 
-/**
- * Lists active free models with their provider identities and capabilities.
- * @param request - Optional caller-supplied declarations replacing the built-in catalog.
- * @returns Flattened active provider/model capabilities.
- */
 export const listFreeModels = (request: { providerManifests?: ReadonlyArray<ProviderManifest> } = {}) =>
   listFreeProviders(request).pipe(
     Effect.map((providerManifests) =>
@@ -376,44 +328,12 @@ export const listFreeModels = (request: { providerManifests?: ReadonlyArray<Prov
     ),
   );
 
-/**
- * Reads persisted health for one provider/model identity.
- * @param request - Provider/model identity and caller-supplied routing state boundary.
- * @returns An Effect containing optional health.
- */
-export const inspectProviderHealth = (request: {
-  providerId: ProviderId;
-  modelId: ModelId;
-  routingState: RoutingStateService;
-}) => request.routingState.readHealth({ providerId: request.providerId, modelId: request.modelId });
-
-/**
- * Routes a chat request with deterministic explicit selection and pre-output automatic fallback.
- * @param request - Validated routing request and caller-supplied dependencies.
- * @returns A lazy Effect Stream of provider-neutral events.
- */
-export const routeFreeChat = (request: {
-  routingRequest: RoutingRequest;
-  dependencies: ProviderRoutingDependencies;
-}): Stream.Stream<StreamEvent, ProviderFailure | NoEligibleProvider | RoutingStateFailure> =>
+// An explicit target never falls back; auto-free moves to the next ranked provider only before the first event streams.
+export const streamFreeChat = (request: FreeChatRequest): FreeChatStream =>
   Stream.unwrap(
-    selectEligibleProviders(request.routingRequest, request.dependencies).pipe(
-      Effect.map((eligibleProviders) =>
-        streamFromEligibleProviders({
-          eligibleProviders,
-          routingRequest: request.routingRequest,
-          dependencies: request.dependencies,
-        }),
-      ),
+    selectEligibleProviders(request).pipe(
+      Effect.map((eligibleProviders) => streamFromEligibleProviders({ ...request, eligibleProviders })),
     ),
   );
 
-/**
- * Collects a routed free-chat stream for non-streaming callers.
- * @param request - Validated routing request and caller-supplied dependencies.
- * @returns An Effect containing the complete event chunk.
- */
-export const completeFreeChat = (request: {
-  routingRequest: RoutingRequest;
-  dependencies: ProviderRoutingDependencies;
-}) => Stream.runCollect(routeFreeChat(request));
+export const askFreeChat = (request: FreeChatRequest) => Stream.runCollect(streamFreeChat(request));

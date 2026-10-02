@@ -12,36 +12,35 @@
   "files": [
     "dist",
     "src/skills",
-    "src/hookIsland",
-    "templates",
+    "src/hooks",
+    "src/templates",
     "README.md",
     "LICENSE",
     "!src/skills/**/node_modules",
     "!src/skills/**/node_modules/**",
     "!src/skills/**/*.test.ts",
-    "!src/hookIsland/**/*.test.ts"
+    "!src/hooks/**/*.test.ts",
+    "!dist/src/scripts"
   ],
   "scripts": {
-    "dev": "pnpm cli",
     "cli": "tsx src/cli/main.ts",
     "prepare": "husky",
     "prebuild": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
-    "build": "tsc && node scripts/assembleHooks.mjs",
+    "build": "tsc && node -e \"require('node:fs').chmodSync('dist/src/cli/main.js',0o755)\"",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
-    "style": "tsx scripts/reportCodeStyle.ts",
-    "style:guide": "tsx scripts/reportStyleGuide.ts",
-    "python:check": "uvx ruff@0.16.0 check src/hookIsland/speakResponse scripts/checkPythonNames.py && uvx ruff@0.16.0 format --check src/hookIsland/speakResponse scripts/checkPythonNames.py && uv run --python 3.10 scripts/checkPythonNames.py",
-    "python:fix": "uvx ruff@0.16.0 check --fix src/hookIsland/speakResponse scripts/checkPythonNames.py && uvx ruff@0.16.0 format src/hookIsland/speakResponse scripts/checkPythonNames.py",
+    "style": "tsx src/scripts/reportCodeStyle.ts",
+    "style:guide": "tsx src/scripts/reportRuleCards.ts",
+    "python:check": "uvx ruff@0.16.0 check src/hooks/voice src/scripts/checkPythonNames.py && uvx ruff@0.16.0 format --check src/hooks/voice src/scripts/checkPythonNames.py && uv run --python 3.10 src/scripts/checkPythonNames.py",
+    "python:fix": "uvx ruff@0.16.0 check --fix src/hooks/voice src/scripts/checkPythonNames.py && uvx ruff@0.16.0 format src/hooks/voice src/scripts/checkPythonNames.py",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
     "format": "biome format --write .",
-    "check:ci": "biome ci .",
     "verify": "biome ci . && pnpm python:check && tsc --noEmit && pnpm style && pnpm style:guide . && vitest run && pnpm build && pnpm generate-readme:check",
     "prepublishOnly": "npm run build",
-    "generate-readme": "node scripts/generateReadme.mjs",
-    "generate-readme:check": "node scripts/generateReadme.mjs --check"
+    "generate-readme": "tsx src/scripts/generateReadme.ts",
+    "generate-readme:check": "tsx src/scripts/generateReadme.ts --check"
   },
   "keywords": [
     "claude-code",
@@ -59,7 +58,7 @@
     "developer-tools",
     "macos",
     "svg",
-    "png-to-code"
+    "image-to-code"
   ],
   "author": "Yosef Hayim Sabag",
   "license": "MIT",
@@ -81,8 +80,7 @@
     "@effect/platform-node": "0.108.0",
     "effect": "3.22.0",
     "jsonc-parser": "3.3.1",
-    "yaml": "2.9.0",
-    "ys-dufflebag": "link:"
+    "yaml": "2.9.0"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.2",

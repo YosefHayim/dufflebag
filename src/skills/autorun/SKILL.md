@@ -1,20 +1,20 @@
 ---
 name: autorun
-description: Drive the autonomous context loop for this session — arm it to auto-/compact and resume work hands-free, or pause/shut it down. Use when the user types /autorun (optionally with a number or `stop`/`exit`), says "autorun", "autopilot", "take it from here", "keep going hands-off", or asks to pause / stop / shut down / exit the auto-compact loop.
+description: Use when you want the agent to keep working without you. When the context is full, it compacts it and continues the task. You can pause or stop it. macOS and Ghostty only. Say "autorun", "autorun 3", "autorun stop", or "keep going alone".
 ---
 
 # autorun
 
-One command drives the **autonomous loop** for the current session. The argument
+One command drives **autorun** for the current session. The argument
 selects the verb:
 
 | You type | Meaning |
 |---|---|
-| `/autorun <n>` (or bare `/autorun`) | **arm** — allow up to **N** auto-compact cycles (bare = configured default) |
-| `/autorun stop` | **pause** — stop compacting but keep the daemon observing (re-arm later) |
-| `/autorun exit` | **shut down** — disarm and tell the daemon to self-terminate |
+| `/autorun <n>` (or bare `/autorun`) | **arm** — allow up to **N** compact cycles (bare = configured default) |
+| `/autorun stop` | **pause** — stop compacting but keep the watcher observing (re-arm later) |
+| `/autorun exit` | **shut down** — disarm and tell the watcher to self-terminate |
 
-Once armed, the `ctx-watch` daemon watches context occupancy. Each time the session
+Once armed, the autorun watcher watches context occupancy. Each time the session
 nears the guardrail (the configured warn %) **and** a fresh handoff doc exists **and**
 the turn is idle **and** Ghostty is frontmost, it types `/compact`, then a continuation
 prompt — so the work carries across resets hands-free. It pauses after **N** cycles,
@@ -26,11 +26,11 @@ Read the argument and shell out to the one control plane:
 
 ```bash
 # arm (bare or a number N)
-node "@@CTL@@" arm "$N"
+node "@@AUTORUN_CONTROL@@" arm "$N"
 # pause
-node "@@CTL@@" stop
-# shut the daemon down
-node "@@CTL@@" exit
+node "@@AUTORUN_CONTROL@@" stop
+# shut the watcher down
+node "@@AUTORUN_CONTROL@@" exit
 ```
 
 - If the argument is a number (e.g. `/autorun 5`), run `arm 5`. Bare `/autorun` → `arm`
@@ -43,21 +43,21 @@ usage, and the last auto-halt reason if any).
 
 ## Your responsibility while armed
 
-The daemon only presses keys — **you** make each compact safe and productive:
+The watcher only presses keys — **you** make each compact safe and productive:
 
 - As you approach the guardrail, **run `/handoff`** to save a resume doc *before* the
-  daemon compacts. No fresh handoff → it waits and never compacts (by design).
+  watcher compacts. No fresh handoff → it waits and never compacts (by design).
 - When the task is **genuinely, fully complete** — nothing left to do — create the
-  done-marker the daemon halts on (the context-guard message tells you the exact path,
-  `~/.claude/.ctx-loop-state/<session-id>.done`) **instead of** another handoff, then
+  done-marker the watcher halts on (the context-guard message tells you the exact path,
+  `~/.claude/dufflebag/state/autorun/<session-id>.done`) **instead of** another handoff, then
   stop. Do **not** invent busy-work to keep the loop alive.
 
 ## Notes
 
-- **Requires macOS + Ghostty.** The daemon types only into THIS session's Ghostty window
+- **Requires macOS + Ghostty.** The watcher types only into THIS session's Ghostty window
   (located by title, idle state only), only when Ghostty is frontmost and the turn is
   idle; a global keystroke mutex serializes injection; a hard cycle cap applies
-  regardless of N; global kill switch `touch ~/.claude/.ctx-guard-off`.
-- `/autorun stop` is a **pause** (re-armable); `/autorun exit` shuts the daemon down for
-  this session — re-enabling then needs a fresh `/autorun`, which re-spawns it.
+  regardless of N; global kill switch `touch ~/.claude/dufflebag/state/context-guard-off`.
+- `/autorun stop` is a **pause** (re-armable); `/autorun exit` shuts the watcher down for
+  this session — re-enabling then needs a fresh `/autorun`, which starts it again.
 - Tune the warn %, budget, and hard cap with `dufflebag config`.

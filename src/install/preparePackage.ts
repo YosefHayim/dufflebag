@@ -1,0 +1,285 @@
+// Prepare the package that install, update, and doctor read: compiled hook code from dist/src/hooks/<sourceDirectory>/
+// goes to dist/prepared/hooks/<sourceDirectory>/, and each catalog skill allowlist to dist/prepared/skills/<id>/.
+
+import { spawnSync } from "node:child_process";
+
+import { FileSystem, Path } from "@effect/platform";
+import type { PlatformError } from "@effect/platform/Error";
+import { Effect, Option, Schema } from "effect";
+
+import { featureCatalog } from "../catalog/featureCatalog.js";
+import { errorMessage, type preparedPackageSchema } from "./installRequest.js";
+import { findPackageRoot, readPackageVersion } from "./packageRoot.js";
+
+class PreparePackageError extends Schema.TaggedError<PreparePackageError>()("PreparePackageError", {
+  issue: Schema.NonEmptyString.annotations({
+    description: "Actionable package preparation failure describing what the operator should fix.",
+  }),
+}) {
+  get message(): string {
+    return `Cannot prepare dufflebag package: ${this.issue}`;
+  }
+}
+
+type PreparedPackage = Schema.Schema.Type<typeof preparedPackageSchema>;
+
+const copyFile = (input: { source: string; destination: string }) =>
+  Effect.gen(function* () {
+    const fileSystem = yield* FileSystem.FileSystem;
+    const path = yield* Path.Path;
+    yield* fileSystem.makeDirectory(path.dirname(input.destination), { recursive: true });
+    const bytes = yield* fileSystem.readFile(input.source);
+    const executable = path.basename(input.source) === "dufflebag-voice";
+    yield* fileSystem.writeFile(input.destination, bytes, executable ? { mode: 0o755 } : undefined);
+    if (executable) {
+      // Some platforms ignore write mode; force the worker bit after the write.
+      yield* fileSystem.chmod(input.destination, 0o755);
+    }
+  });
+
+// Never copy install junk even when a catalog path is a directory allowlist.
+const SKIPPED_TREE_NAMES = new Set(["node_modules", ".playwright", "out", ".git", ".DS_Store"]);
+
+const copyTree = (input: {
+  source: string;
+  destination: string;
+}): Effect.Effect<void, PreparePackageError | PlatformError, FileSystem.FileSystem | Path.Path> =>
+  Effect.gen(function* () {
+    const fileSystem = yield* FileSystem.FileSystem;
+    const path = yield* Path.Path;
+    if (!(yield* fileSystem.exists(input.source))) {
+      return;
+    }
+
+    const sourceStat = yield* fileSystem.stat(input.source);
+    if (sourceStat.type === "File") {
+      yield* copyFile(input);
+      return;
+    }
+
+    if (sourceStat.type !== "Directory") {
+      return;
+    }
+
+    yield* fileSystem.makeDirectory(input.destination, { recursive: true });
+    for (const entry of yield* fileSystem.readDirectory(input.source)) {
+      if (!SKIPPED_TREE_NAMES.has(entry)) {
+        yield* copyTree({ source: path.join(input.source, entry), destination: path.join(input.destination, entry) });
+      }
+    }
+  });
+
+// The shared hook lib is copied into each feature's lib/, so tsc's src/hooks/lib specifier becomes a
+// sibling of lib/ for hooks and commands, and a same-folder import for lib files themselves.
+// e.g. "../../lib/hookConfig.js" from src/hooks/<feature>/hooks/ or src/hooks/<feature>/lib/
+const SHARED_HOOK_LIB_IMPORT = "../../lib/";
+
+const RUNTIME_IMPORT_PARTS: ReadonlyArray<{ readonly part: string; readonly runtimeImport: string }> = [
+  { part: "hooks", runtimeImport: "../lib/" },
+  { part: "command", runtimeImport: "../lib/" },
+  { part: "lib", runtimeImport: "./" },
+];
+
+const rewriteSharedLibImports = (input: { partRoot: string; runtimeImport: string }) =>
+  Effect.gen(function* () {
+    const fileSystem = yield* FileSystem.FileSystem;
+    const path = yield* Path.Path;
+    if (!(yield* fileSystem.exists(input.partRoot))) {
+      return false;
+    }
+
+    const preparedFiles = (yield* fileSystem.readDirectory(input.partRoot)).filter((name) => name.endsWith(".js"));
+    const sharedRuntimeImports = yield* Effect.forEach(preparedFiles, (name) =>
+      Effect.gen(function* () {
+        const preparedPath = path.join(input.partRoot, name);
+        const source = yield* fileSystem.readFileString(preparedPath);
+        const usesSharedRuntime = source.includes(SHARED_HOOK_LIB_IMPORT);
+        if (usesSharedRuntime) {
+          yield* fileSystem.writeFileString(
+            preparedPath,
+            source.replaceAll(SHARED_HOOK_LIB_IMPORT, input.runtimeImport),
+          );
+        }
+        return usesSharedRuntime;
+      }),
+    );
+    return sharedRuntimeImports.some(Boolean);
+  });
+
+const buildVoiceWorker = (packageRoot: string) =>
+  Effect.gen(function* () {
+    const fileSystem = yield* FileSystem.FileSystem;
+    const path = yield* Path.Path;
+    const script = path.join(packageRoot, "src", "scripts", "buildVoiceWorker.sh");
+    if (!(yield* fileSystem.exists(script))) {
+      return yield* new PreparePackageError({
+        issue: `Native voice worker is missing and ${script} was not found to build it.`,
+      });
+    }
+
+    yield* Effect.try({
+      try: () => {
+        const voiceBuild = spawnSync("bash", [script], { cwd: packageRoot, encoding: "utf8", env: process.env });
+        if (voiceBuild.status !== 0) {
+          throw new Error(
+            voiceBuild.stderr || voiceBuild.stdout || `buildVoiceWorker.sh exited ${String(voiceBuild.status)}`,
+          );
+        }
+      },
+      catch: (error) => new PreparePackageError({ issue: `Could not build dufflebag-voice: ${errorMessage(error)}` }),
+    });
+  });
+
+// A worker binary older than any file in its crate would ship old code, so it is rebuilt.
+// A published package has no crate beside the binary and keeps its prebuilt worker.
+const voiceWorkerIsStale = (binary: string) =>
+  Effect.gen(function* () {
+    const fileSystem = yield* FileSystem.FileSystem;
+    const path = yield* Path.Path;
+    const crate = path.join(path.dirname(binary), "worker");
+    if (!(yield* fileSystem.exists(crate))) {
+      return false;
+    }
+    const builtAt = Option.getOrElse((yield* fileSystem.stat(binary)).mtime, () => new Date(0));
+    const sources = (yield* fileSystem.readDirectory(crate, { recursive: true })).filter(
+      (file) => !file.startsWith("target"),
+    );
+    for (const file of sources) {
+      const sourceFile = yield* fileSystem.stat(path.join(crate, file));
+      if (sourceFile.type === "File" && Option.getOrElse(sourceFile.mtime, () => new Date(0)) > builtAt) {
+        return true;
+      }
+    }
+    return false;
+  });
+
+const ensureShippedRuntimeSource = (input: {
+  source: string;
+  shippedPath: string;
+  authoredFeatureRoot: string;
+  packageRoot: string;
+}) =>
+  Effect.gen(function* () {
+    const fileSystem = yield* FileSystem.FileSystem;
+    const isVoiceWorker = input.shippedPath === "dufflebag-voice";
+    if ((yield* fileSystem.exists(input.source)) && !(isVoiceWorker && (yield* voiceWorkerIsStale(input.source)))) {
+      return;
+    }
+    if (isVoiceWorker) {
+      yield* buildVoiceWorker(input.packageRoot);
+    }
+    if (yield* fileSystem.exists(input.source)) {
+      return;
+    }
+    return yield* new PreparePackageError({
+      issue: `Catalog-shipped runtime path ${input.shippedPath} is missing under ${input.authoredFeatureRoot}.`,
+    });
+  });
+
+const copyHookFeature = (input: {
+  packageRoot: string;
+  preparedRoot: string;
+  sourceDirectory: string;
+  shippedPaths: ReadonlyArray<string>;
+}) =>
+  Effect.gen(function* () {
+    const fileSystem = yield* FileSystem.FileSystem;
+    const path = yield* Path.Path;
+    const compiledFeatureRoot = path.join(input.packageRoot, "dist", "src", "hooks", input.sourceDirectory);
+    const authoredFeatureRoot = path.join(input.packageRoot, "src", "hooks", input.sourceDirectory);
+    const preparedFeatureRoot = path.join(input.preparedRoot, "hooks", input.sourceDirectory);
+    if (!(yield* fileSystem.exists(compiledFeatureRoot))) {
+      return;
+    }
+
+    for (const part of ["hooks", "lib", "command"]) {
+      yield* copyTree({
+        source: path.join(compiledFeatureRoot, part),
+        destination: path.join(preparedFeatureRoot, part),
+      });
+    }
+
+    const sharedRuntimeUsers = yield* Effect.forEach(RUNTIME_IMPORT_PARTS, ({ part, runtimeImport }) =>
+      rewriteSharedLibImports({ partRoot: path.join(preparedFeatureRoot, part), runtimeImport }),
+    );
+    if (sharedRuntimeUsers.some(Boolean)) {
+      yield* copyTree({
+        source: path.join(input.packageRoot, "dist", "src", "hooks", "lib"),
+        destination: path.join(preparedFeatureRoot, "lib"),
+      });
+    }
+
+    for (const shippedPath of input.shippedPaths) {
+      const source = path.join(authoredFeatureRoot, shippedPath);
+      yield* ensureShippedRuntimeSource({ source, shippedPath, authoredFeatureRoot, packageRoot: input.packageRoot });
+      yield* copyTree({ source, destination: path.join(preparedFeatureRoot, shippedPath) });
+    }
+  });
+
+const copySkillFeature = (input: {
+  packageRoot: string;
+  preparedRoot: string;
+  sourceDirectory: string;
+  skillId: string;
+  shippedPaths: ReadonlyArray<string>;
+}) =>
+  Effect.gen(function* () {
+    const fileSystem = yield* FileSystem.FileSystem;
+    const path = yield* Path.Path;
+    const skillSourceRoot = path.join(input.packageRoot, "src", "skills", input.sourceDirectory);
+    if (!(yield* fileSystem.exists(skillSourceRoot))) {
+      return yield* new PreparePackageError({ issue: `Authored skill directory missing at ${skillSourceRoot}.` });
+    }
+
+    for (const shippedPath of input.shippedPaths) {
+      const source = path.join(skillSourceRoot, shippedPath);
+      if (!(yield* fileSystem.exists(source))) {
+        return yield* new PreparePackageError({
+          issue: `Catalog-shipped path ${shippedPath} is missing under ${skillSourceRoot}.`,
+        });
+      }
+
+      yield* copyTree({ source, destination: path.join(input.preparedRoot, "skills", input.skillId, shippedPath) });
+    }
+  });
+
+export const preparePackage = Effect.gen(function* () {
+  const fileSystem = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
+  const packageRoot = yield* findPackageRoot;
+  const compiledHooksRoot = path.join(packageRoot, "dist", "src", "hooks");
+  if (!(yield* fileSystem.exists(compiledHooksRoot))) {
+    return yield* new PreparePackageError({
+      issue: `Compiled hooks missing at ${compiledHooksRoot}. Run \`pnpm build\` before install, update, or doctor.`,
+    });
+  }
+
+  const version = yield* readPackageVersion;
+  const preparedRoot = path.join(packageRoot, "dist", "prepared");
+  yield* fileSystem.remove(preparedRoot, { recursive: true }).pipe(Effect.catchAll(() => Effect.void));
+  yield* fileSystem.makeDirectory(path.join(preparedRoot, "hooks"), { recursive: true });
+  yield* fileSystem.makeDirectory(path.join(preparedRoot, "skills"), { recursive: true });
+
+  for (const feature of featureCatalog) {
+    if (feature.runtime._tag === "hook") {
+      yield* copyHookFeature({
+        packageRoot,
+        preparedRoot,
+        sourceDirectory: feature.sourceDirectory,
+        shippedPaths: feature.runtime.shippedPaths,
+      });
+    }
+
+    if (feature.installedSkill._tag === "skill") {
+      yield* copySkillFeature({
+        packageRoot,
+        preparedRoot,
+        sourceDirectory: feature.sourceDirectory,
+        skillId: feature.installedSkill.id,
+        shippedPaths: feature.installedSkill.shippedPaths,
+      });
+    }
+  }
+
+  return { root: preparedRoot, version } satisfies PreparedPackage;
+});

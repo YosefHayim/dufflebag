@@ -1,24 +1,18 @@
-/**
- * Presentation owner for the CLI edge. Translates decoded results and terminal
- * interactions into human-readable output using official Effect platform and
- * CLI facilities. Domain modules never print.
- */
+/** The CLI's only presentation layer: every line printed and every prompt asked goes through here. */
 
 import { Prompt } from "@effect/cli";
 import { Terminal } from "@effect/platform";
 import { Effect } from "effect";
 
-const writeLine = (message: string) =>
-  Effect.gen(function* () {
-    const terminal = yield* Terminal.Terminal;
-    yield* terminal.display(`${message}\n`);
-  });
+import type { OutputFormat } from "./cliOptions.js";
 
-export const appendChatText = (message: string) =>
-  Effect.gen(function* () {
-    const terminal = yield* Terminal.Terminal;
-    yield* terminal.display(message);
-  });
+type PlanStep = { readonly label: string; readonly detail: string };
+
+export const appendChatText = (text: string) => Effect.flatMap(Terminal.Terminal, (terminal) => terminal.display(text));
+
+const writeLine = (message: string) => appendChatText(`${message}\n`);
+
+export const isInteractiveTerminal = Effect.flatMap(Terminal.Terminal, (terminal) => terminal.isTTY);
 
 export const intro = (title: string) => writeLine(`\n  dufflebag · ${title}\n`);
 
@@ -42,31 +36,26 @@ export const note = (message: string, title?: string) =>
       yield* writeLine(`\n  ${title}`);
       yield* writeLine(`  ${"─".repeat(Math.min(title.length, 40))}`);
     }
-
-    // Emit each note line under a consistent indent.
     for (const line of message.split("\n")) {
       yield* writeLine(`  ${line}`);
     }
   });
 
-export const presentError = (error: unknown) =>
-  Effect.gen(function* () {
-    const message = error instanceof Error ? error.message : String(error);
-    yield* fail(message);
-  });
+export const showError = (error: unknown) => fail(error instanceof Error ? error.message : String(error));
 
+export const cancelled = outro("Cancelled — nothing was changed.");
+
+export const showCancelled = (request: { readonly format: OutputFormat; readonly scope: string }) =>
+  request.format === "json" ? json({ _tag: "cancelled", scope: request.scope }) : cancelled;
+
+// Every prompt answers with its fallback when there is no terminal, so non-TTY runs never block.
 export const confirm = (input: { message: string; initialValue: boolean }) =>
   Effect.gen(function* () {
-    const terminal = yield* Terminal.Terminal;
-    const isTTY = yield* terminal.isTTY;
-    if (!isTTY) {
+    if (!(yield* isInteractiveTerminal)) {
       return input.initialValue;
     }
 
-    return yield* Prompt.confirm({
-      message: input.message,
-      initial: input.initialValue,
-    }).pipe(Prompt.run);
+    return yield* Prompt.run(Prompt.confirm({ message: input.message, initial: input.initialValue }));
   });
 
 export const selectOne = <Value>(input: {
@@ -75,25 +64,16 @@ export const selectOne = <Value>(input: {
   initial?: Value;
 }) =>
   Effect.gen(function* () {
-    const terminal = yield* Terminal.Terminal;
-    const isTTY = yield* terminal.isTTY;
-    if (!isTTY) {
-      const fallback = input.initial === undefined ? input.choices.at(0)?.value : input.initial;
-      if (fallback === undefined) {
-        return yield* Effect.fail(new Error("No choices available for non-interactive select."));
-      }
-
-      return fallback;
+    if (yield* isInteractiveTerminal) {
+      return yield* Prompt.run(Prompt.select({ message: input.message, choices: input.choices }));
     }
 
-    return yield* Prompt.select({
-      message: input.message,
-      choices: input.choices.map((choice) => ({
-        title: choice.title,
-        value: choice.value,
-        description: choice.description,
-      })),
-    }).pipe(Prompt.run);
+    const fallback = input.initial === undefined ? input.choices.at(0)?.value : input.initial;
+    if (fallback === undefined) {
+      return yield* Effect.fail(new Error("No choices available for non-interactive select."));
+    }
+
+    return fallback;
   });
 
 export const multiSelect = <Value>(input: {
@@ -102,72 +82,38 @@ export const multiSelect = <Value>(input: {
   initial: ReadonlyArray<Value>;
 }) =>
   Effect.gen(function* () {
-    const terminal = yield* Terminal.Terminal;
-    const isTTY = yield* terminal.isTTY;
-    if (!isTTY) {
+    if (!(yield* isInteractiveTerminal)) {
       return [...input.initial];
     }
 
-    const selected = yield* Prompt.multiSelect({
-      message: input.message,
-      choices: input.choices.map((choice) => ({
-        title: choice.title,
-        value: choice.value,
-        description: choice.description,
-        selected: choice.selected,
-      })),
-    }).pipe(Prompt.run);
-
+    const selected = yield* Prompt.run(Prompt.multiSelect({ message: input.message, choices: input.choices }));
     return selected.length > 0 ? selected : [...input.initial];
-  });
-
-export const isInteractiveTerminal = () =>
-  Effect.gen(function* () {
-    const terminal = yield* Terminal.Terminal;
-    return yield* terminal.isTTY;
   });
 
 export const optionalText = (input: { message: string; fallback: string }) =>
   Effect.gen(function* () {
-    const terminal = yield* Terminal.Terminal;
-    const isTTY = yield* terminal.isTTY;
-    if (!isTTY) {
+    if (!(yield* isInteractiveTerminal)) {
       return input.fallback;
     }
 
-    const value = yield* Prompt.text({
-      message: input.message,
-      default: input.fallback,
-    }).pipe(Prompt.run);
-
-    return value.trim() === "" ? input.fallback : value.trim();
+    const value = (yield* Prompt.run(Prompt.text({ message: input.message, default: input.fallback }))).trim();
+    return value === "" ? input.fallback : value;
   });
 
-/** Numbered lines for a review-before-apply plan (pure; easy to unit-test). */
-export const formatOrderedFlow = (
-  steps: ReadonlyArray<{ readonly label: string; readonly detail: string }>,
-): ReadonlyArray<string> => steps.map((step, index) => `${String(index + 1)}. ${step.label}: ${step.detail}`);
+export const formatPlan = (steps: ReadonlyArray<PlanStep>): ReadonlyArray<string> =>
+  steps.map((planStep, index) => `${String(index + 1)}. ${planStep.label}: ${planStep.detail}`);
 
-/** Print an ordered plan so the user can review intent before mutation. */
-export const presentOrderedFlow = (input: {
-  readonly title: string;
-  readonly steps: ReadonlyArray<{ readonly label: string; readonly detail: string }>;
-}) => note(formatOrderedFlow(input.steps).join("\n"), input.title);
+export const showPlan = (input: { readonly title: string; readonly steps: ReadonlyArray<PlanStep> }) =>
+  note(formatPlan(input.steps).join("\n"), input.title);
 
-/**
- * Show an ordered flow and require explicit confirmation before apply.
- * Non-TTY uses `initialValue` without prompting (same fail-safe as confirm).
- */
-export const approveOrderedFlow = (input: {
+/** Show the numbered plan and ask before applying it; a non-TTY run answers `initialValue` (default no). */
+export const confirmPlan = (input: {
   readonly title: string;
-  readonly steps: ReadonlyArray<{ readonly label: string; readonly detail: string }>;
+  readonly steps: ReadonlyArray<PlanStep>;
   readonly confirmMessage: string;
   readonly initialValue?: boolean;
 }) =>
   Effect.gen(function* () {
-    yield* presentOrderedFlow({ title: input.title, steps: input.steps });
-    return yield* confirm({
-      message: input.confirmMessage,
-      initialValue: input.initialValue === undefined ? false : input.initialValue,
-    });
+    yield* showPlan(input);
+    return yield* confirm({ message: input.confirmMessage, initialValue: input.initialValue === true });
   });

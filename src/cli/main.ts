@@ -1,70 +1,35 @@
 #!/usr/bin/env node
-/**
- * dufflebag CLI entry point — single Effect runtime edge.
- *
- * Only this file may call NodeRuntime.runMain / Effect.run*.
- */
+/** dufflebag CLI entry point: the only file that starts the Effect runtime. */
 
-import { readFileSync, realpathSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { realpathSync } from "node:fs";
+import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { CliConfig, Command, ValidationError } from "@effect/cli";
 import { NodeContext, NodeRuntime } from "@effect/platform-node";
 import { Effect, ParseResult } from "effect";
 
+import { readPackageVersion } from "../install/packageRoot.js";
 import { catalogCommand } from "./catalogCommand.js";
+import { CliUsageError } from "./cliOptions.js";
 import { configCommand } from "./configCommand.js";
-import { dedupCommand } from "./dedupCheckCommand.js";
 import { doctorCommand } from "./doctorCommand.js";
+import { duplicatesCommand } from "./duplicatesCommand.js";
 import { freeProviderCommand } from "./freeProviderCommand.js";
 import { installCommand } from "./installCommand.js";
 import { menuCommand } from "./menuCommand.js";
 import { openRouterCommand } from "./openRouterCommand.js";
-import { workflowCommand } from "./scaffoldWorkflowsCommand.js";
-import { CliUsageError } from "./scopeOptions.js";
+import { sttCommand } from "./sttCommand.js";
 import * as TerminalUI from "./TerminalUI.js";
+import { ttsCommand } from "./ttsCommand.js";
 import { uninstallCommand } from "./uninstallCommand.js";
 import { updateCommand } from "./updateCommand.js";
-import { sttCommand, ttsCommand, voiceCommand } from "./voiceCommand.js";
-
-// An unreadable or malformed package.json is indistinguishable from an absent
-// one here: both mean "keep walking up", so both surface as undefined.
-const declaredPackageVersion = (directory: string): string | undefined => {
-  try {
-    const parsed: unknown = JSON.parse(readFileSync(join(directory, "package.json"), "utf8"));
-    return typeof parsed === "object" && parsed !== null && "version" in parsed && typeof parsed.version === "string"
-      ? parsed.version
-      : "0.0.0";
-  } catch {
-    return undefined;
-  }
-};
-
-const readPackageVersion = (): string => {
-  let directory = dirname(fileURLToPath(import.meta.url));
-
-  // Walk toward the filesystem root until package.json is found.
-  while (true) {
-    const declared = declaredPackageVersion(directory);
-    if (declared !== undefined) {
-      return declared;
-    }
-
-    const parent = dirname(directory);
-    if (parent === directory) {
-      return "0.0.0";
-    }
-
-    directory = parent;
-  }
-};
-
-const VERSION = readPackageVersion();
+import { voiceCommand } from "./voiceCommand.js";
+import { workflowCommand } from "./workflowCommand.js";
 
 const dufflebag = Command.make("dufflebag").pipe(
   Command.withDescription(
-    "Install a personal bag of AI coding-agent skills, hooks, natural voice, and copyable workflows.",
+    "Install a personal set of AI coding-agent skills, hooks, natural voice, and copyable workflows.",
   ),
   Command.withSubcommands([
     installCommand,
@@ -74,7 +39,7 @@ const dufflebag = Command.make("dufflebag").pipe(
     catalogCommand,
     configCommand,
     doctorCommand,
-    dedupCommand,
+    duplicatesCommand,
     workflowCommand,
     sttCommand,
     ttsCommand,
@@ -84,17 +49,12 @@ const dufflebag = Command.make("dufflebag").pipe(
   ]),
 );
 
-const cli = Command.run(dufflebag, {
-  name: "dufflebag",
-  version: VERSION,
-});
-
-const presentCliFailure = (error: unknown) => {
+const showCliFailure = (error: unknown) => {
   const exitCode =
     ValidationError.isValidationError(error) || ParseResult.isParseError(error) || error instanceof CliUsageError
       ? 2
       : 1;
-  const presentation = ValidationError.isValidationError(error) ? Effect.void : TerminalUI.presentError(error);
+  const presentation = ValidationError.isValidationError(error) ? Effect.void : TerminalUI.showError(error);
   return presentation.pipe(
     Effect.zipRight(
       Effect.sync(() => {
@@ -104,10 +64,12 @@ const presentCliFailure = (error: unknown) => {
   );
 };
 
-const program = Effect.gen(function* () {
-  const bareInvocation = process.argv.length <= 2;
+export const isBareArgv = (argv: ReadonlyArray<string>): boolean => argv.length <= 2;
 
-  if (bareInvocation) {
+const program = Effect.gen(function* () {
+  const cli = Command.run(dufflebag, { name: "dufflebag", version: yield* readPackageVersion });
+
+  if (isBareArgv(process.argv)) {
     yield* cli(["node", "dufflebag", "--help"]);
     return;
   }
@@ -115,7 +77,7 @@ const program = Effect.gen(function* () {
   const invocationArguments = process.argv[2] === "-V" ? ["node", "dufflebag", "--version"] : process.argv;
   yield* cli(invocationArguments);
 }).pipe(
-  Effect.catchAll(presentCliFailure),
+  Effect.catchAll(showCliFailure),
   Effect.onInterrupt(() =>
     Effect.sync(() => {
       process.exitCode = 130;
@@ -125,25 +87,20 @@ const program = Effect.gen(function* () {
   Effect.provide(CliConfig.layer({ showBuiltIns: false })),
 );
 
-// Exported for tests that exercise request assembly without starting the runtime.
-export { cli, dufflebag, VERSION };
-
-export const isBareArgv = (argv: ReadonlyArray<string>): boolean => argv.length <= 2;
-
 const thisFile = fileURLToPath(import.meta.url);
 const invoked = process.argv[1] === undefined ? undefined : resolve(process.argv[1]);
-// e.g. ".../main.ts" → ".../main.js" so tsx and compiled entry compare equal
+// tsx runs main.ts while the build runs main.js, so both spellings count as this file.
 let isDirectRun = invoked === thisFile || invoked === thisFile.replace(/\.ts$/, ".js");
 if (!isDirectRun && invoked !== undefined) {
   try {
-    // npm bin is a symlink into node_modules; realpath makes argv match import.meta.url
+    // The npm bin is a symlink into node_modules; realpath makes argv match import.meta.url.
     isDirectRun = realpathSync(invoked) === thisFile;
   } catch {
-    // ignore missing/unreadable argv path
+    // An unreadable argv path is simply not this file.
   }
 }
 
-// Single runtime edge for the main application package — only when invoked as the entrypoint.
+// Tests import this module for isBareArgv, so the runtime starts only when it is the entry point.
 if (isDirectRun) {
   NodeRuntime.runMain(program);
 }

@@ -1,0 +1,60 @@
+name: CI
+
+# One install and one `pnpm verify` run cover the repository's complete gate.
+# Copied by `dufflebag workflow scaffold`; customize this copy when the project
+# needs an additional runtime or service.
+#
+# REQUIRED package.json script:
+#   "verify": the complete formatting, typecheck, test, build, and repo gate.
+#
+# BRANCH PROTECTION:
+#   Require the "CI Gate" status check before merging.
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main, dev]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: CI Gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify
+        run: pnpm verify
+
+  report-failure:
+    name: Open issue on main failure
+    needs: verify
+    if: failure() && github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      issues: write
+      actions: read
+    uses: ./.github/workflows/report-failure.yml
