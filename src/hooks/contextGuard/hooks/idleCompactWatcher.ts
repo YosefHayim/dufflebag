@@ -3,12 +3,11 @@
 
 import { closeSync, existsSync, openSync, writeSync } from "node:fs";
 import { setTimeout as sleep } from "node:timers/promises";
-
+import { isProcessAlive } from "../../lib/processAlive.js";
 import { sendTerminalInput, terminalExists } from "../lib/ghosttyTerminal.js";
 import { decideIdleCompactAction, type IdleCompactAction, type IdleCompactPhase } from "../lib/idleCompactDecision.js";
 import { decodeIdleCompactSessionState, type IdleCompactSessionState } from "../lib/idleCompactSession.js";
 import { withKeystrokeLock } from "../lib/keystrokeLock.js";
-import { isProcessAlive } from "../lib/processAlive.js";
 import { KILL_SWITCH, readJson, remove, writeJsonAtomic } from "../lib/stateFiles.js";
 
 const POLL_MS = 500;

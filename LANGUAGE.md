@@ -100,6 +100,14 @@ _Avoid_: "duplicate checker".
 Guard that denies agent writes into system temporary folders and deletes an ended Claude Code session's own scratch folder. Code names say "scratch" because `temp`/`tmp` are forbidden name tokens.
 _Avoid_: "temp guard", "tmp hook".
 
+**session-rehome**
+Feature that moves an ended Claude Code session or Codex thread into the local repo its work was about, so that repo's `/resume` or `codex resume` lists it. "Rehome" is the verb for that move; a session's **home** is the folder its agent lists it under.
+_Avoid_: "migrate", "relocate" (Claude Code's own word for its worktree moves).
+
+**ledger**
+session-rehome's append-only record of every decision (moved, stayed, uncertain, no-signal, deleted, conflict); the newest line for a session wins.
+_Avoid_: "log", "history" (Claude Code's `history.jsonl` is a different file).
+
 **autorun**
 Feature and skill that arms the context-guard autorun watcher for hands-free compact/resume (`stop`/`exit` verbs). Its hook code is owned by **context-guard**.
 _Avoid_: "auto-compact", "autopilot".

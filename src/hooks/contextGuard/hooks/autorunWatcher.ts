@@ -8,11 +8,11 @@ import path from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 
 import { readConfig } from "../../lib/hookConfig.js";
+import { isProcessAlive } from "../../lib/processAlive.js";
 import { decodeTranscriptLine, readTranscriptTail, type TranscriptEntry } from "../../lib/transcriptReader.js";
 import { appleScriptString, runAppleScript } from "../lib/appleScript.js";
 import { decideAutorunStep } from "../lib/autorunDecision.js";
 import { withKeystrokeLock } from "../lib/keystrokeLock.js";
-import { isProcessAlive } from "../lib/processAlive.js";
 import { findTranscriptForSession, readContextUsage, windowFor } from "../lib/sessionTranscript.js";
 import {
   AUTORUN_STATE_DIR,
