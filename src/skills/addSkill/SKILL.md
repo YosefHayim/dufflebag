@@ -52,7 +52,7 @@ Then stop. On changes, revise and show the proposal again. Continue only on a cl
 
 ### 6. Write
 
-Create branch `feat/<id>` from the default branch, then follow [REFERENCE.md → Registration checklist](REFERENCE.md#registration-checklist): the skill files, the catalog entry, the three test lists, the `which-skill` routing row, sibling "For X, use <id>" lines, and `pnpm generate-readme`.
+Create branch `feat/<id>` from the default branch, then follow [REFERENCE.md → Registration checklist](REFERENCE.md#registration-checklist): the skill files, the catalog entry, the catalog test lists, the `which-skill` routing row, sibling "For X, use <id>" lines, and `pnpm generate-readme`.
 
 ### 7. Check
 

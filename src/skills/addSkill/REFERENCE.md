@@ -78,7 +78,8 @@ All paths are in the dufflebag repo. Put the new skill next to related skills an
    }),
    ```
 
-3. **Catalog tests** — `src/catalog/featureCatalog.test.ts` has three lists in catalog order: `expectedFeatureIds` (add `"<id>"`), `expectedSourceDirectories` (add `"<sourceDirectory>"`), and the shipped-paths list in "derives defaults, installed skills, and exact shipped allowlists" (add `["<id>", [<shippedPaths>]]`).
+3. **Catalog tests** — `src/catalog/featureCatalog.test.ts` has three lists in catalog order: `expectedFeatureIds` (add `"<id>"`), `expectedSourceDirectories` (add `"<sourceDirectory>"`), and the shipped-paths list in "derives defaults, installed skills, and exact shipped allowlists" (add `["<id>", [<shippedPaths>]]`). With `dependencies`, also add `["<id>", [<dependencies>]]` to the list in "expands dependencies once and returns stable catalog order".
+   A skill that writes run records under `docs/agent/<id>/` also gets a row in the "agent run folder isolation" list of `src/skills/skills.test.ts` and in the `which-skill` REFERENCE "Agent artifact paths" table.
 4. **Routing** — a row in the fitting table of `src/skills/whichSkill/REFERENCE.md`: the user's phrases → `` `<id>` ``.
 5. **Siblings** — when the new skill takes work from a sibling, add "For …, use <id>." to that sibling's description.
 6. **README** — run `pnpm generate-readme`. Never edit the generated sections by hand.
