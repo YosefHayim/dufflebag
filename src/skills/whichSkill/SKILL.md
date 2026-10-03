@@ -10,7 +10,7 @@ You are a **dispatcher**, not a second implementation of every skill, and **not 
 
 Turn messy freeform (typing or dictation) into a **ready agent prompt** that reuses existing skills.
 
-Default: **reuse existing skills**. Only suggest creating a new skill when the job is repeated, stable, and not covered (then `save-as-skill` / `improve-skill`).
+Default: **reuse existing skills**. Only suggest creating a new skill when the job is repeated, stable, and not covered (then `add-skill` / `save-as-skill` / `improve-skill`).
 
 ## How this should feel (product contract)
 
@@ -65,6 +65,7 @@ Keep user wording. Note workspace if known. Strip secrets from logs, not from th
 | Cloudflare ops | wrangler, D1 (not prove live) | `manage-cloudflare` |
 | Session skill mining | repeated prompts | `find-repeated-prompts` |
 | Fix a skill | skill misfired | `improve-skill` |
+| New skill | add a skill, make a skill that… | `add-skill` |
 | Bench A vs B | tokens, turns, same tasks | `benchmark-agents` |
 | Unsure / voice dump | which skill | this skill → then primary |
 
@@ -106,7 +107,7 @@ If they only asked which skill / refine for later: short card + refined string. 
 
 ### 7. New skill?
 
-Only if repeated, stable, and uncovered → `save-as-skill` or `improve-skill`. Else keep `which-skill` + primary.
+Only if repeated, stable, and uncovered → `add-skill` (from a description), `save-as-skill` (from what we just did), or `improve-skill` (fix an existing one). Else keep `which-skill` + primary.
 
 ## Verification
 

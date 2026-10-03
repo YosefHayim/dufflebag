@@ -26,7 +26,7 @@ Convert a proven task into the smallest repo-owned reusable asset that can repro
    - a template for repeated file shape;
    - an automated test for repeatable product behavior;
    - a runbook for human-controlled operational steps;
-   - an agent skill for judgment-heavy workflows with recognizable triggers.
+   - an agent skill for judgment-heavy workflows with recognizable triggers. In the dufflebag repo, continue with `add-skill` from its proposal step so the skill is registered, checked, and installed.
 5. Define one documented invocation, inputs, outputs, prerequisites, credential mechanism, side effects, idempotency/retry behavior, validation, cleanup, and recovery.
 6. Implement only the proven happy path plus concrete observed failures. Produce actionable errors for missing or invalid inputs.
 7. Run from a fresh shell, clean checkout, isolated temp directory, new browser profile, or equivalent clean state. Do not rely on services or auth left over from the original run.

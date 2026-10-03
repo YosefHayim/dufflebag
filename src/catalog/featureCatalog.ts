@@ -771,6 +771,14 @@ export const featureCatalog = Schema.decodeUnknownSync(featureCatalogSchema, { o
     dependencies: ["run-tasks-in-parallel", "finish-and-push", "organize-commits"],
   }),
   skillFeature({
+    id: "add-skill",
+    sourceDirectory: "addSkill",
+    title: "Add skill",
+    summary:
+      "Describe a new skill and answer its questions; it shows the whole skill for approval, then adds, checks, and installs it.",
+    shippedPaths: ["SKILL.md", "REFERENCE.md"],
+  }),
+  skillFeature({
     id: "improve-skill",
     sourceDirectory: "improveSkill",
     title: "Improve skill",

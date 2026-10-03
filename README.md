@@ -325,6 +325,7 @@ Every copied skill also has a new plain name; [What it installs](#what-it-instal
 | **clone-all-repos** | Clone or update all your GitHub repos into your Code folder and report what changed. | 🟢 any OS |
 | **manage-cloudflare** | Set up and fix Cloudflare — wrangler config, D1, KV, R2, Workers and Pages projects, and secrets. | 🟢 any OS |
 | **clean-repo-by-feature** | Back up main, then clean a messy project with one agent and one branch per feature, and open one PR per feature for you to review. | 🟢 any OS |
+| **add-skill** | Describe a new skill and answer its questions; it shows the whole skill for approval, then adds, checks, and installs it. | 🟢 any OS |
 | **improve-skill** | Change an existing skill based on feedback or on what went wrong in a real session. | 🟢 any OS |
 | **which-skill** | Not sure which skill to use? It turns your request into a short plan with the right skills and a ready prompt. | 🟢 any OS |
 | **benchmark-agents** | Run the same tasks with different agents, skills, or tools and compare tokens, time, cost, and success. | 🟢 any OS |
