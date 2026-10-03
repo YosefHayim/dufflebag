@@ -25,7 +25,7 @@ Return only this table, one row per finding, no prose. If nothing is found, retu
 | file:line | kind | name | what it really does (evidence: quote, tool output, or count) |
 ```
 
-Doc scout:
+Doc scout (one per framework; this one is for Expo, and the Worker and React get their own):
 
 ```text
 You are a read-only scout for restructure-repo, step 3 (Official docs).
@@ -58,7 +58,7 @@ Card:
 > 2. Delete the files; review the deps in phase 5.
 > 3. Keep everything.
 
-Table:
+Table (first 2 of 7 rows; `PLAN.md` gets all 7):
 
 | Remove | Kind | Evidence | Source |
 |---|---|---|---|

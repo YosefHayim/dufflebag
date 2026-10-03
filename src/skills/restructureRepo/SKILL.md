@@ -21,7 +21,7 @@ Measure every finding against these, in order:
 ## Safety
 
 - Never commit on main or the default branch. Stop if tracked files have uncommitted changes.
-- Change no tracked file until the user approves a phase. Before that, write only the run folder.
+- Change no tracked file until the user approves a phase or an offered hand-off. Before that, write only the run folder.
 - At the first approved change, create `refactor/<goal>` in this checkout: 2–4 words that say why, no date (`refactor/split-app-and-api`).
 - Move files with `git mv`. Make one commit per phase, or one per app or package when a phase is large.
 - Keep behavior. A change to an API response, route, env var, or public export gets its own question.
@@ -54,12 +54,13 @@ Copy this checklist into `$RUN/PLAN.md` and tick it as you go:
 - [ ] 2. Read
 - [ ] 3. Official docs
 - [ ] 4. Baseline
-- [ ] Phase 1: Dead weight
-- [ ] Phase 2: Structure
-- [ ] Phase 3: Code
-- [ ] Phase 4: Names
-- [ ] Phase 5: Deps
-- [ ] Phase 6: Best practices
+- 5. Phases
+  - [ ] Phase 1: Dead weight
+  - [ ] Phase 2: Structure
+  - [ ] Phase 3: Code
+  - [ ] Phase 4: Names
+  - [ ] Phase 5: Deps
+  - [ ] Phase 6: Best practices
 - [ ] 6. Wrap up
 ```
 
@@ -70,7 +71,7 @@ Find the models this host offers right now, as [REFERENCE.md → Scout models](R
 Ask one card before any scout runs:
 
 - **Scout model:** the fastest, cheapest model the host offers first, marked `(Recommended)`, then the stronger ones, each with its cost and care trade-off. The main agent stays on the session model.
-- **Resume:** only when `docs/agent/restructure-repo/CURRENT` exists; resume from the first unticked line of its `PLAN.md`.
+- **Resume:** only when `docs/agent/restructure-repo/CURRENT` points to a `PLAN.md` with unticked lines; resume from the first one.
 
 Otherwise start a run, and write the picked models to `PLAN.md`:
 
@@ -93,7 +94,7 @@ For each framework and main library from step 2, a scout fetches its structure, 
 
 ### 4. Baseline
 
-Run typecheck, lint, build, and tests, and start each app. Write each command and result to `PLAN.md`. If tests are thin, say so, offer `find-missing-tests`, and continue.
+Run typecheck, lint, build, and tests. Start each app in the background, wait until it is ready or 2 minutes pass, then stop it. Write each command and result to `PLAN.md`. If tests are thin, say so, offer `find-missing-tests`, and continue.
 
 ### 5. Phases
 
@@ -120,7 +121,7 @@ The order is delete, move, rewrite, then name, so each phase leaves less work fo
 
 ### 6. Wrap up
 
-- Add a short "Project structure" section to `README.md`. Update the `AGENTS.md` layout table when there is one, or offer `update-agent-docs`.
+- Show a short "Project structure" section for `README.md`, and the `AGENTS.md` layout table change when there is one (or offer `update-agent-docs`). Apply them after approval in one `docs:` commit.
 - When the repo has no `CODE-STYLE.md`, offer `code-style-existing-project` to record the decisions.
 - Push and open a PR only when the user asks, through `finish-and-push`.
 
