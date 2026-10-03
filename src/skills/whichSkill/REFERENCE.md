@@ -50,6 +50,7 @@ Use this as a quick lookup. Prefer **one primary** skill.
 | scan sessions for repeated work | `find-repeated-prompts` |
 | bench skill A vs B | `benchmark-agents` |
 | turn what we just did into a skill | `save-as-skill` |
+| add a new skill / make a skill that… / new skill from a description | `add-skill` |
 | sync skills to all agents | `install-skills` |
 
 ## Repo / platform utilities
