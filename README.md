@@ -320,6 +320,7 @@ Every copied skill also has a new plain name; [What it installs](#what-it-instal
 | **find-missing-tests** | Find the tests each feature is missing (unit, mocks, integration, e2e), then write them test-first. | 🟢 any OS |
 | **ship-missing-tests** | Find missing tests in many features, fill them in parallel branches, and merge to main after checks. | 🟢 any OS |
 | **simplify-repo-with-tests** | Find over-engineering across the repo, simplify it, and use tests to prove the behavior did not change. | 🟢 any OS |
+| **restructure-repo** | Clean a whole repo — folders, names, code, and deps — against its own docs and the official docs of every framework it uses, one approved phase at a time on a branch. | 🟢 any OS |
 | **improve-ux** | Make user flows easier (fewer clicks, better layout, forms, mobile). Shows before/after designs first, then builds the one you pick. | 🟢 any OS |
 | **free-ports** | Stop local servers that block ports (keeps Metro on 8081) so you can start dev again. | 🟢 any OS |
 | **clone-all-repos** | Clone or update all your GitHub repos into your Code folder and report what changed. | 🟢 any OS |
@@ -341,7 +342,7 @@ These skills ship with dufflebag for convenience — installable the same way (`
 
 | Skill | What it does | By |
 | --- | --- | --- |
-| **make-code-readable** | Use when you want code that is easier to read — clearer names, order, files, and functions. It shows before and after, and changes code only after you approve. Say "make this readable", "rename for clarity", or "clean this up". To remove extra layers, use simplify-code. | [Mike Cann](https://github.com/mikecann/agent-skills) (upstream name: `deslop`) |
+| **make-code-readable** | Use when you want code that is easier to read — clearer names, order, files, and functions. It shows before and after, and changes code only after you approve. Say "make this readable", "rename for clarity", or "clean this up". To remove extra layers, use simplify-code. For a whole repo, use restructure-repo. | [Mike Cann](https://github.com/mikecann/agent-skills) (upstream name: `deslop`) |
 | **question-my-plan** | Use when you want the agent to ask you hard questions about your plan until you both understand it the same way. Say "grill me", "question my plan", or "stress-test this plan". | [Matt Pocock](https://github.com/mattpocock/skills) (upstream name: `grill-me`) |
 | **question-plan-with-docs** | Use when you want your plan checked against the project docs and past decisions. It asks hard questions, makes the words clear, and updates the project docs as you decide. Say "grill me with docs" or "check my plan against the docs". | [Matt Pocock](https://github.com/mattpocock/skills) (upstream name: `grill-with-docs`) |
 

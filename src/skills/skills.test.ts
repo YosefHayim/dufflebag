@@ -116,6 +116,7 @@ describe("agent run folder isolation", () => {
     ["findMissingTests", "find-missing-tests"],
     ["shipMissingTests", "ship-missing-tests"],
     ["simplifyRepoWithTests", "simplify-repo-with-tests"],
+    ["restructureRepo", "restructure-repo"],
     ["cleanRepoByFeature", "clean-repo-by-feature"],
     ["improveUx", "improve-ux"],
     ["codeStyleExistingProject", "code-style-existing-project"],
