@@ -732,6 +732,15 @@ export const featureCatalog = Schema.decodeUnknownSync(featureCatalogSchema, { o
     ],
   }),
   skillFeature({
+    id: "restructure-repo",
+    sourceDirectory: "restructureRepo",
+    title: "Restructure repo",
+    summary:
+      "Clean a whole repo — folders, names, code, and deps — against its own docs and the official docs of every framework it uses, one approved phase at a time on a branch.",
+    shippedPaths: ["SKILL.md", "REFERENCE.md", "EXAMPLES.md"],
+    dependencies: ["make-code-readable", "simplify-code"],
+  }),
+  skillFeature({
     id: "improve-ux",
     sourceDirectory: "improveUx",
     title: "Improve UX",

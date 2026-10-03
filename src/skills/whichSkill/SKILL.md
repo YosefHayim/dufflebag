@@ -59,6 +59,7 @@ Keep user wording. Note workspace if known. Strip secrets from logs, not from th
 | Local UI prove | launch local, playwright, don’t deploy | `run-local-and-check` |
 | Prod live prove | redeploy, is live, curl | `deploy-and-check` |
 | Lean / ceremony | deslop, AI slop, ban payload | `simplify-code` |
+| Whole-repo restructure | folders, names, deps, official docs | `restructure-repo` |
 | Style system (existing code) | CODE-STYLE, grill with docs | `code-style-existing-project` |
 | Kill ports | free ports, metro 8081 | `free-ports` |
 | Bootstrap Code folder | clone all GH repos | `clone-all-repos` |

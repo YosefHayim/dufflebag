@@ -25,6 +25,7 @@ Use this as a quick lookup. Prefer **one primary** skill.
 | deslop, AI slop, kill ceremony, ban payload/result (local/scope) | `simplify-code` |
 | identify over-engineering whole repo, prove lean, fewer files/LOC same behavior | `simplify-repo-with-tests` |
 | make readable / rename for clarity | `make-code-readable` |
+| restructure whole repo / better project structure / rename across the codebase / which deps do we not need | `restructure-repo` |
 | CODE-STYLE grill or compliance audit on existing repo | `code-style-existing-project` (grill vs audit mode) |
 | brand-new empty project style | `code-style-new-project` |
 | teach stack choices | `explain-my-stack` |
@@ -78,6 +79,7 @@ Campaign / audit MD is **not** product SSOT. Skills must write under **`docs/age
 | find-missing-tests | `docs/agent/find-missing-tests/<run-id>/` |
 | ship-missing-tests | `docs/agent/ship-missing-tests/<run-id>/` |
 | simplify-repo-with-tests | `docs/agent/simplify-repo-with-tests/<run-id>/` |
+| restructure-repo | `docs/agent/restructure-repo/<run-id>/` |
 | code-style-existing-project | `docs/agent/code-style-existing-project/<run-id>/` |
 | clean-repo-by-feature | `docs/agent/clean-repo-by-feature/<run-id>/` |
 | improve-ux | `docs/agent/improve-ux/<run-id>/` |
