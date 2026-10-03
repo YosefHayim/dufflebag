@@ -12,7 +12,7 @@ Turn a description into a working, installed skill. The user describes it; you a
 
 - Write no files, create no branch, and run no install until the user approves the proposal in step 5. Reading and exploring are fine.
 - Do not add a skill that repeats an existing one. When an existing skill covers most of the request, recommend `improve-skill` instead.
-- Work on a topic branch `feat/<id>`, never on main or the default branch.
+- Work on a topic branch `feat/<id>`, never on main or the default branch. Stop if tracked files have uncommitted changes or the skill's directory already exists.
 - Never put secrets, tokens, account IDs, absolute home paths, or customer data in a skill.
 - Give the new skill its own gates: a skill that deploys, deletes, merges, sends messages, or spends money must ask first in its Safety section.
 - Never run `dufflebag install <id>` alone over an existing install: explicit IDs replace the installed selection and remove every other feature. Use the install command in [REFERENCE.md → Install](REFERENCE.md#install).
@@ -26,7 +26,7 @@ Quote the user's description word for word. In the dufflebag repo (`src/catalog/
 
 ### 2. Check for overlap
 
-Read the frontmatter `description` of every skill (`src/skills/*/SKILL.md` in dufflebag, the installed skills under `~/.claude/skills/` elsewhere).
+Read the frontmatter `description` of every skill (`src/skills/*/SKILL.md` in dufflebag; elsewhere, the skills under `~/.claude/skills/` and the project's `.claude/skills/`).
 
 - One skill already covers most of the request → name it and what is missing, recommend `improve-skill`, and stop unless the user still wants a new skill.
 - Two skills each cover a part → name both and the gap; the new skill covers only the gap and hands off to them.
@@ -60,9 +60,9 @@ Run `pnpm vitest run src/skills/skills.test.ts src/catalog/featureCatalog.test.t
 
 ### 8. Install and try it
 
-Install with the command in [REFERENCE.md → Install](REFERENCE.md#install) and confirm `~/.claude/skills/<id>/SKILL.md` exists. Tell the user to start a new session so the agent loads it.
+First test 3–5 of the user's own phrases against the new description and its closest siblings: would each phrase load this skill, and not a sibling? When one would not, fix the description and run step 7 again.
 
-Then test 3–5 of the user's own phrases against the new description and its closest siblings: would each phrase load this skill, and not a sibling? Fix the description when one would not.
+Then install with the command in [REFERENCE.md → Install](REFERENCE.md#install) and confirm the installed `SKILL.md` exists: `~/.claude/skills/<id>/` for a global install, `.claude/skills/<id>/` for a project install. Tell the user to start a new session so the agent loads it.
 
 ### Outside dufflebag
 
@@ -72,11 +72,12 @@ Run steps 1–5 the same way; in the step 4 card also ask where it lives: `.clau
 
 Report:
 
-- skill id, source path, and branch;
+- skill id and source path;
 - the approved proposal and any change made after approval;
 - files changed;
-- the two test commands and `pnpm verify`, with results;
-- the install path, and each tried phrase → which skill it loads;
+- each tried phrase → which skill it loads;
 - one sentence the user can say to try the skill now.
 
-The skill is not done until the checks pass and the installed `SKILL.md` exists.
+In dufflebag, also report the branch, the two test commands and `pnpm verify` with results, and the install path. The skill is done when the checks pass and the installed `SKILL.md` exists.
+
+Outside dufflebag, report the chosen location. The skill is done when its `SKILL.md` exists there.

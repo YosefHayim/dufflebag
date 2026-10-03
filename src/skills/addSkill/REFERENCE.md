@@ -30,10 +30,10 @@ Fill this in and show it before writing anything.
 | Field | Value |
 |---|---|
 | id / `name` | <kebab-case> |
-| sourceDirectory | src/skills/<camelCase>/ |
+| sourceDirectory | <camelCase> (the folder name under `src/skills/`) |
 | title | <Title case, 2–4 words> |
 | summary | <one sentence for the README table> |
-| type | flow (repeated workflow with gates) or none (short instruction) |
+| type | flow (repeated workflow with gates), or omitted (short instruction) |
 | shippedPaths | SKILL.md[, REFERENCE.md, scripts, templates] |
 | dependencies | <catalog ids it needs installed, or none> |
 | platform | any / macos / macos+ghostty |
@@ -98,4 +98,4 @@ fi
 ls ~/.claude/skills/<id>/SKILL.md
 ```
 
-For a project install, add `--scope project` and use `.claude/dufflebag/receipt.json` in the repo.
+For a project install, run the same commands from the target repo: set `receipt=.claude/dufflebag/receipt.json`, replace `pnpm cli` with `node <dufflebag repo>/dist/src/cli/main.js` (the project is the current folder), add `--scope project` to both `install` lines, and check `.claude/skills/<id>/SKILL.md`.
